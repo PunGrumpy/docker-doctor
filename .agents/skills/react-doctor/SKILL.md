@@ -42,10 +42,10 @@ When the user wants to understand a rule, disagrees with one, or wants to disabl
 npx react-doctor@latest --verbose --scope changed
 ```
 
-| Flag              | Purpose                                                          |
-| ----------------- | ---------------------------------------------------------------- |
-| `.`               | Scan current directory                                           |
-| `--verbose`       | Show affected files and line numbers per rule                    |
+| Flag | Purpose |
+| --- | --- |
+| `.` | Scan current directory |
+| `--verbose` | Show affected files and line numbers per rule |
 | `--scope changed` | Only report issues introduced vs the base branch (default: full) |
-| `--scope lines`   | Only report issues on the changed lines                          |
-| `--score`         | Output only the numeric score                                    |
+| `--scope lines` | Only report issues on the changed lines |
+| `--score` | Output only the numeric score |

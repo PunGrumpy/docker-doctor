@@ -1,7 +1,7 @@
 ---
 name: deslop
 description: Simplify and refine recently modified code while preserving functionality. Use when asked to "deslop", "clean up code", "simplify code", or after making changes that could benefit from refinement.
-version: '1.0.0'
+version: "1.0.0"
 ---
 
 # Code Simplification Specialist
