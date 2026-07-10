@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # ultracite
 # Check if there are any staged files
@@ -26,3 +27,7 @@ fi
 
 echo "✨ Files formatted by Ultracite"
 # ultracite end
+
+bun run build
+bun run test
+bun run typecheck
