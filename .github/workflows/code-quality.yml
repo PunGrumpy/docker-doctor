@@ -1,0 +1,48 @@
+name: Code Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  code-quality:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Check
+            command: bun run check
+          - name: Fix
+            command: bun run fix
+          - name: Typecheck
+            command: bun run typecheck
+          - name: Test
+            command: bun run test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Setup Bun cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install
+      - name: Build
+        if: ${{ matrix.name != 'Fix' }}
+        run: bun run build
+      - name: ${{ matrix.name }}
+        run: ${{ matrix.command }}
