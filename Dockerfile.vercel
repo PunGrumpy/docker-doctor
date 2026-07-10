@@ -1,0 +1,8 @@
+FROM node:26-alpine
+
+RUN npm i -g srvx
+WORKDIR /app
+COPY server.ts .
+
+# srvx listens on $PORT by default
+CMD ["srvx", "--prod"]
