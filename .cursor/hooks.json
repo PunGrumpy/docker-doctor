@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "bun run fix"
+      }
+    ]
+  },
+  "version": 1
+}
