@@ -1,5 +1,5 @@
 {
-  "name": "docker-doctor",
+  "name": "@docker-doctor/cli",
   "version": "0.0.0",
   "description": "Static analysis for Dockerfile and Docker Compose files",
   "keywords": [
@@ -58,13 +58,13 @@
     "clean": "git clean -xdf .turbo node_modules dist"
   },
   "dependencies": {
-    "@docker-doctor/core": "workspace:*",
     "chalk": "^5.4.1",
     "commander": "^15.0.0",
     "effect": "4.0.0-beta.70",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
+    "@docker-doctor/core": "workspace:*",
     "@types/node": "^26",
     "tsdown": "^0.22.4",
     "typescript": "^6"

@@ -65,19 +65,19 @@
       },
     },
     "packages/docker-doctor": {
-      "name": "docker-doctor",
+      "name": "@docker-doctor/cli",
       "version": "0.0.0",
       "bin": {
         "docker-doctor": "./dist/cli.mjs",
       },
       "dependencies": {
-        "@docker-doctor/core": "workspace:*",
         "chalk": "^5.4.1",
         "commander": "^15.0.0",
         "effect": "4.0.0-beta.70",
         "yaml": "^2.7.0",
       },
       "devDependencies": {
+        "@docker-doctor/core": "workspace:*",
         "@types/node": "^26",
         "tsdown": "^0.22.4",
         "typescript": "^6",
@@ -194,6 +194,8 @@
     "@clack/prompts": ["@clack/prompts@1.7.0", "", { "dependencies": { "@clack/core": "1.4.3", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A=="],
 
     "@date-fns/tz": ["@date-fns/tz@1.5.0", "", {}, "sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg=="],
+
+    "@docker-doctor/cli": ["@docker-doctor/cli@workspace:packages/docker-doctor"],
 
     "@docker-doctor/core": ["@docker-doctor/core@workspace:packages/core"],
 
@@ -968,8 +970,6 @@
     "diff": ["diff@8.0.4", "", {}, "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw=="],
 
     "dir-glob": ["dir-glob@3.0.1", "", { "dependencies": { "path-type": "^4.0.0" } }, "sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA=="],
-
-    "docker-doctor": ["docker-doctor@workspace:packages/docker-doctor"],
 
     "dom-serializer": ["dom-serializer@2.0.0", "", { "dependencies": { "domelementtype": "^2.3.0", "domhandler": "^5.0.2", "entities": "^4.2.0" } }, "sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg=="],
 
