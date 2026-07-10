@@ -50,8 +50,9 @@ services:
     ports:
       - "3000:3000"
     `;
-    const compose = parseCompose(content, "docker-compose.yml");
-    expect(compose).toBeDefined();
+    const compose = parseCompose(content, "docker-compose.yml") as {
+      services: Record<string, { image?: string }>;
+    };
     expect(compose.services).toBeDefined();
     expect(compose.services.web).toBeDefined();
     expect(compose.services.web.image).toBe("node:22");
