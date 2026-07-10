@@ -45,6 +45,9 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-border: var(--shadow-border);
+  --shadow-custom: var(--shadow-custom);
 }
 
 :root {
@@ -80,6 +83,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --shadow-border: 0px 0px 0px 1px #0000000f;
+  --shadow-custom:
+    0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f,
+    0px 2px 4px 0px #0000000a;
 }
 
 .dark {
@@ -114,6 +122,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --shadow-border: 0 0 0 1px #ffffff14;
+  --shadow-custom: 0 0 0 1px #ffffff14;
 }
 
 /* This layer is by Verno Studio */
@@ -181,6 +192,66 @@
       animation-iteration-count: 1 !important;
       scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .code-panel {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .code-panel .shiki {
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    overflow-x: hidden !important;
+    max-width: 100%;
+  }
+  .code-panel .shiki code {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .code-panel .shiki code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .code-panel .line {
+    counter-increment: code-line;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .code-panel .line::before {
+    content: counter(code-line);
+    display: inline-block;
+    width: 2ch;
+    text-align: right;
+    margin-right: 1.25rem;
+    color: inherit;
+    opacity: 0.25;
+    font-variant-numeric: tabular-nums;
+    -webkit-user-select: none;
+    user-select: none;
+    font-size: 11px;
+  }
+  .code-panel {
+    counter-reset: code-line;
+    animation: codeEnter 200ms ease-out;
+  }
+
+  @keyframes codeEnter {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
     }
   }
 }
