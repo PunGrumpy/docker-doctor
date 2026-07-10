@@ -12,7 +12,7 @@
     "performance",
     "security"
   ],
-  "homepage": "https://github.com/PunGrumpy/docker-doctor#readme",
+  "homepage": "https://docker-doctor.vercel.app",
   "bugs": {
     "url": "https://github.com/PunGrumpy/docker-doctor/issues"
   },
