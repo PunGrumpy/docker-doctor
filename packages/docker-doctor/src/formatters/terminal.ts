@@ -174,8 +174,12 @@ const printScoreBox = async (
   categoryIssueCounts: Record<string, number>
 ): Promise<void> => {
   const { isTTY } = process.stdout;
-  const frameCount = 40;
-  const frameDelay = 50;
+  const shouldAnimate =
+    isTTY &&
+    !process.env.CI &&
+    !process.env.NO_ANIMATION &&
+    process.env.TERM !== "dumb" &&
+    process.env.NODE_ENV !== "test";
 
   let scoreColor = chalk.red.bold;
   if (score >= 90) {
@@ -194,7 +198,11 @@ const printScoreBox = async (
   );
   const shareUrl = `https://github.com/PunGrumpy/docker-doctor/share?s=${score}&w=${totalIssues}`;
 
-  if (isTTY) {
+  if (shouldAnimate) {
+    const frameCount = 20;
+    // 15ms * 20 = 300ms
+    const frameDelay = 15;
+
     // Hide cursor
     process.stdout.write("\u001B[?25l");
     try {
