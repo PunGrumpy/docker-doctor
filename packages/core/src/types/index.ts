@@ -18,6 +18,7 @@ export interface Diagnostic {
 export interface ProjectInfo {
   dockerfiles: string[];
   composeFiles: string[];
+  dockerignores?: string[];
 }
 
 export interface DiagnoseResult {
