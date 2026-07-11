@@ -23,11 +23,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/PunGrumpy/docker-doctor.git",
+    "url": "git+https://github.com/PunGrumpy/docker-doctor.git",
     "directory": "packages/docker-doctor"
   },
   "bin": {
-    "docker-doctor": "./dist/cli.mjs"
+    "docker-doctor": "dist/cli.mjs"
   },
   "files": [
     "dist",
