@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { stdin as input, stdout as output } from "node:process";
-import readline from "node:readline/promises";
+import readline from "node:readline";
 import { setTimeout } from "node:timers/promises";
 
 import type { Diagnostic, RuleSeverity } from "@docker-doctor/core";
@@ -24,15 +23,202 @@ import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { formatTerminal } from "./formatters/terminal.js";
 
+interface KeypressKey {
+  name?: string;
+  ctrl?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+}
+
+const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
+  const isRaw = process.stdin.isTTY;
+  if (!isRaw) {
+    return Promise.resolve(defaultYes);
+  }
+
+  /* eslint-disable promise/avoid-new */
+  return new Promise((resolve) => {
+    let value = defaultYes;
+
+    readline.emitKeypressEvents(process.stdin);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+
+    // Hide cursor during prompt
+    process.stdout.write("\u001B[?25l");
+
+    const render = (firstTime = false) => {
+      if (!firstTime) {
+        process.stdout.write("\u001B[3A\r");
+      }
+
+      process.stdout.write(
+        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+      );
+
+      // Print options vertically
+      const yesPrefix = value ? chalk.cyan("❯ ") : "  ";
+      const yesText = value ? chalk.cyan.bold("Yes") : chalk.dim("Yes");
+      process.stdout.write(`\r\u001B[K${yesPrefix}${yesText}\n`);
+
+      const noPrefix = value ? "  " : chalk.cyan("❯ ");
+      const noText = value ? chalk.dim("No") : chalk.cyan.bold("No");
+      process.stdout.write(`\r\u001B[K${noPrefix}${noText}\n`);
+    };
+
+    render(true);
+
+    const handleKeypress = (str: string, key: KeypressKey) => {
+      const cleanup = () => {
+        process.stdin.removeListener("keypress", handleKeypress);
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(false);
+        }
+        process.stdin.pause();
+        process.stdout.write("\u001B[?25h");
+      };
+
+      if (
+        key.name === "left" ||
+        key.name === "right" ||
+        key.name === "up" ||
+        key.name === "down" ||
+        key.name === "h" ||
+        key.name === "l" ||
+        key.name === "j" ||
+        key.name === "k"
+      ) {
+        value = !value;
+        render();
+      } else if (str === "y" || str === "Y") {
+        value = true;
+        render();
+      } else if (str === "n" || str === "N") {
+        value = false;
+        render();
+      } else if (
+        key.name === "return" ||
+        key.name === "enter" ||
+        str === "\r" ||
+        str === "\n"
+      ) {
+        cleanup();
+        // Overwrite and resolve vertical layout cleanly
+        process.stdout.write("\u001B[3A\r\u001B[K");
+        process.stdout.write(
+          `  ${chalk.green("✔")} ${chalk.bold(question)} › ${value ? chalk.cyan("Yes") : chalk.dim("No")}\n`
+        );
+        process.stdout.write("\r\u001B[K\n");
+        process.stdout.write("\r\u001B[K\n");
+        process.stdout.write("\u001B[2A");
+        resolve(value);
+      } else if (key.ctrl && key.name === "c") {
+        cleanup();
+        process.stdout.write("\n");
+        process.exit(130);
+      }
+    };
+
+    process.stdin.on("keypress", handleKeypress);
+  });
+  /* eslint-enable promise/avoid-new */
+};
+
+const askSelect = (
+  question: string,
+  options: string[],
+  defaultIndex = 0
+): Promise<number> => {
+  const isRaw = process.stdin.isTTY;
+  if (!isRaw) {
+    return Promise.resolve(defaultIndex);
+  }
+
+  /* eslint-disable promise/avoid-new */
+  return new Promise((resolve) => {
+    let index = defaultIndex;
+
+    readline.emitKeypressEvents(process.stdin);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+
+    // Hide cursor during prompt
+    process.stdout.write("\u001B[?25l");
+
+    const render = (firstTime = false) => {
+      if (!firstTime) {
+        // Move back up to overwrite previous render
+        process.stdout.write(`\u001B[${options.length + 1}A\r`);
+      }
+
+      process.stdout.write(
+        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+      );
+
+      // Print options
+      let i = 0;
+      for (const option of options) {
+        const isSelected = i === index;
+        const prefix = isSelected ? chalk.cyan("❯ ") : "  ";
+        const text = isSelected ? chalk.cyan.bold(option) : chalk.dim(option);
+        process.stdout.write(`\r\u001B[K${prefix}${text}\n`);
+        i += 1;
+      }
+    };
+
+    render(true);
+
+    const handleKeypress = (str: string, key: KeypressKey) => {
+      const cleanup = () => {
+        process.stdin.removeListener("keypress", handleKeypress);
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(false);
+        }
+        process.stdin.pause();
+        process.stdout.write("\u001B[?25h");
+      };
+
+      if (key.name === "up" || key.name === "k") {
+        index = (index - 1 + options.length) % options.length;
+        render();
+      } else if (key.name === "down" || key.name === "j") {
+        index = (index + 1) % options.length;
+        render();
+      } else if (
+        key.name === "return" ||
+        key.name === "enter" ||
+        str === "\r" ||
+        str === "\n"
+      ) {
+        cleanup();
+        // Overwrite and resolve
+        process.stdout.write(`\u001B[${options.length + 1}A\r\u001B[K`);
+        process.stdout.write(
+          `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chalk.cyan(options[index])}\n`
+        );
+        for (const _ of options) {
+          process.stdout.write("\r\u001B[K\n");
+        }
+        process.stdout.write(`\u001B[${options.length}A`);
+        resolve(index);
+      } else if (key.ctrl && key.name === "c") {
+        cleanup();
+        process.stdout.write("\n");
+        process.exit(130);
+      }
+    };
+
+    process.stdin.on("keypress", handleKeypress);
+  });
+  /* eslint-enable promise/avoid-new */
+};
+
 const runInteractiveWizard = async (): Promise<void> => {
-  const rl = readline.createInterface({ input, output });
   try {
-    const ghAnswer = await rl.question(
-      `\n  ${chalk.green("✔")} ${chalk.bold("Add Docker Doctor to GitHub Actions?")}\n` +
-        `    Scan every pull request to prevent new Docker issues while you fix the backlog.\n` +
-        `    › (y/N) `
+    const addGhActions = await askConfirm(
+      "Add Docker Doctor to GitHub Actions?"
     );
-    if (ghAnswer.trim().toLowerCase() === "y") {
+    if (addGhActions) {
       const workflowDir = path.resolve(".github/workflows");
       await fs.mkdir(workflowDir, { recursive: true });
       const workflowPath = path.join(workflowDir, "docker-doctor.yml");
@@ -63,13 +249,12 @@ jobs:
       );
     }
 
-    const nextAnswer = await rl.question(
-      `\n  ${chalk.green("✔")} ${chalk.bold("What would you like to do next?")}\n` +
-        `    1: View rules list\n` +
-        `    2: Skip\n` +
-        `    › `
-    );
-    if (nextAnswer.trim() === "1") {
+    const nextChoice = await askSelect("What would you like to do next?", [
+      "View rules list",
+      "Skip",
+    ]);
+
+    if (nextChoice === 0) {
       console.log(`\n  ${chalk.bold("Available Rules:")}`);
       for (const r of allRules) {
         console.log(
@@ -79,8 +264,6 @@ jobs:
     }
   } catch {
     // Ignore prompt errors
-  } finally {
-    rl.close();
   }
 };
 
@@ -170,11 +353,29 @@ program
   .option("-j, --json", "output results as JSON report", false)
   .option("-c, --config <path>", "custom config file path")
   .action(async (dir, options) => {
+    const isSilent = options.score || options.json;
+
+    // Helper to safely show terminal cursor
+    const restoreCursor = (): void => {
+      if (process.stdout.isTTY && !isSilent) {
+        process.stdout.write("\u001B[?25h");
+      }
+    };
+
+    // Set signal handlers to restore cursor on aborts
+    process.on("exit", restoreCursor);
+    process.once("SIGINT", () => {
+      restoreCursor();
+      process.exit(130);
+    });
+    process.once("SIGTERM", () => {
+      restoreCursor();
+      process.exit(143);
+    });
+
     try {
       const rootDir = path.resolve(dir);
       const startTime = Date.now();
-
-      const isSilent = options.score || options.json;
 
       let statusText = "Discovering workspace...";
       const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -186,10 +387,12 @@ program
       };
 
       if (process.stdout.isTTY && !isSilent) {
+        // Hide cursor during progress/spinner
+        process.stdout.write("\u001B[?25l");
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
         spinnerInterval = setInterval(() => {
           process.stdout.write(
-            `\r${chalk.cyan(spinnerFrames[frameIndex])} ${statusText}`
+            `\r\u001B[K${chalk.cyan(spinnerFrames[frameIndex])} ${statusText}`
           );
           frameIndex = (frameIndex + 1) % spinnerFrames.length;
         }, 80);
@@ -250,8 +453,8 @@ program
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
           spinnerInterval = null;
-          // Clear the spinner line
-          process.stdout.write("\r\u001B[K");
+          // Clear spinner line and restore cursor
+          process.stdout.write("\r\u001B[K\u001B[?25h");
         }
 
         if (process.stdout.isTTY && !isSilent) {
@@ -290,7 +493,7 @@ program
             (d) => d.severity === "error"
           );
 
-          if (process.stdout.isTTY) {
+          if (process.stdout.isTTY && process.stdin.isTTY) {
             await runInteractiveWizard();
           }
           process.exit(hasErrors ? 1 : 0);
@@ -298,7 +501,7 @@ program
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
-          process.stdout.write("\r\u001B[K");
+          process.stdout.write("\r\u001B[K\u001B[?25h");
         }
       }
     } catch (error: unknown) {
