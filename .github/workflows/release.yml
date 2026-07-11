@@ -22,8 +22,6 @@ jobs:
         run: git fetch --unshallow --tags
       - name: Setup Node.js
         uses: actions/setup-node@v6
-        with:
-          registry-url: "https://registry.npmjs.org"
       - name: Update NPM
         run: npm install -g npm@latest
       - name: Install Bun
