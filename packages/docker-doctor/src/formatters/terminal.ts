@@ -200,7 +200,6 @@ const printScoreBox = async (
 
   if (shouldAnimate) {
     const frameCount = 20;
-    // 15ms * 20 = 300ms
     const frameDelay = 15;
 
     // Hide cursor
