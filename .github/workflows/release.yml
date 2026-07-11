@@ -39,6 +39,8 @@ jobs:
         run: bun run test
       - name: Build
         run: bun run build
+      - name: Configure NPM for OIDC
+        run: echo "registry=https://registry.npmjs.org/" > ~/.npmrc
       - name: Create Release PR or Publish to NPM
         id: changesets
         uses: changesets/action@v1
