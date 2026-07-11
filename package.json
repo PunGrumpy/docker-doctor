@@ -14,6 +14,9 @@
     "check": "ultracite check",
     "fix": "ultracite fix",
     "clean": "turbo run clean && git clean -xdf node_modules",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "turbo run build && changeset publish",
     "doctor": "react-doctor",
     "prepare": "husky"
   },
