@@ -16,8 +16,9 @@ export const preferSlimBase: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        const [imagePart] = inst.args.split(/\s+/u);
-        if (imagePart === "scratch") {
+        const parts = inst.args.split(/\s+/u);
+        const imagePart = parts.find((p) => !p.startsWith("--"));
+        if (!imagePart || imagePart === "scratch") {
           continue;
         }
 

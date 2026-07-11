@@ -113,9 +113,9 @@ export const pinImageVersion: DockerfileRule = {
         // FROM image or FROM image:tag or FROM image@sha256:hash
         // Also respect multi-stage builds (AS stageName)
         const parts = inst.args.split(/\s+/u);
-        const [imagePart] = parts;
+        const imagePart = parts.find((p) => !p.startsWith("--"));
 
-        if (imagePart === "scratch") {
+        if (!imagePart || imagePart === "scratch") {
           continue;
         }
 
