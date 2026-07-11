@@ -42,7 +42,7 @@ export const Hero = () => (
         </span>
       </Badge>
     </div>
-    <div className="text-muted-foreground">
+    <div className="text-center text-muted-foreground">
       Diagnostics your infrastructure with&nbsp;
       <span className="relative inline-block">
         Docker and Docker Compose
