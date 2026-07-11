@@ -36,9 +36,14 @@ export const discoverProject = async (
   const allFiles = await walk(rootDir);
   const dockerfiles: string[] = [];
   const composeFiles: string[] = [];
+  const dockerignores: string[] = [];
 
   for (const file of allFiles) {
     const base = path.basename(file).toLowerCase();
+
+    if (base === ".dockerignore") {
+      dockerignores.push(path.relative(rootDir, file));
+    }
 
     // Match Dockerfile, Dockerfile.*, *.dockerfile
     if (
@@ -65,5 +70,6 @@ export const discoverProject = async (
   return {
     composeFiles,
     dockerfiles,
+    dockerignores,
   };
 };
