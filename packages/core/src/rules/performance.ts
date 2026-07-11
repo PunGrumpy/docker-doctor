@@ -57,8 +57,11 @@ export const orderLayers: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "COPY" || inst.instruction === "ADD") {
         const parts = inst.args.split(/\s+/u);
-        // If copying the current directory (e.g., COPY . .)
-        const [src] = parts;
+        const src = parts.find((p) => !p.startsWith("--"));
+
+        if (!src) {
+          continue;
+        }
 
         if (
           (src === "." || src === "./" || src === "*" || src.includes("src")) &&
