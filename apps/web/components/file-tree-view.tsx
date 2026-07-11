@@ -125,7 +125,7 @@ const MobileLayout = ({
               key={entry.path}
               onClick={() => onSelect(i)}
               className={cn(
-                "flex items-center w-full text-left gap-2.5 rounded-md px-2.5 min-h-10",
+                "flex items-center w-full text-left gap-2.5 rounded-lg px-2.5 min-h-10",
                 "transition-colors duration-100 ease-out",
                 "active:scale-[0.98] active:transition-transform active:duration-100",
                 i === activeIndex ? "bg-muted/50" : "hover:bg-muted/20"
