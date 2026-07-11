@@ -52,7 +52,6 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
         process.stdout.write("\u001B[3A\r");
       }
 
-      // Print question
       process.stdout.write(
         `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
       );
@@ -152,7 +151,6 @@ const askSelect = (
         process.stdout.write(`\u001B[${options.length + 1}A\r`);
       }
 
-      // Print question
       process.stdout.write(
         `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
       );
