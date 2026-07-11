@@ -338,6 +338,25 @@ const runRulesEngine = async (
   return diagnostics;
 };
 
+const filterDiagnostics = (
+  diagnostics: Diagnostic[],
+  categories?: Record<string, RuleSeverity>
+): Diagnostic[] => {
+  if (!categories) {
+    return diagnostics;
+  }
+  return diagnostics.filter((d) => {
+    const ruleDef = findRule(d.rule);
+    if (ruleDef) {
+      const catSeverity = categories[ruleDef.category];
+      if (catSeverity === "off") {
+        return false;
+      }
+    }
+    return true;
+  });
+};
+
 const program = new Command();
 
 program
@@ -417,6 +436,7 @@ program
         const projectFilesList = [
           ...project.dockerfiles,
           ...project.composeFiles,
+          ...(project.dockerignores || []),
         ];
 
         const diagnostics = await runRulesEngine(
@@ -430,19 +450,10 @@ program
         );
 
         // Filter by category config if needed
-        let filteredDiagnostics = diagnostics;
-        if (config.categories) {
-          filteredDiagnostics = diagnostics.filter((d) => {
-            const ruleDef = findRule(d.rule);
-            if (ruleDef) {
-              const catSeverity = config.categories?.[ruleDef.category];
-              if (catSeverity === "off") {
-                return false;
-              }
-            }
-            return true;
-          });
-        }
+        const filteredDiagnostics = filterDiagnostics(
+          diagnostics,
+          config.categories
+        );
 
         // Calculate score
         const { score, label } = calculateScore(filteredDiagnostics);
