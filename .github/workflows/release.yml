@@ -41,6 +41,10 @@ jobs:
         run: bun run build
       - name: Configure NPM for OIDC
         run: echo "registry=https://registry.npmjs.org/" > ~/.npmrc
+      - name: Debug npm info
+        run: |
+          npm info @docker-doctor/cli --json || true
+          npm config list || true
       - name: Create Release PR or Publish to NPM
         id: changesets
         uses: changesets/action@v1
