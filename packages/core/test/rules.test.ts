@@ -265,4 +265,62 @@ describe("Best Practices Rules", () => {
     const diags2 = useraddNoLogInit.check(withFlag, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
+
+  test("require-healthcheck", () => {
+    const withoutHealth = parseDockerfile(`
+        FROM node:22-alpine
+        EXPOSE 3000
+      `);
+    const diags1 = requireHealthcheck.check(withoutHealth, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withHealth = parseDockerfile(`
+        FROM node:22-alpine
+        HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1
+      `);
+    const diags2 = requireHealthcheck.check(withHealth, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("prefer-copy-over-add", () => {
+    const addFile = parseDockerfile(`
+        ADD file.txt /app/file.txt
+      `);
+    const diags1 = preferCopyOverAdd.check(addFile, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const addArchive = parseDockerfile(`
+        ADD archive.tar.gz /app/
+      `);
+    const diags2 = preferCopyOverAdd.check(addArchive, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("use-exec-form", () => {
+    const shellForm = parseDockerfile(`
+        CMD node index.js
+      `);
+    const diags1 = useExecForm.check(shellForm, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const execForm = parseDockerfile(`
+        CMD ["node", "index.js"]
+      `);
+    const diags2 = useExecForm.check(execForm, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("require-labels", () => {
+    const withoutLabels = parseDockerfile(`
+        FROM node:22-alpine
+      `);
+    const diags1 = requireLabels.check(withoutLabels, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withLabels = parseDockerfile(`
+        LABEL maintainer="me"
+      `);
+    const diags2 = requireLabels.check(withLabels, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
 });
