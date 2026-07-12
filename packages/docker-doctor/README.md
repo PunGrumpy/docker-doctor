@@ -4,10 +4,12 @@
   <img alt="Docker Doctor" src="https://docker-doctor.vercel.app/docker-doctor-readme-logo-light.svg" width="134" height="36">
 </picture>
 
+<br />
+
 <status>
-<a href="https://www.npmjs.com/package/@docker-doctor/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
-<a href="https://www.npmjs.com/package/@docker-doctor/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/dm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/npm/dm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
-<a href="https://github.com/PunGrumpy/docker-doctor"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/PunGrumpy/docker-doctor/license.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/github/PunGrumpy/docker-doctor/license.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
+    <a href="https://www.npmjs.com/package/@docker-doctor/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
+    <a href="https://www.npmjs.com/package/@docker-doctor/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/dm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/npm/dm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
+    <a href="https://github.com/PunGrumpy/docker-doctor"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/PunGrumpy/docker-doctor/license.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/github/PunGrumpy/docker-doctor/license.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
 </status>
 
 Your Dockerfiles are probably wrong. Docker Doctor finds out why.
