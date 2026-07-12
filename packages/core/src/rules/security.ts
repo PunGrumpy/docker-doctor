@@ -58,38 +58,64 @@ export const noSecretsInEnv: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "ENV" || inst.instruction === "ARG") {
-        const parts = inst.args.split(/\s+/u);
-        // ENV can be KEY=VALUE or KEY VALUE
-        for (const part of parts) {
-          const eqIndex = part.indexOf("=");
-          let key = "";
-          let value = "";
-
-          if (eqIndex > 0) {
-            key = part.slice(0, eqIndex);
-            value = part.slice(eqIndex + 1);
-          } else {
-            // Might be ENV KEY VALUE
-            key = part;
+        const args = inst.args.trim();
+        if (inst.instruction === "ENV" && !args.includes("=")) {
+          // KEY VALUE format
+          const match = args.match(/^(?<key>[^\s]+)\s+(?<value>.*)$/u);
+          if (match?.groups) {
+            const { key, value } = match.groups;
+            const isSecretKey = secretKeywords.some((regex) => regex.test(key));
+            if (
+              isSecretKey &&
+              value &&
+              !value.startsWith("$") &&
+              !value.startsWith("{")
+            ) {
+              diagnostics.push(
+                createDiagnostic(
+                  file,
+                  this.key,
+                  this.defaultSeverity as "error" | "warning" | "info",
+                  `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
+                  this.help,
+                  inst.line
+                )
+              );
+            }
           }
+        } else {
+          // Existing KEY=VALUE logic
+          const parts = args.split(/\s+/u);
+          for (const part of parts) {
+            const eqIndex = part.indexOf("=");
+            let key = "";
+            let value = "";
 
-          const isSecretKey = secretKeywords.some((regex) => regex.test(key));
-          if (
-            isSecretKey &&
-            value &&
-            !value.startsWith("$") &&
-            !value.startsWith("{")
-          ) {
-            diagnostics.push(
-              createDiagnostic(
-                file,
-                this.key,
-                this.defaultSeverity as "error" | "warning" | "info",
-                `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
-                this.help,
-                inst.line
-              )
-            );
+            if (eqIndex > 0) {
+              key = part.slice(0, eqIndex);
+              value = part.slice(eqIndex + 1);
+            } else {
+              key = part;
+            }
+
+            const isSecretKey = secretKeywords.some((regex) => regex.test(key));
+            if (
+              isSecretKey &&
+              value &&
+              !value.startsWith("$") &&
+              !value.startsWith("{")
+            ) {
+              diagnostics.push(
+                createDiagnostic(
+                  file,
+                  this.key,
+                  this.defaultSeverity as "error" | "warning" | "info",
+                  `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
+                  this.help,
+                  inst.line
+                )
+              );
+            }
           }
         }
       }

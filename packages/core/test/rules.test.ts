@@ -62,6 +62,21 @@ describe("Security Rules", () => {
     `);
     const diags = noSecretsInEnv.check(withSecret, "Dockerfile");
     expect(diags).toHaveLength(1);
+
+    const withSpaceSecret = parseDockerfile(`
+      ENV DB_PASSWORD my-secret-pass
+    `);
+    const diagsSpace = noSecretsInEnv.check(withSpaceSecret, "Dockerfile");
+    expect(diagsSpace).toHaveLength(1);
+
+    const withSpaceNormal = parseDockerfile(`
+      ENV NORMAL_VAR my-value
+    `);
+    const diagsSpaceNormal = noSecretsInEnv.check(
+      withSpaceNormal,
+      "Dockerfile"
+    );
+    expect(diagsSpaceNormal).toHaveLength(0);
   });
 });
 
