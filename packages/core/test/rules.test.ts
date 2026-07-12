@@ -82,6 +82,14 @@ describe("Security Rules", () => {
     const diags = noSecretsInEnv.check(withSecret, "Dockerfile");
     expect(diags).toHaveLength(1);
   });
+
+  test("no-add-remote", () => {
+    const remoteAdd = parseDockerfile(`
+        ADD https://example.com/file.txt /app/
+      `);
+    const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
 });
 
 describe("Performance Rules", () => {
@@ -94,6 +102,41 @@ describe("Performance Rules", () => {
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
+  });
+
+  test("use-multi-stage", () => {
+    const singleStage = parseDockerfile(`
+        FROM node:22
+        RUN npm run build
+      `);
+    const diags1 = useMultiStage.check(singleStage, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
+
+  test("minimize-layers", () => {
+    const consecutive = parseDockerfile(`
+        RUN step1
+        RUN step2
+        RUN step3
+      `);
+    const diags1 = minimizeLayers.check(consecutive, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
+
+  test("use-dockerignore", () => {
+    const copyAll = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+    const diags1 = useDockerignore.check(copyAll, "Dockerfile", {
+      projectFiles: ["Dockerfile"],
+    });
+    expect(diags1).toHaveLength(1);
+
+    const diags2 = useDockerignore.check(copyAll, "Dockerfile", {
+      projectFiles: ["Dockerfile", ".dockerignore"],
+    });
+    expect(diags2).toHaveLength(0);
   });
 });
 
@@ -140,7 +183,7 @@ describe("Compose Rules", () => {
   test("use-depends-on-condition", () => {
     const shortForm = {
       services: {
-        web: { image: "node:22", depends_on: ["db"] },
+        web: { depends_on: ["db"], image: "node:22" },
       },
     };
     const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
@@ -174,6 +217,24 @@ describe("Image Size Rules", () => {
       RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     `);
     const diags2 = cleanPackageCache.check(withCleanup, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("avoid-dev-dependencies", () => {
+    const withDev = parseDockerfile(`
+        FROM node:22 AS builder
+        FROM node:22 AS runner
+        RUN npm install
+      `);
+    const diags1 = avoidDevDependencies.check(withDev, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withoutDev = parseDockerfile(`
+        FROM node:22 AS builder
+        FROM node:22 AS runner
+        RUN npm ci --omit=dev
+      `);
+    const diags2 = avoidDevDependencies.check(withoutDev, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
 });
