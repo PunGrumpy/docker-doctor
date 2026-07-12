@@ -88,6 +88,15 @@
   --shadow-custom:
     0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f,
     0px 2px 4px 0px #0000000a;
+
+  /* Strong ease-out for UI interactions */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Strong ease-in-out for on-screen movement */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* iOS-like drawer curve (from Ionic Framework) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
@@ -191,7 +200,9 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       scroll-behavior: auto !important;
-      transition-duration: 0.01ms !important;
+      transition-duration: 200ms !important;
+      transition-property:
+        opacity, color, background-color, border-color, fill, stroke !important;
     }
   }
 }
@@ -239,7 +250,7 @@
   }
   .code-panel {
     counter-reset: code-line;
-    animation: codeEnter 200ms ease-out;
+    animation: codeEnter 200ms var(--ease-out);
   }
 
   @keyframes codeEnter {
@@ -258,20 +269,17 @@
   @keyframes fadeInUp {
     from {
       opacity: 0;
-      transform: translateY(12px);
-      filter: blur(4px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
-      filter: blur(0);
     }
   }
 
   .stagger-enter {
     opacity: 0;
-    transform: translateY(12px);
-    filter: blur(4px);
-    animation: fadeInUp 400ms cubic-bezier(0.2, 0, 0, 1) forwards;
+    transform: translateY(8px);
+    animation: fadeInUp 400ms var(--ease-out) forwards;
   }
 }

@@ -9,7 +9,7 @@ export const Hero = () => (
       </h1>
       <span
         aria-hidden="true"
-        className="absolute -inset-x-1 inset-y-0 border border-blue-500 bg-blue-500/5 transition-colors duration-200 ease-out group-hover:bg-blue-500/10"
+        className="absolute -inset-x-1 inset-y-0 border border-blue-500 bg-blue-500/5 transition-colors duration-200 ease-[var(--ease-out)] group-hover:bg-blue-500/10"
       />
       <span
         aria-hidden="true"
