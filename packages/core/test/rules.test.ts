@@ -8,14 +8,33 @@ import {
   avoidRunCd,
   sortMultilineArgs,
   useraddNoLogInit,
+  requireHealthcheck,
+  preferCopyOverAdd,
+  useExecForm,
+  requireLabels,
 } from "../src/rules/best-practices.js";
-import { noVersionKey, requireResourceLimits } from "../src/rules/compose.js";
-import { preferSlimBase, cleanPackageCache } from "../src/rules/image-size.js";
-import { orderLayers } from "../src/rules/performance.js";
+import {
+  noVersionKey,
+  requireResourceLimits,
+  requireRestartPolicy,
+  useDependsOnCondition,
+} from "../src/rules/compose.js";
+import {
+  preferSlimBase,
+  cleanPackageCache,
+  avoidDevDependencies,
+} from "../src/rules/image-size.js";
+import {
+  orderLayers,
+  useMultiStage,
+  minimizeLayers,
+  useDockerignore,
+} from "../src/rules/performance.js";
 import {
   noRootUser,
   pinImageVersion,
   noSecretsInEnv,
+  noAddRemote,
 } from "../src/rules/security.js";
 
 describe("Security Rules", () => {
@@ -78,6 +97,14 @@ describe("Security Rules", () => {
     );
     expect(diagsSpaceNormal).toHaveLength(0);
   });
+
+  test("no-add-remote", () => {
+    const remoteAdd = parseDockerfile(`
+        ADD https://example.com/file.txt /app/
+      `);
+    const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
 });
 
 describe("Performance Rules", () => {
@@ -90,6 +117,41 @@ describe("Performance Rules", () => {
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
+  });
+
+  test("use-multi-stage", () => {
+    const singleStage = parseDockerfile(`
+        FROM node:22
+        RUN npm run build
+      `);
+    const diags1 = useMultiStage.check(singleStage, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
+
+  test("minimize-layers", () => {
+    const consecutive = parseDockerfile(`
+        RUN step1
+        RUN step2
+        RUN step3
+      `);
+    const diags1 = minimizeLayers.check(consecutive, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+  });
+
+  test("use-dockerignore", () => {
+    const copyAll = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+    const diags1 = useDockerignore.check(copyAll, "Dockerfile", {
+      projectFiles: ["Dockerfile"],
+    });
+    expect(diags1).toHaveLength(1);
+
+    const diags2 = useDockerignore.check(copyAll, "Dockerfile", {
+      projectFiles: ["Dockerfile", ".dockerignore"],
+    });
+    expect(diags2).toHaveLength(0);
   });
 });
 
@@ -113,6 +175,34 @@ describe("Compose Rules", () => {
     };
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
+  });
+
+  test("require-restart-policy", () => {
+    const withoutRestart = {
+      services: {
+        web: { image: "node:22" },
+      },
+    };
+    const diags1 = requireRestartPolicy.check(withoutRestart, "compose.yml");
+    expect(diags1).toHaveLength(1);
+
+    const withRestart = {
+      services: {
+        web: { image: "node:22", restart: "always" },
+      },
+    };
+    const diags2 = requireRestartPolicy.check(withRestart, "compose.yml");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("use-depends-on-condition", () => {
+    const shortForm = {
+      services: {
+        web: { depends_on: ["db"], image: "node:22" },
+      },
+    };
+    const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
+    expect(diags1).toHaveLength(1);
   });
 });
 
@@ -142,6 +232,24 @@ describe("Image Size Rules", () => {
       RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     `);
     const diags2 = cleanPackageCache.check(withCleanup, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("avoid-dev-dependencies", () => {
+    const withDev = parseDockerfile(`
+        FROM node:22 AS builder
+        FROM node:22 AS runner
+        RUN npm install
+      `);
+    const diags1 = avoidDevDependencies.check(withDev, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withoutDev = parseDockerfile(`
+        FROM node:22 AS builder
+        FROM node:22 AS runner
+        RUN npm ci --omit=dev
+      `);
+    const diags2 = avoidDevDependencies.check(withoutDev, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
 });
@@ -259,6 +367,64 @@ describe("Best Practices Rules", () => {
       RUN useradd --no-log-init -r -g mygroup myuser
     `);
     const diags2 = useraddNoLogInit.check(withFlag, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("require-healthcheck", () => {
+    const withoutHealth = parseDockerfile(`
+        FROM node:22-alpine
+        EXPOSE 3000
+      `);
+    const diags1 = requireHealthcheck.check(withoutHealth, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withHealth = parseDockerfile(`
+        FROM node:22-alpine
+        HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1
+      `);
+    const diags2 = requireHealthcheck.check(withHealth, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("prefer-copy-over-add", () => {
+    const addFile = parseDockerfile(`
+        ADD file.txt /app/file.txt
+      `);
+    const diags1 = preferCopyOverAdd.check(addFile, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const addArchive = parseDockerfile(`
+        ADD archive.tar.gz /app/
+      `);
+    const diags2 = preferCopyOverAdd.check(addArchive, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("use-exec-form", () => {
+    const shellForm = parseDockerfile(`
+        CMD node index.js
+      `);
+    const diags1 = useExecForm.check(shellForm, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const execForm = parseDockerfile(`
+        CMD ["node", "index.js"]
+      `);
+    const diags2 = useExecForm.check(execForm, "Dockerfile");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("require-labels", () => {
+    const withoutLabels = parseDockerfile(`
+        FROM node:22-alpine
+      `);
+    const diags1 = requireLabels.check(withoutLabels, "Dockerfile");
+    expect(diags1).toHaveLength(1);
+
+    const withLabels = parseDockerfile(`
+        LABEL maintainer="me"
+      `);
+    const diags2 = requireLabels.check(withLabels, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
 });
