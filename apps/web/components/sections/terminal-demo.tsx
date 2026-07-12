@@ -11,6 +11,46 @@ import { cn } from "@/lib/utils";
 const COMMAND = "docker-doctor .";
 const TOTAL_TICKS = 210;
 const TICK_MS = 100;
+const SPINNERFRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+const Cursor = ({ visible }: { readonly visible: boolean }) => {
+  if (!visible) {
+    return null;
+  }
+  return (
+    <span className="w-2 h-4 bg-foreground inline-block animate-pulse shrink-0" />
+  );
+};
+
+interface PromptLineProps {
+  readonly visible: boolean;
+  readonly cursorVisible: boolean;
+  readonly commandText: string;
+}
+
+const PromptLine = ({
+  visible,
+  cursorVisible,
+  commandText,
+}: PromptLineProps) => {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        animation: "fadeInUp 300ms var(--ease-out) forwards",
+      }}
+    >
+      <div className="flex items-center gap-2 text-foreground">
+        <span className="text-emerald-500 font-bold select-none">$</span>
+        <span>{commandText}</span>
+        <Cursor visible={cursorVisible} />
+      </div>
+    </div>
+  );
+};
 
 interface CommandOutputsProps {
   readonly ticks: number;
@@ -56,6 +96,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
   if (ticks < 16) {
     return null;
   }
+
   return (
     <div className="space-y-4">
       <div className="text-muted-foreground transition-opacity duration-200">
@@ -101,7 +142,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
 
           <div
             className="border border-yellow-500/25 bg-yellow-500/5 rounded-xl p-4 space-y-2 stagger-enter"
-            style={{ animationDelay: "100ms" }}
+            style={{ animationDelay: "50ms" }}
           >
             <div className="flex items-center justify-between text-yellow-600 dark:text-yellow-400 font-bold">
               <span>⚠ WARN [docker-doctor/pin-image-version]:1</span>
@@ -135,7 +176,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
 
           <div
             className="border bg-muted/10 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-center stagger-enter"
-            style={{ animationDelay: "200ms" }}
+            style={{ animationDelay: "100ms" }}
           >
             <div className="flex flex-col font-mono text-red-500/80 dark:text-red-500/60 leading-none font-bold text-center sm:text-left shrink-0">
               <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
@@ -197,12 +238,12 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
 
       <div
         className="w-full border-b border-solid border-border stagger-enter"
-        style={{ animationDelay: "100ms" }}
+        style={{ animationDelay: "50ms" }}
       />
 
       <div
         className="w-full overflow-hidden border border-solid border-border py-4 rounded-xl stagger-enter"
-        style={{ animationDelay: "200ms" }}
+        style={{ animationDelay: "100ms" }}
       >
         <div className="text-xs font-mono leading-[160%]">
           <div className="whitespace-pre border-l-2 border-l-transparent pl-4 pr-5 opacity-50">
@@ -251,7 +292,7 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
 
       <div
         className="whitespace-nowrap text-[#424242] dark:text-[#C6C6C6] text-xs flex items-center gap-1.5 stagger-enter"
-        style={{ animationDelay: "300ms" }}
+        style={{ animationDelay: "150ms" }}
       >
         <span className="inline-block w-[1ch] text-center text-[#909090] dark:text-[#6E6E6E]">
           ✻
@@ -266,6 +307,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
   if (ticks < 151) {
     return null;
   }
+
   return (
     <div className="space-y-4">
       {ticks < 166 ? (
@@ -293,7 +335,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
 
           <div
             className="flex flex-col items-start gap-1 font-mono text-sm leading-relaxed text-muted-foreground stagger-enter"
-            style={{ animationDelay: "100ms" }}
+            style={{ animationDelay: "50ms" }}
           >
             <div className="text-foreground font-semibold">
               ✅ All issues fixed
@@ -314,7 +356,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
 
           <div
             className="border bg-muted/10 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-center stagger-enter"
-            style={{ animationDelay: "200ms" }}
+            style={{ animationDelay: "100ms" }}
           >
             <div className="flex flex-col font-mono text-emerald-500/80 dark:text-emerald-500/60 leading-none font-bold text-center sm:text-left shrink-0">
               <span className="text-cyan-500/80">
@@ -344,7 +386,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
 
           <div
             className="text-xs text-muted-foreground/60 italic pt-2 text-center select-none flex items-center justify-center gap-1.5 stagger-enter"
-            style={{ animationDelay: "300ms" }}
+            style={{ animationDelay: "150ms" }}
           >
             <span>Completed loop. Restarting in a few seconds...</span>
           </div>
@@ -358,11 +400,19 @@ export const TerminalDemo = () => {
   const [ticks, setTicks] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const terminalBodyRef = useRef<HTMLDivElement>(null);
+  const lastScrollHeightRef = useRef(0);
 
   useEffect(() => {
-    if (terminalBodyRef.current) {
-      terminalBodyRef.current.scrollTop = terminalBodyRef.current.scrollHeight;
+    const el = terminalBodyRef.current;
+    if (!el) {
+      return;
     }
+    if (el.scrollHeight <= lastScrollHeightRef.current) {
+      lastScrollHeightRef.current = el.scrollHeight;
+      return;
+    }
+    lastScrollHeightRef.current = el.scrollHeight;
+    el.scrollTo({ top: el.scrollHeight });
   }, [ticks]);
 
   useEffect(() => {
@@ -388,12 +438,11 @@ export const TerminalDemo = () => {
   const commandText2 = getCommandSlice(ticks, 86, 19, "claude");
   const commandText3 = getCommandSlice(ticks, 136, 14, COMMAND);
 
-  const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  const currentSpinner = spinnerFrames[ticks % spinnerFrames.length];
+  const currentSpinner = SPINNERFRAMES[ticks % SPINNERFRAMES.length];
 
   return (
     <Section className="pt-8 pb-16 lg:pb-32 flex flex-col items-center w-full">
-      <div className="relative w-full max-w-2xl bg-card rounded-3xl shadow-border overflow-hidden transition-all duration-300">
+      <div className="relative w-full max-w-2xl bg-card rounded-3xl shadow-border overflow-hidden">
         <div className="flex items-center justify-center w-full h-[45px] shrink-0 relative border-b border-b-[#EBEBEB] dark:border-b-[#1f1f1f] select-none">
           <div className="text-[17px] leading-[145%] text-center w-max font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
             Terminal - 592x648
@@ -426,34 +475,24 @@ export const TerminalDemo = () => {
           <div className="flex items-center gap-2 text-foreground">
             <span className="text-emerald-500 font-bold select-none">$</span>
             <span>{commandText1}</span>
-            {ticks < 16 && (
-              <span className="w-2 h-4 bg-foreground inline-block animate-pulse shrink-0" />
-            )}
+            <Cursor visible={ticks < 16} />
           </div>
 
           <Command1Outputs ticks={ticks} currentSpinner={currentSpinner} />
 
-          {ticks >= 76 && (
-            <div className="flex items-center gap-2 text-foreground">
-              <span className="text-emerald-500 font-bold select-none">$</span>
-              <span>{commandText2}</span>
-              {ticks < 106 && (
-                <span className="w-2 h-4 bg-foreground inline-block animate-pulse shrink-0" />
-              )}
-            </div>
-          )}
+          <PromptLine
+            visible={ticks >= 76}
+            cursorVisible={ticks < 106}
+            commandText={commandText2}
+          />
 
           <Command2Outputs ticks={ticks} />
 
-          {ticks >= 126 && (
-            <div className="flex items-center gap-2 text-foreground animate-in fade-in duration-300">
-              <span className="text-emerald-500 font-bold select-none">$</span>
-              <span>{commandText3}</span>
-              {ticks < 151 && (
-                <span className="w-2 h-4 bg-foreground inline-block animate-pulse shrink-0" />
-              )}
-            </div>
-          )}
+          <PromptLine
+            visible={ticks >= 126}
+            cursorVisible={ticks < 151}
+            commandText={commandText3}
+          />
 
           <Command3Outputs ticks={ticks} currentSpinner={currentSpinner} />
         </div>
@@ -472,12 +511,9 @@ export const TerminalDemo = () => {
               onClick={() => setIsPaused(!isPaused)}
               className={cn(
                 "flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border font-medium",
-                "bg-card hover:bg-muted/40 transition-colors duration-150",
-                "active:scale-[0.96] transition-transform duration-100 ease-out"
+                "bg-card hover:bg-muted/40",
+                "active:scale-[0.96] transition-[transform,background-color,border-color] duration-150 ease-out"
               )}
-              style={{
-                transitionProperty: "transform, background-color, border-color",
-              }}
               aria-label={isPaused ? "Play simulation" : "Pause simulation"}
             >
               {isPaused ? (
@@ -500,12 +536,9 @@ export const TerminalDemo = () => {
                 setIsPaused(false);
               }}
               className={cn(
-                "flex items-center justify-center h-9 w-9 rounded-lg border bg-card hover:bg-muted/40 transition-colors duration-150",
-                "active:scale-[0.96] transition-transform duration-100 ease-out"
+                "flex items-center justify-center size-9 rounded-lg border bg-card hover:bg-muted/40",
+                "active:scale-[0.96] transition-[transform,background-color,border-color] duration-150 ease-out"
               )}
-              style={{
-                transitionProperty: "transform, background-color, border-color",
-              }}
               aria-label="Restart simulation"
             >
               <RotateCcw className="size-3.5" />
