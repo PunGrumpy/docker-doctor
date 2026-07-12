@@ -21,7 +21,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 
 import packageJson from "../package.json" with { type: "json" };
-import { formatTerminal } from "./formatters/terminal.js";
+import { formatTerminal } from "./formatters/terminal";
 
 interface KeypressKey {
   name?: string;
