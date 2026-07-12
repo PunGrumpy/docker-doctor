@@ -1,18 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "animation-vocabulary": {
-      "source": "emilkowalski/skills",
-      "sourceType": "github",
-      "skillPath": "skills/animation-vocabulary/SKILL.md",
-      "computedHash": "39319fc9a33c15be08666b3685f58666f042ff36bb902b7814c0834a5ba99df4"
-    },
-    "apple-design": {
-      "source": "emilkowalski/skills",
-      "sourceType": "github",
-      "skillPath": "skills/apple-design/SKILL.md",
-      "computedHash": "8b94db67cb9edaad5f1501010804caa610131f1d2dfda0a27664b2e858deade3"
-    },
     "deslop": {
       "source": "git@github.com:PunGrumpy/agents.git",
       "sourceUrl": "git@github.com:PunGrumpy/agents.git",
@@ -37,12 +25,6 @@
       "sourceType": "github",
       "skillPath": "skills/improve-animations/SKILL.md",
       "computedHash": "32f23d860467841f5b07cef198fb53efc70f2adaaa6144cf1a3434d782aed246"
-    },
-    "make-interfaces-feel-better": {
-      "source": "jakubkrehel/make-interfaces-feel-better",
-      "sourceType": "github",
-      "skillPath": "skills/make-interfaces-feel-better/SKILL.md",
-      "computedHash": "8e3423e467eae12f3748ca1a365a668105ac59dbb0fdd50e66b45a40bb581950"
     },
     "react-doctor": {
       "source": "millionco/react-doctor",
