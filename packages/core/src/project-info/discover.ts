@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { ProjectInfo } from "../types/index.js";
+import type { ProjectInfo } from "../types/index";
 
 const walk = async (
   dir: string,

@@ -1,4 +1,4 @@
-import type { Diagnostic, DockerfileRule } from "../types/index.js";
+import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
   file: string,

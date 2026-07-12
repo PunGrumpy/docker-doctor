@@ -1,4 +1,4 @@
-import type { Diagnostic, ProjectInfo } from "./types/index.js";
+import type { Diagnostic, ProjectInfo } from "./types/index";
 
 export interface JsonReport {
   diagnostics: {

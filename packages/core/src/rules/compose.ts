@@ -1,4 +1,4 @@
-import type { Diagnostic, ComposeRule } from "../types/index.js";
+import type { Diagnostic, ComposeRule } from "../types/index";
 
 const createDiagnostic = (
   file: string,

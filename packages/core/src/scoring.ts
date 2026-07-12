@@ -1,4 +1,4 @@
-import type { Diagnostic } from "./types/index.js";
+import type { Diagnostic } from "./types/index";
 
 export const calculateScore = (
   diagnostics: Diagnostic[]

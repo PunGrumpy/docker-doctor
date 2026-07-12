@@ -1,16 +1,16 @@
-export { discoverProject } from "./project-info/discover.js";
-export { parseDockerfile } from "./parsers/dockerfile-parser.js";
-export { parseCompose } from "./parsers/compose-parser.js";
-export { runDockerfileRules } from "./runners/dockerfile-runner.js";
-export { runComposeRules } from "./runners/compose-runner.js";
+export { discoverProject } from "./project-info/discover";
+export { parseDockerfile } from "./parsers/dockerfile-parser";
+export { parseCompose } from "./parsers/compose-parser";
+export { runDockerfileRules } from "./runners/dockerfile-runner";
+export { runComposeRules } from "./runners/compose-runner";
 export {
   allRules,
   allDockerfileRules,
   allComposeRules,
   findRule,
-} from "./rules/index.js";
-export { loadConfig } from "./config/loader.js";
-export { calculateScore } from "./scoring.js";
-export * from "./errors.js";
-export * from "./types/index.js";
-export { toJsonReport, type JsonReport } from "./report.js";
+} from "./rules/index";
+export { loadConfig } from "./config/loader";
+export { calculateScore } from "./scoring";
+export * from "./errors";
+export * from "./types/index";
+export { toJsonReport, type JsonReport } from "./report";

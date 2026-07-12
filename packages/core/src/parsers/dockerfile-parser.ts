@@ -1,4 +1,4 @@
-import type { DockerfileInstruction } from "../types/index.js";
+import type { DockerfileInstruction } from "../types/index";
 
 export const parseDockerfile = (content: string): DockerfileInstruction[] => {
   const instructions: DockerfileInstruction[] = [];

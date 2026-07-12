@@ -1,6 +1,6 @@
 import { parse } from "yaml";
 
-import { ParseError } from "../errors.js";
+import { ParseError } from "../errors";
 
 export const parseCompose = (content: string, filepath: string): unknown => {
   try {

@@ -3,9 +3,9 @@ import path from "node:path";
 
 import * as Schema from "effect/Schema";
 
-import { ConfigError } from "../errors.js";
-import type { DockerDoctorConfig } from "../schemas/config.js";
-import { DockerDoctorConfigSchema } from "../schemas/config.js";
+import { ConfigError } from "../errors";
+import type { DockerDoctorConfig } from "../schemas/config";
+import { DockerDoctorConfigSchema } from "../schemas/config";
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {

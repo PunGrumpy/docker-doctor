@@ -1,5 +1,5 @@
-import { allComposeRules } from "../rules/index.js";
-import type { Diagnostic, RuleSeverity } from "../types/index.js";
+import { allComposeRules } from "../rules/index";
+import type { Diagnostic, RuleSeverity } from "../types/index";
 
 export const runComposeRules = (
   composeContent: unknown,

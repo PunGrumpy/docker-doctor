@@ -1,9 +1,9 @@
-import { allDockerfileRules } from "../rules/index.js";
+import { allDockerfileRules } from "../rules/index";
 import type {
   DockerfileInstruction,
   Diagnostic,
   RuleSeverity,
-} from "../types/index.js";
+} from "../types/index";
 
 export const runDockerfileRules = (
   instructions: DockerfileInstruction[],

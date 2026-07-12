@@ -1,9 +1,9 @@
-import type { ConfigError } from "./errors/config-error.js";
-import type { FileNotFoundError } from "./errors/file-not-found-error.js";
-import type { ParseError } from "./errors/parse-error.js";
+import type { ConfigError } from "./errors/config-error";
+import type { FileNotFoundError } from "./errors/file-not-found-error";
+import type { ParseError } from "./errors/parse-error";
 
-export { ConfigError } from "./errors/config-error.js";
-export { FileNotFoundError } from "./errors/file-not-found-error.js";
-export { ParseError } from "./errors/parse-error.js";
+export { ConfigError } from "./errors/config-error";
+export { FileNotFoundError } from "./errors/file-not-found-error";
+export { ParseError } from "./errors/parse-error";
 
 export type DockerDoctorError = ParseError | FileNotFoundError | ConfigError;

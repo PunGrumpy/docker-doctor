@@ -2,12 +2,12 @@ import type {
   DockerfileRule,
   ComposeRule,
   RuleDefinition,
-} from "../types/index.js";
-import { bestPracticesRules } from "./best-practices.js";
-import { composeRules } from "./compose.js";
-import { imageSizeRules } from "./image-size.js";
-import { performanceRules } from "./performance.js";
-import { securityRules } from "./security.js";
+} from "../types/index";
+import { bestPracticesRules } from "./best-practices";
+import { composeRules } from "./compose";
+import { imageSizeRules } from "./image-size";
+import { performanceRules } from "./performance";
+import { securityRules } from "./security";
 
 export const allDockerfileRules: DockerfileRule[] = [
   ...securityRules,
