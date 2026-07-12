@@ -8,14 +8,33 @@ import {
   avoidRunCd,
   sortMultilineArgs,
   useraddNoLogInit,
+  requireHealthcheck,
+  preferCopyOverAdd,
+  useExecForm,
+  requireLabels,
 } from "../src/rules/best-practices.js";
-import { noVersionKey, requireResourceLimits } from "../src/rules/compose.js";
-import { preferSlimBase, cleanPackageCache } from "../src/rules/image-size.js";
-import { orderLayers } from "../src/rules/performance.js";
+import {
+  noVersionKey,
+  requireResourceLimits,
+  requireRestartPolicy,
+  useDependsOnCondition,
+} from "../src/rules/compose.js";
+import {
+  preferSlimBase,
+  cleanPackageCache,
+  avoidDevDependencies,
+} from "../src/rules/image-size.js";
+import {
+  orderLayers,
+  useMultiStage,
+  minimizeLayers,
+  useDockerignore,
+} from "../src/rules/performance.js";
 import {
   noRootUser,
   pinImageVersion,
   noSecretsInEnv,
+  noAddRemote,
 } from "../src/rules/security.js";
 
 describe("Security Rules", () => {
