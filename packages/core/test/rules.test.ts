@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
-import { parseDockerfile } from "../src/parsers/dockerfile-parser.js";
+import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   combineAptUpdateInstall,
   usePipefail,
@@ -12,30 +12,30 @@ import {
   preferCopyOverAdd,
   useExecForm,
   requireLabels,
-} from "../src/rules/best-practices.js";
+} from "../src/rules/best-practices";
 import {
   noVersionKey,
   requireResourceLimits,
   requireRestartPolicy,
   useDependsOnCondition,
-} from "../src/rules/compose.js";
+} from "../src/rules/compose";
 import {
   preferSlimBase,
   cleanPackageCache,
   avoidDevDependencies,
-} from "../src/rules/image-size.js";
+} from "../src/rules/image-size";
 import {
   orderLayers,
   useMultiStage,
   minimizeLayers,
   useDockerignore,
-} from "../src/rules/performance.js";
+} from "../src/rules/performance";
 import {
   noRootUser,
   pinImageVersion,
   noSecretsInEnv,
   noAddRemote,
-} from "../src/rules/security.js";
+} from "../src/rules/security";
 
 describe("Security Rules", () => {
   test("no-root-user", () => {

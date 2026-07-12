@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 
-import { parseCompose } from "../src/parsers/compose-parser.js";
-import { parseDockerfile } from "../src/parsers/dockerfile-parser.js";
+import { parseCompose } from "../src/parsers/compose-parser";
+import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 
 describe("Dockerfile Parser", () => {
   test("should parse simple Dockerfile instruction", () => {
