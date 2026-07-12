@@ -118,6 +118,34 @@ describe("Compose Rules", () => {
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
   });
+
+  test("require-restart-policy", () => {
+    const withoutRestart = {
+      services: {
+        web: { image: "node:22" },
+      },
+    };
+    const diags1 = requireRestartPolicy.check(withoutRestart, "compose.yml");
+    expect(diags1).toHaveLength(1);
+
+    const withRestart = {
+      services: {
+        web: { image: "node:22", restart: "always" },
+      },
+    };
+    const diags2 = requireRestartPolicy.check(withRestart, "compose.yml");
+    expect(diags2).toHaveLength(0);
+  });
+
+  test("use-depends-on-condition", () => {
+    const shortForm = {
+      services: {
+        web: { image: "node:22", depends_on: ["db"] },
+      },
+    };
+    const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
+    expect(diags1).toHaveLength(1);
+  });
 });
 
 describe("Image Size Rules", () => {
