@@ -1,4 +1,8 @@
-# Docker Doctor
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://docker-doctor.vercel.app/docker-doctor-readme-logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://docker-doctor.vercel.app/docker-doctor-readme-logo-light.svg">
+  <img alt="Docker Doctor" src="https://docker-doctor.vercel.app/docker-doctor-readme-logo-light.svg" width="96" height="16">
+</picture>
 
 <status>
 <a href="https://www.npmjs.com/package/@docker-doctor/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=dark"><img alt="badge" src="https://shieldcn.dev/npm/@docker-doctor/cli.svg?size=xs&amp;statusDot=true&amp;mode=light"></picture></a>
