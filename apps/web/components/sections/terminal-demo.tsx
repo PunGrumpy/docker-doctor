@@ -197,7 +197,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
                 {getProgressBar(45)}
               </div>
               <div className="text-[10px] text-muted-foreground font-mono">
-                Docker Doctor (https://github.com/PunGrumpy/docker-doctor)
+                Docker Doctor (https://docker-doctor.vercel.app)
               </div>
             </div>
           </div>
@@ -379,7 +379,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
                 {getProgressBar(100)}
               </div>
               <div className="text-[10px] text-muted-foreground font-mono">
-                Docker Doctor (https://github.com/PunGrumpy/docker-doctor)
+                Docker Doctor (https://docker-doctor.vercel.app)
               </div>
             </div>
           </div>

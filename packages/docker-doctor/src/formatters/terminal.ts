@@ -224,7 +224,7 @@ const printScoreBox = async (
         process.stdout.write(
           `  ${whaleLines[0]}  ${scoreColor(`${currentScore} / 100`)} ${scoreColor(label)}\n` +
             `  ${whaleLines[1]}  ${bar}\n` +
-            `  ${whaleLines[2]}  ${chalk.dim("Docker Doctor (https://github.com/PunGrumpy/docker-doctor)")}\n` +
+            `  ${whaleLines[2]}  ${chalk.dim("Docker Doctor (https://docker-doctor.vercel.app)")}\n` +
             `  ${whaleLines[3]}\n`
         );
 
@@ -249,7 +249,7 @@ const printScoreBox = async (
     );
     console.log(`  ${whaleLines[1]}  ${bar}`);
     console.log(
-      `  ${whaleLines[2]}  ${chalk.dim("Docker Doctor (https://github.com/PunGrumpy/docker-doctor)")}`
+      `  ${whaleLines[2]}  ${chalk.dim("Docker Doctor (https://docker-doctor.vercel.app)")}`
     );
     console.log(`  ${whaleLines[3]}`);
   }
