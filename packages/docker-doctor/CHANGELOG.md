@@ -1,5 +1,12 @@
 # @docker-doctor/cli
 
+## 0.2.1
+
+### Patch Changes
+
+- 62078a3: Update terminal formatter to output a score sharing URL pointing to the web app dashboard with score, warnings, and errors parameters.
+- 49fb8ba: Update terminal score box URL from GitHub repo to Vercel web app.
+
 ## 0.2.0
 
 ### Minor Changes
