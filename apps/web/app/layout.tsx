@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { Header } from "@/components/header";
 import { DesignSystemProvider } from "@/components/providers/client";
 import { Footer } from "@/components/sections/footer";
 import { fonts } from "@/lib/fonts";
@@ -44,6 +45,7 @@ const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
     <body className={fonts}>
       <DesignSystemProvider>
+        <Header />
         <main className="flex justify-center min-h-screen">
           <div className="relative flex w-full flex-col bg-background overflow-x-clip">
             <div
