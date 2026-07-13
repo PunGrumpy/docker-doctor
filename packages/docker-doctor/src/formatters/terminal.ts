@@ -171,7 +171,9 @@ const easeOutCubic = (x: number): number => 1 - (1 - x) ** 3;
 const printScoreBox = async (
   score: number,
   label: string,
-  categoryIssueCounts: Record<string, number>
+  categoryIssueCounts: Record<string, number>,
+  warningsCount: number,
+  errorsCount: number
 ): Promise<void> => {
   const { isTTY } = process.stdout;
   const shouldAnimate =
@@ -192,11 +194,7 @@ const printScoreBox = async (
   const border = scoreColor;
   const whaleLines = getWhaleMascot(score, border);
 
-  const totalIssues = Object.values(categoryIssueCounts).reduce(
-    (a, b) => a + b,
-    0
-  );
-  const shareUrl = `https://github.com/PunGrumpy/docker-doctor/share?s=${score}&w=${totalIssues}`;
+  const shareUrl = `https://docker-doctor.vercel.app/share?s=${score}&w=${warningsCount}&e=${errorsCount}`;
 
   if (shouldAnimate) {
     const frameCount = 20;
@@ -295,13 +293,28 @@ export const formatTerminal = async (
     Security: 0,
   };
 
+  let warningsCount = 0;
+  let errorsCount = 0;
+
   for (const d of diagnostics) {
     const ruleDef = findRule(d.rule);
     const category = ruleDef?.category || "Best Practices";
     categoryIssueCounts[category] = (categoryIssueCounts[category] || 0) + 1;
+
+    if (d.severity === "warning") {
+      warningsCount += 1;
+    } else if (d.severity === "error") {
+      errorsCount += 1;
+    }
   }
 
   printDiagnostics(diagnostics, verbose, fileContents, categoryIssueCounts);
 
-  await printScoreBox(score, label, categoryIssueCounts);
+  await printScoreBox(
+    score,
+    label,
+    categoryIssueCounts,
+    warningsCount,
+    errorsCount
+  );
 };
