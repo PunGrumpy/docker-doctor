@@ -16,13 +16,10 @@ export const GET = async (request: NextRequest) => {
   const score = parseScore(searchParams.get("s"));
   const { color } = getScoreData(score);
 
-  const regularFont = await readFile(
-    path.join(process.cwd(), "app/share/og/geist-sans-regular.ttf")
-  );
-
-  const semiboldFont = await readFile(
-    path.join(process.cwd(), "app/share/og/geist-sans-semibold.ttf")
-  );
+  const [regularFont, semiboldFont] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/share/og/geist-sans-regular.ttf")),
+    readFile(path.join(process.cwd(), "app/share/og/geist-sans-semibold.ttf")),
+  ]);
 
   return new ImageResponse(
     <div
