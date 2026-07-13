@@ -90,7 +90,7 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
 
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl bg-card/20 p-1 shadow-custom group-focus-visible:ring-2">
-      <div className="relative flex size-full flex-col overflow-hidden rounded-xl bg-background">
+      <div className="relative flex size-full flex-col overflow-hidden rounded-xl preview-card">
         <div className="flex w-full grow flex-col items-center justify-center gap-5.5 pt-9.75 pb-6">
           <div className="flex flex-col items-center gap-2.25">
             <Pill>{label}</Pill>
@@ -125,8 +125,6 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
           <ShareButton href={linkedinUrl}>Share on LinkedIn</ShareButton>
           <ShareButton onClick={handleCopyBadge}>Copy GitHub badge</ShareButton>
         </div>
-
-        <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-foreground/9 ring-inset" />
       </div>
     </div>
   );

@@ -205,10 +205,42 @@
   }
 }
 
+@keyframes codeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility stagger-enter {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeInUp 400ms var(--ease-out) forwards;
+}
+
 @layer components {
   .code-panel {
     max-width: 100%;
     overflow-x: hidden;
+    counter-reset: code-line;
+    animation: codeEnter 200ms var(--ease-out);
   }
   .code-panel .shiki {
     margin: 0;
@@ -220,8 +252,6 @@
   .code-panel .shiki code {
     max-width: 100%;
     box-sizing: border-box;
-  }
-  .code-panel .shiki code {
     font-family: var(--font-mono);
     font-size: 11px;
     min-width: 0;
@@ -246,38 +276,16 @@
     user-select: none;
     font-size: 11px;
   }
-  .code-panel {
-    counter-reset: code-line;
-    animation: codeEnter 200ms var(--ease-out);
-  }
 
-  @keyframes codeEnter {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-      filter: blur(2px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-      filter: blur(0);
-    }
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .stagger-enter {
-    opacity: 0;
-    transform: translateY(8px);
-    animation: fadeInUp 400ms var(--ease-out) forwards;
+  .preview-card {
+    background-color: var(--background);
+    width: 100%;
+    box-shadow: var(--shadow-custom);
+    border-radius: 0.75rem;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    overflow: hidden;
   }
 }
