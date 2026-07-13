@@ -2,27 +2,19 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { ImageResponse } from "next/og";
-import type { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+import { getScoreData } from "@/lib/score";
 
 const parseScore = (raw: string | null): number => {
   const value = Math.trunc(Number(raw || "100"));
   return Math.min(100, Math.max(0, value));
 };
 
-const scoreColor = (score: number): string => {
-  if (score >= 90) {
-    return "#22c55e";
-  }
-  if (score >= 75) {
-    return "#eab308";
-  }
-  return "#ef4444";
-};
-
-export const GET = async (request: NextRequest): Promise<NextResponse> => {
+export const GET = async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const score = parseScore(searchParams.get("s"));
-  const color = scoreColor(score);
+  const { color } = getScoreData(score);
 
   const regularFont = await readFile(
     path.join(process.cwd(), "app/share/og/geist-sans-regular.ttf")
