@@ -21,13 +21,12 @@ export const Installer = () => (
       rel="noopener noreferrer"
       className={cn(
         "flex items-center justify-center gap-2 h-12 w-full sm:w-auto px-4 rounded-xl",
-        "font-medium text-white",
-        "bg-linear-to-b from-blue-400 to-blue-500 shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]",
-        "active:scale-[0.97] hover:brightness-110 transition-[transform,filter] duration-150 ease-out"
+        "has-[>svg:first-child:not(:last-child)]:pl-3 has-[>svg:last-child:not(:first-child)]:pr-3 has-[>svg:only-child]:px-3",
+        "font-medium text-white bg-linear-to-b from-blue-400 to-blue-500 shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]"
       )}
       aria-label="View on GitHub"
     >
-      <GitHub className="size-4" />
+      <GitHub className="size-5" />
       <span className="content select-none">View on GitHub</span>
     </a>
   </Section>
