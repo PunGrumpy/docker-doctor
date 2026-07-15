@@ -3,7 +3,10 @@
 import { Play, Pause, RotateCcw, Check, AlertTriangle } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
-import { ClaudeCode } from "@/components/icons/claude-code";
+import { ClaudeDiff } from "@/components/claude/claude-diff";
+import { ClaudeHeader } from "@/components/claude/claude-header";
+import { ClaudeThinking } from "@/components/claude/claude-thinking";
+import { ClaudeTodoList } from "@/components/claude/claude-todo-list";
 import { Plus } from "@/components/icons/plus";
 import { Section } from "@/components/section";
 import { cn } from "@/lib/utils";
@@ -213,92 +216,81 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
   }
 
   return (
-    <div className="space-y-4 flex flex-col items-start gap-4">
-      <div
-        className="flex w-full flex-col text-[#F76038] font-sans stagger-enter"
-        style={{ animationDelay: "0ms" }}
-      >
-        <div className="flex items-stretch h-3">
-          <div className="w-5 shrink-0 rounded-tl-[10px] border-l border-t border-[#F76038]" />
-          <div className="px-2 text-xs font-semibold select-none leading-none transform -translate-y-1/2">
-            Claude Code v2.1
-          </div>
-          <div className="flex-1 rounded-tr-[10px] border-r border-t border-[#F76038]" />
-        </div>
-        <div className="flex flex-col items-start gap-1.5 rounded-b-[10px] border-x border-b border-[#F76038] px-5 pt-3 pb-4">
-          <ClaudeCode className="h-auto w-16 shrink-0" aria-hidden="true" />
-          <div className="pt-1 text-[#424242] dark:text-[#C6C6C6] text-xs font-semibold">
-            Fable 5
-          </div>
-          <div className="text-[#909090] dark:text-[#6E6E6E] text-[10px]">
-            ~/Developer/project
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="w-full border-b border-solid border-border stagger-enter"
-        style={{ animationDelay: "50ms" }}
+    <div
+      className="space-y-4 flex flex-col w-full stagger-enter"
+      style={{ animationDelay: "0ms" }}
+    >
+      <ClaudeHeader
+        version="v2.1"
+        user="PunGrumpy"
+        model="Fable 5 with max effort"
+        org="docker-doctor Organization"
+        cwd="~/Developments/docker-doctor"
+        tips={[
+          "Ask Claude to fix configuration issues",
+          "Run /doctor to analyze performance",
+        ]}
+        whatsNew={[
+          "Interactive radiogroups for permission prompts",
+          "Accessible, keyboard-operable details blocks",
+        ]}
+        className="bg-card text-foreground dark:text-[#c0caf5]"
       />
 
-      <div
-        className="w-full overflow-hidden border border-solid border-border py-4 rounded-xl stagger-enter"
-        style={{ animationDelay: "100ms" }}
-      >
-        <div className="text-xs font-mono leading-[160%]">
-          <div className="whitespace-pre border-l-2 border-l-transparent pl-4 pr-5 opacity-50">
-            <span className="text-muted-foreground/45 select-none w-10 inline-block text-right pr-2" />
-            <span className="text-muted-foreground/45 select-none">
-              # Dockerfile
+      {ticks >= 112 && (
+        <ClaudeTodoList
+          todos={[
+            {
+              label: "Analyze Dockerfile layout",
+              status: "done",
+            },
+            {
+              label: "Pin Node.js base image version and add non-root user",
+              status: ticks >= 118 ? "done" : "active",
+            },
+          ]}
+        />
+      )}
+
+      {ticks >= 106 && ticks < 118 && (
+        <ClaudeThinking
+          running={true}
+          verbs={["Levitating", "Herding", "Percolating", "Conjuring"]}
+          showTokens={true}
+          className="text-foreground dark:text-[#c0caf5]"
+        />
+      )}
+
+      {ticks >= 118 && (
+        <div
+          className="space-y-4 w-full stagger-enter"
+          style={{ animationDelay: "50ms" }}
+        >
+          <ClaudeDiff
+            file="Dockerfile"
+            summary="Updated Dockerfile: pinned base image version, added non-root USER instruction"
+            lines={[
+              { n: 1, text: "FROM node:latest", type: "del" },
+              { n: 1, text: "FROM node:22.2.0-alpine", type: "add" },
+              { n: 2, text: "COPY . .", type: "ctx" },
+              { n: 3, text: "RUN npm install", type: "ctx" },
+              { n: 4, text: "USER node", type: "add" },
+              { n: 5, text: 'CMD ["npm", "start"]', type: "ctx" },
+            ]}
+            className="w-full text-foreground dark:text-[#c0caf5]"
+          />
+
+          <div
+            className="whitespace-nowrap text-[#424242] dark:text-[#C6C6C6] text-xs flex items-center gap-1.5 stagger-enter"
+            style={{ animationDelay: "100ms" }}
+          >
+            <span className="inline-block w-[1ch] text-center text-[#cd694a] font-bold">
+              ✻
             </span>
-          </div>
-          <div className="whitespace-pre border-l-2 pl-4 pr-5 bg-[#FF3B3014] border-l-[#FF3B30] dark:bg-[#FF453A24] dark:border-l-[#FF453A]">
-            <span className="text-[#C9303C] dark:text-[#FF7A85]">
-              - 1 │ FROM node:latest
-            </span>
-          </div>
-          <div className="whitespace-pre border-l-2 pl-4 pr-5 bg-[#34C75914] border-l-[#34C759] dark:bg-[#30D15824] dark:border-l-[#30D158]">
-            <span className="text-[#1F8A43] dark:text-[#4ADE80]">
-              + 1 │ FROM node:22.2.0-alpine
-            </span>
-          </div>
-          <div className="whitespace-pre border-l-2 border-l-transparent pl-4 pr-5 opacity-50">
-            <span className="text-muted-foreground/45 select-none w-10 inline-block text-right pr-2">
-              2 │{" "}
-            </span>
-            <span className="text-foreground">COPY . .</span>
-          </div>
-          <div className="whitespace-pre border-l-2 border-l-transparent pl-4 pr-5 opacity-50">
-            <span className="text-muted-foreground/45 select-none w-10 inline-block text-right pr-2">
-              3 │{" "}
-            </span>
-            <span className="text-foreground">RUN npm install</span>
-          </div>
-          <div className="whitespace-pre border-l-2 pl-4 pr-5 bg-[#34C75914] border-l-[#34C759] dark:bg-[#30D15824] dark:border-l-[#30D158]">
-            <span className="text-[#1F8A43] dark:text-[#4ADE80]">
-              + 4 │ USER node
-            </span>
-          </div>
-          <div className="whitespace-pre border-l-2 border-l-transparent pl-4 pr-5 opacity-50">
-            <span className="text-muted-foreground/45 select-none w-10 inline-block text-right pr-2">
-              5 │{" "}
-            </span>
-            <span className="text-foreground">
-              CMD [&quot;npm&quot;, &quot;start&quot;]
-            </span>
+            <span className="font-mono text-[13px]">Done in 1.4s</span>
           </div>
         </div>
-      </div>
-
-      <div
-        className="whitespace-nowrap text-[#424242] dark:text-[#C6C6C6] text-xs flex items-center gap-1.5 stagger-enter"
-        style={{ animationDelay: "150ms" }}
-      >
-        <span className="inline-block w-[1ch] text-center text-[#909090] dark:text-[#6E6E6E]">
-          ✻
-        </span>
-        <span>Cooked for 4s</span>
-      </div>
+      )}
     </div>
   );
 };
