@@ -47,7 +47,7 @@ export const ClaudeDiff = ({
         <span aria-hidden className="shrink-0" style={{ color: "#565f89" }}>
           ⎿
         </span>
-        <span className="min-w-0 break-words">{summary}</span>
+        <span className="min-w-0 wrap-break-words">{summary}</span>
       </div>
     ) : null}
 

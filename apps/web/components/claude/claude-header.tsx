@@ -117,7 +117,7 @@ export const ClaudeHeader = ({
         <div className="font-semibold">Welcome back {user}!</div>
         <ClaudeLogo className="my-1.5" />
         <div
-          className="min-w-0 space-y-0.5 break-words"
+          className="min-w-0 space-y-0.5 wrap-break-words"
           style={{ color: GRAY }}
         >
           <div>{model}</div>

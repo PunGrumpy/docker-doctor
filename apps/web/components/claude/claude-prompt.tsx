@@ -123,7 +123,7 @@ export const ClaudePrompt = ({
           className="flex justify-end px-1 pb-1 text-[12px]"
           style={{ color: GRAY }}
         >
-          <span className="min-w-0 break-words text-right">
+          <span className="min-w-0 wrap-break-words text-right">
             <span aria-hidden>{e.glyph}</span> {e.label}
           </span>
         </div>
@@ -169,7 +169,7 @@ export const ClaudePrompt = ({
         />
       </div>
 
-      <div className="mt-1.5 min-w-0 break-words px-1 text-[12px]">
+      <div className="mt-1.5 min-w-0 wrap-break-words px-1 text-[12px]">
         <span style={{ color: m.color }}>
           <span aria-hidden>{m.glyph} </span>
           {m.label}
