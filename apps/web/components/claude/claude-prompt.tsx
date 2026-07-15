@@ -90,8 +90,8 @@ const EFFORTS: Record<
 export const ClaudePrompt = ({
   value,
   defaultValue = "",
-  onChange,
-  onKeyDown,
+  onChangeAction,
+  onKeyDownAction,
   placeholder = "",
   mode = "auto",
   effort = "xhigh",
@@ -100,8 +100,8 @@ export const ClaudePrompt = ({
 }: {
   value?: string;
   defaultValue?: string;
-  onChange?: React.ChangeEventHandler<HTMLInputElement>;
-  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  onChangeAction?: React.ChangeEventHandler<HTMLInputElement>;
+  onKeyDownAction?: React.KeyboardEventHandler<HTMLInputElement>;
   placeholder?: string;
   mode?: ClaudeMode;
   /** Effort chip above the prompt. Pass `false` to hide. */
@@ -151,8 +151,10 @@ export const ClaudePrompt = ({
           type="text"
           aria-label="Prompt"
           placeholder={placeholder}
-          onKeyDown={onKeyDown}
-          {...(controlled ? { onChange, value } : { defaultValue, onChange })}
+          onKeyDown={onKeyDownAction}
+          {...(controlled
+            ? { onChange: onChangeAction, value }
+            : { defaultValue, onChange: onChangeAction })}
           className={cn(
             "term-input min-w-0 flex-1 bg-transparent py-0.5 pl-[1ch] outline-none placeholder:text-[#565f89]",
             inputClassName

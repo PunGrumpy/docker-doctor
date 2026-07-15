@@ -59,7 +59,7 @@ export const ClaudeToolCall = ({
           >
             ⏺
           </span>
-          <span className="min-w-0 break-words">
+          <span className="min-w-0 wrap-break-words">
             <span className="text-[#c0caf5]">{tool}</span>
             {arg === undefined ? null : (
               <>
@@ -79,7 +79,7 @@ export const ClaudeToolCall = ({
             <span aria-hidden className="shrink-0 text-[#565f89]">
               ⎿
             </span>
-            <span className="min-w-0 break-words">
+            <span className="min-w-0 wrap-break-words">
               {result}
               {expandable ? (
                 <span className="ml-2 text-[#565f89] group-open:hidden">

@@ -26,7 +26,7 @@ export const ClaudePermission = ({
   question = "Do you want to proceed?",
   options = DEFAULT_OPTIONS,
   defaultSelected = 0,
-  onChoose,
+  onChooseAction,
   className,
 }: {
   title?: string;
@@ -34,7 +34,7 @@ export const ClaudePermission = ({
   question?: string;
   options?: string[];
   defaultSelected?: number;
-  onChoose?: (index: number) => void;
+  onChooseAction?: (index: number) => void;
   className?: string;
 }) => {
   const [sel, setSel] = React.useState(defaultSelected);
@@ -51,7 +51,7 @@ export const ClaudePermission = ({
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       setSel(i);
-      onChoose?.(i);
+      onChooseAction?.(i);
     }
   };
 
@@ -80,7 +80,7 @@ export const ClaudePermission = ({
               onKeyDown={(e) => onKey(e, i)}
               onClick={() => {
                 setSel(i);
-                onChoose?.(i);
+                onChooseAction?.(i);
               }}
               className="flex cursor-pointer items-baseline gap-2 rounded px-1 py-0.5 outline-none focus-visible:ring-1 focus-visible:ring-[#7dcfff]/60"
               style={{ background: active ? `${ROSE}1f` : "transparent" }}
