@@ -1,7 +1,8 @@
 /* eslint-disable jsx-a11y/prefer-tag-over-role */
 "use client";
 
-import * as React from "react";
+import type { KeyboardEvent } from "react";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -37,9 +38,9 @@ export const ClaudePermission = ({
   onChooseAction?: (index: number) => void;
   className?: string;
 }) => {
-  const [sel, setSel] = React.useState(defaultSelected);
+  const [sel, setSel] = useState(defaultSelected);
 
-  const onKey = (e: React.KeyboardEvent, i: number) => {
+  const onKey = (e: KeyboardEvent, i: number) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const next =

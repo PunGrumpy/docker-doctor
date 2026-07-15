@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type { ChangeEventHandler, KeyboardEventHandler } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -100,8 +100,8 @@ export const ClaudePrompt = ({
 }: {
   value?: string;
   defaultValue?: string;
-  onChangeAction?: React.ChangeEventHandler<HTMLInputElement>;
-  onKeyDownAction?: React.KeyboardEventHandler<HTMLInputElement>;
+  onChangeAction?: ChangeEventHandler<HTMLInputElement>;
+  onKeyDownAction?: KeyboardEventHandler<HTMLInputElement>;
   placeholder?: string;
   mode?: ClaudeMode;
   /** Effort chip above the prompt. Pass `false` to hide. */

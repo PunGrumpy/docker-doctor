@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useState, useEffect } from "react";
 
 /**
  * ClaudeThinking — Claude Code's "working" line.
@@ -30,13 +30,13 @@ const HILITE = "#e79475";
 const DIM = "#7d7d7d";
 
 const usePrefersReducedMotion = () => {
-  const [reduced, setReduced] = React.useState(() => {
+  const [reduced, setReduced] = useState(() => {
     if (typeof window !== "undefined") {
       return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
     return false;
   });
-  React.useEffect(() => {
+  useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const on = () => setReduced(mq.matches);
     mq.addEventListener("change", on);
@@ -57,11 +57,11 @@ export const ClaudeThinking = ({
   className?: string;
 }) => {
   const prefersReduced = usePrefersReducedMotion();
-  const [glyph, setGlyph] = React.useState(0);
-  const [verbIdx, setVerbIdx] = React.useState(0);
-  const [secs, setSecs] = React.useState(0);
+  const [glyph, setGlyph] = useState(0);
+  const [verbIdx, setVerbIdx] = useState(0);
+  const [secs, setSecs] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!running || prefersReduced) {
       return;
     }
@@ -69,7 +69,7 @@ export const ClaudeThinking = ({
     return () => clearInterval(id);
   }, [running, prefersReduced]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!running) {
       return;
     }
@@ -77,7 +77,7 @@ export const ClaudeThinking = ({
     return () => clearInterval(id);
   }, [running]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!running) {
       return;
     }
