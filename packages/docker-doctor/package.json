@@ -54,6 +54,7 @@
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=4096' tsdown",
     "dev": "NODE_OPTIONS='--max-old-space-size=4096' tsdown --watch",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf .turbo node_modules dist"
   },
