@@ -55,6 +55,10 @@ export const orderLayers: DockerfileRule = {
     let copyAllLine = -1;
 
     for (const inst of instructions) {
+      if (inst.instruction === "FROM") {
+        copyAllLine = -1;
+      }
+
       if (inst.instruction === "COPY" || inst.instruction === "ADD") {
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
@@ -63,10 +67,15 @@ export const orderLayers: DockerfileRule = {
           continue;
         }
 
-        if (
-          (src === "." || src === "./" || src === "*" || src.includes("src")) &&
-          copyAllLine === -1
-        ) {
+        const normalized = src.replace(/^\.\//u, "");
+        const isCopyAll =
+          normalized === "." ||
+          normalized === "" ||
+          normalized === "*" ||
+          normalized === "src" ||
+          normalized.startsWith("src/");
+
+        if (isCopyAll && copyAllLine === -1) {
           copyAllLine = inst.line;
         }
       }

@@ -155,6 +155,27 @@ describe("Performance Rules", () => {
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
   });
 
+  test("order-layers: correct multi-stage build", () => {
+    const correctMultiStage = parseDockerfile(`
+      FROM node:22-alpine AS build
+      COPY . .
+      RUN npm run build
+      FROM node:22-alpine
+      COPY package.json ./
+      RUN npm ci --omit=dev
+    `);
+    expect(orderLayers.check(correctMultiStage, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("order-layers: /usr/src path is not a copy-all", () => {
+    const usrSrcPath = parseDockerfile(`
+      FROM node:22-alpine
+      COPY /usr/src/lib /lib
+      RUN npm ci
+    `);
+    expect(orderLayers.check(usrSrcPath, "Dockerfile")).toHaveLength(0);
+  });
+
   test("use-multi-stage", () => {
     const singleStage = parseDockerfile(`
         FROM node:22
