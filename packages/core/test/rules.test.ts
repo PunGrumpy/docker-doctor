@@ -55,6 +55,19 @@ describe("Security Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  test("no-root-user: multi-stage runtime without USER", () => {
+    const multiStageRootRuntime = parseDockerfile(`
+      FROM node:22-alpine AS build
+      USER node
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      CMD ["node", "dist/index.js"]
+    `);
+    const diags3 = noRootUser.check(multiStageRootRuntime, "Dockerfile");
+    expect(diags3).toHaveLength(1);
+  });
+
   test("pin-image-version", () => {
     const unpinned = parseDockerfile(`
       FROM node

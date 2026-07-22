@@ -16,7 +16,10 @@ export const noRootUser: DockerfileRule = {
     let lastUserLine = 1;
 
     for (const inst of instructions) {
-      if (inst.instruction === "USER") {
+      if (inst.instruction === "FROM") {
+        lastUser = "root";
+        lastUserLine = inst.line;
+      } else if (inst.instruction === "USER") {
         lastUser = inst.args.trim().toLowerCase();
         lastUserLine = inst.line;
       }
