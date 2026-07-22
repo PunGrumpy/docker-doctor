@@ -51,12 +51,12 @@ export const noSecretsInEnv: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     const secretKeywords = [
-      /password/iu,
-      /secret/iu,
-      /token/iu,
-      /api_key/iu,
-      /private_key/iu,
-      /auth/iu,
+      /(?:^|[_-])password(?:[_-]|$)/iu,
+      /(?:^|[_-])secret(?:[_-]|$)/iu,
+      /(?:^|[_-])token(?:[_-]|$)/iu,
+      /(?:^|[_-])api_key(?:[_-]|$)/iu,
+      /(?:^|[_-])private_key(?:[_-]|$)/iu,
+      /(?:^|[_-])auth(?:[_-]|$)/iu,
     ];
 
     for (const inst of instructions) {

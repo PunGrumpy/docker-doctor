@@ -111,6 +111,22 @@ describe("Security Rules", () => {
     expect(diagsSpaceNormal).toHaveLength(0);
   });
 
+  test("no-secrets-in-env: AUTHOR is not a secret", () => {
+    const authorNotSecret = parseDockerfile(`
+      ENV AUTHOR=grumpy
+    `);
+    expect(noSecretsInEnv.check(authorNotSecret, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("no-secrets-in-env: OAUTH_ISSUER_URL is not a secret", () => {
+    const oauthUrlNotSecret = parseDockerfile(`
+      ENV OAUTH_ISSUER_URL=https://example.com
+    `);
+    expect(noSecretsInEnv.check(oauthUrlNotSecret, "Dockerfile")).toHaveLength(
+      0
+    );
+  });
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
