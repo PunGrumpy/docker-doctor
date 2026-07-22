@@ -160,8 +160,18 @@ export const useDockerignore: DockerfileRule = {
     // If copying everything, we definitely need .dockerignore
     const hasCopyAll = instructions.some((inst) => {
       if (inst.instruction === "COPY" || inst.instruction === "ADD") {
+        // COPY --from=<stage> reads from a previous build stage, not the
+        // build context, so .dockerignore is irrelevant to it.
+        const isStageCopy = /(?:^|\s)--from=/u.test(inst.args);
+        if (isStageCopy) {
+          return false;
+        }
+
         const parts = inst.args.split(/\s+/u);
-        const [src] = parts;
+        const src = parts.find((p) => !p.startsWith("--"));
+        if (!src) {
+          return false;
+        }
         return src === "." || src === "./" || src === "*";
       }
       return false;

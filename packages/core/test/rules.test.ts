@@ -134,6 +134,13 @@ describe("Security Rules", () => {
     const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
     expect(diags1).toHaveLength(1);
   });
+
+  test("no-add-remote: remote URL with --chown flag", () => {
+    const remoteAddWithChown = parseDockerfile(`
+      ADD --chown=node:node https://example.com/file.txt /app/
+    `);
+    expect(noAddRemote.check(remoteAddWithChown, "Dockerfile")).toHaveLength(1);
+  });
 });
 
 describe("Performance Rules", () => {
@@ -181,6 +188,17 @@ describe("Performance Rules", () => {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
     expect(diags2).toHaveLength(0);
+  });
+
+  test("use-dockerignore ignores stage-to-stage copies", () => {
+    const stageCopy = parseDockerfile(`
+      FROM node:22-alpine AS build
+      FROM node:22-alpine
+      COPY --from=build . ./
+    `);
+    expect(
+      useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
+    ).toHaveLength(0);
   });
 });
 

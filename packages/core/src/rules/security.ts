@@ -196,7 +196,11 @@ export const noAddRemote: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "ADD") {
         const parts = inst.args.split(/\s+/u);
-        const [src] = parts;
+        const src = parts.find((p) => !p.startsWith("--"));
+
+        if (!src) {
+          continue;
+        }
 
         if (src.startsWith("http://") || src.startsWith("https://")) {
           diagnostics.push(
