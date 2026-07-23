@@ -476,7 +476,8 @@ program
 
         if (options.score) {
           console.log(score);
-          process.exit(score < 50 ? 1 : 0);
+          process.exitCode = score < 50 ? 1 : 0;
+          return;
         } else if (options.json) {
           const report = toJsonReport(
             filteredDiagnostics,
@@ -488,27 +489,27 @@ program
           const hasErrors = filteredDiagnostics.some(
             (d) => d.severity === "error"
           );
-          process.exit(hasErrors ? 1 : 0);
-        } else {
-          await formatTerminal(
-            filteredDiagnostics,
-            score,
-            label,
-            project,
-            options.verbose,
-            fileContents
-          );
-
-          // Exit with non-zero code if there are any error severity diagnostics
-          const hasErrors = filteredDiagnostics.some(
-            (d) => d.severity === "error"
-          );
-
-          if (process.stdout.isTTY && process.stdin.isTTY) {
-            await runInteractiveWizard();
-          }
-          process.exit(hasErrors ? 1 : 0);
+          process.exitCode = hasErrors ? 1 : 0;
+          return;
         }
+        await formatTerminal(
+          filteredDiagnostics,
+          score,
+          label,
+          project,
+          options.verbose,
+          fileContents
+        );
+
+        // Exit with non-zero code if there are any error severity diagnostics
+        const hasErrors = filteredDiagnostics.some(
+          (d) => d.severity === "error"
+        );
+
+        if (process.stdout.isTTY && process.stdin.isTTY) {
+          await runInteractiveWizard();
+        }
+        process.exitCode = hasErrors ? 1 : 0;
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
