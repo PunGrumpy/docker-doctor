@@ -1,5 +1,28 @@
 import type { DockerfileInstruction } from "../types/index";
 
+const DOCKERFILE_KEYWORDS = new Set([
+  "ADD",
+  "ARG",
+  "CMD",
+  "COPY",
+  "ENTRYPOINT",
+  "ENV",
+  "EXPOSE",
+  "FROM",
+  "HEALTHCHECK",
+  "LABEL",
+  "MAINTAINER",
+  "ONBUILD",
+  "RUN",
+  "SHELL",
+  "STOPSIGNAL",
+  "USER",
+  "VOLUME",
+  "WORKDIR",
+]);
+
+const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>.*)$/u;
+
 export const parseDockerfile = (content: string): DockerfileInstruction[] => {
   const instructions: DockerfileInstruction[] = [];
   const lines = content.split(/\r?\n/u);
@@ -37,17 +60,14 @@ export const parseDockerfile = (content: string): DockerfileInstruction[] => {
     } else {
       startLine = lineNum;
       // Match the first instruction word (e.g. FROM, RUN, COPY)
-      const match = lineContent.match(/^(?<inst>[A-Z]+)\s+(?<args>.*)$/iu);
-      if (match?.groups) {
-        currentInstruction = match.groups.inst.toUpperCase();
-        currentArgs = match.groups.args;
+      const match = lineContent.match(INSTRUCTION_LINE_RE);
+      const matchedWord = match?.groups?.inst.toUpperCase();
+      if (matchedWord && DOCKERFILE_KEYWORDS.has(matchedWord)) {
+        currentInstruction = matchedWord;
+        currentArgs = match?.groups?.args ?? "";
       } else {
         const word = lineContent.trim().toUpperCase();
-        if (
-          ["RUN", "CMD", "ENTRYPOINT", "EXPOSE", "USER", "WORKDIR"].includes(
-            word
-          )
-        ) {
+        if (DOCKERFILE_KEYWORDS.has(word)) {
           currentInstruction = word;
           currentArgs = "";
         }
