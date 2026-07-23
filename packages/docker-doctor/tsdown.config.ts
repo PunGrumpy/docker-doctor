@@ -6,7 +6,7 @@ export default defineConfig({
   },
   clean: true,
   deps: {
-    alwaysBundle: ["@docker-doctor/core"],
+    alwaysBundle: ["@docker-doctor/core", "chalk"],
   },
   dts: {
     eager: true,
