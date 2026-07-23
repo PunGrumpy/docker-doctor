@@ -53,6 +53,18 @@ describe("Security Rules", () => {
     `);
     const diags2 = noRootUser.check(withUserNode, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const multiStageWithFinalUser = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      USER node
+      CMD ["node", "dist/index.js"]
+    `);
+    expect(
+      noRootUser.check(multiStageWithFinalUser, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("no-root-user: multi-stage runtime without USER", () => {
@@ -133,6 +145,29 @@ describe("Security Rules", () => {
       "Dockerfile"
     );
     expect(diagsSpaceNormal).toHaveLength(0);
+
+    const argPassthrough = parseDockerfile(`
+      ARG API_KEY
+      ENV API_KEY=\${API_KEY}
+    `);
+    expect(noSecretsInEnv.check(argPassthrough, "Dockerfile")).toHaveLength(0);
+
+    const multipleNormalVars = parseDockerfile(`
+      ENV NODE_ENV=production PORT=3000
+    `);
+    expect(noSecretsInEnv.check(multipleNormalVars, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const awsSecretKey = parseDockerfile(`
+      ENV AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+    `);
+    expect(noSecretsInEnv.check(awsSecretKey, "Dockerfile")).toHaveLength(1);
+
+    const apiKey = parseDockerfile(`
+      ENV API_KEY=not-a-real-secret
+    `);
+    expect(noSecretsInEnv.check(apiKey, "Dockerfile")).toHaveLength(1);
   });
 
   test("no-secrets-in-env: AUTHOR is not a secret", () => {
@@ -157,6 +192,13 @@ describe("Security Rules", () => {
       `);
     const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const localArchiveWithChown = parseDockerfile(`
+      ADD --chown=node:node local-archive.tar.gz /app/
+    `);
+    expect(noAddRemote.check(localArchiveWithChown, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("no-add-remote: remote URL with --chown flag", () => {
@@ -177,6 +219,14 @@ describe("Performance Rules", () => {
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
+
+    const goodOrder = parseDockerfile(`
+      FROM node:22-alpine
+      COPY package.json package-lock.json ./
+      RUN npm install
+      COPY . .
+    `);
+    expect(orderLayers.check(goodOrder, "Dockerfile")).toHaveLength(0);
   });
 
   test("order-layers: correct multi-stage build", () => {
@@ -207,6 +257,16 @@ describe("Performance Rules", () => {
       `);
     const diags1 = useMultiStage.check(singleStage, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const realisticMultiStage = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+    `);
+    expect(useMultiStage.check(realisticMultiStage, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("minimize-layers", () => {
@@ -217,6 +277,12 @@ describe("Performance Rules", () => {
       `);
     const diags1 = minimizeLayers.check(consecutive, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const combinedRun = parseDockerfile(`
+      FROM node:22-alpine
+      RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    `);
+    expect(minimizeLayers.check(combinedRun, "Dockerfile")).toHaveLength(0);
   });
 
   test("use-dockerignore", () => {
@@ -233,6 +299,15 @@ describe("Performance Rules", () => {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
     expect(diags2).toHaveLength(0);
+
+    const copyAllWithChown = parseDockerfile(`
+      FROM node:22-alpine
+      COPY --chown=node:node . .
+    `);
+    const diags3 = useDockerignore.check(copyAllWithChown, "Dockerfile", {
+      projectFiles: ["Dockerfile", ".dockerignore"],
+    });
+    expect(diags3).toHaveLength(0);
   });
 
   test("use-dockerignore ignores stage-to-stage copies", () => {
@@ -257,6 +332,16 @@ describe("Compose Rules", () => {
     };
     const diags = noVersionKey.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
+
+    const realisticCompliant = {
+      services: {
+        db: { image: "postgres:16-alpine" },
+        web: { image: "node:22-alpine" },
+      },
+    };
+    expect(noVersionKey.check(realisticCompliant, "compose.yml")).toHaveLength(
+      0
+    );
   });
 
   test("require-resource-limits", () => {
@@ -267,6 +352,20 @@ describe("Compose Rules", () => {
     };
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
+
+    const withLimits = {
+      services: {
+        web: {
+          deploy: {
+            resources: { limits: { cpus: "0.5", memory: "512M" } },
+          },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(requireResourceLimits.check(withLimits, "compose.yml")).toHaveLength(
+      0
+    );
   });
 
   test("require-restart-policy", () => {
@@ -285,6 +384,18 @@ describe("Compose Rules", () => {
     };
     const diags2 = requireRestartPolicy.check(withRestart, "compose.yml");
     expect(diags2).toHaveLength(0);
+
+    const withDeployRestartPolicy = {
+      services: {
+        web: {
+          deploy: { restart_policy: { condition: "on-failure" } },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(
+      requireRestartPolicy.check(withDeployRestartPolicy, "compose.yml")
+    ).toHaveLength(0);
   });
 
   test("use-depends-on-condition", () => {
@@ -295,6 +406,18 @@ describe("Compose Rules", () => {
     };
     const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
     expect(diags1).toHaveLength(1);
+
+    const longForm = {
+      services: {
+        web: {
+          depends_on: { db: { condition: "service_healthy" } },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
+      0
+    );
   });
 });
 
@@ -341,6 +464,11 @@ describe("Image Size Rules", () => {
     `);
     const diags2 = cleanPackageCache.check(withCleanup, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const apkNoCache = parseDockerfile(`
+      RUN apk add --no-cache curl
+    `);
+    expect(cleanPackageCache.check(apkNoCache, "Dockerfile")).toHaveLength(0);
   });
 
   test("avoid-dev-dependencies", () => {
@@ -411,6 +539,17 @@ describe("Best Practices Rules", () => {
     expect(diags3).toHaveLength(0);
   });
 
+  // Known false positive: the pipefail check tests inst.raw with no quote
+  // awareness, so a regex alternation inside a quoted argument reads as a
+  // shell pipeline. Not fixed here - see plans/README.md deferred list.
+  test.todo("use-pipefail ignores pipes inside quoted arguments", () => {
+    const quotedPipe = parseDockerfile(`
+      FROM node:22-alpine
+      RUN grep -E "foo|bar" /etc/passwd
+    `);
+    expect(usePipefail.check(quotedPipe, "Dockerfile")).toHaveLength(0);
+  });
+
   test("absolute-workdir", () => {
     const relative = parseDockerfile(`
       WORKDIR app/src
@@ -424,6 +563,13 @@ describe("Best Practices Rules", () => {
     `);
     const diags2 = absoluteWorkdir.check(absolute, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const variableWorkdir = parseDockerfile(`
+      WORKDIR \${APP_HOME}
+    `);
+    expect(absoluteWorkdir.check(variableWorkdir, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("avoid-run-cd", () => {
@@ -440,6 +586,16 @@ describe("Best Practices Rules", () => {
     `);
     const diags2 = avoidRunCd.check(withoutCd, "Dockerfile");
     expect(diags2).toHaveLength(0);
+  });
+
+  // Known false positive: /\bcd\b/ matches path segments and words in
+  // strings, not just the cd command. Not fixed here.
+  test.todo("avoid-run-cd ignores cd inside paths and strings", () => {
+    const pathWithCd = parseDockerfile(`
+      FROM node:22-alpine
+      RUN mkdir -p /opt/cd && echo abcd
+    `);
+    expect(avoidRunCd.check(pathWithCd, "Dockerfile")).toHaveLength(0);
   });
 
   test("sort-multiline-args", () => {
@@ -492,6 +648,19 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = requireHealthcheck.check(withHealth, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const multiStageWithHealth = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      EXPOSE 3000
+      HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/health || exit 1
+      CMD ["node", "dist/index.js"]
+    `);
+    expect(
+      requireHealthcheck.check(multiStageWithHealth, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("prefer-copy-over-add", () => {
@@ -506,6 +675,13 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = preferCopyOverAdd.check(addArchive, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const addArchiveWithChown = parseDockerfile(`
+      ADD --chown=node:node archive.tar.gz /app/
+    `);
+    expect(
+      preferCopyOverAdd.check(addArchiveWithChown, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("use-exec-form", () => {
@@ -520,6 +696,11 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = useExecForm.check(execForm, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const entrypointExecForm = parseDockerfile(`
+      ENTRYPOINT ["docker-entrypoint.sh"]
+    `);
+    expect(useExecForm.check(entrypointExecForm, "Dockerfile")).toHaveLength(0);
   });
 
   test("require-labels", () => {
@@ -534,5 +715,10 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = requireLabels.check(withLabels, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const withOciLabels = parseDockerfile(`
+      LABEL org.opencontainers.image.authors="team@example.com" org.opencontainers.image.version="1.0.0"
+    `);
+    expect(requireLabels.check(withOciLabels, "Dockerfile")).toHaveLength(0);
   });
 });
