@@ -1,5 +1,9 @@
 import type { Diagnostic, ProjectInfo } from "./types/index";
 
+// Bump whenever the JSON report shape or the score formula/weights change.
+// The unversioned shape shipped before this field existed is implicitly 1.
+export const REPORT_SCHEMA_VERSION = 2;
+
 export interface JsonReport {
   diagnostics: {
     column?: number;
@@ -12,6 +16,7 @@ export interface JsonReport {
   }[];
   label: string;
   project: ProjectInfo;
+  schemaVersion: number;
   score: number;
   timestamp: string;
 }
@@ -33,6 +38,7 @@ export const toJsonReport = (
   })),
   label,
   project,
+  schemaVersion: REPORT_SCHEMA_VERSION,
   score,
   timestamp: new Date().toISOString(),
 });

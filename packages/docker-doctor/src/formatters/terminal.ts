@@ -259,9 +259,7 @@ const printScoreBox = async (
   );
   console.log(`  Share: ${chalk.cyan(shareUrl)}`);
   console.log(`  Tell others how you did on socials\n`);
-  console.log(
-    `  Docs: ${chalk.cyan("https://github.com/PunGrumpy/docker-doctor/docs")}`
-  );
+  console.log(`  Docs: ${chalk.cyan("https://docker-doctor.vercel.app")}`);
   console.log(`  Learn more about fixing issues, setting up CI/CD, and`);
   console.log(`  configuring rules with a config file\n`);
   console.log(
