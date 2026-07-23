@@ -1,6 +1,10 @@
-import * as Data from "effect/Data";
-
-export class ParseError extends Data.TaggedError("ParseError")<{
+export class ParseError extends Error {
+  readonly _tag = "ParseError" as const;
   readonly file: string;
-  readonly message: string;
-}> {}
+
+  constructor(options: { readonly file: string; readonly message: string }) {
+    super(options.message);
+    this.name = "ParseError";
+    this.file = options.file;
+  }
+}

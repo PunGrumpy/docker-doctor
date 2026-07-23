@@ -1,5 +1,8 @@
-import * as Data from "effect/Data";
+export class ConfigError extends Error {
+  readonly _tag = "ConfigError" as const;
 
-export class ConfigError extends Data.TaggedError("ConfigError")<{
-  readonly message: string;
-}> {}
+  constructor(options: { readonly message: string }) {
+    super(options.message);
+    this.name = "ConfigError";
+  }
+}
