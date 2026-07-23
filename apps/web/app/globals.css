@@ -4,6 +4,34 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
+/* Tailwind v4 must scan fumadocs-ui's compiled components so their layout
+   utility classes are generated; without this the docs content collapses. */
+@source '../node_modules/fumadocs-ui/dist/**/*.js';
+
+/* Map Fumadocs' --color-fd-* tokens onto the site's own design tokens so the
+   docs share the homepage palette, borders, and cards. The var() references
+   resolve per-theme automatically (--background etc. are redefined in .dark),
+   and this block follows the fumadocs imports so it wins the cascade tie. */
+:root,
+.dark {
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-popover: var(--card);
+  --color-fd-popover-foreground: var(--card-foreground);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--card-foreground);
+  --color-fd-border: var(--border);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-secondary: var(--muted);
+  --color-fd-secondary-foreground: var(--foreground);
+  --color-fd-accent: var(--accent);
+  --color-fd-accent-foreground: var(--accent-foreground);
+  --color-fd-ring: var(--ring);
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
