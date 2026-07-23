@@ -59,7 +59,14 @@ describe("--json contract", () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
     const report = JSON.parse(stdout);
     expect(Object.keys(report).toSorted()).toEqual(
-      ["diagnostics", "label", "project", "score", "timestamp"].toSorted()
+      [
+        "diagnostics",
+        "label",
+        "project",
+        "schemaVersion",
+        "score",
+        "timestamp",
+      ].toSorted()
     );
   });
 
@@ -153,5 +160,13 @@ describe("piped --json output is not truncated", () => {
     await Bun.file(outFile).delete();
 
     expect(fileReport.diagnostics.length).toBe(report.diagnostics.length);
+  });
+});
+
+describe("heredoc fixture", () => {
+  test("heredoc fixture with --json yields at least one diagnostic", async () => {
+    const { stdout } = await runCli([fixture("heredoc"), "--json"]);
+    const report = JSON.parse(stdout);
+    expect(report.diagnostics.length).toBeGreaterThanOrEqual(1);
   });
 });

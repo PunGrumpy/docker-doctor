@@ -1,3 +1,4 @@
+import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -16,7 +17,10 @@ export const noRootUser: DockerfileRule = {
     let lastUserLine = 1;
 
     for (const inst of instructions) {
-      if (inst.instruction === "USER") {
+      if (inst.instruction === "FROM") {
+        lastUser = "root";
+        lastUserLine = inst.line;
+      } else if (inst.instruction === "USER") {
         lastUser = inst.args.trim().toLowerCase();
         lastUserLine = inst.line;
       }
@@ -48,12 +52,12 @@ export const noSecretsInEnv: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     const secretKeywords = [
-      /password/iu,
-      /secret/iu,
-      /token/iu,
-      /api_key/iu,
-      /private_key/iu,
-      /auth/iu,
+      /(?:^|[_-])password(?:[_-]|$)/iu,
+      /(?:^|[_-])secret(?:[_-]|$)/iu,
+      /(?:^|[_-])token(?:[_-]|$)/iu,
+      /(?:^|[_-])api_key(?:[_-]|$)/iu,
+      /(?:^|[_-])private_key(?:[_-]|$)/iu,
+      /(?:^|[_-])auth(?:[_-]|$)/iu,
     ];
 
     for (const inst of instructions) {
@@ -133,6 +137,7 @@ export const pinImageVersion: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    const stageAliases = collectStageAliases(instructions);
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
@@ -145,10 +150,13 @@ export const pinImageVersion: DockerfileRule = {
           continue;
         }
 
-        const colonIndex = imagePart.indexOf(":");
-        const atIndex = imagePart.indexOf("@");
+        const ref = parseImageRef(imagePart);
 
-        if (colonIndex === -1 && atIndex === -1) {
+        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+          continue;
+        }
+
+        if (!(ref.tag || ref.digest)) {
           diagnostics.push(
             createDiagnostic(
               file,
@@ -159,20 +167,17 @@ export const pinImageVersion: DockerfileRule = {
               inst.line
             )
           );
-        } else if (colonIndex !== -1) {
-          const tag = imagePart.slice(colonIndex + 1);
-          if (tag === "latest") {
-            diagnostics.push(
-              createDiagnostic(
-                file,
-                this.key,
-                this.defaultSeverity as "error" | "warning" | "info",
-                `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
-                this.help,
-                inst.line
-              )
-            );
-          }
+        } else if (ref.tag === "latest" && !ref.digest) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity as "error" | "warning" | "info",
+              `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
+              this.help,
+              inst.line
+            )
+          );
         }
       }
     }
@@ -193,7 +198,11 @@ export const noAddRemote: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "ADD") {
         const parts = inst.args.split(/\s+/u);
-        const [src] = parts;
+        const src = parts.find((p) => !p.startsWith("--"));
+
+        if (!src) {
+          continue;
+        }
 
         if (src.startsWith("http://") || src.startsWith("https://")) {
           diagnostics.push(
