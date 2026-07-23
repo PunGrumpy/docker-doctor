@@ -37,6 +37,9 @@
    divider echoing the site's dashed-grid frame. Scoped to the docs layout so
    the marketing pages are untouched. */
 #nd-notebook-layout {
+  /* Center the docs inside a fixed-width column, like the homepage frame. */
+  --fd-layout-width: 1200px;
+
   & h1 {
     font-family: var(--font-serif);
     font-weight: 400;
@@ -49,11 +52,34 @@
     box-shadow: var(--shadow-custom);
   }
 
-  & #nd-sidebar,
-  & #nd-tocnav {
+  & #nd-sidebar {
     border-inline-end-style: dashed;
-    border-inline-start-style: dashed;
   }
+}
+
+/* Dashed-grid frame around the docs column, echoing the homepage. The vertical
+   rules trace the edges of the centered layout width; the horizontal rule sits
+   just under the full-width navbar. Both are non-interactive overlays. */
+#nd-notebook-layout::before {
+  content: "";
+  position: fixed;
+  inset-block: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--fd-layout-width), 100vw);
+  border-inline: 0.5px dashed var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+
+#nd-notebook-layout::after {
+  content: "";
+  position: fixed;
+  inset-inline: max(calc(50vw - var(--fd-layout-width) / 2), 0px);
+  top: 3.5rem;
+  border-top: 0.5px dashed var(--border);
+  pointer-events: none;
+  z-index: 1;
 }
 
 @custom-variant dark (&:is(.dark *));
