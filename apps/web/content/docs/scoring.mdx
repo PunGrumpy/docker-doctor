@@ -1,0 +1,45 @@
+---
+title: Scoring
+description: How the 0-100 health score and its label are calculated.
+---
+
+Every scan produces a 0-100 health score alongside a label:
+
+| Label         | Threshold   |
+| ------------- | ----------- |
+| Excellent 🏆  | score >= 90 |
+| Good ✅       | score >= 75 |
+| Needs Work ⚠️ | score >= 50 |
+| Critical 🚨   | score < 50  |
+
+## Penalty per diagnostic
+
+Each diagnostic adds a penalty based on its severity:
+
+| Severity  | Penalty |
+| --------- | ------- |
+| `error`   | 10      |
+| `warning` | 4       |
+| `info`    | 1       |
+
+## The curve
+
+The penalties are summed, then the score is computed as an asymptotic decay curve rather than a simple subtraction:
+
+```text
+score = round(100 * e^(-penalty / K))   // K = 70
+```
+
+A perfect project (no diagnostics) always scores exactly 100. As penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings.
+
+`K = 70` was chosen so a single warning (penalty 4) still lands around 94 — comfortably inside the `Excellent` bucket — while errors and repeated warnings continue to meaningfully erode the score. The previous `K = 40` pushed a single warning down to ~90, right on the Excellent/Good boundary — too harsh a penalty for one warning.
+
+The old `max(0, 100 - penalty)` formula saturated at 0 once penalty reached 100 (about 10 errors), making a messy project and a catastrophic one indistinguishable, and the score could never register a fix. The exponential curve stays monotonic and responsive across the whole range instead.
+
+## Using the score in CI
+
+```bash
+npx @docker-doctor/cli@latest . --score
+```
+
+Prints only the numeric score and exits non-zero if it's below 50 — useful as a lightweight CI gate alongside the default scan's error-based exit code.

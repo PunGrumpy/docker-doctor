@@ -1,0 +1,64 @@
+---
+title: Rules
+description: The five rule categories and a sample of the rules in each.
+---
+
+docker-doctor ships 21+ rules across five categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config.
+
+List everything docker-doctor knows about:
+
+```bash
+npx @docker-doctor/cli@latest rules list
+```
+
+Explain any single rule in depth:
+
+```bash
+npx @docker-doctor/cli@latest rules explain <rule>
+```
+
+## Security
+
+Catches Dockerfile patterns that widen your attack surface.
+
+- `docker-doctor/no-root-user` — container should not run as root
+- `docker-doctor/no-secrets-in-env` — flags secret-shaped `ENV`/`ARG` values (passwords, tokens, API keys)
+- `docker-doctor/pin-image-version` — base images should be pinned to a specific tag, not `latest`
+- `docker-doctor/no-add-remote` — don't use `ADD` to fetch remote URLs
+
+## Performance
+
+Reduces build time and layer bloat.
+
+- `docker-doctor/use-multi-stage` — use multi-stage builds to keep the final image lean
+- `docker-doctor/order-layers` — order instructions so rarely-changing layers cache better
+- `docker-doctor/minimize-layers` — combine instructions to avoid unnecessary layers
+- `docker-doctor/use-dockerignore` — a `.dockerignore` file should exist to exclude build context bloat
+
+## Best Practices
+
+General Dockerfile hygiene.
+
+- `docker-doctor/require-healthcheck` — images should declare a `HEALTHCHECK`
+- `docker-doctor/prefer-copy-over-add` — use `COPY` instead of `ADD` for local files
+- `docker-doctor/use-exec-form` — prefer exec-form `CMD`/`ENTRYPOINT` over shell form
+- `docker-doctor/combine-apt-update-install` — `apt-get update` and `install` should run in the same `RUN` layer
+
+## Compose
+
+Docker Compose-specific checks.
+
+- `docker-doctor/no-version-key` — the top-level `version:` key is obsolete and should be removed
+- `docker-doctor/require-resource-limits` — services should declare CPU/memory limits
+- `docker-doctor/require-restart-policy` — services should declare a `restart` policy
+- `docker-doctor/use-depends-on-condition` — prefer condition-based `depends_on` over a bare service name
+
+## Image Size
+
+Keeps final images small.
+
+- `docker-doctor/prefer-slim-base` — prefer slim/alpine base image variants
+- `docker-doctor/clean-package-cache` — clean package manager caches in the same layer they're populated
+- `docker-doctor/avoid-dev-dependencies` — don't ship dev dependencies in the production image
+
+See [Configuration](/docs/configuration) to change a rule's severity or turn off a whole category.

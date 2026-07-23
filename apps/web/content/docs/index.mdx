@@ -1,0 +1,45 @@
+---
+title: Introduction
+description: docker-doctor is a static analysis tool for Dockerfile and Docker Compose files.
+---
+
+Your Dockerfiles are probably wrong. docker-doctor finds out why.
+
+docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 21+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
+
+Works with any project that uses Docker.
+
+## Key features
+
+- **21+ built-in rules** across five categories: Security, Performance, Best Practices, Compose, and Image Size.
+- **A 0-100 health score** with a human-readable label (`Excellent`, `Good`, `Needs Work`, `Critical`) so regressions are obvious at a glance.
+- **Fix guidance for every diagnostic** — each finding carries a `Help:` line with the concrete fix, plus `rules explain <rule>` for more depth.
+- **Configurable** per-rule and per-category severities, plus file ignores, via `docker-doctor.config.ts`.
+- **CI-friendly** — machine-readable `--json` output and a `--score` mode that exits non-zero below a health threshold.
+
+## Quick example
+
+```bash
+npx @docker-doctor/cli@latest
+```
+
+```text
+✔ Scanned 4 files in 0.3s [~8 workers]
+
+Dockerfile
+  10:1  warning  Container should not run as root user  docker-doctor/no-root-user
+  Help: Add a non-root user (e.g., 'USER node' or 'USER 1000') to improve security.
+
+Score: 94 Good ✅
+```
+
+## API
+
+docker-doctor also ships its scanning engine as a library:
+
+```ts
+import { discoverProject, toJsonReport } from "@docker-doctor/cli";
+import type { Diagnostic } from "@docker-doctor/cli";
+```
+
+Continue to [Getting Started](/docs/getting-started) to run your first scan.
