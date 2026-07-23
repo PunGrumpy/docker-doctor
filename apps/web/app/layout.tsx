@@ -1,6 +1,5 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Script from "next/script";
 import type { ReactNode } from "react";
 
 import { Header } from "@/components/header";
@@ -44,13 +43,6 @@ interface RootLayoutProps {
 
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
-    <head>
-      <Script
-        src="//unpkg.com/react-grab/dist/index.global.js"
-        crossOrigin="anonymous"
-        strategy="beforeInteractive"
-      />
-    </head>
     <body className={fonts}>
       <DesignSystemProvider>
         <Header />
