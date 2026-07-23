@@ -32,6 +32,30 @@
   --color-fd-ring: var(--ring);
 }
 
+/* Give the docs the homepage's design language: a serif display title like the
+   hero, the soft custom shadow on card/code panels, and a dashed sidebar
+   divider echoing the site's dashed-grid frame. Scoped to the docs layout so
+   the marketing pages are untouched. */
+#nd-notebook-layout {
+  & h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 2.5rem;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  & [class~="bg-fd-card"][class~="rounded-xl"] {
+    box-shadow: var(--shadow-custom);
+  }
+
+  & #nd-sidebar,
+  & #nd-tocnav {
+    border-inline-end-style: dashed;
+    border-inline-start-style: dashed;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
