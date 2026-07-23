@@ -5,29 +5,53 @@ export interface ScoreData {
   label: string;
 }
 
-export const getScoreData = (score: number): ScoreData => {
-  if (score >= 90) {
-    return {
-      background: "bg-green-500/10",
-      border: "border-green-500",
-      color: "#22c55e",
-      label: "Excellent",
-    };
-  }
-  if (score >= 75) {
-    return {
-      background: "bg-yellow-500/10",
-      border: "border-yellow-500",
-      color: "#eab308",
-      label: "Good",
-    };
-  }
-  return {
-    background: "bg-red-500/10",
-    border: "border-red-500",
-    color: "#ef4444",
+// NOTE: this mirrors `SCORE_BUCKETS` in `packages/core/src/scoring.ts`
+// (thresholds 90/75/50/0). It is intentionally NOT imported from
+// `@docker-doctor/core`: that package's raw-TS sources use regex named
+// capturing groups (e.g. dockerfile-parser.ts, rules/security.ts), which
+// require `target >= ES2018`, but this app's tsconfig targets ES2017 --
+// importing the package breaks `tsc --noEmit` for the whole app. See the
+// plan 007 report for the exact error; fixing this (bumping the web
+// target, or dropping named groups in core) is a decision for the
+// maintainer, not made here.
+const SCORE_BUCKETS = [
+  {
+    background: "bg-green-500/10",
+    border: "border-green-500",
+    color: "#22c55e",
+    label: "Excellent",
+    min: 90,
+  },
+  {
+    background: "bg-yellow-500/10",
+    border: "border-yellow-500",
+    color: "#eab308",
+    label: "Good",
+    min: 75,
+  },
+  {
+    background: "bg-orange-500/10",
+    border: "border-orange-500",
+    color: "#f97316",
     label: "Needs Work",
-  };
+    min: 50,
+  },
+  {
+    background: "bg-red-600/10",
+    border: "border-red-600",
+    color: "#dc2626",
+    label: "Critical",
+    min: 0,
+  },
+] as const;
+
+export const getScoreData = (score: number): ScoreData => {
+  for (const bucket of SCORE_BUCKETS) {
+    if (score >= bucket.min) {
+      return bucket;
+    }
+  }
+  return SCORE_BUCKETS.at(-1) as ScoreData;
 };
 
 const clampScore = (n: number): number => Math.min(100, Math.max(0, n));

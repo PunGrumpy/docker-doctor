@@ -1,15 +1,28 @@
-import { parseScoreQuery } from "@/lib/score";
+import { getScoreData, parseScoreQuery } from "@/lib/score";
 
 const LABEL = "Docker Doctor";
 
+// Color-only variant of the same thresholds as `getScoreData` in
+// `@/lib/score` (which mirrors `SCORE_BUCKETS` in
+// `packages/core/src/scoring.ts` -- see the note there on why this
+// isn't unified via an `@docker-doctor/core` import).
 const getScoreColor = (score: number): string => {
-  if (score >= 90) {
-    return "#4c1";
+  const { label } = getScoreData(score);
+  switch (label) {
+    case "Excellent": {
+      return "#4c1";
+    }
+    case "Good": {
+      return "#dfb317";
+    }
+    case "Needs Work": {
+      return "#fe7d37";
+    }
+    default: {
+      // Critical
+      return "#e05d44";
+    }
   }
-  if (score >= 75) {
-    return "#dfb317";
-  }
-  return "#e05d44";
 };
 
 export const GET = (req: Request): Response => {
