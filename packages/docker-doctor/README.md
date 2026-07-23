@@ -54,6 +54,28 @@ export default {
 };
 ```
 
+## How the score works
+
+Every scan produces a 0-100 health score alongside a label (`Excellent 🏆`, `Good ✅`, `Needs Work ⚠️`, `Critical 🚨`).
+
+Each diagnostic adds a penalty based on severity:
+
+| Severity  | Penalty |
+| --------- | ------- |
+| `error`   | 10      |
+| `warning` | 4       |
+| `info`    | 1       |
+
+The penalties are summed, then the score is computed as an asymptotic decay curve rather than a simple subtraction:
+
+```
+score = round(100 * e^(-penalty / K))   // K = 70
+```
+
+A perfect project (no diagnostics) always scores exactly 100. As penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings. `K = 70` was chosen so a single warning (penalty 4) still lands around 94 — comfortably inside the `Excellent` bucket — while errors and repeated warnings continue to meaningfully erode the score.
+
+The label thresholds are unchanged: `>= 90` Excellent, `>= 75` Good, `>= 50` Needs Work, otherwise Critical.
+
 ## API
 
 ```ts
