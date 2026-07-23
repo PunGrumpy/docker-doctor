@@ -4,16 +4,11 @@ import path from "node:path";
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 
-import { getScoreData } from "@/lib/score";
-
-const parseScore = (raw: string | null): number => {
-  const value = Math.trunc(Number(raw || "100"));
-  return Math.min(100, Math.max(0, value));
-};
+import { getScoreData, parseScoreQuery } from "@/lib/score";
 
 export const GET = async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
-  const score = parseScore(searchParams.get("s"));
+  const score = parseScoreQuery(searchParams.get("s"), 100);
   const { color } = getScoreData(score);
 
   const [regularFont, semiboldFont] = await Promise.all([

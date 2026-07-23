@@ -125,6 +125,44 @@ describe("empty project", () => {
   });
 });
 
+describe("piped --json output is not truncated", () => {
+  test("--json on a piped stdout exits (does not hang) and parses", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("with-error"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
+
+  test("large --json output over a pipe is not truncated", async () => {
+    const piped = await runCli([fixture("many-diagnostics"), "--json"]);
+    expect(piped.exitCode).toBe(1);
+    expect(piped.stdout.length).toBeGreaterThan(65_536);
+
+    const report = JSON.parse(piped.stdout);
+    expect(Array.isArray(report.diagnostics)).toBe(true);
+    expect(report.diagnostics.length).toBeGreaterThan(100);
+
+    // Cross-check against a non-piped (file-redirected) run: the
+    // diagnostics count must match exactly -- a truncated pipe write
+    // would either fail JSON.parse or yield a shorter diagnostics array.
+    const outFile = path.join(import.meta.dir, ".large-out.json");
+    const redirected = Bun.spawn(
+      ["node", CLI, fixture("many-diagnostics"), "--json"],
+      {
+        stderr: "pipe",
+        stdout: Bun.file(outFile),
+      }
+    );
+    await redirected.exited;
+    const fileReport = JSON.parse(await Bun.file(outFile).text());
+    await Bun.file(outFile).delete();
+
+    expect(fileReport.diagnostics.length).toBe(report.diagnostics.length);
+  });
+});
+
 describe("heredoc fixture", () => {
   test("heredoc fixture with --json yields at least one diagnostic", async () => {
     const { stdout } = await runCli([fixture("heredoc"), "--json"]);

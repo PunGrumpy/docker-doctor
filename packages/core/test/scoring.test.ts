@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
-import { calculateScore } from "../src/scoring";
+import { calculateScore, getScoreBucket, SCORE_BUCKETS } from "../src/scoring";
 import type { Diagnostic } from "../src/types/index";
 
 const diag = (severity: "error" | "warning" | "info"): Diagnostic => ({
@@ -82,5 +82,21 @@ describe("calculateScore (asymptotic curve, K=70)", () => {
     const { score, label } = calculateScore(many("info", 50));
     expect(score).toBe(49);
     expect(label).toBe("Critical 🚨");
+  });
+});
+
+describe("getScoreBucket", () => {
+  test("returns the matching bucket for a boundary score", () => {
+    expect(getScoreBucket(0).label).toBe("Critical");
+    expect(getScoreBucket(49).label).toBe("Critical");
+    expect(getScoreBucket(50).label).toBe("Needs Work");
+    expect(getScoreBucket(75).label).toBe("Good");
+    expect(getScoreBucket(90).label).toBe("Excellent");
+    expect(getScoreBucket(100).label).toBe("Excellent");
+  });
+
+  test("SCORE_BUCKETS is ordered from highest to lowest threshold", () => {
+    const mins = SCORE_BUCKETS.map((b) => b.min);
+    expect(mins).toEqual([...mins].toSorted((a, b) => b - a));
   });
 });
