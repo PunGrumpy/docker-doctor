@@ -1,11 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import * as Schema from "effect/Schema";
-
 import { ConfigError } from "../errors";
 import type { DockerDoctorConfig } from "../schemas/config";
-import { DockerDoctorConfigSchema } from "../schemas/config";
+import { validateConfig } from "../schemas/config";
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
@@ -94,11 +92,7 @@ export const loadConfig = async (
   }
 
   try {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    const decoded = Schema.decodeSync(DockerDoctorConfigSchema as any)(
-      configObject
-    );
-    return decoded as DockerDoctorConfig;
+    return validateConfig(configObject);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     throw new ConfigError({

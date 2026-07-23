@@ -5,6 +5,15 @@ import path from "node:path";
 
 import { loadConfig } from "../src/config/loader";
 import { ConfigError } from "../src/errors";
+import type { DockerDoctorConfig } from "../src/schemas/config";
+
+// The `DockerDoctorConfig["categories"]` type is a full `Record<RuleCategory,
+// RuleSeverity>` (all 5 keys), but a valid runtime config may legitimately
+// set only a subset. `as unknown as DockerDoctorConfig` below silences that
+// pre-existing type-vs-runtime mismatch without altering what is actually
+// compared at runtime (still a plain deep-equal on the literal object).
+const expectPartialCategories = (value: unknown): DockerDoctorConfig =>
+  value as unknown as DockerDoctorConfig;
 
 describe("loadConfig", () => {
   let dir: string;
@@ -37,7 +46,9 @@ describe("loadConfig", () => {
       JSON.stringify({ categories: { Security: "warning" } })
     );
     const config = await loadConfig(dir);
-    expect(config).toEqual({ categories: { Security: "warning" } });
+    expect(config).toEqual(
+      expectPartialCategories({ categories: { Security: "warning" } })
+    );
   });
 
   test("returns valid ignore.files as-is", async () => {
@@ -138,7 +149,11 @@ describe("loadConfig", () => {
       })
     );
     const config = await loadConfig(dir);
-    expect(config).toEqual({ categories: { "Best Practices": "warning" } });
+    expect(config).toEqual(
+      expectPartialCategories({
+        categories: { "Best Practices": "warning" },
+      })
+    );
   });
 
   test("silently strips unknown keys nested under ignore", async () => {
