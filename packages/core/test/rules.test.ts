@@ -456,6 +456,11 @@ describe("Image Size Rules", () => {
     `);
     const diags2 = cleanPackageCache.check(withCleanup, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const apkNoCache = parseDockerfile(`
+      RUN apk add --no-cache curl
+    `);
+    expect(cleanPackageCache.check(apkNoCache, "Dockerfile")).toHaveLength(0);
   });
 
   test("avoid-dev-dependencies", () => {
