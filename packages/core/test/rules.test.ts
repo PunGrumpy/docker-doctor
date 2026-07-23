@@ -55,6 +55,19 @@ describe("Security Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  test("no-root-user: multi-stage runtime without USER", () => {
+    const multiStageRootRuntime = parseDockerfile(`
+      FROM node:22-alpine AS build
+      USER node
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      CMD ["node", "dist/index.js"]
+    `);
+    const diags3 = noRootUser.check(multiStageRootRuntime, "Dockerfile");
+    expect(diags3).toHaveLength(1);
+  });
+
   test("pin-image-version", () => {
     const unpinned = parseDockerfile(`
       FROM node
@@ -98,12 +111,35 @@ describe("Security Rules", () => {
     expect(diagsSpaceNormal).toHaveLength(0);
   });
 
+  test("no-secrets-in-env: AUTHOR is not a secret", () => {
+    const authorNotSecret = parseDockerfile(`
+      ENV AUTHOR=grumpy
+    `);
+    expect(noSecretsInEnv.check(authorNotSecret, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("no-secrets-in-env: OAUTH_ISSUER_URL is not a secret", () => {
+    const oauthUrlNotSecret = parseDockerfile(`
+      ENV OAUTH_ISSUER_URL=https://example.com
+    `);
+    expect(noSecretsInEnv.check(oauthUrlNotSecret, "Dockerfile")).toHaveLength(
+      0
+    );
+  });
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
       `);
     const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
     expect(diags1).toHaveLength(1);
+  });
+
+  test("no-add-remote: remote URL with --chown flag", () => {
+    const remoteAddWithChown = parseDockerfile(`
+      ADD --chown=node:node https://example.com/file.txt /app/
+    `);
+    expect(noAddRemote.check(remoteAddWithChown, "Dockerfile")).toHaveLength(1);
   });
 });
 
@@ -117,6 +153,27 @@ describe("Performance Rules", () => {
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
+  });
+
+  test("order-layers: correct multi-stage build", () => {
+    const correctMultiStage = parseDockerfile(`
+      FROM node:22-alpine AS build
+      COPY . .
+      RUN npm run build
+      FROM node:22-alpine
+      COPY package.json ./
+      RUN npm ci --omit=dev
+    `);
+    expect(orderLayers.check(correctMultiStage, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("order-layers: /usr/src path is not a copy-all", () => {
+    const usrSrcPath = parseDockerfile(`
+      FROM node:22-alpine
+      COPY /usr/src/lib /lib
+      RUN npm ci
+    `);
+    expect(orderLayers.check(usrSrcPath, "Dockerfile")).toHaveLength(0);
   });
 
   test("use-multi-stage", () => {
@@ -152,6 +209,17 @@ describe("Performance Rules", () => {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
     expect(diags2).toHaveLength(0);
+  });
+
+  test("use-dockerignore ignores stage-to-stage copies", () => {
+    const stageCopy = parseDockerfile(`
+      FROM node:22-alpine AS build
+      FROM node:22-alpine
+      COPY --from=build . ./
+    `);
+    expect(
+      useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
+    ).toHaveLength(0);
   });
 });
 
