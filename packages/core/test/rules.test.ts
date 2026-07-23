@@ -324,6 +324,16 @@ describe("Compose Rules", () => {
     };
     const diags = noVersionKey.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
+
+    const realisticCompliant = {
+      services: {
+        db: { image: "postgres:16-alpine" },
+        web: { image: "node:22-alpine" },
+      },
+    };
+    expect(noVersionKey.check(realisticCompliant, "compose.yml")).toHaveLength(
+      0
+    );
   });
 
   test("require-resource-limits", () => {
@@ -334,6 +344,20 @@ describe("Compose Rules", () => {
     };
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
+
+    const withLimits = {
+      services: {
+        web: {
+          deploy: {
+            resources: { limits: { cpus: "0.5", memory: "512M" } },
+          },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(requireResourceLimits.check(withLimits, "compose.yml")).toHaveLength(
+      0
+    );
   });
 
   test("require-restart-policy", () => {
@@ -352,6 +376,18 @@ describe("Compose Rules", () => {
     };
     const diags2 = requireRestartPolicy.check(withRestart, "compose.yml");
     expect(diags2).toHaveLength(0);
+
+    const withDeployRestartPolicy = {
+      services: {
+        web: {
+          deploy: { restart_policy: { condition: "on-failure" } },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(
+      requireRestartPolicy.check(withDeployRestartPolicy, "compose.yml")
+    ).toHaveLength(0);
   });
 
   test("use-depends-on-condition", () => {
@@ -362,6 +398,18 @@ describe("Compose Rules", () => {
     };
     const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
     expect(diags1).toHaveLength(1);
+
+    const longForm = {
+      services: {
+        web: {
+          depends_on: { db: { condition: "service_healthy" } },
+          image: "node:22-alpine",
+        },
+      },
+    };
+    expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
+      0
+    );
   });
 });
 
