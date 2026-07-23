@@ -14,51 +14,72 @@ const diag = (severity: "error" | "warning" | "info"): Diagnostic => ({
 const many = (severity: "error" | "warning" | "info", n: number) =>
   Array.from({ length: n }, () => diag(severity));
 
-describe("calculateScore (characterization: current saturating curve)", () => {
-  test("an empty diagnostics list scores 100", () => {
+describe("calculateScore (asymptotic curve, K=70)", () => {
+  test("a perfect project scores 100", () => {
     expect(calculateScore([]).score).toBe(100);
   });
 
-  test("one error scores 90", () => {
-    expect(calculateScore(many("error", 1)).score).toBe(90);
+  test("one error scores 87", () => {
+    expect(calculateScore(many("error", 1)).score).toBe(87);
   });
 
-  test("one warning scores 96", () => {
-    expect(calculateScore(many("warning", 1)).score).toBe(96);
+  test("one warning stays comfortably inside Excellent (~94)", () => {
+    const { score, label } = calculateScore(many("warning", 1));
+    expect(score).toBe(94);
+    expect(label).toBe("Excellent 🏆");
   });
 
   test("one info scores 99", () => {
     expect(calculateScore(many("info", 1)).score).toBe(99);
   });
 
-  test("ten errors scores 0", () => {
-    expect(calculateScore(many("error", 10)).score).toBe(0);
+  test("is strictly monotonic and never saturates", () => {
+    const a = calculateScore(many("error", 10)).score;
+    const b = calculateScore(many("error", 20)).score;
+    const c = calculateScore(many("error", 40)).score;
+    expect(b).toBeLessThan(a);
+    expect(c).toBeLessThan(b);
   });
 
-  test("twenty errors also scores 0 (saturation)", () => {
-    expect(calculateScore(many("error", 20)).score).toBe(0);
+  test("score is always an integer in range", () => {
+    for (const n of [0, 1, 5, 25, 100, 500]) {
+      const { score } = calculateScore(many("warning", n));
+      expect(Number.isInteger(score)).toBe(true);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    }
+  });
+
+  test("fixing an issue always raises the score", () => {
+    const before = calculateScore(many("warning", 30)).score;
+    const after = calculateScore(many("warning", 29)).score;
+    expect(after).toBeGreaterThan(before);
   });
 
   test("label is Excellent at score exactly 90", () => {
-    const { score, label } = calculateScore(many("info", 10));
+    // penalty 7 -> round(100 * e^(-7/70)) = 90
+    const { score, label } = calculateScore(many("info", 7));
     expect(score).toBe(90);
     expect(label).toBe("Excellent 🏆");
   });
 
   test("label is Good at score exactly 75", () => {
-    const { score, label } = calculateScore(many("info", 25));
+    // penalty 20 -> round(100 * e^(-20/70)) = 75
+    const { score, label } = calculateScore(many("info", 20));
     expect(score).toBe(75);
     expect(label).toBe("Good ✅");
   });
 
   test("label is Needs Work at score exactly 50", () => {
-    const { score, label } = calculateScore(many("info", 50));
+    // penalty 48 -> round(100 * e^(-48/70)) = 50
+    const { score, label } = calculateScore(many("info", 48));
     expect(score).toBe(50);
     expect(label).toBe("Needs Work ⚠️");
   });
 
   test("label is Critical at score exactly 49", () => {
-    const { score, label } = calculateScore(many("info", 51));
+    // penalty 50 -> round(100 * e^(-50/70)) = 49
+    const { score, label } = calculateScore(many("info", 50));
     expect(score).toBe(49);
     expect(label).toBe("Critical 🚨");
   });
