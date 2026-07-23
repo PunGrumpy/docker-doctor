@@ -1,99 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "fumadocs-ui/css/neutral.css";
-@import "fumadocs-ui/css/preset.css";
-
-/* Tailwind v4 must scan fumadocs-ui's compiled components so their layout
-   utility classes are generated; without this the docs content collapses. */
-@source '../node_modules/fumadocs-ui/dist/**/*.js';
-
-/* Map Fumadocs' --color-fd-* tokens onto the site's own design tokens so the
-   docs share the homepage palette, borders, and cards. The var() references
-   resolve per-theme automatically (--background etc. are redefined in .dark),
-   and this block follows the fumadocs imports so it wins the cascade tie. */
-:root,
-.dark {
-  --color-fd-background: var(--background);
-  --color-fd-foreground: var(--foreground);
-  --color-fd-muted: var(--muted);
-  --color-fd-muted-foreground: var(--muted-foreground);
-  --color-fd-popover: var(--card);
-  --color-fd-popover-foreground: var(--card-foreground);
-  --color-fd-card: var(--card);
-  --color-fd-card-foreground: var(--card-foreground);
-  --color-fd-border: var(--border);
-  --color-fd-primary: var(--primary);
-  --color-fd-primary-foreground: var(--primary-foreground);
-  --color-fd-secondary: var(--muted);
-  --color-fd-secondary-foreground: var(--foreground);
-  --color-fd-accent: var(--accent);
-  --color-fd-accent-foreground: var(--accent-foreground);
-  --color-fd-ring: var(--ring);
-}
-
-/* Give the docs the homepage's design language: a serif display title like the
-   hero, the soft custom shadow on card/code panels, and a dashed sidebar
-   divider echoing the site's dashed-grid frame. Scoped to the docs layout so
-   the marketing pages are untouched. */
-#nd-notebook-layout {
-  /* Center the docs inside a fixed-width column, like the homepage frame. */
-  --fd-layout-width: 1200px;
-
-  /* Serif display headings, matching the homepage's hero and section titles. */
-  & h1,
-  & .prose :is(h2, h3, h4) {
-    font-family: var(--font-serif);
-    font-weight: 400;
-    letter-spacing: -0.02em;
-  }
-
-  & h1 {
-    font-size: 2.5rem;
-    line-height: 1.15;
-  }
-
-  & .prose h2 {
-    font-size: 1.85rem;
-  }
-
-  & .prose h3 {
-    font-size: 1.4rem;
-  }
-
-  & [class~="bg-fd-card"][class~="rounded-xl"] {
-    box-shadow: var(--shadow-custom);
-  }
-
-  & #nd-sidebar {
-    border-inline-end-style: dashed;
-  }
-}
-
-/* Dashed-grid frame around the docs column, echoing the homepage. The vertical
-   rules trace the edges of the centered layout width; the horizontal rule sits
-   just under the full-width navbar. Both are non-interactive overlays. */
-#nd-notebook-layout::before {
-  content: "";
-  position: fixed;
-  inset-block: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(var(--fd-layout-width), 100vw);
-  border-inline: 0.5px dashed var(--border);
-  pointer-events: none;
-  z-index: 1;
-}
-
-#nd-notebook-layout::after {
-  content: "";
-  position: fixed;
-  inset-inline: max(calc(50vw - var(--fd-layout-width) / 2), 0px);
-  top: 3.5rem;
-  border-top: 0.5px dashed var(--border);
-  pointer-events: none;
-  z-index: 1;
-}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -329,6 +236,21 @@
 }
 
 @layer components {
+  /* fumadocs-mdx highlights code with shiki's dual-theme (`defaultColor:
+     false`) mode, which only emits `--shiki-light`/`--shiki-dark` CSS
+     variables per token — no `color` is set. This is normally resolved by
+     fumadocs-ui's preset CSS; since the docs no longer depend on
+     fumadocs-ui, we supply the same mapping ourselves so token colors still
+     render in both themes. See https://shiki.style/guide/dual-themes */
+  .shiki,
+  .shiki span {
+    color: var(--shiki-light);
+  }
+  .dark .shiki,
+  .dark .shiki span {
+    color: var(--shiki-dark);
+  }
+
   .code-panel {
     max-width: 100%;
     overflow-x: hidden;
