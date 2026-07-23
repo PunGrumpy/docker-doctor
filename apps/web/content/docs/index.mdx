@@ -3,6 +3,14 @@ title: Introduction
 description: docker-doctor is a static analysis tool for Dockerfile and Docker Compose files.
 ---
 
+import {
+  Gauge,
+  Layers,
+  SlidersHorizontal,
+  TerminalSquare,
+  Wrench,
+} from "lucide-react";
+
 Your Dockerfiles are probably wrong. docker-doctor finds out why.
 
 docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 21+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
@@ -11,11 +19,28 @@ Works with any project that uses Docker.
 
 ## Key features
 
-- **21+ built-in rules** across five categories: Security, Performance, Best Practices, Compose, and Image Size.
-- **A 0-100 health score** with a human-readable label (`Excellent`, `Good`, `Needs Work`, `Critical`) so regressions are obvious at a glance.
-- **Fix guidance for every diagnostic** — each finding carries a `Help:` line with the concrete fix, plus `rules explain <rule>` for more depth.
-- **Configurable** per-rule and per-category severities, plus file ignores, via `docker-doctor.config.ts`.
-- **CI-friendly** — machine-readable `--json` output and a `--score` mode that exits non-zero below a health threshold.
+<Cards>
+  <Card icon={<Layers />} title="21+ built-in rules">
+    Across five categories: Security, Performance, Best Practices, Compose, and
+    Image Size.
+  </Card>
+  <Card icon={<Gauge />} title="0–100 health score">
+    A human-readable label (Excellent, Good, Needs Work, Critical) so
+    regressions are obvious at a glance.
+  </Card>
+  <Card icon={<Wrench />} title="Fix guidance for every diagnostic">
+    Each finding carries a `Help:` line with the concrete fix, plus `rules
+    explain <rule>` for more depth.
+  </Card>
+  <Card icon={<SlidersHorizontal />} title="Fully configurable">
+    Per-rule and per-category severities, plus file ignores, via
+    `docker-doctor.config.ts`.
+  </Card>
+  <Card icon={<TerminalSquare />} title="CI-friendly">
+    Machine-readable `--json` output and a `--score` mode that exits non-zero
+    below a health threshold.
+  </Card>
+</Cards>
 
 ## Quick example
 
@@ -42,4 +67,4 @@ import { discoverProject, toJsonReport } from "@docker-doctor/cli";
 import type { Diagnostic } from "@docker-doctor/cli";
 ```
 
-Continue to [Getting Started](/docs/getting-started) to run your first scan.
+Continue to [Getting Started](/docs/guides/getting-started) to run your first scan.

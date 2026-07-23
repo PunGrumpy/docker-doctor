@@ -6,6 +6,10 @@ import { appName, gitConfig } from "./shared";
 
 export const baseOptions = (): BaseLayoutProps => ({
   githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+  links: [
+    { active: "nested-url", text: "Docs", url: "/docs" },
+    { text: "Changelog", url: "/changelog" },
+  ],
   nav: {
     title: (
       <>
@@ -13,5 +17,6 @@ export const baseOptions = (): BaseLayoutProps => ({
         {appName}
       </>
     ),
+    url: "/",
   },
 });
