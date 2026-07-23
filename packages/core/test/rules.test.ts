@@ -531,6 +531,17 @@ describe("Best Practices Rules", () => {
     expect(diags3).toHaveLength(0);
   });
 
+  // Known false positive: the pipefail check tests inst.raw with no quote
+  // awareness, so a regex alternation inside a quoted argument reads as a
+  // shell pipeline. Not fixed here - see plans/README.md deferred list.
+  test.todo("use-pipefail ignores pipes inside quoted arguments", () => {
+    const quotedPipe = parseDockerfile(`
+      FROM node:22-alpine
+      RUN grep -E "foo|bar" /etc/passwd
+    `);
+    expect(usePipefail.check(quotedPipe, "Dockerfile")).toHaveLength(0);
+  });
+
   test("absolute-workdir", () => {
     const relative = parseDockerfile(`
       WORKDIR app/src
@@ -544,6 +555,13 @@ describe("Best Practices Rules", () => {
     `);
     const diags2 = absoluteWorkdir.check(absolute, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const variableWorkdir = parseDockerfile(`
+      WORKDIR \${APP_HOME}
+    `);
+    expect(absoluteWorkdir.check(variableWorkdir, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("avoid-run-cd", () => {
@@ -560,6 +578,16 @@ describe("Best Practices Rules", () => {
     `);
     const diags2 = avoidRunCd.check(withoutCd, "Dockerfile");
     expect(diags2).toHaveLength(0);
+  });
+
+  // Known false positive: /\bcd\b/ matches path segments and words in
+  // strings, not just the cd command. Not fixed here.
+  test.todo("avoid-run-cd ignores cd inside paths and strings", () => {
+    const pathWithCd = parseDockerfile(`
+      FROM node:22-alpine
+      RUN mkdir -p /opt/cd && echo abcd
+    `);
+    expect(avoidRunCd.check(pathWithCd, "Dockerfile")).toHaveLength(0);
   });
 
   test("sort-multiline-args", () => {
@@ -612,6 +640,19 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = requireHealthcheck.check(withHealth, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const multiStageWithHealth = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      EXPOSE 3000
+      HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/health || exit 1
+      CMD ["node", "dist/index.js"]
+    `);
+    expect(
+      requireHealthcheck.check(multiStageWithHealth, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("prefer-copy-over-add", () => {
@@ -626,6 +667,13 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = preferCopyOverAdd.check(addArchive, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const addArchiveWithChown = parseDockerfile(`
+      ADD --chown=node:node archive.tar.gz /app/
+    `);
+    expect(
+      preferCopyOverAdd.check(addArchiveWithChown, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("use-exec-form", () => {
@@ -640,6 +688,11 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = useExecForm.check(execForm, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const entrypointExecForm = parseDockerfile(`
+      ENTRYPOINT ["docker-entrypoint.sh"]
+    `);
+    expect(useExecForm.check(entrypointExecForm, "Dockerfile")).toHaveLength(0);
   });
 
   test("require-labels", () => {
@@ -654,5 +707,10 @@ describe("Best Practices Rules", () => {
       `);
     const diags2 = requireLabels.check(withLabels, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const withOciLabels = parseDockerfile(`
+      LABEL org.opencontainers.image.authors="team@example.com" org.opencontainers.image.version="1.0.0"
+    `);
+    expect(requireLabels.check(withOciLabels, "Dockerfile")).toHaveLength(0);
   });
 });
