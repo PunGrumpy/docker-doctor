@@ -219,6 +219,14 @@ describe("Performance Rules", () => {
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
+
+    const goodOrder = parseDockerfile(`
+      FROM node:22-alpine
+      COPY package.json package-lock.json ./
+      RUN npm install
+      COPY . .
+    `);
+    expect(orderLayers.check(goodOrder, "Dockerfile")).toHaveLength(0);
   });
 
   test("order-layers: correct multi-stage build", () => {
