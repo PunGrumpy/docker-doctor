@@ -10,7 +10,7 @@ export {
   findRule,
 } from "./rules/index";
 export { loadConfig } from "./config/loader";
-export { calculateScore } from "./scoring";
+export { calculateScore, getScoreBucket, SCORE_BUCKETS } from "./scoring";
 export * from "./errors";
 export * from "./types/index";
 export { toJsonReport, type JsonReport } from "./report";

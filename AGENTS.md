@@ -150,27 +150,16 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 
 ## Effect v4 Conventions
 
-Built on `effect@4.0.0-beta.70`. See `tmp/effect/.patterns/effect.md` (cloned reference) for canonical examples.
+`effect@4.0.0-beta.70` is used NARROWLY in this repo — for two things only:
+
+- **`effect/Schema`** — config validation: `packages/core/src/schemas/config.ts` and `packages/core/src/config/loader.ts`.
+- **`effect/Data.TaggedError`** — the three error classes in `packages/core/src/errors/` (`config-error.ts`, `parse-error.ts`, `file-not-found-error.ts`).
+
+Rules and parsers (`packages/core/src/rules/`, `packages/core/src/parsers/`) are PLAIN SYNCHRONOUS functions — there are no Effect pipelines here, no generator-based effects, no tag-based error dispatch. Do not introduce `Effect.gen` or pipeline idioms without discussion first — the rule functions have no error/async/resource semantics that would benefit from them.
 
 ### Imports
 
-- ALWAYS: `import * as Schema from "effect/Schema"`, `import * as Effect from "effect/Effect"`, `import * as Cause from "effect/Cause"`, etc. — one module per import line.
-- NEVER: `import { Schema, Effect } from "effect"` — the umbrella import inflates the type-resolution graph and contradicts what every other Effect codebase does.
+- ALWAYS: `import * as Schema from "effect/Schema"`, `import * as Data from "effect/Data"` — one module per import line.
+- NEVER: `import { Schema, Data } from "effect"` — the umbrella import inflates the type-resolution graph.
 
-### Error dispatch / recovery — v4 idioms
-
-- **`Effect.catchReasons(errorTag, cases, orElse?)`** — the v4-canonical way to dispatch on a `Schema.TaggedErrorClass` reason union. Each entry catches one reason `_tag`; the optional `orElse` handles unmatched reasons. NEVER write manual `if (cause.reason instanceof X)` ladders inside a `catch` block — the Effect pipeline gives you exhaustive, type-safe narrowing for free. See `inspect.ts → restoreLegacyThrow` and `api/diagnose.ts` for the canonical shape.
-- **`Effect.catchTag(tag, handler)`** — for a single tagged error (e.g. `Effect.catchTag("PlatformError", ...)` in `services/git.ts` to fold the `ChildProcess` platform error into a `ReactDoctorError`).
-- **`Effect.catch`** (renamed from v3 `Effect.catchAll`) — for catch-all.
-- **`Effect.die(error)`** — promote a recovered value into a defect that `runPromise` re-throws unchanged. Used in `catchReasons` handlers when the programmatic contract still wants the legacy `Error` class on the throw.
-- **NEVER** `try/catch` inside `Effect.gen` (v4 hard rule). Wrap the sync throw in `Effect.try({ try, catch })` and recover via `Effect.orElseSucceed` / `Effect.catch` instead. See `render-summary.ts → printSummary` for the canonical shape.
-
-### Generator hygiene
-
-- **`return yield* Effect.fail(...)`** — terminal effects (Effect.fail, Effect.interrupt, Effect.die) must be `return yield*` so TypeScript sees the unreachable-code property. Bare `yield*` of a terminal lets unreachable code accumulate after it. See `services/git.ts` `diffSelection` for examples.
-- **`Effect.gen({ self: this }, function* () { ... })`** — v4 changed the `self`-bound form. The plain `Effect.gen(function* () { ... })` form is unchanged; only class-method generators bound to `this` need the options object.
-- **`Effect.fnUntraced(function* () { ... })`** — prefer over a function whose body is `Effect.gen` when the function is called many times per operation (hot path). Cuts tracing overhead. Not currently used in this codebase — Git invocations and inspect-pipeline calls run once per scan, not in a hot loop.
-
-## Reference reading
-
-- `tmp/effect/.patterns/effect.md` — canonical Effect v4 idioms (cloned for reference, gitignored)
+> `effect` is currently a runtime dependency of the published CLI for these two narrow uses only. Plan 011 proposes removing it — whoever executes 011 must revisit this section.
