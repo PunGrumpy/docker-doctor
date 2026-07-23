@@ -53,6 +53,18 @@ describe("Security Rules", () => {
     `);
     const diags2 = noRootUser.check(withUserNode, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const multiStageWithFinalUser = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+      USER node
+      CMD ["node", "dist/index.js"]
+    `);
+    expect(
+      noRootUser.check(multiStageWithFinalUser, "Dockerfile")
+    ).toHaveLength(0);
   });
 
   test("no-root-user: multi-stage runtime without USER", () => {
@@ -133,6 +145,29 @@ describe("Security Rules", () => {
       "Dockerfile"
     );
     expect(diagsSpaceNormal).toHaveLength(0);
+
+    const argPassthrough = parseDockerfile(`
+      ARG API_KEY
+      ENV API_KEY=\${API_KEY}
+    `);
+    expect(noSecretsInEnv.check(argPassthrough, "Dockerfile")).toHaveLength(0);
+
+    const multipleNormalVars = parseDockerfile(`
+      ENV NODE_ENV=production PORT=3000
+    `);
+    expect(noSecretsInEnv.check(multipleNormalVars, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const awsSecretKey = parseDockerfile(`
+      ENV AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+    `);
+    expect(noSecretsInEnv.check(awsSecretKey, "Dockerfile")).toHaveLength(1);
+
+    const apiKey = parseDockerfile(`
+      ENV API_KEY=not-a-real-secret
+    `);
+    expect(noSecretsInEnv.check(apiKey, "Dockerfile")).toHaveLength(1);
   });
 
   test("no-secrets-in-env: AUTHOR is not a secret", () => {
@@ -157,6 +192,13 @@ describe("Security Rules", () => {
       `);
     const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const localArchiveWithChown = parseDockerfile(`
+      ADD --chown=node:node local-archive.tar.gz /app/
+    `);
+    expect(noAddRemote.check(localArchiveWithChown, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("no-add-remote: remote URL with --chown flag", () => {
@@ -207,6 +249,16 @@ describe("Performance Rules", () => {
       `);
     const diags1 = useMultiStage.check(singleStage, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const realisticMultiStage = parseDockerfile(`
+      FROM node:22-alpine AS build
+      RUN npm run build
+      FROM node:22-alpine
+      COPY --from=build /app/dist ./dist
+    `);
+    expect(useMultiStage.check(realisticMultiStage, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
   test("minimize-layers", () => {
@@ -217,6 +269,12 @@ describe("Performance Rules", () => {
       `);
     const diags1 = minimizeLayers.check(consecutive, "Dockerfile");
     expect(diags1).toHaveLength(1);
+
+    const combinedRun = parseDockerfile(`
+      FROM node:22-alpine
+      RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+    `);
+    expect(minimizeLayers.check(combinedRun, "Dockerfile")).toHaveLength(0);
   });
 
   test("use-dockerignore", () => {
@@ -233,6 +291,15 @@ describe("Performance Rules", () => {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
     expect(diags2).toHaveLength(0);
+
+    const copyAllWithChown = parseDockerfile(`
+      FROM node:22-alpine
+      COPY --chown=node:node . .
+    `);
+    const diags3 = useDockerignore.check(copyAllWithChown, "Dockerfile", {
+      projectFiles: ["Dockerfile", ".dockerignore"],
+    });
+    expect(diags3).toHaveLength(0);
   });
 
   test("use-dockerignore ignores stage-to-stage copies", () => {
