@@ -124,3 +124,11 @@ describe("empty project", () => {
     expect(report.diagnostics).toEqual([]);
   });
 });
+
+describe("heredoc fixture", () => {
+  test("heredoc fixture with --json yields at least one diagnostic", async () => {
+    const { stdout } = await runCli([fixture("heredoc"), "--json"]);
+    const report = JSON.parse(stdout);
+    expect(report.diagnostics.length).toBeGreaterThanOrEqual(1);
+  });
+});
