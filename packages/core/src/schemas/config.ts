@@ -96,13 +96,6 @@ const validateIgnore = (value: unknown): { files?: string[] } => {
   return result;
 };
 
-/**
- * Validates and normalizes a raw config object, throwing on invalid input.
- *
- * Mirrors the legacy schema's behavior exactly, including silently
- * dropping unknown top-level (and nested) keys rather than throwing
- * or preserving them.
- */
 const describeInvalidTopLevel = (input: unknown): string => {
   if (input === null) {
     return "null";
@@ -113,6 +106,13 @@ const describeInvalidTopLevel = (input: unknown): string => {
   return typeof input;
 };
 
+/**
+ * Validates and normalizes a raw config object, throwing on invalid input.
+ *
+ * Mirrors the legacy schema's behavior exactly, including silently
+ * dropping unknown top-level (and nested) keys rather than throwing
+ * or preserving them.
+ */
 export const validateConfig = (input: unknown): DockerDoctorConfig => {
   if (!isPlainObject(input)) {
     throw new Error(
