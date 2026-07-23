@@ -38,31 +38,34 @@ Config lives in `docker-doctor.config.{ts,js,mjs,cjs,json}` or the `dockerDoctor
 // docker-doctor.config.ts
 export default {
   // Per-rule severity override. Severity: "error" | "warning" | "info" | "off".
+  // Fully implemented (packages/core/src/runners/dockerfile-runner.ts): the
+  // configured severity replaces the rule's default for every diagnostic it produces.
   rules: {
     "docker-doctor/no-root-user": "off",
     "docker-doctor/use-multi-stage": "warning",
   },
   // Per-category override. Categories: "Security" | "Performance" | "Best Practices" | "Compose" | "Image Size".
+  // Only "off" currently has any effect (it disables the whole category). Any other
+  // value here ("error" / "warning" / "info") is accepted by the schema but ignored —
+  // there is no category-level severity cascade today.
   categories: {
     "Image Size": "off",
   },
-  // Skip specific files entirely.
-  ignore: {
-    files: ["examples/legacy.Dockerfile"],
-  },
 };
 ```
+
+The config schema also accepts an `ignore.files` array, but it is NOT currently implemented — nothing in the codebase reads it, so listing files there has no effect. Do not tell users it will exempt a file from scanning.
 
 ## Decision guide
 
 Match the change to the intent — prefer the narrowest one:
 
 - **User disagrees with one rule / it's a false positive** → set it off in `rules`: `"docker-doctor/<key>": "off"`. The rule stops running everywhere. This is the default for "I don't want this rule".
-- **Rule is fine but wrong severity** → set `"docker-doctor/<key>": "warning"` (or `"error"` / `"info"`) in `rules`.
-- **A whole area is unwanted** (e.g. all image-size rules) → set the category off: `categories: { "Image Size": "off" }`.
-- **A specific file should be exempt from everything** → add its path to `ignore.files`.
+- **Rule is fine but wrong severity** → set `"docker-doctor/<key>": "warning"` (or `"error"` / `"info"`) in `rules`. This works today via the per-rule override.
+- **A whole area is unwanted** (e.g. all image-size rules) → set the category off: `categories: { "Image Size": "off" }`. This is the only working `categories` value.
+- **A specific file should be exempt from everything** → there is currently no way to do this; `ignore.files` is unimplemented. Say so rather than suggesting it.
 
-How the layers combine: a per-rule entry in `rules` overrides the category severity in `categories`, which overrides the rule's built-in default. Files listed in `ignore.files` are skipped before any rule runs.
+How this actually combines: each rule's default severity can be overridden per-rule via `rules`. Separately, a whole category can be turned `"off"` via `categories`, which drops every diagnostic in that category regardless of per-rule settings. There is no severity cascade between `categories` and `rules` beyond that "off" check — a non-"off" `categories` value does nothing.
 
 ## Educating the user
 

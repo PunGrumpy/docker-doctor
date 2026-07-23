@@ -38,13 +38,20 @@ Docker Doctor is a monorepo managed with [Bun](https://bun.sh) workspaces and [T
 
 ### Testing Your Changes Locally
 
-To test the CLI locally:
+Run it directly against a test project — no build or link required:
+
+```bash
+bun packages/docker-doctor/src/cli.ts <path-to-test-project>
+```
+
+This works because `packages/core` declares `"main": "./src/index.ts"` (raw TS) and Bun runs TypeScript directly, so your local edits are picked up immediately.
+
+To test the actual BUILT binary instead:
 
 1. Build the CLI: `bun run build --filter @docker-doctor/cli`
-2. Run directly: `bun run --packages/docker-doctor docker-doctor <path-to-test-project>`
-3. Or link it locally: `cd packages/docker-doctor && bun link --global`
-4. In your test project: `bun link --global @docker-doctor/cli`
-5. Run `npx @docker-doctor/cli` to test your changes
+2. Link it locally: `cd packages/docker-doctor && bun link --global`
+3. In your test project: `bun link --global @docker-doctor/cli`
+4. Run `docker-doctor <path-to-test-project>` (the linked bin) — do NOT run it via `npx`, which resolves the published package from the registry instead of your local build
 
 ### Editing Documentation
 
