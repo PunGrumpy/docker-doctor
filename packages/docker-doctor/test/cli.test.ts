@@ -59,7 +59,14 @@ describe("--json contract", () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
     const report = JSON.parse(stdout);
     expect(Object.keys(report).toSorted()).toEqual(
-      ["diagnostics", "label", "project", "score", "timestamp"].toSorted()
+      [
+        "diagnostics",
+        "label",
+        "project",
+        "schemaVersion",
+        "score",
+        "timestamp",
+      ].toSorted()
     );
   });
 
