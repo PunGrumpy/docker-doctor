@@ -40,12 +40,25 @@
   /* Center the docs inside a fixed-width column, like the homepage frame. */
   --fd-layout-width: 1200px;
 
-  & h1 {
+  /* Serif display headings, matching the homepage's hero and section titles. */
+  & h1,
+  & .prose :is(h2, h3, h4) {
     font-family: var(--font-serif);
     font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+
+  & h1 {
     font-size: 2.5rem;
     line-height: 1.15;
-    letter-spacing: -0.02em;
+  }
+
+  & .prose h2 {
+    font-size: 1.85rem;
+  }
+
+  & .prose h3 {
+    font-size: 1.4rem;
   }
 
   & [class~="bg-fd-card"][class~="rounded-xl"] {
