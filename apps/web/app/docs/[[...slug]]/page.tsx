@@ -1,13 +1,7 @@
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-} from "fumadocs-ui/layouts/notebook/page";
-import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { DocsToc } from "@/components/docs/toc";
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
 
@@ -25,17 +19,20 @@ const Page = async ({ params }: DocPageProps) => {
   const MdxContent = page.data.body;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
-      <DocsBody>
-        <MdxContent
-          components={getMDXComponents({
-            a: createRelativeLink(source, page),
-          })}
-        />
-      </DocsBody>
-    </DocsPage>
+    <div className="flex gap-12">
+      <article className="min-w-0 max-w-3xl flex-1">
+        <h1 className="font-serif text-4xl font-normal tracking-tight">
+          {page.data.title}
+        </h1>
+        {page.data.description ? (
+          <p className="mt-2 text-muted-foreground">{page.data.description}</p>
+        ) : null}
+        <div className="mt-8">
+          <MdxContent components={getMDXComponents()} />
+        </div>
+      </article>
+      <DocsToc toc={page.data.toc} />
+    </div>
   );
 };
 
