@@ -11,8 +11,6 @@ export interface DiffLine {
   text: string;
 }
 
-const GREEN = "#4ea96f";
-
 export const ClaudeDiff = ({
   file,
   summary,
@@ -24,42 +22,36 @@ export const ClaudeDiff = ({
   lines: DiffLine[];
   className?: string;
 }) => (
-  <div
-    className={cn("min-w-0 font-mono text-[13px] leading-[1.55]", className)}
-  >
+  <div className={cn("min-w-0 text-[13px] leading-[1.55]", className)}>
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-      <span aria-hidden className="shrink-0" style={{ color: GREEN }}>
+      <span
+        aria-hidden
+        className="shrink-0 text-emerald-600 dark:text-[#4ea96f]"
+      >
         ⏺
       </span>
-      <span className="text-[#c0caf5]">Update</span>
-      <span className="min-w-0 break-all">
-        <span className="text-[#565f89]">(</span>
-        <span className="text-[#7dcfff]">{file}</span>
-        <span className="text-[#565f89]">)</span>
+      <span className="font-medium text-foreground">Update</span>
+      <span className="min-w-0 break-all font-mono">
+        <span className="text-muted-foreground">(</span>
+        <span className="text-blue-600 dark:text-[#7dcfff]">{file}</span>
+        <span className="text-muted-foreground">)</span>
       </span>
     </div>
     {summary ? (
-      <div className="flex min-w-0 items-baseline gap-2 text-[#8b8fa3]">
+      <div className="flex min-w-0 items-baseline gap-2 text-muted-foreground">
         {/* invisible status glyph spacer: aligns ⎿ under "Update" */}
         <span aria-hidden className="invisible shrink-0">
           ⏺
         </span>
-        <span aria-hidden className="shrink-0" style={{ color: "#565f89" }}>
+        <span aria-hidden className="shrink-0 text-muted-foreground/60">
           ⎿
         </span>
         <span className="min-w-0 wrap-break-words">{summary}</span>
       </div>
     ) : null}
 
-    <pre className="mt-1 min-w-0 overflow-x-auto rounded-none border border-[#202022] bg-[#101010] py-1.5 pl-2 pr-3">
+    <pre className="mt-1 min-w-0 overflow-x-auto rounded-md border border-border bg-muted/30 py-1.5 pl-2 pr-3">
       {lines.map((l, i) => {
-        let bg = "transparent";
-        if (l.type === "add") {
-          bg = "rgba(78, 169, 111,.10)";
-        } else if (l.type === "del") {
-          bg = "rgba(247,118,142,.12)";
-        }
-
         let mark = " ";
         if (l.type === "add") {
           mark = "+";
@@ -67,31 +59,36 @@ export const ClaudeDiff = ({
           mark = "-";
         }
 
-        let markColor = "#565f89";
-        if (l.type === "add") {
-          markColor = GREEN;
-        } else if (l.type === "del") {
-          markColor = "#f7768e";
-        }
         return (
-          <div key={i} className="flex min-w-0" style={{ background: bg }}>
-            <span
-              className="w-9 shrink-0 select-none pr-2 text-right"
-              style={{ color: "#3b3f52" }}
-            >
+          <div
+            key={i}
+            className={cn(
+              "flex min-w-0",
+              l.type === "add" &&
+                "bg-emerald-500/10 dark:bg-[rgba(78,169,111,.10)]",
+              l.type === "del" &&
+                "bg-rose-500/10 dark:bg-[rgba(247,118,142,.12)]",
+              l.type === "ctx" && "bg-transparent"
+            )}
+          >
+            <span className="w-9 shrink-0 select-none pr-2 text-right text-muted-foreground/50">
               {l.n ?? ""}
             </span>
             <span
-              className="w-3 shrink-0 select-none"
-              style={{ color: markColor }}
+              className={cn(
+                "w-3 shrink-0 select-none",
+                l.type === "add" && "text-emerald-600 dark:text-[#4ea96f]",
+                l.type === "del" && "text-rose-600 dark:text-[#f7768e]",
+                l.type === "ctx" && "text-muted-foreground/60"
+              )}
             >
               {mark}
             </span>
             <span
-              className="min-w-0 break-all"
-              style={{
-                color: l.type === "ctx" ? "#8b8fa3" : "#c0caf5",
-              }}
+              className={cn(
+                "min-w-0 break-all font-mono",
+                l.type === "ctx" ? "text-muted-foreground" : "text-foreground"
+              )}
             >
               {l.type === "ctx" ? null : (
                 <span className="sr-only">

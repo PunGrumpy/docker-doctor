@@ -1,3 +1,4 @@
+import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -13,6 +14,7 @@ export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    const stageAliases = collectStageAliases(instructions);
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
@@ -22,39 +24,39 @@ export const preferSlimBase: DockerfileRule = {
           continue;
         }
 
-        const colonIndex = imagePart.indexOf(":");
-        if (colonIndex !== -1) {
-          const tag = imagePart.slice(colonIndex + 1).toLowerCase();
+        const ref = parseImageRef(imagePart);
 
-          // If the tag doesn't contain alpine, slim, distroless, or sha256
-          const isSlim =
-            tag.includes("alpine") ||
-            tag.includes("slim") ||
-            tag.includes("distroless");
-          const isSha = tag.startsWith("sha256:");
+        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+          continue;
+        }
 
-          // Skip if it's a multi-stage builder step reference (e.g. FROM build AS publish)
-          const isStageReference = instructions.some(
-            (other) =>
-              other.line < inst.line &&
-              other.instruction === "FROM" &&
-              other.args
-                .toLowerCase()
-                .includes(` as ${imagePart.toLowerCase()}`)
+        // Digest pins are already fully deterministic; not our concern here.
+        if (ref.digest) {
+          continue;
+        }
+
+        // No tag: pin-image-version owns the untagged case, don't double-report.
+        if (!ref.tag) {
+          continue;
+        }
+
+        const tag = ref.tag.toLowerCase();
+        const isSlim =
+          tag.includes("alpine") ||
+          tag.includes("slim") ||
+          tag.includes("distroless");
+
+        if (!isSlim) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity as "error" | "warning" | "info",
+              `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
+              this.help,
+              inst.line
+            )
           );
-
-          if (!isSlim && !isSha && !isStageReference) {
-            diagnostics.push(
-              createDiagnostic(
-                file,
-                this.key,
-                this.defaultSeverity as "error" | "warning" | "info",
-                `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
-                this.help,
-                inst.line
-              )
-            );
-          }
         }
       }
     }

@@ -86,6 +86,30 @@ describe("Security Rules", () => {
     `);
     const diags3 = pinImageVersion.check(pinned, "Dockerfile");
     expect(diags3).toHaveLength(0);
+
+    const registryPortUntagged = parseDockerfile(`
+      FROM myregistry.example.com:5000/team/app
+    `);
+    expect(
+      pinImageVersion.check(registryPortUntagged, "Dockerfile")
+    ).toHaveLength(1);
+
+    const stageAlias = parseDockerfile(`
+      FROM node:22-alpine AS build
+      FROM build
+    `);
+    expect(pinImageVersion.check(stageAlias, "Dockerfile")).toHaveLength(0);
+
+    const argDriven = parseDockerfile(`
+      ARG NODE_IMAGE=node:22-alpine
+      FROM \${NODE_IMAGE}
+    `);
+    expect(pinImageVersion.check(argDriven, "Dockerfile")).toHaveLength(0);
+
+    const digestPinned = parseDockerfile(`
+      FROM node@sha256:aaaabbbbccccdddd
+    `);
+    expect(pinImageVersion.check(digestPinned, "Dockerfile")).toHaveLength(0);
   });
 
   test("no-secrets-in-env", () => {
@@ -287,6 +311,22 @@ describe("Image Size Rules", () => {
     `);
     const diags2 = preferSlimBase.check(slimBase, "Dockerfile");
     expect(diags2).toHaveLength(0);
+
+    const digestPinned = parseDockerfile(`
+      FROM node@sha256:aaaabbbbccccdddd
+    `);
+    expect(preferSlimBase.check(digestPinned, "Dockerfile")).toHaveLength(0);
+
+    const registryPort = parseDockerfile(`
+      FROM myregistry.example.com:5000/team/app
+    `);
+    expect(preferSlimBase.check(registryPort, "Dockerfile")).toHaveLength(0);
+
+    const stageAlias = parseDockerfile(`
+      FROM node:22-alpine AS build
+      FROM build
+    `);
+    expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
   });
 
   test("clean-package-cache", () => {

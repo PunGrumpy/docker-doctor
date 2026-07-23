@@ -1,3 +1,4 @@
+import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -136,6 +137,7 @@ export const pinImageVersion: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    const stageAliases = collectStageAliases(instructions);
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
@@ -148,10 +150,13 @@ export const pinImageVersion: DockerfileRule = {
           continue;
         }
 
-        const colonIndex = imagePart.indexOf(":");
-        const atIndex = imagePart.indexOf("@");
+        const ref = parseImageRef(imagePart);
 
-        if (colonIndex === -1 && atIndex === -1) {
+        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+          continue;
+        }
+
+        if (!(ref.tag || ref.digest)) {
           diagnostics.push(
             createDiagnostic(
               file,
@@ -162,20 +167,17 @@ export const pinImageVersion: DockerfileRule = {
               inst.line
             )
           );
-        } else if (colonIndex !== -1) {
-          const tag = imagePart.slice(colonIndex + 1);
-          if (tag === "latest") {
-            diagnostics.push(
-              createDiagnostic(
-                file,
-                this.key,
-                this.defaultSeverity as "error" | "warning" | "info",
-                `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
-                this.help,
-                inst.line
-              )
-            );
-          }
+        } else if (ref.tag === "latest" && !ref.digest) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity as "error" | "warning" | "info",
+              `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
+              this.help,
+              inst.line
+            )
+          );
         }
       }
     }
