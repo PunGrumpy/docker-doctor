@@ -1,3 +1,5 @@
+import { parseScoreQuery } from "@/lib/score";
+
 const LABEL = "Docker Doctor";
 
 const getScoreColor = (score: number): string => {
@@ -10,12 +12,9 @@ const getScoreColor = (score: number): string => {
   return "#e05d44";
 };
 
-const parseQuery = (value: string | null, fallback: number): number =>
-  Math.min(100, Math.max(0, Math.trunc(Number(value ?? fallback))));
-
 export const GET = (req: Request): Response => {
   const { searchParams } = new URL(req.url);
-  const score = parseQuery(searchParams.get("s"), 100);
+  const score = parseScoreQuery(searchParams.get("s"), 100);
 
   const labelWidth = 108;
   const valueWidth = 76;

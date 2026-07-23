@@ -29,3 +29,26 @@ export const getScoreData = (score: number): ScoreData => {
     label: "Needs Work",
   };
 };
+
+const clampScore = (n: number): number => Math.min(100, Math.max(0, n));
+
+/**
+ * Parses a raw `s` query-param value into a score clamped to [0, 100].
+ *
+ * `value === null` (the param is absent) falls back to `fallback`.
+ * Any present-but-non-finite value (e.g. "abc") also falls back to
+ * `fallback`. An empty string ("") is a *present* value: `Number("")`
+ * is `0`, so it clamps to `0` rather than falling back -- this is a
+ * deliberate choice, not an oversight.
+ */
+export const parseScoreQuery = (
+  value: string | null,
+  fallback = 100
+): number => {
+  if (value === null) {
+    return clampScore(fallback);
+  }
+  const parsed = Number(value);
+  const n = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+  return clampScore(n);
+};
