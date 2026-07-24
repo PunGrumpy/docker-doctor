@@ -100,11 +100,11 @@ export const Anchor = ({
 export const Code = ({ className, ...props }: ComponentProps<"code">) => (
   <code
     className={cn(
-      "rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground",
+      "rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[13px] text-foreground",
       // Reset the inline-code chip when this `code` is the child of a `pre`
       // (a fenced/highlighted block) so shiki's own token colors show
       // through untouched.
-      "[pre_&]:rounded-none [pre_&]:border-0 [pre_&]:bg-transparent [pre_&]:p-0 [pre_&]:font-inherit [pre_&]:text-inherit",
+      "in-[pre]:rounded-none in-[pre]:border-0 in-[pre]:bg-transparent in-[pre]:p-0 in-[pre]:font-inherit in-[pre]:text-inherit",
       className
     )}
     {...props}
@@ -168,8 +168,6 @@ interface CardProps {
   readonly children?: ReactNode;
 }
 
-const cardClassName = "rounded-xl border bg-card p-4 shadow-custom";
-
 export const Card = ({ icon, title, href, children }: CardProps) => {
   const content = (
     <>
@@ -194,7 +192,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
     return (
       <Link
         className={cn(
-          cardClassName,
+          "rounded-xl bg-card p-4 shadow-custom",
           "block transition-colors hover:bg-muted/30"
         )}
         href={href}
@@ -204,7 +202,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
     );
   }
 
-  return <div className={cardClassName}>{content}</div>;
+  return <div className="rounded-xl bg-card p-4 shadow-custom">{content}</div>;
 };
 
 export const Cards = ({ children }: { readonly children: ReactNode }) => (
