@@ -10,6 +10,11 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+// Every page-tree node carries a stable `$id`; pages also have a unique
+// `url`. Prefer those over the array index so keys survive reordering.
+const nodeKey = (node: PageTreeNode): string =>
+  node.$id ?? ("url" in node ? node.url : String(node.name));
+
 interface DocsSidebarProps {
   readonly tree: PageTreeRoot;
 }
@@ -53,9 +58,9 @@ const SidebarNode = ({ node, pathname }: SidebarNodeProps) => {
           {node.name}
         </p>
         <div className="flex flex-col gap-0.5">
-          {node.children.map((child, index) => (
+          {node.children.map((child) => (
             <SidebarNode
-              key={child.$id ?? `${String(child.name)}-${index}`}
+              key={nodeKey(child)}
               node={child}
               pathname={pathname}
             />
@@ -77,12 +82,8 @@ export const DocsSidebar = ({ tree }: DocsSidebarProps) => {
 
   return (
     <nav className="flex flex-col gap-0.5">
-      {tree.children.map((node, index) => (
-        <SidebarNode
-          key={node.$id ?? `${String(node.name)}-${index}`}
-          node={node}
-          pathname={pathname}
-        />
+      {tree.children.map((node) => (
+        <SidebarNode key={nodeKey(node)} node={node} pathname={pathname} />
       ))}
     </nav>
   );
