@@ -7,13 +7,16 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit",
-    "clean": "git clean -xdf .cache .turbo .next node_modules"
+    "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "clean": "git clean -xdf .cache .turbo .next node_modules",
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "cnfast": "^0.0.8",
     "date-fns": "^4.4.0",
+    "fumadocs-core": "^16.12.1",
+    "fumadocs-mdx": "^15.2.0",
     "lucide-react": "^1.24.0",
     "motion": "^12.42.2",
     "next": "16.2.10",
@@ -26,6 +29,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
+    "@types/mdx": "^2.0.14",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
