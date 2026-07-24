@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
-    "clean": "git clean -xdf .cache .turbo .next node_modules"
+    "clean": "git clean -xdf .cache .turbo .next node_modules",
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
