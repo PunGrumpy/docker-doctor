@@ -136,7 +136,7 @@ export const Pre = ({
 };
 
 export const Table = ({ className, ...props }: ComponentProps<"table">) => (
-  <div className="my-6 overflow-x-auto rounded-xl border">
+  <div className="my-6 overflow-x-auto rounded-xl shadow-border">
     <table className={cn("w-full text-sm", className)} {...props} />
   </div>
 );
