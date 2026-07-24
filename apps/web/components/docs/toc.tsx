@@ -1,7 +1,7 @@
 "use client";
 
+import { AnchorProvider, TOCItem } from "fumadocs-core/toc";
 import type { TableOfContents } from "fumadocs-core/toc";
-import Link from "next/link";
 
 interface DocsTocProps {
   readonly toc: TableOfContents;
@@ -15,21 +15,31 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
   return (
     <aside className="hidden w-56 shrink-0 xl:block">
       <div className="sticky top-24">
-        <p className="mb-3 text-xs font-medium text-muted-foreground">
+        <p
+          className="mb-3 font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wider"
+          id="toc-heading"
+        >
           On this page
         </p>
-        <nav className="flex flex-col gap-2 border-s border-dashed ps-4">
-          {toc.map((item) => (
-            <Link
-              className="text-sm text-muted-foreground hover:text-foreground"
-              href={item.url}
-              key={item.url}
-              style={{ paddingInlineStart: `${(item.depth - 2) * 0.75}rem` }}
-            >
-              {item.title}
-            </Link>
-          ))}
-        </nav>
+        <AnchorProvider toc={toc}>
+          <nav
+            aria-labelledby="toc-heading"
+            className="flex flex-col gap-0.5 border-s border-dashed ps-4"
+          >
+            {toc.map((item) => (
+              <TOCItem
+                className="py-1 text-muted-foreground text-sm hover:text-foreground data-[active=true]:text-foreground"
+                href={item.url}
+                key={item.url}
+                style={{
+                  paddingInlineStart: `${Math.max(0, item.depth - 2) * 0.75}rem`,
+                }}
+              >
+                {item.title}
+              </TOCItem>
+            ))}
+          </nav>
+        </AnchorProvider>
       </div>
     </aside>
   );
