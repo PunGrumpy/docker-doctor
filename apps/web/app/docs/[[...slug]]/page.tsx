@@ -10,6 +10,23 @@ interface DocPageProps {
   readonly params: Promise<{ slug?: string[] }>;
 }
 
+export const generateStaticParams = () => source.generateParams();
+
+export const generateMetadata = async ({
+  params,
+}: DocPageProps): Promise<Metadata> => {
+  const { slug } = await params;
+  const page = source.getPage(slug);
+  if (!page) {
+    notFound();
+  }
+
+  return {
+    description: page.data.description,
+    title: page.data.title,
+  };
+};
+
 const Page = async ({ params }: DocPageProps) => {
   const { slug } = await params;
   const page = source.getPage(slug);
@@ -39,20 +56,3 @@ const Page = async ({ params }: DocPageProps) => {
 };
 
 export default Page;
-
-export const generateStaticParams = () => source.generateParams();
-
-export const generateMetadata = async ({
-  params,
-}: DocPageProps): Promise<Metadata> => {
-  const { slug } = await params;
-  const page = source.getPage(slug);
-  if (!page) {
-    notFound();
-  }
-
-  return {
-    description: page.data.description,
-    title: page.data.title,
-  };
-};
