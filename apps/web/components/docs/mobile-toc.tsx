@@ -34,7 +34,7 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
           className="size-4 text-muted-foreground transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-180"
         />
       </summary>
-      <div className="absolute inset-x-0 top-full max-h-[60vh] animate-in overflow-y-auto overscroll-contain border-dashed border-b bg-background p-2 shadow-custom duration-200 ease-[var(--ease-out)] fade-in slide-in-from-top-1">
+      <div className="absolute inset-x-0 top-full max-h-[60vh] animate-in overflow-y-auto overscroll-contain border-dashed border-b bg-background p-2 shadow-custom animation-duration-200 [--tw-ease:var(--ease-out)] fade-in slide-in-from-top-1">
         <AnchorProvider toc={toc}>
           <nav aria-label="On this page" className="flex flex-col">
             {toc.map((item) => (
