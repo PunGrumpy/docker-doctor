@@ -35,7 +35,7 @@ const SidebarLink = ({
 }) => (
   <Link
     className={cn(
-      "block rounded-lg px-3 py-1.5 text-sm transition-colors",
+      "block rounded-lg px-3 py-1.5 text-sm",
       active
         ? "bg-muted text-foreground"
         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -81,7 +81,7 @@ export const DocsSidebar = ({ tree }: DocsSidebarProps) => {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-1">
+    <nav aria-label="Documentation" className="flex flex-col gap-1">
       {tree.children.map((node) => (
         <SidebarNode key={nodeKey(node)} node={node} pathname={pathname} />
       ))}
