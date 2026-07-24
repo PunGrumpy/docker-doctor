@@ -6,7 +6,7 @@ import { ChangelogButton, DocsButton } from "@/components/nav-buttons";
 import { source } from "@/lib/source";
 
 export const Header = () => (
-  <header className="sticky top-0 z-20 border-b border-dashed bg-background">
+  <header className="fixed inset-x-0 top-0 z-20 border-b border-dashed bg-background">
     <nav
       aria-label="Primary"
       className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 lg:px-14"
