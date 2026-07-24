@@ -251,11 +251,6 @@
   li::marker {
     color: --alpha(var(--color-muted-foreground) / 40%);
   }
-
-  :not(pre) > code {
-    @apply p-0.75 rounded-[5px] border bg-muted font-mono text-foreground;
-    overflow-wrap: anywhere;
-  }
 }
 
 @layer components {
