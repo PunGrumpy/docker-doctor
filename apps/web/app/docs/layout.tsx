@@ -39,16 +39,15 @@ const DocsRootLayout = ({ children }: DocsRootLayoutProps) => (
       </nav>
     </header>
 
-    <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 px-4 lg:px-8">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 left-4 hidden border-l border-dashed lg:left-8 lg:block"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-4 hidden border-r border-dashed lg:right-8 lg:block"
-      />
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-x-0 top-0 bottom-0 z-30 mx-auto hidden w-full max-w-[1200px] px-4 lg:block lg:px-8"
+    >
+      <div className="absolute inset-y-0 left-4 border-l border-dashed lg:left-8" />
+      <div className="absolute inset-y-0 right-4 border-r border-dashed lg:right-8" />
+    </div>
 
+    <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 px-4 lg:px-8">
       <div className="grid w-full grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
         <aside className="hidden lg:block">
           <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto border-e border-dashed py-8 pe-4 ps-4">
