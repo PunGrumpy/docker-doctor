@@ -11,6 +11,9 @@
   "[css]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
+  "[postcss]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
   "[graphql]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
