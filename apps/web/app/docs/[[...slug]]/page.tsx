@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { DocsMobileToc } from "@/components/docs/mobile-toc";
 import { DocsToc } from "@/components/docs/toc";
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
@@ -27,6 +28,7 @@ const Page = async ({ params }: DocPageProps) => {
         {page.data.description ? (
           <p className="mt-2 text-muted-foreground">{page.data.description}</p>
         ) : null}
+        <DocsMobileToc toc={page.data.toc} />
         <div className="mt-8">
           <MdxContent components={getMDXComponents()} />
         </div>
