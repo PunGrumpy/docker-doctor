@@ -23,50 +23,50 @@ npx @docker-doctor/cli@latest rules explain <rule>
 
 Catches Dockerfile patterns that widen your attack surface.
 
-- `docker-doctor/no-root-user` — Container should not run as root user _(warning)_
-- `docker-doctor/no-secrets-in-env` — Do not store secrets in ENV or ARG instructions _(error)_
-- `docker-doctor/pin-image-version` — Always pin base image versions to specific tags _(warning)_
-- `docker-doctor/no-add-remote` — Avoid using ADD with remote URLs _(warning)_
+- `docker-doctor/no-root-user` — Container should not run as root user (`warning`)
+- `docker-doctor/no-secrets-in-env` — Do not store secrets in ENV or ARG instructions (`error`)
+- `docker-doctor/pin-image-version` — Always pin base image versions to specific tags (`warning`)
+- `docker-doctor/no-add-remote` — Avoid using ADD with remote URLs (`warning`)
 
 ## Performance
 
 Reduces build time and layer bloat.
 
-- `docker-doctor/use-multi-stage` — Consider using multi-stage builds _(info)_
-- `docker-doctor/order-layers` — Order layers to maximize build cache utility _(warning)_
-- `docker-doctor/minimize-layers` — Minimize the number of image layers _(info)_
-- `docker-doctor/use-dockerignore` — Ensure .dockerignore is used _(warning)_
+- `docker-doctor/use-multi-stage` — Consider using multi-stage builds (`info`)
+- `docker-doctor/order-layers` — Order layers to maximize build cache utility (`warning`)
+- `docker-doctor/minimize-layers` — Minimize the number of image layers (`info`)
+- `docker-doctor/use-dockerignore` — Ensure .dockerignore is used (`warning`)
 
 ## Best Practices
 
 General Dockerfile and Compose hygiene.
 
-- `docker-doctor/require-healthcheck` — Add a HEALTHCHECK instruction _(info)_
-- `docker-doctor/prefer-copy-over-add` — Prefer COPY over ADD _(warning)_
-- `docker-doctor/use-exec-form` — Use exec form for CMD and ENTRYPOINT _(warning)_
-- `docker-doctor/require-labels` — Add LABEL metadata to images _(info)_
-- `docker-doctor/combine-apt-update-install` — Combine apt-get update and apt-get install _(warning)_
-- `docker-doctor/use-pipefail` — Use pipefail to catch pipeline command failures _(warning)_
-- `docker-doctor/absolute-workdir` — Use absolute paths for WORKDIR _(warning)_
-- `docker-doctor/avoid-run-cd` — Avoid changing directories with cd in RUN _(info)_
-- `docker-doctor/sort-multiline-args` — Sort multi-line arguments alphanumerically _(info)_
-- `docker-doctor/useradd-no-log-init` — Use --no-log-init with useradd _(warning)_
+- `docker-doctor/require-healthcheck` — Add a HEALTHCHECK instruction (`info`)
+- `docker-doctor/prefer-copy-over-add` — Prefer COPY over ADD (`warning`)
+- `docker-doctor/use-exec-form` — Use exec form for CMD and ENTRYPOINT (`warning`)
+- `docker-doctor/require-labels` — Add LABEL metadata to images (`info`)
+- `docker-doctor/combine-apt-update-install` — Combine apt-get update and apt-get install (`warning`)
+- `docker-doctor/use-pipefail` — Use pipefail to catch pipeline command failures (`warning`)
+- `docker-doctor/absolute-workdir` — Use absolute paths for WORKDIR (`warning`)
+- `docker-doctor/avoid-run-cd` — Avoid changing directories with cd in RUN (`info`)
+- `docker-doctor/sort-multiline-args` — Sort multi-line arguments alphanumerically (`info`)
+- `docker-doctor/useradd-no-log-init` — Use --no-log-init with useradd (`warning`)
 
 ## Compose
 
 Docker Compose-specific checks.
 
-- `docker-doctor/no-version-key` — Remove the 'version' key from Compose file _(warning)_
-- `docker-doctor/require-resource-limits` — Define resource limits for services _(warning)_
-- `docker-doctor/require-restart-policy` — Set restart policy for services _(warning)_
-- `docker-doctor/use-depends-on-condition` — Use long-form depends*on with healthcheck conditions *(info)\_
+- `docker-doctor/no-version-key` — Remove the 'version' key from Compose file (`warning`)
+- `docker-doctor/require-resource-limits` — Define resource limits for services (`warning`)
+- `docker-doctor/require-restart-policy` — Set restart policy for services (`warning`)
+- `docker-doctor/use-depends-on-condition` — Use long-form depends_on with healthcheck conditions (`info`)
 
 ## Image Size
 
 Keeps final images small.
 
-- `docker-doctor/prefer-slim-base` — Use slim, alpine, or distroless base images _(info)_
-- `docker-doctor/clean-package-cache` — Clean up package manager cache in the same RUN layer _(warning)_
-- `docker-doctor/avoid-dev-dependencies` — Avoid installing development dependencies in final production stage _(warning)_
+- `docker-doctor/prefer-slim-base` — Use slim, alpine, or distroless base images (`info`)
+- `docker-doctor/clean-package-cache` — Clean up package manager cache in the same RUN layer (`warning`)
+- `docker-doctor/avoid-dev-dependencies` — Avoid installing development dependencies in final production stage (`warning`)
 
 See [Configuration](/docs/reference/configuration) to change a rule's severity or turn off a whole category.

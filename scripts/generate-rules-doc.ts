@@ -47,8 +47,11 @@ const CATEGORY_BLURB: Record<RuleCategory, string> = {
 const rulesByCategory = (category: RuleCategory): RuleDefinition[] =>
   allRules.filter((rule) => rule.category === category);
 
+// Severity is rendered as a code span rather than markdown emphasis: rule
+// messages can contain underscores (e.g. "depends_on"), and an `_(...)_`
+// emphasis wrapper pairs with them, which the MDX formatter then mangles.
 const renderRule = (rule: RuleDefinition): string =>
-  `- \`${rule.key}\` — ${rule.message} _(${rule.defaultSeverity})_`;
+  `- \`${rule.key}\` — ${rule.message} (\`${rule.defaultSeverity}\`)`;
 
 const renderSection = (category: RuleCategory): string => {
   const rules = rulesByCategory(category);
