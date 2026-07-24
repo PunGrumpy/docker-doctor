@@ -24,17 +24,17 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
 
   return (
     <details
-      className="group sticky top-14 z-20 mt-6 mb-8 border-dashed border-y bg-background xl:hidden"
+      className="group sticky top-14 z-20 -mx-4 mt-6 mb-8 border-dashed border-y bg-background lg:mx-0 xl:hidden"
       ref={detailsRef}
     >
-      <summary className="flex h-12 cursor-pointer list-none items-center justify-between font-medium text-sm [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-12 cursor-pointer list-none items-center justify-between px-4 font-medium text-sm lg:px-0 [&::-webkit-details-marker]:hidden">
         On this page
         <ChevronDown
           aria-hidden="true"
           className="size-4 text-muted-foreground transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-180"
         />
       </summary>
-      <div className="absolute inset-x-0 top-full max-h-[60vh] overflow-y-auto overscroll-contain border-dashed border-b bg-background p-2 shadow-custom">
+      <div className="absolute inset-x-0 top-full max-h-[60vh] animate-in overflow-y-auto overscroll-contain border-dashed border-b bg-background p-2 shadow-custom duration-200 ease-[var(--ease-out)] fade-in slide-in-from-top-1">
         <AnchorProvider toc={toc}>
           <nav aria-label="On this page" className="flex flex-col">
             {toc.map((item) => (
