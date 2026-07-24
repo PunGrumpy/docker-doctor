@@ -18,7 +18,7 @@ const MarketingLayout = ({ children }: MarketingLayoutProps) => (
         />
         <div
           aria-hidden="true"
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-196 h-full border-[0.5px] border-dashed pointer-events-none hidden lg:block"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-196 h-full border-x-[0.5px] border-dashed pointer-events-none hidden lg:block"
         />
         <div className="relative flex flex-col w-full px-4 lg:px-24 max-w-196 mx-auto">
           {children}
