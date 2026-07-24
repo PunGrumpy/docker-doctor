@@ -53,7 +53,7 @@ const TocThumb = ({
   return (
     <span
       aria-hidden="true"
-      className="absolute start-0 w-px bg-foreground transition-[transform,height] duration-200 ease-[var(--ease-out)]"
+      className="absolute -inset-px w-px bg-foreground transition-[transform,height] duration-200 ease-[var(--ease-out)]"
       style={{
         height: position.height,
         transform: `translateY(${position.top}px)`,
