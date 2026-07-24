@@ -1,13 +1,70 @@
 "use client";
 
-import { AnchorProvider, TOCItem } from "fumadocs-core/toc";
+import { AnchorProvider, TOCItem, useActiveAnchor } from "fumadocs-core/toc";
 import type { TableOfContents } from "fumadocs-core/toc";
+import type { RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface DocsTocProps {
   readonly toc: TableOfContents;
 }
 
+interface ThumbPosition {
+  readonly top: number;
+  readonly height: number;
+}
+
+// A solid marker that slides along the dashed rail to track the active
+// heading. It reads the active `TOCItem` anchor's offset within the nav (which
+// is `position: relative`), so it stays aligned regardless of item depth.
+const TocThumb = ({
+  containerRef,
+}: {
+  readonly containerRef: RefObject<HTMLElement | null>;
+}) => {
+  const active = useActiveAnchor();
+  const [position, setPosition] = useState<ThumbPosition | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!(container && active)) {
+      setPosition(null);
+      return;
+    }
+
+    const measure = () => {
+      const link = container.querySelector<HTMLElement>(
+        `a[href="#${CSS.escape(active)}"]`
+      );
+      setPosition(
+        link ? { height: link.offsetHeight, top: link.offsetTop } : null
+      );
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [active, containerRef]);
+
+  if (!position) {
+    return null;
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute start-0 w-px bg-foreground transition-[transform,height] duration-200 ease-[var(--ease-out)]"
+      style={{
+        height: position.height,
+        transform: `translateY(${position.top}px)`,
+      }}
+    />
+  );
+};
+
 export const DocsToc = ({ toc }: DocsTocProps) => {
+  const navRef = useRef<HTMLElement | null>(null);
+
   if (toc.length === 0) {
     return null;
   }
@@ -24,8 +81,10 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
         <AnchorProvider toc={toc}>
           <nav
             aria-labelledby="toc-heading"
-            className="flex flex-col gap-0.5 border-s border-dashed ps-4"
+            className="relative flex flex-col gap-0.5 border-s border-dashed ps-4"
+            ref={navRef}
           >
+            <TocThumb containerRef={navRef} />
             {toc.map((item) => (
               <TOCItem
                 className="py-1 text-muted-foreground text-sm hover:text-foreground data-[active=true]:text-foreground"
