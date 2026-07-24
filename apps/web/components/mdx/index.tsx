@@ -15,7 +15,7 @@ import {
   TableCell,
   TableHeaderCell,
   UnorderedList,
-} from "@/components/mdx-elements";
+} from "./elements";
 
 export const getMDXComponents = (
   components?: MDXComponents
