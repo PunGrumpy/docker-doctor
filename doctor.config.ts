@@ -9,6 +9,10 @@ const config: ReactDoctorConfig = {
       },
     ],
   },
+  // Scan only the real React surfaces. `videos` is deliberately absent:
+  // it's a Remotion project full of registry-vendored components that
+  // react-doctor's app rules aren't written for.
+  projects: ["web"],
 };
 
 export default config;
