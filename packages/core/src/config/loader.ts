@@ -34,7 +34,7 @@ const parseConfigFile = async (
 
 const importConfig = async (filePath: string): Promise<unknown> => {
   if (filePath.endsWith(".json")) {
-    return parseConfigFile(filePath, "JSON", (content) => JSON.parse(content));
+    return parseConfigFile(filePath, "JSON", JSON.parse);
   }
 
   if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
