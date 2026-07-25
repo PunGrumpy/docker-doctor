@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { DocsMobileToc } from "@/components/docs/mobile-toc";
 import { DocsToc } from "@/components/docs/toc";
 import { getMDXComponents } from "@/components/mdx";
-import { source } from "@/lib/source";
+import { getPageImageUrl, source } from "@/lib/source";
 
 interface DocPageProps {
   readonly params: Promise<{ slug?: string[] }>;
@@ -23,6 +23,11 @@ export const generateMetadata = async ({
 
   return {
     description: page.data.description,
+    openGraph: {
+      description: page.data.description,
+      images: [getPageImageUrl(page).url],
+      title: page.data.title,
+    },
     title: page.data.title,
   };
 };
