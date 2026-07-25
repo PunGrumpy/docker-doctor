@@ -15,6 +15,7 @@ export const Installer = () => (
       <CopyButton
         value="npx @docker-doctor/cli@latest"
         aria-label="Copy installation command"
+        data-track="install_command_copied"
       />
     </div>
     <a

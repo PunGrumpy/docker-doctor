@@ -129,6 +129,7 @@ export const Pre = ({
       <CopyButton
         aria-label="Copy code"
         className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        data-track="docs_code_copied"
         value={code}
       />
     </div>
