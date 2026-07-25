@@ -252,11 +252,11 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
         />
       )}
 
-      {ticks >= 106 && ticks < 118 && (
+      {ticks < 118 && (
         <ClaudeThinking
-          running={true}
+          running
           verbs={["Levitating", "Herding", "Percolating", "Conjuring"]}
-          showTokens={true}
+          showTokens
           className="text-foreground dark:text-[#c0caf5]"
         />
       )}

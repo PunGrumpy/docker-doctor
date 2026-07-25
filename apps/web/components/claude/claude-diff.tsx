@@ -51,7 +51,7 @@ export const ClaudeDiff = ({
     ) : null}
 
     <pre className="mt-1 min-w-0 overflow-x-auto rounded-md border border-border bg-muted/30 py-1.5 pl-2 pr-3">
-      {lines.map((l, i) => {
+      {lines.map((l) => {
         let mark = " ";
         if (l.type === "add") {
           mark = "+";
@@ -61,7 +61,7 @@ export const ClaudeDiff = ({
 
         return (
           <div
-            key={i}
+            key={`${l.type}-${l.n ?? ""}-${l.text}`}
             className={cn(
               "flex min-w-0",
               l.type === "add" &&

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { Cursor } from "@/components/icons/cursor";
 import { getScoreData } from "@/lib/score";
@@ -28,6 +28,20 @@ interface ShareButtonProps {
   href?: string;
   onClick?: () => void;
 }
+
+// window.location.origin is fixed for the lifetime of the page, so the
+// store never notifies; the server snapshot ("") keeps SSR and hydration
+// consistent without an effect-driven setState.
+const subscribeToNothing = () => () => {
+  // nothing to unsubscribe
+};
+
+const useOrigin = () =>
+  useSyncExternalStore(
+    subscribeToNothing,
+    () => window.location.origin,
+    () => ""
+  );
 
 const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
   if (href) {
@@ -62,7 +76,8 @@ const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
 export const Card = ({ score, warnings, errors }: CardProps) => {
   const { label, background, border } = getScoreData(score);
 
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const origin = useOrigin();
+
   const params = new URLSearchParams({
     e: String(errors),
     s: String(score),

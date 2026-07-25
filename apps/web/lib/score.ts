@@ -76,3 +76,17 @@ export const parseScoreQuery = (
   const n = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
   return clampScore(n);
 };
+
+/**
+ * Parses a raw `w`/`e` query-param value into a non-negative integer
+ * count, with the same null/non-finite fallback semantics as
+ * `parseScoreQuery`.
+ */
+export const parseCountQuery = (value: string | null, fallback = 0): number => {
+  if (value === null) {
+    return Math.max(0, fallback);
+  }
+  const parsed = Number(value);
+  const n = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+  return Math.max(0, n);
+};

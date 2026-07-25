@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 
 /**
  * ClaudeThinking — Claude Code's "working" line.
@@ -29,21 +29,23 @@ const CLAUDE = "#cd694a";
 const HILITE = "#e79475";
 const DIM = "#7d7d7d";
 
-const usePrefersReducedMotion = () => {
-  const [reduced, setReduced] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    }
-    return false;
-  });
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const on = () => setReduced(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return reduced;
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+const subscribeReducedMotion = (onChange: () => void) => {
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
 };
+
+// useSyncExternalStore keeps the server render and the first client render
+// in agreement (server snapshot: false) — reading matchMedia in a useState
+// initializer caused a hydration mismatch for reduced-motion users.
+const usePrefersReducedMotion = () =>
+  useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION_QUERY).matches,
+    () => false
+  );
 
 export const ClaudeThinking = ({
   running = true,

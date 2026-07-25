@@ -18,8 +18,8 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-    } catch (error) {
-      console.error("Failed to copy text:", error);
+    } catch {
+      // clipboard not available
     }
   }, [value]);
 
