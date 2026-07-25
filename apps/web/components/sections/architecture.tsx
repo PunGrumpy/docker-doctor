@@ -236,7 +236,7 @@ export const Architecture = async () => {
         codeToHtml(snippet.code, { lang: "typescript", theme: "github-light" }),
         codeToHtml(snippet.code, {
           lang: "typescript",
-          theme: "vesper",
+          theme: "github-dark",
         }),
       ])
     )

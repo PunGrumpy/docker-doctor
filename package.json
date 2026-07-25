@@ -18,6 +18,7 @@
     "changeset:version": "changeset version",
     "changeset:publish": "turbo run build && changeset publish",
     "doctor": "react-doctor",
+    "docs:rules": "bun scripts/generate-rules-doc.ts",
     "prepare": "husky"
   },
   "devDependencies": {

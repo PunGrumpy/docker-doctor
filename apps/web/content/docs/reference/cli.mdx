@@ -1,0 +1,58 @@
+---
+title: CLI Reference
+description: Commands, flags, and exit codes for the docker-doctor CLI.
+---
+
+## Default scan command
+
+```bash
+npx @docker-doctor/cli@latest [dir]
+```
+
+`[dir]` is the directory to scan and defaults to `.`.
+
+| Flag | Alias | Description |
+| --- | --- | --- |
+| `--verbose` | `-v` | Show the affected file, line, an explanation, and a `Help:` fix hint for every diagnostic |
+| `--score` | `-s` | Print only the numeric health score |
+| `--json` | `-j` | Output the full report as JSON |
+| `--config <path>` | `-c` | Use a custom config file path |
+| `--version` | `-V` | Print the CLI version |
+
+## Piped / CI output
+
+`--score` and `--json` both suppress the interactive spinner and prompts, so they're safe to pipe or run in CI:
+
+```bash
+npx @docker-doctor/cli@latest . --score
+```
+
+```bash
+npx @docker-doctor/cli@latest . --json > report.json
+```
+
+### Exit codes
+
+| Mode         | Exit code                                              |
+| ------------ | ------------------------------------------------------ |
+| Default scan | Non-zero if any `error`-severity diagnostic is present |
+| `--score`    | Non-zero if the score is below 50                      |
+| `--json`     | Non-zero if any `error`-severity diagnostic is present |
+
+## Rules subcommands
+
+List every built-in rule, its category, default severity, and description:
+
+```bash
+npx @docker-doctor/cli@latest rules list
+```
+
+Explain a single rule and its fix in detail (requires the full rule key):
+
+```bash
+npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user
+```
+
+## Interactive mode
+
+When run in a TTY without `--score` or `--json`, docker-doctor shows a spinner while scanning and, after printing results, offers to scaffold a `.github/workflows/docker-doctor.yml` CI workflow for you.

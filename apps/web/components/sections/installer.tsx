@@ -7,9 +7,11 @@ export const Installer = () => (
   <Section className="pt-8 pb-8 flex flex-col sm:flex-row items-center gap-3 w-full">
     <div className="flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl bg-background shadow-border flex-1 w-full">
       <span className="font-mono text-muted-foreground/60 select-none">$</span>
-      <code className="font-mono text-foreground select-all flex-1 truncate">
-        npx @docker-doctor/cli@latest
-      </code>
+      <pre className="select-all flex-1 truncate">
+        <code className="font-mono text-foreground">
+          npx @docker-doctor/cli@latest
+        </code>
+      </pre>
       <CopyButton
         value="npx @docker-doctor/cli@latest"
         aria-label="Copy installation command"

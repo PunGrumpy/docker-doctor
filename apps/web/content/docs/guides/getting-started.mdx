@@ -1,0 +1,56 @@
+---
+title: Getting Started
+description: Install docker-doctor and run your first scan.
+---
+
+## Install
+
+docker-doctor is published as `@docker-doctor/cli`. There's nothing to install permanently — run it directly with `npx` or `bunx`:
+
+```bash
+npx @docker-doctor/cli@latest
+```
+
+```bash
+bunx @docker-doctor/cli@latest
+```
+
+## Run a scan
+
+By default docker-doctor scans the current directory for Dockerfiles and Compose files:
+
+```bash
+npx @docker-doctor/cli@latest .
+```
+
+You can point it at any directory:
+
+```bash
+npx @docker-doctor/cli@latest ./path/to/project
+```
+
+## Read the output
+
+A scan prints one line per diagnostic — the file and line, the severity, a short message, and the rule key that raised it — followed by an overall health score:
+
+```text
+Dockerfile
+  10:1  warning  Container should not run as root user  docker-doctor/no-root-user
+
+Score: 94 Good ✅
+```
+
+Add `--verbose` to see the affected file, an explanation, and a `Help:` fix hint for every diagnostic:
+
+```bash
+npx @docker-doctor/cli@latest . --verbose
+```
+
+The scan exits non-zero when any `error`-severity diagnostic is present, which makes it a natural CI gate — after your first scan, docker-doctor will offer to wire up a GitHub Actions workflow for you.
+
+## Next steps
+
+- Browse every rule with `npx @docker-doctor/cli@latest rules list`, or read the full list in [Rules](/docs/reference/rules).
+- See all flags and exit codes in the [CLI reference](/docs/reference/cli).
+- Tune rule severities or ignore files in [Configuration](/docs/reference/configuration).
+- Understand how the health score is calculated in [Scoring](/docs/reference/scoring).

@@ -1,0 +1,48 @@
+---
+title: Configuration
+description: How docker-doctor resolves and validates its config file.
+---
+
+## File resolution
+
+Unless you pass `--config <path>`, docker-doctor looks for the first of these, in order, in the scanned directory:
+
+1. `docker-doctor.config.ts`
+2. `docker-doctor.config.js`
+3. `docker-doctor.config.mjs`
+4. `docker-doctor.config.cjs`
+5. `docker-doctor.config.json`
+6. a `"dockerDoctor"` key in `package.json`
+
+If none of these exist, docker-doctor runs with its built-in defaults.
+
+```bash
+npx @docker-doctor/cli@latest . --config ./custom-docker-doctor.config.ts
+```
+
+## Shape
+
+```ts
+// docker-doctor.config.ts
+export default {
+  rules: {
+    "docker-doctor/no-root-user": "error",
+  },
+  categories: {
+    "Image Size": "off",
+  },
+  ignore: {
+    files: ["examples/**/Dockerfile"],
+  },
+};
+```
+
+| Key | Type | Purpose |
+| --- | --- | --- |
+| `rules` | `Record<string, "error" \| "warning" \| "info" \| "off">` | Override the severity of an individual rule by its full key |
+| `categories` | `Record<Category, "error" \| "warning" \| "info" \| "off">` | Override every rule in a category at once. `"off"` drops all diagnostics in that category |
+| `ignore.files` | `string[]` | Glob patterns for files to exclude from scanning |
+
+The five valid `categories` keys are `Security`, `Performance`, `Best Practices`, `Compose`, and `Image Size`.
+
+Unknown top-level keys and unknown category names are silently dropped rather than rejected, matching the legacy config schema's behavior. Invalid severities throw a config error with the offending rule/category name.
