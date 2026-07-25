@@ -28,7 +28,7 @@ export const Logo = () => {
       </div>
       <div
         style={{
-          color: "#ffffff",
+          color: "rgba(0,0,0,0.85)",
           fontFamily: "var(--font-serif), ui-serif, Georgia, serif",
           fontSize: 92,
           fontWeight: 400,
@@ -41,7 +41,7 @@ export const Logo = () => {
       </div>
       <div
         style={{
-          color: "rgba(255,255,255,0.72)",
+          color: "rgba(0,0,0,0.55)",
           fontFamily:
             "var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace",
           fontSize: 17,

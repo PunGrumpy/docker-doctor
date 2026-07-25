@@ -2,9 +2,14 @@ import { loadFont as loadGeistSans } from "@remotion/google-fonts/Geist";
 import { loadFont as loadGeistMono } from "@remotion/google-fonts/GeistMono";
 import { loadFont as loadInstrumentSerif } from "@remotion/google-fonts/InstrumentSerif";
 import type { CSSProperties, ReactNode } from "react";
-import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Img,
+  Sequence,
+  staticFile,
+  useVideoConfig,
+} from "remotion";
 
-import { Backdrop } from "./components/backdrop";
 import { SharedAxisY } from "./components/remocn/shared-axis-y";
 import { SoftBlurIn } from "./components/remocn/soft-blur-in";
 import { Typewriter } from "./components/remocn/typewriter";
@@ -17,7 +22,7 @@ import {
 } from "./scenes/scan-terminal";
 
 // The Docker Doctor launch video, built on blume's launch-video system:
-// gradient backdrop, white Geist type, frosted terminal cards, and a
+// gradient image backdrop, dark Geist type, frosted terminal cards, and a
 // derived timeline so the terminal scenes can grow without hand-retiming
 // everything after them.
 
@@ -34,7 +39,7 @@ const { fontFamily: INSTRUMENT_SERIF } = loadInstrumentSerif("normal", {
   weights: ["400"],
 });
 
-const WHITE = "#ffffff";
+const INK = "rgba(0,0,0,0.85)";
 const SANS =
   "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
 
@@ -65,7 +70,7 @@ const CenteredLine = ({
   <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
     <span
       style={{
-        color: WHITE,
+        color: INK,
         fontFamily: SANS,
         fontSize,
         fontWeight: 600,
@@ -83,11 +88,11 @@ const CenteredLine = ({
 const SceneTagline = () => (
   <>
     <Positioned dy={-37}>
-      <SoftBlurIn color={WHITE} fontSize={70} text="Your containers run." />
+      <SoftBlurIn color={INK} fontSize={70} text="Your containers run." />
     </Positioned>
     <Sequence from={8} layout="none">
       <Positioned dy={37}>
-        <SoftBlurIn color={WHITE} fontSize={70} text="But are they healthy?" />
+        <SoftBlurIn color={INK} fontSize={70} text="But are they healthy?" />
       </Positioned>
     </Sequence>
   </>
@@ -100,11 +105,11 @@ const QUESTION_DURATION = 80;
 const SceneQuestion = () => (
   <>
     <Positioned dy={-37}>
-      <SoftBlurIn color={WHITE} fontSize={62} text="But who wants to fix" />
+      <SoftBlurIn color={INK} fontSize={62} text="But who wants to fix" />
     </Positioned>
     <Sequence from={8} layout="none">
       <Positioned dy={37}>
-        <SoftBlurIn color={WHITE} fontSize={62} text="all that by hand?" />
+        <SoftBlurIn color={INK} fontSize={62} text="all that by hand?" />
       </Positioned>
     </Sequence>
   </>
@@ -139,7 +144,7 @@ const SceneFeatures = () => (
           layout="none"
         >
           <SharedAxisY
-            color={WHITE}
+            color={INK}
             fontSize={64}
             fromText={SNAPS[i]}
             toText={snap}
@@ -158,8 +163,8 @@ const SceneCta = () => (
     <Typewriter
       background="transparent"
       charsPerSecond={16}
-      color={WHITE}
-      cursorColor={WHITE}
+      color={INK}
+      cursorColor={INK}
       fontSize={64}
       text="bunx @docker-doctor/cli"
     />
@@ -201,7 +206,12 @@ export const DockerDoctor = () => {
 
   return (
     <AbsoluteFill style={FONT_VARS}>
-      <Backdrop />
+      <AbsoluteFill>
+        <Img
+          src={staticFile("background.png")}
+          style={{ height: "100%", objectFit: "cover", width: "100%" }}
+        />
+      </AbsoluteFill>
 
       {/* Reference stage, scaled from the top-left to fill the frame. */}
       <AbsoluteFill>

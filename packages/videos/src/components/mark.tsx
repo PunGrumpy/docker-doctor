@@ -3,7 +3,7 @@
 // if the site logo changes.
 export const Mark = ({
   size = 72,
-  fill = "#ffffff",
+  fill = "#2b7fff",
 }: {
   readonly size?: number;
   readonly fill?: string;
