@@ -1,38 +1,54 @@
-# videos
+# Remotion video
 
-Remotion project for the Docker Doctor launch video, built on the visual system of [blume's launch videos](https://github.com/haydenbleasel/blume/tree/main/packages/video): a gradient backdrop, white Geist type, frosted-glass terminal cards, and a derived timeline. The structure mirrors blume's `AuditVideo` — the closest analogue to what docker-doctor does — with docker-doctor's real CLI output and brand (Instrument Serif wordmark, ASCII mascot).
+<p align="center">
+  <a href="https://github.com/remotion-dev/logo">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-dark.apng">
+      <img alt="Animated Remotion Logo" src="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-light.gif">
+    </picture>
+  </a>
+</p>
 
-Seven scenes, ~35s:
-
-> **Tagline** "Your containers run. / But are they healthy?" → **Report** frosted terminal: `docker-doctor .` prints findings + 45/100 scorecard → **Question** "But who wants to fix / all that by hand?" → **Agent** `claude` banner + echoed fix prompt + spinner, re-scan goes 100/100 → **Features** five snap claims → **CTA** typewriter `bunx @docker-doctor/cli` → **Logo** brand mark + serif wordmark.
+Welcome to your Remotion project!
 
 ## Commands
 
-```bash
-bun run dev      # open Remotion Studio to scrub/preview
-bun run render   # render out/docker-doctor.mp4 (1920x1080, H.264, ~35s)
-bun run still -- out/frame.png --frame=255   # render a single frame
-bun run typecheck
+**Install Dependencies**
+
+```console
+npm i
 ```
 
-## Layout
+**Start Preview**
 
-```
-src/
-  Root.tsx              registers the DockerDoctor composition (1080p @ 30fps)
-  DockerDoctor.tsx      the composition: backdrop + 1280x720 stage scaled up,
-                        scene timeline derived from the terminal script lengths
-  fonts.ts              Geist / Geist Mono / Instrument Serif
-  components/
-    Backdrop.tsx        CSS mesh-gradient stand-in for blume's background.jpg
-    remocn/             ports of blume's motion primitives:
-                        soft-blur-in (per-char), shared-axis-y (word-level
-                        step cut), typewriter (cps + caret)
-  scenes/
-    scan-terminal.tsx   script compiler + frosted terminal card; the report
-                        and agent scripts (modeled on blume audit-terminal)
-    logo.tsx            brand mark + Instrument Serif wordmark sign-off
-                        (Mark.tsx copies the SVG from apps/web/components/logo.tsx)
+```console
+npm run dev
 ```
 
-The terminal scripts mirror the real CLI: rule keys and help strings come from `packages/core/src/rules` (30 rules), and the scorecard is the CLI's ASCII mascot + meter. If the CLI output changes shape, update the scripts.
+**Render video**
+
+```console
+npx remotion render
+```
+
+**Upgrade Remotion**
+
+```console
+npx remotion upgrade
+```
+
+## Docs
+
+Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
+
+## Help
+
+We provide help on our [Discord server](https://discord.gg/6VzzNDwUwV).
+
+## Issues
+
+Found an issue with Remotion? [File an issue here](https://github.com/remotion-dev/remotion/issues/new).
+
+## License
+
+Note that for some entities a company license is needed. [Read the terms here](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md).
