@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { Cursor } from "@/components/icons/cursor";
 import { getScoreData } from "@/lib/score";
@@ -28,6 +28,20 @@ interface ShareButtonProps {
   href?: string;
   onClick?: () => void;
 }
+
+// window.location.origin is fixed for the lifetime of the page, so the
+// store never notifies; the server snapshot ("") keeps SSR and hydration
+// consistent without an effect-driven setState.
+const subscribeToNothing = () => () => {
+  // nothing to unsubscribe
+};
+
+const useOrigin = () =>
+  useSyncExternalStore(
+    subscribeToNothing,
+    () => window.location.origin,
+    () => ""
+  );
 
 const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
   if (href) {
@@ -62,13 +76,7 @@ const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
 export const Card = ({ score, warnings, errors }: CardProps) => {
   const { label, background, border } = getScoreData(score);
 
-  // Read the origin after mount so the server render and the first client
-  // render agree — reading window.location during render causes a
-  // hydration mismatch on the share hrefs.
-  const [origin, setOrigin] = useState("");
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const origin = useOrigin();
 
   const params = new URLSearchParams({
     e: String(errors),
