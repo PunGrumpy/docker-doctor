@@ -25,6 +25,7 @@ const Pill = ({ children }: PillProps) => (
 
 interface ShareButtonProps {
   children: ReactNode;
+  channel: string;
   href?: string;
   onClick?: () => void;
 }
@@ -43,10 +44,17 @@ const useOrigin = () =>
     () => ""
   );
 
-const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
+const ShareButton = ({
+  channel,
+  href,
+  onClick,
+  children,
+}: ShareButtonProps) => {
   if (href) {
     return (
       <a
+        data-channel={channel}
+        data-track="share_clicked"
         href={href}
         target="_blank"
         rel="noopener noreferrer"
@@ -61,6 +69,8 @@ const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
   }
   return (
     <button
+      data-channel={channel}
+      data-track="share_clicked"
       type="button"
       onClick={onClick}
       className={cn(
@@ -136,9 +146,15 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
         </div>
 
         <div className="flex w-full items-center gap-2 px-4 pb-3.75 pt-3 [border-top-width:0.5px] border-border">
-          <ShareButton href={twitterUrl}>Share on X</ShareButton>
-          <ShareButton href={linkedinUrl}>Share on LinkedIn</ShareButton>
-          <ShareButton onClick={handleCopyBadge}>Copy GitHub badge</ShareButton>
+          <ShareButton channel="x" href={twitterUrl}>
+            Share on X
+          </ShareButton>
+          <ShareButton channel="linkedin" href={linkedinUrl}>
+            Share on LinkedIn
+          </ShareButton>
+          <ShareButton channel="badge" onClick={handleCopyBadge}>
+            Copy GitHub badge
+          </ShareButton>
         </div>
       </div>
     </div>
