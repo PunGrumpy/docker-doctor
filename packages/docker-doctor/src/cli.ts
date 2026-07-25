@@ -38,7 +38,6 @@ import { launchAgent } from "./agents/launch-agent";
 import {
   AGENT_BINARIES,
   detectLaunchableAgents,
-  getAgentDisplayName,
 } from "./agents/launchable-agents";
 import {
   getSkillSourceDirectory,
@@ -358,13 +357,17 @@ interface WizardContext {
   rootDir: string;
 }
 
+// getSkillAgentConfig rejects the synthetic "universal" id at the type level.
+const agentDisplayName = (agent: SkillAgentType): string =>
+  agent === "universal" ? "Universal" : getSkillAgentConfig(agent).displayName;
+
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
 // prompt for any other agent. Only reached when the scan found something.
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const launchable = detectLaunchableAgents();
   const options = [
-    ...launchable.map((agentId) => getAgentDisplayName(agentId)),
+    ...launchable.map((agentId) => agentDisplayName(agentId)),
     "Copy prompt to clipboard",
     "Skip",
   ];
@@ -376,7 +379,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
     return;
   }
 
-  const diagnosticsDir = await writeDiagnosticsDirectory(
+  await writeDiagnosticsDirectory(
     context.diagnostics,
     context.report,
     context.rootDir
@@ -385,9 +388,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   const payload = buildHandoffPayload({
     diagnostics: context.diagnostics,
-    diagnosticsDir,
     projectName: path.basename(context.rootDir),
-    rootDir: context.rootDir,
   });
 
   if (choice === clipboardIndex) {
@@ -406,10 +407,10 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const installResult = await installSkillForAgents([agentId], context.rootDir);
   if (installResult && installResult.installed.length > 0) {
     console.log(
-      `\n  ${chalk.green("✔")} Installed the docker-doctor skill for ${getAgentDisplayName(agentId)}`
+      `\n  ${chalk.green("✔")} Installed the docker-doctor skill for ${agentDisplayName(agentId)}`
     );
   }
-  console.log(`\n  Handing off to ${getAgentDisplayName(agentId)}...\n`);
+  console.log(`\n  Handing off to ${agentDisplayName(agentId)}...\n`);
   const launched = await launchAgent(agentId, payload);
   if (!launched) {
     console.log(
@@ -732,10 +733,6 @@ const CURATED_INSTALL_AGENTS: SkillAgentType[] = [
   "cursor",
   "opencode",
 ];
-
-// getSkillAgentConfig rejects the synthetic "universal" id at the type level.
-const agentDisplayName = (agent: SkillAgentType): string =>
-  agent === "universal" ? "Universal" : getSkillAgentConfig(agent).displayName;
 
 const resolveInstallAgents = async (
   requested: string[] | undefined

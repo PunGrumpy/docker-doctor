@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import type { Diagnostic } from "@docker-doctor/core";
 import { findRule } from "@docker-doctor/core";
 
@@ -25,8 +23,6 @@ const SEVERITY_LABEL: Record<Diagnostic["severity"], string> = {
 export interface HandoffPayloadInput {
   diagnostics: Diagnostic[];
   projectName: string;
-  diagnosticsDir?: string;
-  rootDir: string;
 }
 
 // The prompt handed to the chosen agent: every rule group inline (docker
@@ -69,17 +65,10 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
     }
   }
 
-  lines.push("");
-  if (input.diagnosticsDir) {
-    const relativeDir =
-      path.relative(input.rootDir, input.diagnosticsDir) ||
-      DIAGNOSTICS_DIR_NAME;
-    lines.push(
-      `Full report (diagnostics.json + a .txt per rule): ${relativeDir}/`,
-      ""
-    );
-  }
   lines.push(
+    "",
+    `Full report (diagnostics.json + a .txt per rule): ${DIAGNOSTICS_DIR_NAME}/`,
+    "",
     "Read each file and fix the root cause — don't suppress or silence the rule.",
     "When you're done, re-run `npx @docker-doctor/cli@latest .` and confirm the score improved and no errors remain."
   );

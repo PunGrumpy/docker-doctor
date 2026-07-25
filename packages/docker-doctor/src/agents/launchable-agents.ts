@@ -1,5 +1,3 @@
-import { getSkillAgentConfig } from "agent-install";
-
 import { isCommandAvailable } from "./is-command-available";
 
 export type LaunchableAgentId = "claude-code" | "codex" | "cursor";
@@ -26,9 +24,6 @@ export const AGENT_AUTO_FLAGS: Record<LaunchableAgentId, readonly string[]> = {
   codex: ["--yolo"],
   cursor: ["--force"],
 };
-
-export const getAgentDisplayName = (agentId: LaunchableAgentId): string =>
-  getSkillAgentConfig(agentId).displayName;
 
 // Launchable = the agent's CLI binary is on PATH. Windows is excluded: npm
 // installs .cmd shims there that `spawn` can only run through a shell, and a

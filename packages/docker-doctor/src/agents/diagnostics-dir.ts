@@ -34,7 +34,7 @@ export const writeDiagnosticsDirectory = async (
   diagnostics: Diagnostic[],
   report: JsonReport,
   rootDir: string
-): Promise<string> => {
+): Promise<void> => {
   const dir = path.join(rootDir, DIAGNOSTICS_DIR_NAME);
   await fs.rm(dir, { force: true, recursive: true });
   await fs.mkdir(dir, { recursive: true });
@@ -67,8 +67,6 @@ export const writeDiagnosticsDirectory = async (
     );
   }
   await Promise.all(writes);
-
-  return dir;
 };
 
 // Keeps the scan output out of version control: appends `.docker-doctor/` to
