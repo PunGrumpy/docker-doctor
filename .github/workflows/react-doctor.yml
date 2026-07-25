@@ -40,6 +40,11 @@ jobs:
           fetch-depth: 0
 
       - uses: millionco/react-doctor@v2
+        # The action's default is `project: *` (scan every workspace project),
+        # and an explicit project selection overrides the `projects` field in
+        # doctor.config.ts — so the videos exclusion must be repeated here.
+        with:
+          project: web
         # Advisory by default: React Doctor reports findings on every PR — a
         # sticky summary comment, inline review comments, and a commit status
         # with the health score — but never fails the check, so it won't red-X
