@@ -12,7 +12,9 @@ Unless you pass `--config <path>`, docker-doctor looks for the first of these, i
 3. `docker-doctor.config.mjs`
 4. `docker-doctor.config.cjs`
 5. `docker-doctor.config.json`
-6. a `"dockerDoctor"` key in `package.json`
+6. `docker-doctor.config.yaml`
+7. `docker-doctor.config.yml`
+8. a `"dockerDoctor"` key in `package.json`
 
 If none of these exist, docker-doctor runs with its built-in defaults.
 
@@ -44,6 +46,34 @@ export default {
 | `ignore.files` | `string[]` | Glob patterns for files to exclude from scanning |
 
 The five valid `categories` keys are `Security`, `Performance`, `Best Practices`, `Compose`, and `Image Size`.
+
+## YAML and JSON configs
+
+If you'd rather stay in YAML (you're writing Compose files anyway), the same shape works as `docker-doctor.config.yaml` — no `package.json` or `"type": "module"` required:
+
+```yaml
+# yaml-language-server: $schema=https://docker-doctor.vercel.app/schema.json
+rules:
+  "docker-doctor/no-root-user": error
+categories:
+  "Image Size": "off"
+ignore:
+  files:
+    - "examples/**/Dockerfile"
+```
+
+The `yaml-language-server` comment gives you autocomplete and validation in editors with the YAML extension. JSON configs get the same via a `$schema` key:
+
+```json
+{
+  "$schema": "https://docker-doctor.vercel.app/schema.json",
+  "rules": {
+    "docker-doctor/no-root-user": "error"
+  }
+}
+```
+
+The schema at [`/schema.json`](https://docker-doctor.vercel.app/schema.json) is generated from the built-in rule set, so every rule key and category autocompletes with its description.
 
 ## Typed config
 

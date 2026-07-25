@@ -61,7 +61,7 @@ export default {
 } satisfies DockerDoctorConfig;
 ```
 
-A `defineConfig` helper is also exported for projects with `@docker-doctor/cli` installed — see the [configuration docs](https://docker-doctor.vercel.app/docs/reference/configuration).
+Prefer YAML? `docker-doctor.config.yaml` works too, with editor autocomplete via `# yaml-language-server: $schema=https://docker-doctor.vercel.app/schema.json`. A `defineConfig` helper is also exported for projects with `@docker-doctor/cli` installed — see the [configuration docs](https://docker-doctor.vercel.app/docs/reference/configuration).
 
 ## How the score works
 

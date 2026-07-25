@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { parse as parseYaml } from "yaml";
+
 import { ConfigError } from "../errors";
 import type { DockerDoctorConfig } from "../schemas/config";
 import { validateConfig } from "../schemas/config";
@@ -23,6 +25,18 @@ const importConfig = async (filePath: string): Promise<unknown> => {
       const msg = error instanceof Error ? error.message : String(error);
       throw new ConfigError({
         message: `Failed to parse config JSON: ${msg}`,
+      });
+    }
+  }
+
+  if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      return parseYaml(content);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new ConfigError({
+        message: `Failed to parse config YAML: ${msg}`,
       });
     }
   }
@@ -59,6 +73,8 @@ export const loadConfig = async (
       "docker-doctor.config.mjs",
       "docker-doctor.config.cjs",
       "docker-doctor.config.json",
+      "docker-doctor.config.yaml",
+      "docker-doctor.config.yml",
     ];
 
     /* eslint-disable no-await-in-loop */
