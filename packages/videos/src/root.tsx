@@ -1,6 +1,6 @@
 import { Composition } from "remotion";
 
-import { DockerDoctor, DURATION, FPS, HEIGHT, WIDTH } from "./docker-doctor";
+import { DockerDoctor, DURATION, FPS, HEIGHT, WIDTH } from "./composition";
 
 import "./index.css";
 
