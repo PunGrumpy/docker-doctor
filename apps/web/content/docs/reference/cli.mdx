@@ -39,6 +39,22 @@ npx @docker-doctor/cli@latest . --json > report.json
 | `--score`    | Non-zero if the score is below 50                      |
 | `--json`     | Non-zero if any `error`-severity diagnostic is present |
 
+## Install for agents
+
+Install the Docker Doctor agent skill for your coding agents (interactive multi-select in a TTY):
+
+```bash
+npx @docker-doctor/cli@latest install
+```
+
+Non-interactive runs must name the agents:
+
+```bash
+npx @docker-doctor/cli@latest install --agent claude-code cursor
+```
+
+See the [Coding Agents guide](/docs/guides/coding-agents) for details.
+
 ## Rules subcommands
 
 List every built-in rule, its category, default severity, and description:
@@ -56,3 +72,5 @@ npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user
 ## Interactive mode
 
 When run in a TTY without `--score` or `--json`, docker-doctor shows a spinner while scanning and, after printing results, offers to scaffold a `.github/workflows/docker-doctor.yml` CI workflow for you.
+
+If the scan found issues, it then offers to hand them to a coding agent detected on your machine — launching the agent with the issues as its prompt — or to copy that prompt to your clipboard. See the [Coding Agents guide](/docs/guides/coding-agents).

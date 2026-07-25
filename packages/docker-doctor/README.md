@@ -28,12 +28,17 @@ Works with any project that uses Docker.
 npx @docker-doctor/cli@latest
 ```
 
-### 2. Browse rules
+### 2. Install for agents
+
+Once you have an audit, install the skill so your coding agent learns the `/docker-doctor` triage workflow and can fix the issues for you:
 
 ```bash
-npx @docker-doctor/cli@latest rules list
-npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user
+npx @docker-doctor/cli@latest install
 ```
+
+Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interactive scan finds issues, Docker Doctor also offers to hand them straight to an agent detected on your machine.
+
+[Rules reference →](https://docker-doctor.vercel.app/docs/reference/rules)
 
 ### 3. Run in CI
 
