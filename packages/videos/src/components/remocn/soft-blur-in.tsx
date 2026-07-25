@@ -1,68 +1,85 @@
+"use client";
+
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 
-// Ported from blume's remocn SoftBlurIn: every character rises, sharpens and
-// fades in with a 1-frame stagger, so a line materializes left-to-right.
+export interface SoftBlurInProps {
+  text: string;
+  blur?: number;
+  fontSize?: number;
+  color?: string;
+  fontWeight?: number;
+  speed?: number;
+  className?: string;
+}
 
-const CHAR_DURATION = 27;
-const STAGGER = 1;
-const EASE = Easing.bezier(0.22, 1, 0.36, 1);
-
-export const SoftBlurIn = ({
+export function SoftBlurIn({
   text,
   blur = 12,
   fontSize = 72,
-  color = "#ffffff",
+  color = "#171717",
   fontWeight = 600,
-  fontFamily = "var(--font-geist-sans), -apple-system, sans-serif",
-  letterSpacing = "-0.05em",
-}: {
-  readonly text: string;
-  readonly blur?: number;
-  readonly fontSize?: number;
-  readonly color?: string;
-  readonly fontWeight?: number;
-  readonly fontFamily?: string;
-  readonly letterSpacing?: string;
-}) => {
-  const frame = useCurrentFrame();
-  const chars = [...text];
-  const clamp = {
-    easing: EASE,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  } as const;
+  speed = 1,
+  className,
+}: SoftBlurInProps) {
+  const frame = useCurrentFrame() * speed;
+
+  const chars = Array.from(text);
+  const charDurationFrames = 27;
+  const charTravelFrames = 9;
+  const staggerFrames = 1;
 
   return (
     <div
       style={{
-        alignItems: "center",
-        display: "flex",
-        inset: 0,
-        justifyContent: "center",
         position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "transparent",
       }}
     >
-      <span style={{ color, fontFamily, fontSize, fontWeight, letterSpacing }}>
+      <span
+        className={className}
+        style={{
+          fontSize,
+          fontWeight,
+          color,
+          letterSpacing: "-0.05em",
+          fontFamily:
+            "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
         {chars.map((char, i) => {
-          const local = frame - i * STAGGER;
-          const opacity = interpolate(local, [0, CHAR_DURATION], [0, 1], clamp);
-          const y = interpolate(local, [0, CHAR_DURATION], [16, 0], clamp);
+          const local = frame - i * staggerFrames;
+          const easing = Easing.bezier(0.22, 1, 0.36, 1);
+          const opacity = interpolate(local, [0, charDurationFrames], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+            easing,
+          });
+          const y = interpolate(local, [0, charTravelFrames], [16, 0], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+            easing,
+          });
           const blurAmount = interpolate(
             local,
-            [0, CHAR_DURATION],
+            [0, charDurationFrames],
             [blur, 0],
-            clamp
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing },
           );
           return (
             <span
-              key={`${char}-${i}`}
+              key={i}
               style={{
-                backfaceVisibility: "hidden",
                 display: "inline-block",
-                filter: `blur(${blurAmount}px)`,
+                whiteSpace: "pre",
+                backfaceVisibility: "hidden",
+                transformOrigin: "50% 55%",
                 opacity,
                 transform: `translateY(${y}px)`,
-                whiteSpace: "pre",
+                filter: `blur(${blurAmount}px)`,
               }}
             >
               {char}
@@ -72,4 +89,4 @@ export const SoftBlurIn = ({
       </span>
     </div>
   );
-};
+}

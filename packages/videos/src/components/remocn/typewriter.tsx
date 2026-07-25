@@ -1,68 +1,75 @@
-import { useCurrentFrame, useVideoConfig } from "remotion";
+"use client";
 
-// Ported from blume's remocn Typewriter: characters land at a fixed
-// chars-per-second rate; the caret is solid while typing and blinks at 2 Hz
-// once the line is complete, running out to the end of the sequence.
+import { Caret } from "@/components/remocn/caret";
+import { useTypewriter } from "@/lib/remocn-ui";
 
-export const Typewriter = ({
+export interface TypewriterProps {
+  text: string;
+  cursor?: boolean;
+  charsPerSecond?: number;
+  speed?: number;
+  fontSize?: number;
+  color?: string;
+  cursorColor?: string;
+  fontWeight?: number;
+  /** Fill behind the line — pass "transparent" to let the backdrop through. */
+  background?: string;
+  className?: string;
+}
+
+export function Typewriter({
   text,
-  fontSize = 64,
-  charsPerSecond = 16,
-  color = "#ffffff",
-  cursorColor = "#ffffff",
+  cursor = true,
+  charsPerSecond = 22,
+  speed = 1,
+  fontSize = 48,
+  color = "#171717",
+  cursorColor = "#171717",
   fontWeight = 600,
-  fontFamily = "var(--font-geist-sans), -apple-system, sans-serif",
-}: {
-  readonly text: string;
-  readonly fontSize?: number;
-  readonly charsPerSecond?: number;
-  readonly color?: string;
-  readonly cursorColor?: string;
-  readonly fontWeight?: number;
-  readonly fontFamily?: string;
-}) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const revealed = Math.min(
-    text.length,
-    Math.floor((frame / fps) * charsPerSecond)
-  );
-  const typing = revealed < text.length;
-  const caretOn = typing || Math.floor((frame / fps) * 2) % 2 === 0;
+  background = "white",
+  className,
+}: TypewriterProps) {
+  const tw = useTypewriter(text, { cps: charsPerSecond, speed });
 
   return (
     <div
       style={{
-        alignItems: "center",
-        display: "flex",
-        inset: 0,
-        justifyContent: "center",
         position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background,
       }}
     >
       <span
+        className={className}
         style={{
-          color,
-          fontFamily,
           fontSize,
           fontWeight,
+          color,
           letterSpacing: "-0.03em",
+          fontFamily:
+            "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif",
           whiteSpace: "pre",
         }}
       >
-        {text.slice(0, revealed)}
-        <span
-          style={{
-            backgroundColor: cursorColor,
-            display: "inline-block",
-            height: "1em",
-            marginLeft: "0.04em",
-            opacity: caretOn ? 1 : 0,
-            verticalAlign: "text-bottom",
-            width: "0.08em",
-          }}
-        />
+        {tw.text}
+        {cursor && (
+          <Caret
+            color={cursorColor}
+            blink={!tw.typing}
+            speed={speed}
+            radius={0}
+            style={{
+              width: "0.08em",
+              height: "1em",
+              marginLeft: "0.04em",
+              verticalAlign: "text-bottom",
+            }}
+          />
+        )}
       </span>
     </div>
   );
-};
+}

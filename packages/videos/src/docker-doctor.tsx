@@ -141,6 +141,7 @@ const SceneCta = () => (
   // to the final frame.
   <Sequence durationInFrames={90} layout="none">
     <Typewriter
+      background="transparent"
       charsPerSecond={16}
       color={WHITE}
       cursorColor={WHITE}
