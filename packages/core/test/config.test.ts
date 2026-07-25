@@ -5,15 +5,6 @@ import path from "node:path";
 
 import { loadConfig } from "../src/config/loader";
 import { ConfigError } from "../src/errors";
-import type { DockerDoctorConfig } from "../src/schemas/config";
-
-// The `DockerDoctorConfig["categories"]` type is a full `Record<RuleCategory,
-// RuleSeverity>` (all 5 keys), but a valid runtime config may legitimately
-// set only a subset. `as unknown as DockerDoctorConfig` below silences that
-// pre-existing type-vs-runtime mismatch without altering what is actually
-// compared at runtime (still a plain deep-equal on the literal object).
-const expectPartialCategories = (value: unknown): DockerDoctorConfig =>
-  value as unknown as DockerDoctorConfig;
 
 describe("loadConfig", () => {
   let dir: string;
@@ -46,9 +37,7 @@ describe("loadConfig", () => {
       JSON.stringify({ categories: { Security: "warning" } })
     );
     const config = await loadConfig(dir);
-    expect(config).toEqual(
-      expectPartialCategories({ categories: { Security: "warning" } })
-    );
+    expect(config).toEqual({ categories: { Security: "warning" } });
   });
 
   test("returns valid ignore.files as-is", async () => {
@@ -149,11 +138,9 @@ describe("loadConfig", () => {
       })
     );
     const config = await loadConfig(dir);
-    expect(config).toEqual(
-      expectPartialCategories({
-        categories: { "Best Practices": "warning" },
-      })
-    );
+    expect(config).toEqual({
+      categories: { "Best Practices": "warning" },
+    });
   });
 
   test("silently strips unknown keys nested under ignore", async () => {
@@ -165,5 +152,76 @@ describe("loadConfig", () => {
     );
     const config = await loadConfig(dir);
     expect(config).toEqual({ ignore: { files: ["a"] } });
+  });
+
+  test("loads a .yaml config", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yaml"),
+      [
+        "rules:",
+        '  "docker-doctor/no-root-user": error',
+        "categories:",
+        '  "Image Size": "off"',
+        "ignore:",
+        "  files:",
+        '    - "examples/**/Dockerfile"',
+        "",
+      ].join("\n")
+    );
+    const config = await loadConfig(dir);
+    expect(config).toEqual({
+      categories: { "Image Size": "off" },
+      ignore: { files: ["examples/**/Dockerfile"] },
+      rules: { "docker-doctor/no-root-user": "error" },
+    });
+  });
+
+  test("loads a .yml config", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yml"),
+      'rules:\n  "docker-doctor/no-root-user": warning\n'
+    );
+    const config = await loadConfig(dir);
+    expect(config).toEqual({
+      rules: { "docker-doctor/no-root-user": "warning" },
+    });
+  });
+
+  test("prefers .json config over .yaml when both exist", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: { "from-json": "error" } })
+    );
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yaml"),
+      'rules:\n  "from-yaml": warning\n'
+    );
+    const config = await loadConfig(dir);
+    expect(config).toEqual({ rules: { "from-json": "error" } });
+  });
+
+  test("throws ConfigError on malformed YAML", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yaml"),
+      "rules:\n  bad: [unclosed\n"
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+  });
+
+  test("throws ConfigError on invalid severity in YAML", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yaml"),
+      'rules:\n  "no-latest-tag": banana\n'
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+  });
+
+  test("loads a .yaml config via --config custom path", async () => {
+    await fs.writeFile(
+      path.join(dir, "custom.yaml"),
+      "categories:\n  Security: error\n"
+    );
+    const config = await loadConfig(dir, "custom.yaml");
+    expect(config).toEqual({ categories: { Security: "error" } });
   });
 });

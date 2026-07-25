@@ -21,6 +21,7 @@
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@databuddy/sdk": "^2.6.0",
+        "@docker-doctor/core": "workspace:*",
         "cnfast": "^0.0.8",
         "date-fns": "^4.4.0",
         "fumadocs-core": "^16.12.1",
