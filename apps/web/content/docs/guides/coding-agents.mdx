@@ -31,12 +31,12 @@ When an interactive scan finds issues, Docker Doctor asks what to do next:
 
 ```
 ✔ What would you like to do next?
-❯ Fix with Claude Code (launches claude)
+❯ Claude Code
   Copy prompt to clipboard
   Skip
 ```
 
-- **Fix with &lt;agent&gt;** — shown for each agent CLI found on your `PATH` (`claude`, `codex`, `cursor-agent`). Docker Doctor installs the skill for that agent, then launches it in your terminal with a prompt describing every issue, its fix, and the affected files. The agent runs in its auto-approve mode so it can fix the issues end-to-end.
+- **&lt;agent name&gt;** — shown for each agent CLI found on your `PATH` (`claude`, `codex`, `cursor-agent`). Docker Doctor installs the skill for that agent, then launches it in your terminal with a prompt describing every issue, its fix, and the affected files. The agent runs in its auto-approve mode so it can fix the issues end-to-end.
 - **Copy prompt to clipboard** — copies the same prompt so you can paste it into any agent or chat.
 - **Skip** — do nothing.
 

@@ -364,10 +364,7 @@ interface WizardContext {
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const launchable = detectLaunchableAgents();
   const options = [
-    ...launchable.map(
-      (agentId) =>
-        `Fix with ${getAgentDisplayName(agentId)} (launches ${AGENT_BINARIES[agentId]})`
-    ),
+    ...launchable.map((agentId) => getAgentDisplayName(agentId)),
     "Copy prompt to clipboard",
     "Skip",
   ];
