@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Cursor } from "@/components/icons/cursor";
 import { getScoreData } from "@/lib/score";
@@ -62,7 +62,14 @@ const ShareButton = ({ href, onClick, children }: ShareButtonProps) => {
 export const Card = ({ score, warnings, errors }: CardProps) => {
   const { label, background, border } = getScoreData(score);
 
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  // Read the origin after mount so the server render and the first client
+  // render agree — reading window.location during render causes a
+  // hydration mismatch on the share hrefs.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
   const params = new URLSearchParams({
     e: String(errors),
     s: String(score),

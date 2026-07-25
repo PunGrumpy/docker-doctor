@@ -74,7 +74,7 @@ export const ClaudePermission = ({
           const active = sel === i;
           return (
             <div
-              key={i}
+              key={opt}
               role="radio"
               aria-checked={active}
               tabIndex={active ? 0 : -1}

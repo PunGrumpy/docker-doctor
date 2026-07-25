@@ -1,7 +1,7 @@
 "use client";
 
 import { LazyMotion, domAnimation, m } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -19,26 +19,24 @@ interface FileTreeViewProps {
   entries: EntryData[];
 }
 
-const CodePanel = ({ entry }: { entry: EntryData }) => {
-  const lightRef = useRef<HTMLDivElement>(null);
-  const darkRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (lightRef.current) {
-      lightRef.current.innerHTML = entry.codeHighlightedLight;
-    }
-    if (darkRef.current) {
-      darkRef.current.innerHTML = entry.codeHighlightedDark;
-    }
-  }, [entry.codeHighlightedDark, entry.codeHighlightedLight]);
-
-  return (
-    <div key={entry.path} className="code-panel">
-      <div ref={lightRef} className="dark:hidden" />
-      <div ref={darkRef} className="hidden dark:block" />
-    </div>
-  );
-};
+// The highlighted markup is generated at build time by shiki in a server
+// component (trusted, not user input), so it can be inlined directly —
+// this keeps the code in the server-rendered HTML instead of popping in
+// after hydration via an effect.
+const CodePanel = ({ entry }: { entry: EntryData }) => (
+  <div className="code-panel">
+    <div
+      className="dark:hidden"
+      // oxlint-disable-next-line no-danger -- build-time shiki output
+      dangerouslySetInnerHTML={{ __html: entry.codeHighlightedLight }}
+    />
+    <div
+      className="hidden dark:block"
+      // oxlint-disable-next-line no-danger -- build-time shiki output
+      dangerouslySetInnerHTML={{ __html: entry.codeHighlightedDark }}
+    />
+  </div>
+);
 
 const DesktopLayout = ({
   entries,
@@ -59,6 +57,7 @@ const DesktopLayout = ({
             type="button"
             key={entry.path}
             onClick={() => onSelect(i)}
+            aria-pressed={i === activeIndex}
             className={cn(
               "flex items-center w-full text-left gap-2 rounded-sm px-1.5 py-[3px]",
               "transition-[transform,colors] duration-100 ease-out relative isolate",
@@ -135,6 +134,7 @@ const MobileLayout = ({
               type="button"
               key={entry.path}
               onClick={() => onSelect(i)}
+              aria-pressed={i === activeIndex}
               className={cn(
                 "flex items-center w-full text-left gap-2.5 rounded-lg px-2.5 min-h-10 relative isolate",
                 "transition-[transform,colors] duration-100 ease-out",
@@ -208,13 +208,11 @@ export const FileTreeView = ({ entries }: FileTreeViewProps) => {
           onSelect={handleSelect}
         />
 
-        <div className="sm:hidden">
-          <MobileLayout
-            entries={entries}
-            activeIndex={activeIndex}
-            onSelect={handleSelect}
-          />
-        </div>
+        <MobileLayout
+          entries={entries}
+          activeIndex={activeIndex}
+          onSelect={handleSelect}
+        />
       </div>
     </LazyMotion>
   );

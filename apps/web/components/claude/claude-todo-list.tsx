@@ -57,7 +57,7 @@ export const ClaudeTodoList = ({
       }
 
       return (
-        <li key={i} className="whitespace-pre">
+        <li key={t.label} className="whitespace-pre">
           {/*
               First row: "  ⎿ " then icon. Later rows: four spaces so the
               icon column lines up under ✔ (no capture-style nbsp jump).
