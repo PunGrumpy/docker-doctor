@@ -58,7 +58,7 @@ export interface ComposeRule extends RuleDefinition {
 
 export interface DockerDoctorConfig {
   rules?: Record<string, RuleSeverity>;
-  categories?: Record<RuleCategory, RuleSeverity>;
+  categories?: Partial<Record<RuleCategory, RuleSeverity>>;
   ignore?: {
     files?: string[];
   };

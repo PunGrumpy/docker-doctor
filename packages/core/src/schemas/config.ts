@@ -48,7 +48,7 @@ const validateRules = (value: unknown): Record<string, RuleSeverity> => {
 
 const validateCategories = (
   value: unknown
-): Record<RuleCategory, RuleSeverity> => {
+): Partial<Record<RuleCategory, RuleSeverity>> => {
   if (!isPlainObject(value)) {
     throw new Error(
       `Invalid config: "categories" must be an object, got ${typeof value}`
@@ -70,7 +70,7 @@ const validateCategories = (
     result[key as RuleCategory] = severity;
   }
 
-  return result as Record<RuleCategory, RuleSeverity>;
+  return result;
 };
 
 const validateIgnore = (value: unknown): { files?: string[] } => {

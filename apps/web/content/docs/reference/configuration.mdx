@@ -45,4 +45,36 @@ export default {
 
 The five valid `categories` keys are `Security`, `Performance`, `Best Practices`, `Compose`, and `Image Size`.
 
+## Typed config
+
+`@docker-doctor/cli` exports the `DockerDoctorConfig` type and a `defineConfig` helper. Which one to use depends on how you run docker-doctor:
+
+**Running via `npx` without installing** — use the type with `satisfies`. Type-only imports are erased when the config loads, so nothing needs to be installed at runtime (install `@docker-doctor/cli` as a devDependency if you want editor autocomplete):
+
+```ts
+// docker-doctor.config.ts
+import type { DockerDoctorConfig } from "@docker-doctor/cli";
+
+export default {
+  rules: {
+    "docker-doctor/no-root-user": "error",
+  },
+} satisfies DockerDoctorConfig;
+```
+
+**`@docker-doctor/cli` installed as a devDependency** — `defineConfig` also works and gives the same autocomplete:
+
+```ts
+// docker-doctor.config.ts
+import { defineConfig } from "@docker-doctor/cli";
+
+export default defineConfig({
+  categories: {
+    "Image Size": "off",
+  },
+});
+```
+
+`defineConfig` is a real runtime import — a config that uses it fails to load when the package isn't installed in the project, so prefer the `satisfies` form for npx-only projects.
+
 Unknown top-level keys and unknown category names are silently dropped rather than rejected, matching the legacy config schema's behavior. Invalid severities throw a config error with the offending rule/category name.

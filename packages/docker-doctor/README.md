@@ -50,14 +50,18 @@ npx @docker-doctor/cli@latest
 
 ### 4. Configure
 
-```js
+```ts
 // docker-doctor.config.ts
+import type { DockerDoctorConfig } from "@docker-doctor/cli";
+
 export default {
   rules: {
     "docker-doctor/no-root-user": "error",
   },
-};
+} satisfies DockerDoctorConfig;
 ```
+
+A `defineConfig` helper is also exported for projects with `@docker-doctor/cli` installed — see the [configuration docs](https://docker-doctor.vercel.app/docs/reference/configuration).
 
 ## How the score works
 
