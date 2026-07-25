@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { Analytics } from "@/components/providers/analytics";
 import { DesignSystemProvider } from "@/components/providers/client";
 import { fonts } from "@/lib/fonts";
 import { url } from "@/lib/url";
@@ -42,7 +43,10 @@ interface RootLayoutProps {
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
     <body className={fonts}>
-      <DesignSystemProvider>{children}</DesignSystemProvider>
+      <DesignSystemProvider>
+        {children}
+        <Analytics />
+      </DesignSystemProvider>
     </body>
   </html>
 );
