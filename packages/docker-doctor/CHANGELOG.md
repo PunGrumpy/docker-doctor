@@ -1,5 +1,13 @@
 # @docker-doctor/cli
 
+## 0.3.1
+
+### Patch Changes
+
+- 3546391: Add coding-agent integration: a `docker-doctor install` command that installs the bundled agent skill for any agent-install-supported coding agent (Claude Code, Cursor, Codex, OpenCode, and more), and a post-scan handoff that replaces the old "View rules list" prompt — when a scan finds issues, the CLI now offers to launch a detected agent (`claude`, `codex`, `cursor-agent`) with the issues as its prompt, or copy that prompt to the clipboard. Handoffs write the full report to `.docker-doctor/` (auto-gitignored) and install the skill for the chosen agent.
+- e6e7e88: Export the `DockerDoctorConfig` type (plus `RuleCategory`) and a `defineConfig` helper for typed `docker-doctor.config.ts` files, and fix the config type's `categories` field to accept a subset of categories (`Partial<Record<…>>`) — matching the validator's actual behavior and the documented examples.
+- b730028: Support `docker-doctor.config.yaml` / `.yml` config files (resolved after `.json`, and via `--config`). A JSON Schema generated from the rule set is published at https://docker-doctor.vercel.app/schema.json for editor autocomplete/validation in YAML (`# yaml-language-server: $schema=…`) and JSON (`"$schema"` key) configs.
+
 ## 0.3.0
 
 ### Minor Changes
