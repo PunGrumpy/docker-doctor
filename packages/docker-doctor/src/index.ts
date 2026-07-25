@@ -8,10 +8,16 @@ export {
   runDockerfileRules,
   runComposeRules,
   calculateScore,
+  defineConfig,
   loadConfig,
   allRules,
   findRule,
   toJsonReport,
 } from "@docker-doctor/core";
-export type { Diagnostic, RuleSeverity } from "@docker-doctor/core";
+export type {
+  Diagnostic,
+  DockerDoctorConfig,
+  RuleCategory,
+  RuleSeverity,
+} from "@docker-doctor/core";
 export const { version } = packageJson;

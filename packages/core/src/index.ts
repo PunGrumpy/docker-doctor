@@ -9,6 +9,7 @@ export {
   allComposeRules,
   findRule,
 } from "./rules/index";
+export { defineConfig } from "./config/define-config";
 export { loadConfig } from "./config/loader";
 export { calculateScore, getScoreBucket, SCORE_BUCKETS } from "./scoring";
 export * from "./errors";
