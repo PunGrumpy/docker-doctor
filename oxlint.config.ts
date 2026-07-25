@@ -5,5 +5,10 @@ import react from "ultracite/oxlint/react";
 
 export default defineConfig({
   extends: [core, react, next],
-  ignorePatterns: [".cursor/hooks", "apps/web/components/ui"],
+  ignorePatterns: [
+    ".cursor/hooks",
+    "apps/web/components/ui",
+    "packages/videos/src/components",
+    "packages/videos/src/lib/remocn-ui",
+  ],
 });

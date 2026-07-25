@@ -3,7 +3,7 @@ import { Composition } from "remotion";
 import { DockerDoctor, DURATION, FPS, HEIGHT, WIDTH } from "./docker-doctor";
 import "./fonts";
 
-import "./style.css";
+import "./index.css";
 
 export const RemotionRoot = () => (
   <Composition
