@@ -16,29 +16,29 @@ const fileExists = async (filePath: string): Promise<boolean> => {
   }
 };
 
+const parseConfigFile = async (
+  filePath: string,
+  format: "JSON" | "YAML",
+  parse: (content: string) => unknown
+): Promise<unknown> => {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return parse(content);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new ConfigError({
+      message: `Failed to parse config ${format}: ${msg}`,
+    });
+  }
+};
+
 const importConfig = async (filePath: string): Promise<unknown> => {
   if (filePath.endsWith(".json")) {
-    try {
-      const content = await fs.readFile(filePath, "utf-8");
-      return JSON.parse(content);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new ConfigError({
-        message: `Failed to parse config JSON: ${msg}`,
-      });
-    }
+    return parseConfigFile(filePath, "JSON", (content) => JSON.parse(content));
   }
 
   if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
-    try {
-      const content = await fs.readFile(filePath, "utf-8");
-      return parseYaml(content);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new ConfigError({
-        message: `Failed to parse config YAML: ${msg}`,
-      });
-    }
+    return parseConfigFile(filePath, "YAML", parseYaml);
   }
 
   try {

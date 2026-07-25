@@ -1,7 +1,8 @@
 import { allRules } from "@docker-doctor/core";
 import { NextResponse } from "next/server";
 
-// cached forever
+// Prerendered once per deploy, so the schema always matches the rule set the
+// site was built against.
 export const revalidate = false;
 
 const SEVERITY_ENUM = ["error", "warning", "info", "off"];
