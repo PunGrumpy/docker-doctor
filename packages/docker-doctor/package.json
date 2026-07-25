@@ -68,7 +68,7 @@
   "devDependencies": {
     "@docker-doctor/core": "workspace:*",
     "@types/node": "^26",
-    "tsdown": "^0.22.4",
+    "tsdown": "^0.22.14",
     "typescript": "^6"
   }
 }
