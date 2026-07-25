@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "remotion studio",
-    "render": "remotion render DockerDoctor out/docker-doctor.mp4",
-    "still": "remotion still DockerDoctor",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf .turbo node_modules out"
   },
