@@ -14,7 +14,7 @@ npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user
 ```
 
 3. Pick the narrowest change that matches the user's intent (see decision guide).
-4. **Hand-edit `docker-doctor.config.ts`** (or `.js`/`.mjs`/`.cjs`/`.json`, or the `dockerDoctor` key in `package.json`). There is no `rules disable`/`set`/`category` CLI subcommand — configuration is edited by hand.
+4. **Hand-edit `docker-doctor.config.ts`** (or `.js`/`.mjs`/`.cjs`/`.json`/`.yaml`/`.yml`, or the `dockerDoctor` key in `package.json`). There is no `rules disable`/`set`/`category` CLI subcommand — configuration is edited by hand.
 5. Validate the change did what they wanted:
 
 ```bash
@@ -32,7 +32,7 @@ npx @docker-doctor/cli@latest rules explain <rule>    # why it matters + how to 
 
 ## Config shape
 
-Config lives in `docker-doctor.config.{ts,js,mjs,cjs,json}` or the `dockerDoctor` key in `package.json`. Three maps:
+Config lives in `docker-doctor.config.{ts,js,mjs,cjs,json,yaml,yml}` or the `dockerDoctor` key in `package.json`. Match the file format the project already uses. Three maps (same shape in every format):
 
 ```ts
 // docker-doctor.config.ts
