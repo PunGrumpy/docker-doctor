@@ -73,9 +73,6 @@ export const ListItem = ({ className, ...props }: ComponentProps<"li">) => (
   <li className={cn("my-1.5", className)} {...props} />
 );
 
-const linkClassName =
-  "text-primary underline underline-offset-4 hover:opacity-80";
-
 export const Anchor = ({
   href,
   className,
@@ -84,14 +81,28 @@ export const Anchor = ({
 }: ComponentProps<"a">) => {
   if (href?.startsWith("/")) {
     return (
-      <Link className={cn(linkClassName, className)} href={href} {...props}>
+      <Link
+        className={cn(
+          "text-primary underline underline-offset-4 hover:opacity-80",
+          className
+        )}
+        href={href}
+        {...props}
+      >
         {children}
       </Link>
     );
   }
 
   return (
-    <a className={cn(linkClassName, className)} href={href} {...props}>
+    <a
+      className={cn(
+        "text-primary underline underline-offset-4 hover:opacity-80",
+        className
+      )}
+      href={href}
+      {...props}
+    >
       {children}
     </a>
   );
