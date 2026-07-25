@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     qualities: [75, 95],
   },
+
+  rewrites: () => [
+    {
+      destination: "/llms.mdx/docs/:path*",
+      source: "/docs/:path*.md",
+    },
+  ],
 };
 
 export default withMDX(nextConfig);
