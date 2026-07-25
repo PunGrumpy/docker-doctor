@@ -224,3 +224,6 @@ generated
 
 # Next.js
 next-env.d.ts
+
+# Bundled agent skill (copied from skills/docker-doctor at build time)
+packages/docker-doctor/skill/

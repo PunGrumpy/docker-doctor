@@ -31,6 +31,7 @@
   },
   "files": [
     "dist",
+    "skill",
     "LICENSE"
   ],
   "type": "module",
@@ -56,9 +57,10 @@
     "dev": "NODE_OPTIONS='--max-old-space-size=4096' tsdown --watch",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "clean": "git clean -xdf .turbo node_modules dist"
+    "clean": "git clean -xdf .turbo node_modules dist skill"
   },
   "dependencies": {
+    "agent-install": "0.0.8",
     "chalk": "^5.4.1",
     "commander": "^15.0.0",
     "yaml": "^2.7.0"

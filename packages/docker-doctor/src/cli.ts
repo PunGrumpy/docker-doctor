@@ -4,7 +4,7 @@ import path from "node:path";
 import readline from "node:readline";
 import { setTimeout } from "node:timers/promises";
 
-import type { Diagnostic, RuleSeverity } from "@docker-doctor/core";
+import type { Diagnostic, JsonReport, RuleSeverity } from "@docker-doctor/core";
 import {
   discoverProject,
   parseDockerfile,
@@ -17,10 +17,33 @@ import {
   findRule,
   toJsonReport,
 } from "@docker-doctor/core";
+import type { SkillAgentType } from "agent-install";
+import {
+  detectInstalledSkillAgents,
+  getSkillAgentConfig,
+  getSkillAgentTypes,
+  isSkillAgentType,
+} from "agent-install";
 import chalk from "chalk";
 import { Command } from "commander";
 
 import packageJson from "../package.json" with { type: "json" };
+import { copyToClipboard } from "./agents/clipboard";
+import {
+  ensureGitignoreEntry,
+  writeDiagnosticsDirectory,
+} from "./agents/diagnostics-dir";
+import { buildHandoffPayload } from "./agents/handoff-payload";
+import { launchAgent } from "./agents/launch-agent";
+import {
+  AGENT_BINARIES,
+  detectLaunchableAgents,
+  getAgentDisplayName,
+} from "./agents/launchable-agents";
+import {
+  getSkillSourceDirectory,
+  installSkillForAgents,
+} from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
 
 interface KeypressKey {
@@ -213,7 +236,193 @@ const askSelect = (
   /* eslint-enable promise/avoid-new */
 };
 
-const runInteractiveWizard = async (): Promise<void> => {
+interface MultiSelectOption {
+  label: string;
+  selected: boolean;
+}
+
+const askMultiSelect = (
+  question: string,
+  options: MultiSelectOption[]
+): Promise<number[]> => {
+  const isRaw = process.stdin.isTTY;
+  if (!isRaw) {
+    return Promise.resolve(
+      options.flatMap((option, i) => (option.selected ? [i] : []))
+    );
+  }
+
+  /* eslint-disable promise/avoid-new */
+  return new Promise((resolve) => {
+    let index = 0;
+    const selected = options.map((option) => option.selected);
+    const lineCount = options.length + 2;
+
+    readline.emitKeypressEvents(process.stdin);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+
+    // Hide cursor during prompt
+    process.stdout.write("\u001B[?25l");
+
+    const render = (firstTime = false) => {
+      if (!firstTime) {
+        process.stdout.write(`\u001B[${lineCount}A\r`);
+      }
+
+      process.stdout.write(
+        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+      );
+
+      let i = 0;
+      for (const option of options) {
+        const isCursor = i === index;
+        const cursor = isCursor ? chalk.cyan("❯ ") : "  ";
+        const box = selected[i] ? chalk.cyan("[x]") : chalk.dim("[ ]");
+        let text = chalk.dim(option.label);
+        if (isCursor) {
+          text = chalk.cyan.bold(option.label);
+        } else if (selected[i]) {
+          text = option.label;
+        }
+        process.stdout.write(`\r\u001B[K${cursor}${box} ${text}\n`);
+        i += 1;
+      }
+      process.stdout.write(
+        `\r\u001B[K  ${chalk.dim("space to toggle · enter to confirm")}\n`
+      );
+    };
+
+    render(true);
+
+    const handleKeypress = (str: string, key: KeypressKey) => {
+      const cleanup = () => {
+        process.stdin.removeListener("keypress", handleKeypress);
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(false);
+        }
+        process.stdin.pause();
+        process.stdout.write("\u001B[?25h");
+      };
+
+      if (key.name === "up" || key.name === "k") {
+        index = (index - 1 + options.length) % options.length;
+        render();
+      } else if (key.name === "down" || key.name === "j") {
+        index = (index + 1) % options.length;
+        render();
+      } else if (key.name === "space" || str === " ") {
+        selected[index] = !selected[index];
+        render();
+      } else if (
+        key.name === "return" ||
+        key.name === "enter" ||
+        str === "\r" ||
+        str === "\n"
+      ) {
+        cleanup();
+        const chosen = options.flatMap((option, i) =>
+          selected[i] ? [option.label] : []
+        );
+        // Overwrite the prompt with a one-line summary
+        process.stdout.write(`\u001B[${lineCount}A\r\u001B[K`);
+        process.stdout.write(
+          `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chosen.length > 0 ? chalk.cyan(chosen.join(", ")) : chalk.dim("none")}\n`
+        );
+        for (let i = 0; i < lineCount - 1; i += 1) {
+          process.stdout.write("\r\u001B[K\n");
+        }
+        process.stdout.write(`\u001B[${lineCount - 1}A`);
+        resolve(options.flatMap((_, i) => (selected[i] ? [i] : [])));
+      } else if (key.ctrl && key.name === "c") {
+        cleanup();
+        process.stdout.write("\n");
+        process.exit(130);
+      }
+    };
+
+    process.stdin.on("keypress", handleKeypress);
+  });
+  /* eslint-enable promise/avoid-new */
+};
+
+const printAgentPrompt = (payload: string): void => {
+  console.log(`\n${chalk.dim("──── Agent prompt ────")}`);
+  console.log(payload);
+  console.log(chalk.dim("──────────────────────"));
+};
+
+interface WizardContext {
+  diagnostics: Diagnostic[];
+  report: JsonReport;
+  rootDir: string;
+}
+
+// Post-scan handoff: offer to send the findings to a coding agent detected on
+// this machine (launching it with the issues as its prompt), or copy the
+// prompt for any other agent. Only reached when the scan found something.
+const runAgentHandoff = async (context: WizardContext): Promise<void> => {
+  const launchable = detectLaunchableAgents();
+  const options = [
+    ...launchable.map(
+      (agentId) =>
+        `Fix with ${getAgentDisplayName(agentId)} (launches ${AGENT_BINARIES[agentId]})`
+    ),
+    "Copy prompt to clipboard",
+    "Skip",
+  ];
+  const skipIndex = options.length - 1;
+  const clipboardIndex = options.length - 2;
+
+  const choice = await askSelect("What would you like to do next?", options);
+  if (choice === skipIndex) {
+    return;
+  }
+
+  const diagnosticsDir = await writeDiagnosticsDirectory(
+    context.diagnostics,
+    context.report,
+    context.rootDir
+  );
+  await ensureGitignoreEntry(context.rootDir);
+
+  const payload = buildHandoffPayload({
+    diagnostics: context.diagnostics,
+    diagnosticsDir,
+    projectName: path.basename(context.rootDir),
+    rootDir: context.rootDir,
+  });
+
+  if (choice === clipboardIndex) {
+    const copied = await copyToClipboard(payload);
+    if (copied) {
+      console.log(
+        `\n  ${chalk.green("✔")} Prompt copied — paste it into any agent or chat.`
+      );
+    } else {
+      printAgentPrompt(payload);
+    }
+    return;
+  }
+
+  const agentId = launchable[choice];
+  const installResult = await installSkillForAgents([agentId], context.rootDir);
+  if (installResult && installResult.installed.length > 0) {
+    console.log(
+      `\n  ${chalk.green("✔")} Installed the docker-doctor skill for ${getAgentDisplayName(agentId)}`
+    );
+  }
+  console.log(`\n  Handing off to ${getAgentDisplayName(agentId)}...\n`);
+  const launched = await launchAgent(agentId, payload);
+  if (!launched) {
+    console.log(
+      `  ${chalk.yellow("⚠")} Couldn't launch ${AGENT_BINARIES[agentId]}. Here's the prompt instead:`
+    );
+    printAgentPrompt(payload);
+  }
+};
+
+const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
   try {
     const addGhActions = await askConfirm(
       "Add Docker Doctor to GitHub Actions?"
@@ -249,19 +458,10 @@ jobs:
       );
     }
 
-    const nextChoice = await askSelect("What would you like to do next?", [
-      "View rules list",
-      "Skip",
-    ]);
-
-    if (nextChoice === 0) {
-      console.log(`\n  ${chalk.bold("Available Rules:")}`);
-      for (const r of allRules) {
-        console.log(
-          `    - ${chalk.cyan(r.key)}: ${r.message} (${chalk.dim(r.category)})`
-        );
-      }
+    if (context.diagnostics.length === 0) {
+      return;
     }
+    await runAgentHandoff(context);
   } catch {
     // Ignore prompt errors
   }
@@ -507,7 +707,11 @@ program
         );
 
         if (process.stdout.isTTY && process.stdin.isTTY) {
-          await runInteractiveWizard();
+          await runInteractiveWizard({
+            diagnostics: filteredDiagnostics,
+            report: toJsonReport(filteredDiagnostics, score, label, project),
+            rootDir,
+          });
         }
         process.exitCode = hasErrors ? 1 : 0;
       } finally {
@@ -521,6 +725,105 @@ program
       console.error(`Error: ${msg}`);
       process.exit(1);
     }
+  });
+
+// Curated picker entries shown alongside whatever agents are detected on this
+// machine — any other agent-install id still works via --agent.
+const CURATED_INSTALL_AGENTS: SkillAgentType[] = [
+  "claude-code",
+  "codex",
+  "cursor",
+  "opencode",
+];
+
+// getSkillAgentConfig rejects the synthetic "universal" id at the type level.
+const agentDisplayName = (agent: SkillAgentType): string =>
+  agent === "universal" ? "Universal" : getSkillAgentConfig(agent).displayName;
+
+const resolveInstallAgents = async (
+  requested: string[] | undefined
+): Promise<SkillAgentType[] | null> => {
+  if (requested && requested.length > 0) {
+    const invalid = requested.filter((agent) => !isSkillAgentType(agent));
+    if (invalid.length > 0) {
+      console.error(`Unknown agent id(s): ${invalid.join(", ")}`);
+      console.error(
+        `Valid ids: ${getSkillAgentTypes()
+          .filter((agent) => agent !== "universal")
+          .join(", ")}`
+      );
+      return null;
+    }
+    return requested.filter((agent) => isSkillAgentType(agent));
+  }
+
+  if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+    console.error(
+      "Non-interactive run: pass --agent <id...> (e.g. --agent claude-code cursor)."
+    );
+    return null;
+  }
+
+  const installedAgents = await detectInstalledSkillAgents();
+  const detected = installedAgents.filter((agent) => agent !== "universal");
+  const choices = [...new Set([...detected, ...CURATED_INSTALL_AGENTS])];
+  const detectedSet = new Set<SkillAgentType>(detected);
+  const picked = await askMultiSelect(
+    "Which coding agents should get the docker-doctor skill?",
+    choices.map((agent) => ({
+      label: agentDisplayName(agent),
+      selected: detectedSet.has(agent),
+    }))
+  );
+  return picked.map((i) => choices[i]);
+};
+
+program
+  .command("install")
+  .description("install the Docker Doctor agent skill for your coding agents")
+  .option(
+    "-a, --agent <agents...>",
+    "agent id(s) to install for (e.g. claude-code codex cursor)"
+  )
+  .action(async (options: { agent?: string[] }) => {
+    const source = getSkillSourceDirectory();
+    if (!source) {
+      console.error(
+        "Bundled skill not found — this looks like a broken installation."
+      );
+      process.exit(1);
+    }
+
+    const agents = await resolveInstallAgents(options.agent);
+    if (agents === null) {
+      process.exit(1);
+    }
+    if (agents.length === 0) {
+      console.log("Nothing selected — skipped.");
+      return;
+    }
+
+    const result = await installSkillForAgents(agents, process.cwd());
+    if (!result) {
+      console.error("Failed to install the skill.");
+      process.exit(1);
+    }
+    for (const installed of result.installed) {
+      console.log(
+        `  ${chalk.green("✔")} ${agentDisplayName(installed.agent)} → ${installed.path}`
+      );
+    }
+    for (const failed of result.failed) {
+      console.log(
+        `  ${chalk.red("✖")} ${agentDisplayName(failed.agent)}: ${failed.error}`
+      );
+    }
+    if (result.installed.length > 0) {
+      console.log(
+        `\n  The agent can now run ${chalk.cyan("/docker-doctor")} to scan and triage this project.`
+      );
+    }
+    process.exitCode = result.failed.length > 0 ? 1 : 0;
   });
 
 // Rules subcommand group
