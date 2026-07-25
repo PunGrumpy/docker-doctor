@@ -12,7 +12,6 @@ export const Header = () => (
       className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 lg:px-14"
     >
       <div className="flex items-center gap-2">
-        <DocsMobileNav tree={source.getPageTree()} />
         <Link className="flex items-center gap-1.5 font-medium" href="/">
           <Logo aria-hidden="true" className="size-4" />
           Docker Doctor
@@ -23,6 +22,8 @@ export const Header = () => (
         <ChangelogButton />
         <DocsButton />
       </div>
+
+      <DocsMobileNav tree={source.getPageTree()} />
     </nav>
   </header>
 );
