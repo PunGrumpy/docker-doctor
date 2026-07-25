@@ -57,7 +57,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
         aria-controls="docs-mobile-menu"
         aria-haspopup="dialog"
         aria-label="Open documentation menu"
-        className="-ms-1 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground lg:hidden"
+        className="-me-1 flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-transform duration-150 hover:bg-muted/50 hover:text-foreground active:scale-[0.97] lg:hidden"
         onClick={openMenu}
         type="button"
       >
@@ -66,7 +66,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
 
       <dialog
         aria-label="Documentation"
-        className="fixed inset-y-0 left-0 z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none -translate-x-full border-dashed border-e bg-background text-foreground transition-[transform,overlay,display] transition-discrete duration-200 ease-[var(--ease-out)] backdrop:bg-black/40 open:translate-x-0 starting:open:-translate-x-full"
+        className="fixed inset-y-0 right-0 left-auto z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none translate-x-full border-dashed border-s bg-background text-foreground transition-[transform,overlay,display] transition-discrete duration-350 ease-[var(--ease-drawer)] backdrop:bg-black/40 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-350 backdrop:ease-[var(--ease-drawer)] open:translate-x-0 open:backdrop:opacity-100 starting:open:translate-x-full starting:open:backdrop:opacity-0 motion-reduce:transition-none motion-reduce:backdrop:transition-none"
         id="docs-mobile-menu"
         onClose={() => {
           document.body.style.overflow = "";
@@ -84,7 +84,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
             </Link>
             <button
               aria-label="Close menu"
-              className="-me-1 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              className="-me-1 flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-transform duration-150 hover:bg-muted/50 hover:text-foreground active:scale-[0.97]"
               onClick={closeMenu}
               type="button"
             >
