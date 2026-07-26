@@ -35,8 +35,8 @@ export const Hero = () => (
           diagnostics
         </span>
         <span className="absolute flex items-center top-full left-1/2 -translate-x-1/2 flex-col">
-          <span className="border-dashed will-change-transform h-3 border-l" />
-          <span className="block shrink-0 rounded-full bg-border p-0.5 will-change-transform">
+          <span className="border-dashed h-3 border-l" />
+          <span className="block shrink-0 rounded-full bg-border p-0.5">
             <span className="block size-[5px] shrink-0 rounded-full bg-background" />
           </span>
         </span>
@@ -62,8 +62,8 @@ export const Hero = () => (
             opinionated
           </span>
           <span className="absolute flex items-center top-full left-1/2 -translate-x-1/2 flex-col">
-            <span className="border-dashed will-change-transform h-3 border-l" />
-            <span className="block shrink-0 rounded-full bg-border p-0.5 will-change-transform">
+            <span className="border-dashed h-3 border-l" />
+            <span className="block shrink-0 rounded-full bg-border p-0.5">
               <span className="block size-[5px] shrink-0 rounded-full bg-background" />
             </span>
           </span>
