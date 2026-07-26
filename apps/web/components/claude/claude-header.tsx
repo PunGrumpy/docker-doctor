@@ -20,7 +20,7 @@ const LOGO_BITS = [
   "000010100001010000",
 ];
 
-export const ClaudeLogo = ({
+const ClaudeLogo = ({
   scale = 4,
   color = ROSE,
   className,
