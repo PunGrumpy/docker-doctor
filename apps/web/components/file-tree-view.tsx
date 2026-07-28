@@ -24,7 +24,7 @@ interface FileTreeViewProps {
 // this keeps the code in the server-rendered HTML instead of popping in
 // after hydration via an effect.
 const CodePanel = ({ entry }: { entry: EntryData }) => (
-  <div className="code-panel">
+  <div className="code-panel max-h-[60vh] overflow-auto scroll-fade">
     <div
       className="dark:hidden"
       // oxlint-disable-next-line no-danger -- build-time shiki output
