@@ -8,7 +8,7 @@ export const Installer = () => (
     <div className="flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl bg-background shadow-border flex-1 w-full">
       <span className="font-mono text-muted-foreground/60 select-none">$</span>
       <pre className="select-all flex-1 truncate">
-        <code className="font-mono text-foreground">
+        <code className="font-mono text-muted-foreground shimmer">
           npx @docker-doctor/cli@latest
         </code>
       </pre>
