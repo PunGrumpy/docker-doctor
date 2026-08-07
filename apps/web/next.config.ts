@@ -1,6 +1,9 @@
 import { createMDX } from "fumadocs-mdx/next";
 import type { NextConfig } from "next";
 
+// Validate environment variables at build time.
+import "./lib/env";
+
 const withMDX = createMDX();
 
 const nextConfig: NextConfig = {
@@ -14,7 +17,17 @@ const nextConfig: NextConfig = {
       destination: "/llms.mdx/docs/:path*",
       source: "/docs/:path*.md",
     },
+    {
+      destination: "https://us-assets.i.posthog.com/static/:path*",
+      source: "/ingest/static/:path*",
+    },
+    {
+      destination: "https://us.i.posthog.com/:path*",
+      source: "/ingest/:path*",
+    },
   ],
+
+  skipTrailingSlashRedirect: true,
 };
 
 export default withMDX(nextConfig);
