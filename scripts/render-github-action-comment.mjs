@@ -16,9 +16,19 @@ import path from "node:path";
 
 const MARKER = "<!-- docker-doctor:summary -->";
 const SITE_URL = "https://docker-doctor.vercel.app";
-const MAX_ITEMS_PER_SECTION = 50;
+const MAX_TABLE_ROWS = 20;
+const MAX_FINDING_LINES = 50;
 const MAX_MESSAGE_LENGTH = 180;
 const SHORT_SHA_LENGTH = 7;
+
+const SEVERITY_RANK = { error: 3, info: 1, warning: 2 };
+const STATUS_BY_SEVERITY = {
+  error: "🔴 Error",
+  info: "🔵 Info",
+  warning: "🟡 Warning",
+};
+const ICON_BY_SEVERITY = { error: "❌", info: "ℹ️", warning: "⚠️" };
+const CLEAN_STATUS = "🟢 Clean";
 
 const env = (name, fallback = "") => process.env[name] ?? fallback;
 
@@ -46,6 +56,8 @@ const readReport = () => {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
+const intro = `The latest Docker Doctor scan for this pull request. Learn more about [Docker Doctor](${SITE_URL}).`;
+
 const shortMessage = (message) => {
   const sentenceEnd = message.indexOf(". ");
   const firstSentence =
@@ -56,42 +68,145 @@ const shortMessage = (message) => {
   return `${firstSentence.slice(0, MAX_MESSAGE_LENGTH)}…`;
 };
 
-const blobPath = (file) => {
-  const joined = path.posix.join(
-    scanDirectory.split(path.sep).join("/"),
-    file.split(path.sep).join("/")
-  );
-  return joined.replace(/^(?:\.\/)+/u, "");
+const blobUrl = (file, line) => {
+  const joined = path.posix
+    .join(
+      scanDirectory.split(path.sep).join("/"),
+      file.split(path.sep).join("/")
+    )
+    .replace(/^(?:\.\/)+/u, "");
+  const fragment = line ? `#L${line}` : "";
+  return `${serverUrl}/${repository}/blob/${headSha}/${joined}${fragment}`;
 };
 
-const diagnosticLine = (diagnostic, icon) => {
+const formatTimestamp = (iso) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    hour: "numeric",
+    hour12: true,
+    minute: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+  })
+    .format(date)
+    .replace(" AM", "am")
+    .replace(" PM", "pm");
+};
+
+const countSummary = (diagnostics) => {
+  const counts = { error: 0, info: 0, warning: 0 };
+  for (const diagnostic of diagnostics) {
+    counts[diagnostic.severity] += 1;
+  }
+  const parts = [
+    counts.error > 0 ? plural(counts.error, "error") : "",
+    counts.warning > 0 ? plural(counts.warning, "warning") : "",
+    counts.info > 0 ? `${counts.info} info` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "—";
+};
+
+const fileRow = (file, diagnostics, updated) => {
+  let worst = 0;
+  for (const diagnostic of diagnostics) {
+    worst = Math.max(worst, SEVERITY_RANK[diagnostic.severity] ?? 0);
+  }
+  const status =
+    worst === 0
+      ? CLEAN_STATUS
+      : STATUS_BY_SEVERITY[
+          Object.keys(SEVERITY_RANK).find((s) => SEVERITY_RANK[s] === worst)
+        ];
+  return {
+    markdown: `| [\`${file}\`](${blobUrl(file)}) | ${status} | ${countSummary(diagnostics)} | ${updated} |`,
+    worst,
+  };
+};
+
+const TABLE_HEADER = [
+  "| File | Status | Issues | Updated (UTC) |",
+  "| :--- | :----- | :----- | :------------ |",
+];
+
+const buildTable = (report) => {
+  const byFile = new Map();
+  for (const file of [
+    ...report.project.dockerfiles,
+    ...report.project.composeFiles,
+  ]) {
+    byFile.set(file, []);
+  }
+  for (const diagnostic of report.diagnostics) {
+    const list = byFile.get(diagnostic.file) ?? [];
+    list.push(diagnostic);
+    byFile.set(diagnostic.file, list);
+  }
+  const updated = formatTimestamp(report.timestamp);
+  const rows = [...byFile.entries()]
+    .map(([file, diagnostics]) => fileRow(file, diagnostics, updated))
+    .toSorted((a, b) => b.worst - a.worst);
+
+  const lines = [
+    ...TABLE_HEADER,
+    ...rows.slice(0, MAX_TABLE_ROWS).map((row) => row.markdown),
+  ];
+  const overflow = rows.slice(MAX_TABLE_ROWS);
+  if (overflow.length > 0) {
+    lines.push(
+      "",
+      "<details>",
+      `<summary>${plural(overflow.length, "more file")}</summary>`,
+      "",
+      ...TABLE_HEADER,
+      ...overflow.map((row) => row.markdown),
+      "",
+      "</details>"
+    );
+  }
+  return lines;
+};
+
+const findingLine = (diagnostic) => {
   const location = diagnostic.line
     ? `${diagnostic.file}:${diagnostic.line}`
     : diagnostic.file;
-  const fragment = diagnostic.line ? `#L${diagnostic.line}` : "";
-  const url = `${serverUrl}/${repository}/blob/${headSha}/${blobPath(diagnostic.file)}${fragment}`;
   const rule = diagnostic.rule.replace(/^docker-doctor\//u, "");
-  return `- ${icon} [\`${location}\`](${url}) ${shortMessage(diagnostic.message)} \`${rule}\``;
+  return `- ${ICON_BY_SEVERITY[diagnostic.severity] ?? "•"} [\`${location}\`](${blobUrl(diagnostic.file, diagnostic.line)}) ${shortMessage(diagnostic.message)} \`${rule}\``;
 };
 
-const collapsedSection = (diagnostics, icon, summaryLabel) => {
-  if (diagnostics.length === 0) {
-    return "";
-  }
+const findingsSection = (report, hasErrors) => {
+  const sorted = [...report.diagnostics].toSorted(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0) ||
+      (a.line ?? 0) - (b.line ?? 0)
+  );
   const byFile = new Map();
-  for (const diagnostic of diagnostics.slice(0, MAX_ITEMS_PER_SECTION)) {
+  for (const diagnostic of sorted.slice(0, MAX_FINDING_LINES)) {
     const lines = byFile.get(diagnostic.file) ?? [];
-    lines.push(diagnosticLine(diagnostic, icon));
+    lines.push(findingLine(diagnostic));
     byFile.set(diagnostic.file, lines);
   }
   const groups = [...byFile.entries()].map(
     ([file, lines]) => `**\`${file}\`**\n${lines.join("\n")}`
   );
-  const overflow = diagnostics.length - MAX_ITEMS_PER_SECTION;
+  const overflow = sorted.length - MAX_FINDING_LINES;
   if (overflow > 0) {
-    groups.push(`…and ${plural(overflow, "more")} not shown.`);
+    groups.push(`…and ${plural(overflow, "more finding")} not shown.`);
   }
-  return `<details>\n<summary>${summaryLabel}</summary>\n\n${groups.join("\n\n")}\n\n</details>`;
+  // Auto-expand when there are errors so they are never buried.
+  return [
+    hasErrors ? "<details open>" : "<details>",
+    `<summary>${plural(sorted.length, "issue")}</summary>`,
+    "",
+    groups.join("\n\n"),
+    "",
+    "</details>",
+  ];
 };
 
 const footer = () => {
@@ -138,46 +253,20 @@ const renderReport = (report) => {
   const scannedFiles =
     report.project.dockerfiles.length + report.project.composeFiles.length;
 
-  const lines = [MARKER];
+  const lines = [MARKER, intro, ""];
 
   if (scannedFiles === 0) {
     lines.push(
       `**Docker Doctor** found no Dockerfiles or Compose files in \`${scanDirectory}\`.`
     );
-  } else if (total === 0) {
-    lines.push(
-      `**Docker Doctor** found no issues in ${plural(scannedFiles, "file")} 🎉 · score ${report.score} / 100 (${report.label})`
-    );
   } else {
-    const affectedFiles = new Set(report.diagnostics.map((d) => d.file)).size;
-    const counts = [
-      errors.length > 0 ? plural(errors.length, "error") : "",
-      warnings.length > 0 ? plural(warnings.length, "warning") : "",
-      infos.length > 0 ? `${infos.length} info` : "",
-    ]
-      .filter(Boolean)
-      .join(", ");
     lines.push(
-      `**Docker Doctor** found **${plural(total, "issue")}** in ${plural(affectedFiles, "file")} · ${counts} · score ${report.score} / 100 (${report.label})`
+      ...buildTable(report),
+      "",
+      `**Score:** ${report.score} / 100 (${report.label})`
     );
-
-    if (errors.length > 0) {
-      lines.push("");
-      const shown = errors.slice(0, MAX_ITEMS_PER_SECTION);
-      lines.push(...shown.map((d) => diagnosticLine(d, "❌")));
-      if (errors.length > shown.length) {
-        lines.push(
-          `…and ${plural(errors.length - shown.length, "more error")} not shown.`
-        );
-      }
-    }
-    for (const section of [
-      collapsedSection(warnings, "⚠️", plural(warnings.length, "warning")),
-      collapsedSection(infos, "ℹ️", `${infos.length} info`),
-    ]) {
-      if (section) {
-        lines.push("", section);
-      }
+    if (total > 0) {
+      lines.push("", ...findingsSection(report, errors.length > 0));
     }
   }
 
