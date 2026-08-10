@@ -1,0 +1,38 @@
+# Dogfoods the Docker Doctor GitHub Action (./action.yml) against a fixture
+# with known findings, so every PR exercises the scan → render → sticky-comment
+# pipeline end to end.
+
+name: Docker Doctor
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: docker-doctor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./
+        with:
+          directory: packages/docker-doctor/test/fixtures/with-error
+          # Advisory: the fixture intentionally contains an error-severity
+          # finding, so the gate must stay at "none" here.
+          blocking: none

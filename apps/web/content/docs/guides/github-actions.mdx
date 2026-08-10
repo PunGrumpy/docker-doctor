@@ -1,0 +1,83 @@
+---
+title: GitHub Actions
+description: Scan every pull request and post a sticky summary comment with the score and findings.
+---
+
+The Docker Doctor GitHub Action scans the Dockerfiles and Compose files in your repository on every pull request and posts a single summary comment that updates in place on each push — no comment spam.
+
+## Quick start
+
+```yaml
+# .github/workflows/docker-doctor.yml
+name: Docker Doctor
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+jobs:
+  docker-doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PunGrumpy/docker-doctor@v0
+```
+
+That's the whole setup. The action is advisory by default — it reports findings on every pull request but never fails the check, so it won't red-X a teammate's PR on day one.
+
+## What the comment shows
+
+Every pull request gets one sticky comment that updates in place on each push:
+
+- A per-file status table — status dot, issue counts, and when the scan ran — sorted worst-first, with every file linked at the scanned commit.
+- The health score, linking to a shareable score card.
+- Every finding grouped by file with a link to the exact line, the message, and the rule id. Findings stay collapsed unless there are errors.
+
+See a live comment on [this pull request](https://github.com/PunGrumpy/docker-doctor/pull/38).
+
+The same summary is mirrored to the workflow's job summary. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there — pushes never fail the check either way.
+
+## Inputs
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `directory` | `.` | Directory to scan, relative to the repository root. |
+| `version` | `latest` | `@docker-doctor/cli` version to run — pin it to keep scans reproducible. |
+| `blocking` | `none` | Which severities fail the check on pull requests: `none` (advisory), `warning`, or `error`. |
+| `comment` | `true` | Post/update the sticky summary comment on pull requests. |
+| `config` | — | Path to a [config file](/docs/reference/configuration), passed to the CLI as `--config`. |
+
+## Outputs
+
+Every run exposes step outputs for downstream jobs: `score`, `label`, `error-count`, `warning-count`, `info-count`, and `total-issues`.
+
+```yaml
+- uses: PunGrumpy/docker-doctor@v0
+  id: doctor
+- run: echo "Score is ${{ steps.doctor.outputs.score }}"
+```
+
+## Graduating the gate
+
+When your team trusts the signal, raise `blocking`:
+
+```yaml
+- uses: PunGrumpy/docker-doctor@v0
+  with:
+    blocking: error # fail on error-severity findings ("warning" fails on warnings too)
+```
+
+Two rules always hold:
+
+- Only `pull_request` events can fail. Pushes to your default branch are health snapshots — they never go red.
+- A scan that crashes without producing a report fails the run regardless of `blocking`, so a broken setup can't silently pass.
+
+## Versioning
+
+The action is versioned in lockstep with the CLI, and every release moves two tags:
+
+- A floating major — `v0` today, `v1` once the CLI reaches 1.0 — that always points at the latest release. Use this (as the examples above do) to pick up fixes automatically.
+- An exact `v<version>` (for example `v0.3.2`) matching the npm release, for reproducible pins.
+
+The `version` input controls the CLI independently — by default it runs `latest`, so pinned action refs still scan with the newest rules.

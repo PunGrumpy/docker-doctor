@@ -42,11 +42,7 @@ Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interac
 
 ### 3. Run in CI
 
-Docker Doctor walks you through setting up a GitHub Actions workflow after your first scan:
-
-```bash
-npx @docker-doctor/cli@latest
-```
+The GitHub Action (`PunGrumpy/docker-doctor`) scans every pull request and posts a sticky summary comment — advisory by default, with an opt-in gate. See the [GitHub Actions guide](https://docker-doctor.vercel.app/docs/guides/github-actions) for setup, inputs, and gating.
 
 ### 4. Configure
 
