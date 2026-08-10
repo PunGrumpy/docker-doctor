@@ -46,12 +46,14 @@ const SCORE_DOT_BY_LABEL = {
   "Needs Work": "needs-work",
 };
 
-const scoreLine = (score, label) => {
+const scoreLine = ({ errors, label, score, warnings }) => {
   // CLI labels carry a trailing emoji ("Good ✅") — keep only the text.
   const text = label.replaceAll(/[^ -~]/gu, "").trim();
   const dot = SCORE_DOT_BY_LABEL[text];
   const status = dot ? `${statusDot(dot, text)} ${text}` : text;
-  return `**Score:** ${score} / 100 · ${status}`;
+  // Same share URL the CLI prints after a terminal scan.
+  const shareUrl = `${SITE_URL}/share?s=${score}&w=${warnings}&e=${errors}`;
+  return `**Score:** [${score} / 100](${shareUrl}) · ${status}`;
 };
 
 const env = (name, fallback = "") => process.env[name] ?? fallback;
@@ -294,7 +296,7 @@ const renderReport = (report) => {
     lines.push(
       ...buildTable(report),
       "",
-      scoreLine(report.score, report.label)
+      scoreLine({ errors, label: report.label, score: report.score, warnings })
     );
     if (total > 0) {
       lines.push("", ...findingsSection(report, errors > 0));
