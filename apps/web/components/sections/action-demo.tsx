@@ -34,15 +34,12 @@ export const ActionDemo = () => (
       by default, gate when you trust it.
     </p>
 
-    {/* The mock is drawn at a fixed 740x357 and scaled to the container
-        width (tan(atan2()) divides the two lengths into a plain ratio),
-        so it always fits without horizontal scrolling. */}
-    <div className="mt-8 w-full max-w-185 [container-type:inline-size]">
-      <div className="relative w-full aspect-[740/357]">
-        <div className="absolute top-0 left-0 w-185 h-89.25 origin-top-left [scale:calc(tan(atan2(100cqw,740px)))] rounded-lg bg-card border border-solid border-border select-none">
+    <div className="mt-8 w-full max-w-185 @container">
+      <div className="relative w-full aspect-740/357">
+        <div className="absolute top-0 left-0 w-185 h-89.25 origin-top-left scale-[calc(tan(atan2(100cqw,740px)))] rounded-lg bg-card shadow-border select-none">
           <div
             aria-hidden="true"
-            className="absolute -left-px -top-px w-185 h-89.25 rounded-lg bg-origin-border border border-solid border-border bg-linear-to-b from-muted/40 to-transparent"
+            className="absolute -left-px -top-px w-185 h-89.25 rounded-lg shadow-border bg-linear-to-b from-muted/40 to-transparent"
           />
 
           <div
@@ -51,7 +48,7 @@ export const ActionDemo = () => (
           />
           <div
             aria-hidden="true"
-            className="absolute left-25 top-19.75 w-0.5 h-69.25 bg-linear-to-b from-border from-[85%] to-transparent"
+            className="absolute left-25 top-19.75 w-0.5 h-69.25 bg-linear-to-b from-border from-85% to-transparent"
           />
 
           <div className="absolute left-7.5 top-9 flex size-10.75 items-center justify-center rounded-[10px] bg-card shadow-custom">
@@ -78,7 +75,7 @@ export const ActionDemo = () => (
             </div>
           </div>
 
-          <div className="absolute left-33.5 top-22.25 w-143.75 h-58.25 rounded-[11px] bg-background border border-solid border-border shadow-custom" />
+          <div className="absolute left-33.5 top-22.25 w-143.75 h-58.25 rounded-[11px] bg-background shadow-border" />
 
           <div className="absolute left-37.75 top-24.75 font-medium text-muted-foreground text-sm/[23.29px]">
             Dockerfile
