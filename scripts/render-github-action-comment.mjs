@@ -84,17 +84,22 @@ const formatTimestamp = (iso) => {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  return new Intl.DateTimeFormat("en-US", {
+  const day = new Intl.DateTimeFormat("en-US", {
     day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     hour12: true,
     minute: "2-digit",
-    month: "short",
     timeZone: "UTC",
   })
     .format(date)
     .replace(" AM", "am")
     .replace(" PM", "pm");
+  return `${day} ${time}`;
 };
 
 const countSummary = (diagnostics) => {
