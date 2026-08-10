@@ -61,14 +61,14 @@
   },
   "dependencies": {
     "agent-install": "0.0.8",
-    "chalk": "^5.4.1",
+    "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@docker-doctor/core": "workspace:*",
-    "@types/node": "^26",
+    "@types/node": "^26.2.0",
     "tsdown": "^0.22.14",
-    "typescript": "^6"
+    "typescript": "^7.0.2"
   }
 }
