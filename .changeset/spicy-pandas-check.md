@@ -2,4 +2,4 @@
 "@docker-doctor/cli": patch
 ---
 
-Document the Docker Doctor GitHub Action (`PunGrumpy/docker-doctor@v0.3.2`) in the README: a Vercel-style per-file status table in a sticky PR comment, an advisory-by-default gate (`blocking: none | warning | error`), and score/count step outputs. The action is versioned in lockstep with the CLI — each release moves a plain `v<version>` tag.
+Add a GitHub Action for running Docker Doctor in CI. `uses: PunGrumpy/docker-doctor@v0.3.2` scans the repository on every pull request and posts a sticky summary comment: a per-file status table, the health score linking to a shareable score card, and every finding linked to the exact line at the scanned commit. The gate is advisory by default and can be raised with `blocking: warning | error` (pull requests only — pushes never fail), and the score and per-severity counts are exposed as step outputs. The action is versioned in lockstep with the CLI: every release moves a matching `v<version>` tag.

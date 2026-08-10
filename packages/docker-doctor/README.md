@@ -42,39 +42,7 @@ Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interac
 
 ### 3. Run in CI
 
-The GitHub Action scans every pull request and posts a sticky summary comment with the score and findings:
-
-```yaml
-# .github/workflows/docker-doctor.yml
-name: Docker Doctor
-on:
-  pull_request:
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-jobs:
-  docker-doctor:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v0.3.2
-        # Advisory by default: findings are reported but never fail the check.
-        # When you trust the signal, graduate the gate:
-        # with:
-        #   blocking: error      # "none" (default) | "warning" | "error"
-        #   directory: apps/api  # scan a sub-directory (default: ".")
-        #   version: "0.3.1"     # pin the CLI version instead of "latest"
-        #   comment: "false"     # disable the sticky PR comment
-```
-
-The action is versioned in lockstep with the CLI — every release publishes a matching `v<version>` tag.
-
-The action exposes `score`, `label`, and per-severity counts as step outputs for downstream jobs. The CLI can also scaffold this workflow for you after your first scan:
-
-```bash
-npx @docker-doctor/cli@latest
-```
+The GitHub Action (`PunGrumpy/docker-doctor`) scans every pull request and posts a sticky summary comment — advisory by default, with an opt-in gate. See the [GitHub Actions guide](https://docker-doctor.vercel.app/docs/guides/github-actions) for setup, inputs, and gating.
 
 ### 4. Configure
 
