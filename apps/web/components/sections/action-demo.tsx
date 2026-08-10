@@ -1,39 +1,9 @@
-import { ArrowUpRight, Stethoscope } from "lucide-react";
+import { Eye, Stethoscope } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/badge";
 import { GitHub } from "@/components/icons/github";
 import { Section } from "@/components/section";
-import { cn } from "@/lib/utils";
-
-const LIVE_EXAMPLE_URL = "https://github.com/PunGrumpy/docker-doctor/pull/38";
-
-const DOT_COLORS = {
-  clean: "bg-[#44cc11]",
-  error: "bg-[#ee0000]",
-  good: "bg-[#dfb317]",
-} as const;
-
-const Dot = ({ tone }: { readonly tone: keyof typeof DOT_COLORS }) => (
-  <span
-    aria-hidden="true"
-    className={cn("size-2.5 shrink-0 rounded-full", DOT_COLORS[tone])}
-  />
-);
-
-const FILE_ROWS = [
-  {
-    file: "Dockerfile",
-    issues: "1 error, 2 warnings",
-    status: "Error",
-    tone: "error",
-  },
-  {
-    file: "compose.yml",
-    issues: "—",
-    status: "Clean",
-    tone: "clean",
-  },
-] as const;
 
 export const ActionDemo = () => (
   <Section className="pt-8 pb-16 flex flex-col items-center w-full">
@@ -64,96 +34,118 @@ export const ActionDemo = () => (
       by default, gate when you trust it.
     </p>
 
-    <div className="mt-8 w-full max-w-2xl rounded-3xl bg-card shadow-border overflow-hidden select-none">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-b-[#EBEBEB] dark:border-b-[#1f1f1f]">
-        <span className="flex items-center justify-center size-9 shrink-0 rounded-full bg-muted">
-          <Stethoscope
+    {/* The mock is drawn at a fixed 740x357 and scaled to the container
+        width (tan(atan2()) divides the two lengths into a plain ratio),
+        so it always fits without horizontal scrolling. */}
+    <div className="mt-8 w-full max-w-185 [container-type:inline-size]">
+      <div className="relative w-full aspect-[740/357]">
+        <div className="absolute top-0 left-0 w-185 h-89.25 origin-top-left [scale:calc(tan(atan2(100cqw,740px)))] rounded-lg bg-card border border-solid border-border select-none">
+          <div
             aria-hidden="true"
-            className="size-4.5 text-muted-foreground"
+            className="absolute -left-px -top-px w-185 h-89.25 rounded-lg bg-origin-border border border-solid border-border bg-linear-to-b from-muted/40 to-transparent"
           />
-        </span>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-medium text-foreground">docker-doctor</span>
-          <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-            Bot
-          </span>
-          <span className="text-muted-foreground">commented 2 days ago</span>
-        </div>
-      </div>
 
-      <div className="p-6 space-y-5 text-sm">
-        <div className="space-y-2">
-          <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_7rem_9rem] gap-x-6 text-xs text-muted-foreground border-b pb-2">
-            <span>File</span>
-            <span>Status</span>
-            <span className="hidden sm:block">Issues</span>
+          <div
+            aria-hidden="true"
+            className="absolute left-25 top-0 w-0.5 h-9 bg-linear-to-b from-transparent to-border"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-25 top-19.75 w-0.5 h-69.25 bg-linear-to-b from-border from-[85%] to-transparent"
+          />
+
+          <div className="absolute left-7.5 top-9 flex size-10.75 items-center justify-center rounded-[10px] bg-card shadow-custom">
+            <Stethoscope
+              aria-hidden="true"
+              className="size-5 text-muted-foreground"
+            />
           </div>
-          {FILE_ROWS.map((row) => (
-            <div
-              className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_7rem_9rem] gap-x-6 items-center"
-              key={row.file}
-            >
-              <span className="font-mono text-[13px] text-foreground">
-                {row.file}
-              </span>
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Dot tone={row.tone} />
-                {row.status}
-              </span>
-              <span className="hidden sm:block text-muted-foreground">
-                {row.issues}
-              </span>
+          <div className="absolute left-21.25 top-10.5 flex size-8 items-center justify-center rounded-full bg-border">
+            <Eye aria-hidden="true" className="size-4 text-foreground" />
+          </div>
+
+          <div className="absolute left-32.25 top-11.5 flex items-start gap-1.75">
+            <div className="font-medium text-foreground text-base/[23.29px]">
+              docker-doctor
             </div>
-          ))}
-        </div>
+            <div className="flex items-center px-2.25 rounded-full bg-muted">
+              <div className="font-medium text-muted-foreground text-sm/[23.29px]">
+                Bot
+              </div>
+            </div>
+            <div className="text-muted-foreground text-base/[23.29px]">
+              reviewed 2 days ago
+            </div>
+          </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="font-semibold text-foreground">Score:</span>
-          <span className="font-mono tabular-nums text-foreground">
-            84 / 100
-          </span>
-          <span aria-hidden="true" className="text-muted-foreground">
-            ·
-          </span>
-          <Dot tone="good" />
-          <span className="text-muted-foreground">Good</span>
-        </div>
+          <div className="absolute left-33.5 top-22.25 w-143.75 h-58.25 rounded-[11px] bg-background border border-solid border-border shadow-custom" />
 
-        <div className="rounded-xl border bg-muted/10 p-4 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Dot tone="error" />
-            <span className="font-mono text-[13px] text-foreground">
-              Dockerfile:2
-            </span>
-            <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
-              no-secrets-in-env
+          <div className="absolute left-37.75 top-24.75 font-medium text-muted-foreground text-sm/[23.29px]">
+            Dockerfile
+          </div>
+
+          <div
+            aria-hidden="true"
+            className="absolute left-33.5 top-33.5 w-143.75 h-7.75 bg-muted/40"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-33.5 top-41.25 w-143.75 h-7.75 bg-red-500/10"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-33.5 top-33.5 w-15.25 h-7.75 bg-muted/60"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-33.5 top-41.25 w-15.25 h-7.75 bg-red-500/15"
+          />
+
+          <div className="absolute left-37.75 top-34.5 font-mono text-muted-foreground/60 text-[13px]/[23.29px]">
+            1
+          </div>
+          <div className="absolute left-37.75 top-42.25 font-mono text-muted-foreground/60 text-[13px]/[23.29px]">
+            2
+          </div>
+
+          <div className="absolute left-54.5 top-34.5 font-mono text-[13px]/[23.29px]">
+            <span className="text-[#d73a49] dark:text-[#f97583]">FROM</span>{" "}
+            <span className="text-[#24292e] dark:text-[#e1e4e8]">
+              node:latest
             </span>
           </div>
-          <p className="text-muted-foreground text-wrap-pretty">
-            Potential secret found in ENV: &lsquo;DB_PASSWORD&rsquo;. Use Docker
-            Secrets or runtime environment variables instead of baking them into
-            the image.
-          </p>
+          <div className="absolute left-54.5 top-42.25 font-mono text-[13px]/[23.29px]">
+            <span className="text-[#d73a49] dark:text-[#f97583]">ENV</span>{" "}
+            <span className="text-[#24292e] dark:text-[#e1e4e8]">
+              DB_PASSWORD=hunter2
+            </span>
+          </div>
+
+          <div className="absolute left-38.5 top-53 flex items-center gap-1.75">
+            <div className="font-medium text-red-600 dark:text-red-400 text-sm/[23.29px]">
+              Docker Doctor
+            </div>
+            <div className="flex h-5.5 items-center rounded-[5px] bg-muted px-2">
+              <div className="font-mono font-medium text-foreground text-[13px]/[23.29px]">
+                no-secrets-in-env
+              </div>
+            </div>
+            <div className="font-medium text-red-600 dark:text-red-400 text-sm/[23.29px]">
+              (error)
+            </div>
+          </div>
+          <div className="absolute left-38.5 top-60.25 w-lg text-muted-foreground text-sm/[23.29px]">
+            Fix -&gt; use Docker Secrets or runtime environment variables
+            instead of baking credentials into the image.
+          </div>
+          <Link
+            className="absolute left-38.5 top-72 select-auto text-foreground text-sm/[23.29px] underline decoration-1 [text-underline-position:from-font] transition-opacity hover:opacity-70 after:absolute after:-inset-x-6 after:-inset-y-5"
+            href="/docs/reference/rules"
+          >
+            See docs
+          </Link>
         </div>
       </div>
-
-      <a
-        className="group flex items-center justify-end gap-1.5 px-6 py-3.5 border-t bg-muted/20 dark:bg-muted/5 text-xs text-muted-foreground transition-opacity hover:opacity-70 select-auto"
-        href={LIVE_EXAMPLE_URL}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <span>
-          View a live example on{" "}
-          <span className="font-medium text-foreground">
-            PunGrumpy/docker-doctor
-          </span>
-        </span>
-        <ArrowUpRight
-          aria-hidden="true"
-          className="size-3.5 transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-        />
-      </a>
     </div>
   </Section>
 );
