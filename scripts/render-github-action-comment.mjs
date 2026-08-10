@@ -38,6 +38,22 @@ const ICON_BY_SEVERITY = {
 };
 const CLEAN_STATUS = `${statusDot("clean", "Clean")} Clean`;
 
+// Score buckets get their own dots, colored to match the badge palette.
+const SCORE_DOT_BY_LABEL = {
+  Critical: "critical",
+  Excellent: "excellent",
+  Good: "good",
+  "Needs Work": "needs-work",
+};
+
+const scoreLine = (score, label) => {
+  // CLI labels carry a trailing emoji ("Good ✅") — keep only the text.
+  const text = label.replaceAll(/[^ -~]/gu, "").trim();
+  const dot = SCORE_DOT_BY_LABEL[text];
+  const status = dot ? `${statusDot(dot, text)} ${text}` : text;
+  return `**Score:** ${score} / 100 · ${status}`;
+};
+
 const env = (name, fallback = "") => process.env[name] ?? fallback;
 
 const reportFile = env("DOCTOR_REPORT_FILE");
@@ -276,7 +292,7 @@ const renderReport = (report) => {
     lines.push(
       ...buildTable(report),
       "",
-      `**Score:** ${report.score} / 100 (${report.label})`
+      scoreLine(report.score, report.label)
     );
     if (total > 0) {
       lines.push("", ...findingsSection(report, errors.length > 0));
