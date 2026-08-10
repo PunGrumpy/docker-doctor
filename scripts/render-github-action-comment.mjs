@@ -25,8 +25,7 @@ const SEVERITY_RANK = { error: 3, info: 1, warning: 2 };
 
 // Status dots are tiny SVG circles served from the site (same approach as
 // Vercel's bot comments — https://vercel.com/static/status/ready.svg).
-const statusDot = (kind, alt) =>
-  `![${alt}](${SITE_URL}/static/status/${kind}.svg)`;
+const statusDot = (kind, alt) => `![${alt}](${SITE_URL}/status/${kind}.svg)`;
 const STATUS_BY_SEVERITY = {
   error: `${statusDot("error", "Error")} Error`,
   info: `${statusDot("info", "Info")} Info`,
