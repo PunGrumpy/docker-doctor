@@ -25,18 +25,21 @@ const SEVERITY_RANK = { error: 3, info: 1, warning: 2 };
 
 // Status dots are tiny SVG circles served from the site (same approach as
 // Vercel's bot comments — https://vercel.com/static/status/ready.svg).
-const statusDot = (kind, alt) => `![${alt}](${SITE_URL}/status/${kind}.svg)`;
+// Empty alt when a text label sits next to the dot (it is decorative there);
+// a real alt only where the dot is the sole severity cue.
+const statusDot = (kind, alt = "") =>
+  `![${alt}](${SITE_URL}/status/${kind}.svg)`;
 const STATUS_BY_SEVERITY = {
-  error: `${statusDot("error", "Error")} Error`,
-  info: `${statusDot("info", "Info")} Info`,
-  warning: `${statusDot("warning", "Warning")} Warning`,
+  error: `${statusDot("error")} Error`,
+  info: `${statusDot("info")} Info`,
+  warning: `${statusDot("warning")} Warning`,
 };
 const ICON_BY_SEVERITY = {
   error: statusDot("error", "error"),
   info: statusDot("info", "info"),
   warning: statusDot("warning", "warning"),
 };
-const CLEAN_STATUS = `${statusDot("clean", "Clean")} Clean`;
+const CLEAN_STATUS = `${statusDot("clean")} Clean`;
 
 // Score buckets get their own dots, colored to match the badge palette.
 const SCORE_DOT_BY_LABEL = {
@@ -50,7 +53,7 @@ const scoreLine = ({ errors, label, score, warnings }) => {
   // CLI labels carry a trailing emoji ("Good ✅") — keep only the text.
   const text = label.replaceAll(/[^ -~]/gu, "").trim();
   const dot = SCORE_DOT_BY_LABEL[text];
-  const status = dot ? `${statusDot(dot, text)} ${text}` : text;
+  const status = dot ? `${statusDot(dot)} ${text}` : text;
   // Same share URL the CLI prints after a terminal scan.
   const shareUrl = `${SITE_URL}/share?s=${score}&w=${warnings}&e=${errors}`;
   return `**Score:** [${score} / 100](${shareUrl}) · ${status}`;

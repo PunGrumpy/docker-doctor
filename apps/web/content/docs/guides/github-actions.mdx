@@ -34,19 +34,19 @@ The latest Docker Doctor scan for this pull request. Learn more about [Docker Do
 
 | File | Status | Issues | Updated (UTC) |
 | :-- | :-- | :-- | :-- |
-| [`Dockerfile`](#what-the-comment-shows) | <img className="inline" src="/status/error.svg" alt="Error" /> Error | 1 error, 1 info | Aug 10, 2026 1:11pm |
-| [`compose.yml`](#what-the-comment-shows) | <img className="inline" src="/status/clean.svg" alt="Clean" /> Clean | — | Aug 10, 2026 1:11pm |
+| [`Dockerfile`](https://github.com/PunGrumpy/docker-doctor/pull/38) | <img className="inline" src="/status/error.svg" alt="" /> Error | 1 error, 1 info | Aug 10, 2026 1:11pm |
+| [`compose.yml`](https://github.com/PunGrumpy/docker-doctor/pull/38) | <img className="inline" src="/status/clean.svg" alt="" /> Clean | — | Aug 10, 2026 1:11pm |
 
-**Score:** [84 / 100](/share?s=84&w=0&e=1) · <img className="inline" src="/status/good.svg" alt="Good" /> Good
+**Score:** [84 / 100](/share?s=84&w=0&e=1) · <img className="inline" src="/status/good.svg" alt="" /> Good
 
 **`Dockerfile`**
 
 - <img className="inline" src="/status/error.svg" alt="error" />
-  [`Dockerfile:2`](#what-the-comment-shows) Potential secret found in ENV:
-  'DB_PASSWORD'. `no-secrets-in-env`
+  [`Dockerfile:2`](https://github.com/PunGrumpy/docker-doctor/pull/38) Potential
+  secret found in ENV: 'DB_PASSWORD'. `no-secrets-in-env`
 - <img className="inline" src="/status/info.svg" alt="info" />
-  [`Dockerfile:1`](#what-the-comment-shows) No HEALTHCHECK instruction found.
-  `require-healthcheck`
+  [`Dockerfile:1`](https://github.com/PunGrumpy/docker-doctor/pull/38) No
+  HEALTHCHECK instruction found. `require-healthcheck`
 
 <span className="text-muted-foreground text-xs">
   Scanned by Docker Doctor for commit <code>4f69cb4</code>.
@@ -54,11 +54,11 @@ The latest Docker Doctor scan for this pull request. Learn more about [Docker Do
 
 </div>
 
-- The per-file table is sorted worst-first, and every file links to it at the scanned commit.
+- The per-file table is sorted worst-first, and every file links to it at the scanned commit (the links above lead to a [live example](https://github.com/PunGrumpy/docker-doctor/pull/38)).
 - The score links to a shareable score card.
 - Findings are grouped by file with a link to the exact line, the message, and the rule id — collapsed unless there are errors.
 
-The same summary is mirrored to the workflow's job summary, so runs on pushes are visible without a pull request.
+The same summary is mirrored to the workflow's job summary. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there — pushes never fail the check either way.
 
 ## Inputs
 

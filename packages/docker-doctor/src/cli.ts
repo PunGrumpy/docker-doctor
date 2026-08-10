@@ -452,7 +452,7 @@ jobs:
         `\n  ${chalk.green("✨")} Created ${chalk.cyan(".github/workflows/docker-doctor.yml")}!`
       );
       console.log(
-        `    Every pull request gets scanned and a sticky summary comment — advisory by default.`
+        `    Every pull request gets a scan and a sticky summary comment — advisory by default.`
       );
       console.log(
         `    Inputs and gating: ${chalk.cyan("https://docker-doctor.vercel.app/docs/guides/github-actions")}`
