@@ -42,7 +42,33 @@ Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interac
 
 ### 3. Run in CI
 
-Docker Doctor walks you through setting up a GitHub Actions workflow after your first scan:
+The GitHub Action scans every pull request and posts a sticky summary comment with the score and findings:
+
+```yaml
+# .github/workflows/docker-doctor.yml
+name: Docker Doctor
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+jobs:
+  docker-doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PunGrumpy/docker-doctor@v1
+        # Advisory by default: findings are reported but never fail the check.
+        # When you trust the signal, graduate the gate:
+        # with:
+        #   blocking: error      # "none" (default) | "warning" | "error"
+        #   directory: apps/api  # scan a sub-directory (default: ".")
+        #   version: "0.3.1"     # pin the CLI version instead of "latest"
+        #   comment: "false"     # disable the sticky PR comment
+```
+
+The action exposes `score`, `label`, and per-severity counts as step outputs for downstream jobs. The CLI can also scaffold this workflow for you after your first scan:
 
 ```bash
 npx @docker-doctor/cli@latest
