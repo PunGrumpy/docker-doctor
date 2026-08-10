@@ -80,7 +80,17 @@ const readReport = () => {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-const intro = `The latest Docker Doctor scan for this pull request. Learn more about [Docker Doctor](${SITE_URL}).`;
+const INTRO = `The latest Docker Doctor scan for this pull request. Learn more about [Docker Doctor](${SITE_URL}).`;
+
+const groupByFile = (diagnostics, seedFiles = []) => {
+  const byFile = new Map(seedFiles.map((file) => [file, []]));
+  for (const diagnostic of diagnostics) {
+    const list = byFile.get(diagnostic.file) ?? [];
+    list.push(diagnostic);
+    byFile.set(diagnostic.file, list);
+  }
+  return byFile;
+};
 
 const shortMessage = (message) => {
   const sentenceEnd = message.indexOf(". ");
@@ -140,19 +150,16 @@ const countSummary = (diagnostics) => {
 };
 
 const fileRow = (file, diagnostics, updated) => {
-  let worst = 0;
-  for (const diagnostic of diagnostics) {
-    worst = Math.max(worst, SEVERITY_RANK[diagnostic.severity] ?? 0);
+  let worst = null;
+  for (const { severity } of diagnostics) {
+    if ((SEVERITY_RANK[severity] ?? 0) > (SEVERITY_RANK[worst] ?? 0)) {
+      worst = severity;
+    }
   }
-  const status =
-    worst === 0
-      ? CLEAN_STATUS
-      : STATUS_BY_SEVERITY[
-          Object.keys(SEVERITY_RANK).find((s) => SEVERITY_RANK[s] === worst)
-        ];
+  const status = worst ? STATUS_BY_SEVERITY[worst] : CLEAN_STATUS;
   return {
     markdown: `| [\`${file}\`](${blobUrl(file)}) | ${status} | ${countSummary(diagnostics)} | ${updated} |`,
-    worst,
+    worst: SEVERITY_RANK[worst] ?? 0,
   };
 };
 
@@ -162,18 +169,10 @@ const TABLE_HEADER = [
 ];
 
 const buildTable = (report) => {
-  const byFile = new Map();
-  for (const file of [
+  const byFile = groupByFile(report.diagnostics, [
     ...report.project.dockerfiles,
     ...report.project.composeFiles,
-  ]) {
-    byFile.set(file, []);
-  }
-  for (const diagnostic of report.diagnostics) {
-    const list = byFile.get(diagnostic.file) ?? [];
-    list.push(diagnostic);
-    byFile.set(diagnostic.file, list);
-  }
+  ]);
   const updated = formatTimestamp(report.timestamp);
   const rows = [...byFile.entries()]
     .map(([file, diagnostics]) => fileRow(file, diagnostics, updated))
@@ -214,14 +213,10 @@ const findingsSection = (report, hasErrors) => {
       (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0) ||
       (a.line ?? 0) - (b.line ?? 0)
   );
-  const byFile = new Map();
-  for (const diagnostic of sorted.slice(0, MAX_FINDING_LINES)) {
-    const lines = byFile.get(diagnostic.file) ?? [];
-    lines.push(findingLine(diagnostic));
-    byFile.set(diagnostic.file, lines);
-  }
+  const byFile = groupByFile(sorted.slice(0, MAX_FINDING_LINES));
   const groups = [...byFile.entries()].map(
-    ([file, lines]) => `**\`${file}\`**\n${lines.join("\n")}`
+    ([file, diagnostics]) =>
+      `**\`${file}\`**\n${diagnostics.map(findingLine).join("\n")}`
   );
   const overflow = sorted.length - MAX_FINDING_LINES;
   if (overflow > 0) {
@@ -243,26 +238,32 @@ const footer = () => {
   return `<sub>Scanned by <a href="${SITE_URL}">Docker Doctor</a> for commit <code>${shortSha}</code>.</sub>`;
 };
 
-const renderFailure = () => {
-  const body = [
+const stepOutputs = ({ errors, gate, infos, label, score, warnings }) => ({
+  "error-count": String(errors),
+  "gate-status": gate,
+  "info-count": String(infos),
+  label,
+  score: String(score),
+  "total-issues": String(errors + warnings + infos),
+  "warning-count": String(warnings),
+});
+
+const renderFailure = () => ({
+  body: [
     MARKER,
     "**Docker Doctor** could not produce a scan report — check the workflow logs for the CLI output.",
     "",
     `<sub>If this looks like a bug, please <a href="https://github.com/PunGrumpy/docker-doctor/issues/new">open an issue</a>.</sub>`,
-  ].join("\n");
-  return {
-    body,
-    outputs: {
-      "error-count": "0",
-      "gate-status": "1",
-      "info-count": "0",
-      label: "",
-      score: "0",
-      "total-issues": "0",
-      "warning-count": "0",
-    },
-  };
-};
+  ].join("\n"),
+  outputs: stepOutputs({
+    errors: 0,
+    gate: "1",
+    infos: 0,
+    label: "",
+    score: 0,
+    warnings: 0,
+  }),
+});
 
 const gateStatus = (errorCount, warningCount) => {
   if (blocking === "error") {
@@ -275,14 +276,15 @@ const gateStatus = (errorCount, warningCount) => {
 };
 
 const renderReport = (report) => {
-  const errors = report.diagnostics.filter((d) => d.severity === "error");
-  const warnings = report.diagnostics.filter((d) => d.severity === "warning");
-  const infos = report.diagnostics.filter((d) => d.severity === "info");
+  const count = (severity) =>
+    report.diagnostics.filter((d) => d.severity === severity).length;
+  const errors = count("error");
+  const warnings = count("warning");
   const total = report.diagnostics.length;
   const scannedFiles =
     report.project.dockerfiles.length + report.project.composeFiles.length;
 
-  const lines = [MARKER, intro, ""];
+  const lines = [MARKER, INTRO, ""];
 
   if (scannedFiles === 0) {
     lines.push(
@@ -295,7 +297,7 @@ const renderReport = (report) => {
       scoreLine(report.score, report.label)
     );
     if (total > 0) {
-      lines.push("", ...findingsSection(report, errors.length > 0));
+      lines.push("", ...findingsSection(report, errors > 0));
     }
   }
 
@@ -303,15 +305,14 @@ const renderReport = (report) => {
 
   return {
     body: lines.join("\n"),
-    outputs: {
-      "error-count": String(errors.length),
-      "gate-status": gateStatus(errors.length, warnings.length),
-      "info-count": String(infos.length),
+    outputs: stepOutputs({
+      errors,
+      gate: gateStatus(errors, warnings),
+      infos: total - errors - warnings,
       label: report.label,
-      score: String(report.score),
-      "total-issues": String(total),
-      "warning-count": String(warnings.length),
-    },
+      score: report.score,
+      warnings,
+    }),
   };
 };
 
