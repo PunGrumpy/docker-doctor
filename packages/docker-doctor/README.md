@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v0.3.1
+      - uses: PunGrumpy/docker-doctor@v0.3.2
         # Advisory by default: findings are reported but never fail the check.
         # When you trust the signal, graduate the gate:
         # with:
