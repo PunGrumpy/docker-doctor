@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v1
+      - uses: PunGrumpy/docker-doctor@v0.3.1
         # Advisory by default: findings are reported but never fail the check.
         # When you trust the signal, graduate the gate:
         # with:
@@ -67,6 +67,8 @@ jobs:
         #   version: "0.3.1"     # pin the CLI version instead of "latest"
         #   comment: "false"     # disable the sticky PR comment
 ```
+
+The action is versioned in lockstep with the CLI — every release publishes a matching `v<version>` tag.
 
 The action exposes `score`, `label`, and per-severity counts as step outputs for downstream jobs. The CLI can also scaffold this workflow for you after your first scan:
 
