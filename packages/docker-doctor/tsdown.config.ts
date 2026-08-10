@@ -13,6 +13,7 @@ export default defineConfig({
   },
   dts: {
     eager: true,
+    generator: "oxc",
   },
   entry: ["src/index.ts", "src/cli.ts"],
   format: ["esm", "cjs"],

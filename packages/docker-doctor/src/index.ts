@@ -20,4 +20,4 @@ export type {
   RuleCategory,
   RuleSeverity,
 } from "@docker-doctor/core";
-export const { version } = packageJson;
+export const version: string = packageJson.version;
