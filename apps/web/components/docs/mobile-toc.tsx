@@ -24,22 +24,22 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
 
   return (
     <details
-      className="group sticky top-14 z-20 -mx-4 mt-6 mb-8 border-dashed border-y bg-background lg:mx-0 xl:hidden"
+      className="group bg-background sticky top-14 z-20 -mx-4 mt-6 mb-8 border-y border-dashed lg:mx-0 xl:hidden"
       ref={detailsRef}
     >
-      <summary className="flex h-12 cursor-pointer list-none items-center justify-between px-4 font-medium text-sm lg:px-0 [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium lg:px-0 [&::-webkit-details-marker]:hidden">
         On this page
         <ChevronDown
           aria-hidden="true"
-          className="size-4 text-muted-foreground transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-180"
+          className="text-muted-foreground size-4 transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-180"
         />
       </summary>
-      <div className="absolute inset-x-0 top-full max-h-[60vh] animate-in overflow-y-auto overscroll-contain border-dashed border-b bg-background p-2 shadow-custom animation-duration-200 [--tw-ease:var(--ease-out)] fade-in slide-in-from-top-1">
+      <div className="animate-in bg-background shadow-custom animation-duration-200 fade-in slide-in-from-top-1 absolute inset-x-0 top-full max-h-[60vh] overflow-y-auto overscroll-contain border-b border-dashed p-2 [--tw-ease:var(--ease-out)]">
         <AnchorProvider toc={toc}>
           <nav aria-label="On this page" className="flex flex-col">
             {toc.map((item) => (
               <TOCItem
-                className="rounded-md py-1.5 text-muted-foreground text-sm hover:bg-muted/50 hover:text-foreground data-[active=true]:text-foreground"
+                className="text-muted-foreground hover:bg-muted/50 hover:text-foreground data-[active=true]:text-foreground rounded-md py-1.5 text-sm"
                 href={item.url}
                 key={item.url}
                 onClick={close}

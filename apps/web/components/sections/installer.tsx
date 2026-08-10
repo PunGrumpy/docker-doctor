@@ -4,11 +4,11 @@ import { Section } from "@/components/section";
 import { cn } from "@/lib/utils";
 
 export const Installer = () => (
-  <Section className="pt-8 pb-8 flex flex-col sm:flex-row items-center gap-3 w-full">
-    <div className="flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl bg-background shadow-border flex-1 w-full">
-      <span className="font-mono text-muted-foreground/60 select-none">$</span>
-      <pre className="select-all flex-1 truncate">
-        <code className="font-mono text-muted-foreground shimmer">
+  <Section className="flex w-full flex-col items-center gap-3 pt-8 pb-8 sm:flex-row">
+    <div className="bg-background shadow-border flex w-full flex-1 items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
+      <span className="text-muted-foreground/60 font-mono select-none">$</span>
+      <pre className="flex-1 truncate select-all">
+        <code className="text-muted-foreground shimmer font-mono">
           npx @docker-doctor/cli@latest
         </code>
       </pre>
@@ -23,9 +23,9 @@ export const Installer = () => (
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "flex items-center justify-center gap-2 h-12 w-full sm:w-auto px-4 rounded-xl",
+        "flex h-12 w-full items-center justify-center gap-2 rounded-xl px-4 sm:w-auto",
         "has-[>svg:first-child:not(:last-child)]:pl-3 has-[>svg:last-child:not(:first-child)]:pr-3 has-[>svg:only-child]:px-3",
-        "font-medium text-white bg-linear-to-b from-blue-400 to-blue-500 shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]"
+        "bg-linear-to-b from-blue-400 to-blue-500 font-medium text-white shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]"
       )}
       aria-label="View on GitHub"
     >

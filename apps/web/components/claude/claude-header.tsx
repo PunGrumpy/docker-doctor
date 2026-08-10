@@ -102,7 +102,7 @@ export const ClaudeHeader = ({
 }) => (
   <fieldset
     className={cn(
-      "min-w-0 rounded-[6px] border px-3 pb-3.5 pt-1 font-mono text-[13px] leading-[1.5] text-[#c0caf5] sm:px-4",
+      "min-w-0 rounded-[6px] border px-3 pt-1 pb-3.5 font-mono text-[13px] leading-[1.5] text-[#c0caf5] sm:px-4",
       className
     )}
     style={{ borderColor: ROSE }}
@@ -117,7 +117,7 @@ export const ClaudeHeader = ({
         <div className="font-semibold">Welcome back {user}!</div>
         <ClaudeLogo className="my-1.5" />
         <div
-          className="min-w-0 space-y-0.5 wrap-break-words"
+          className="wrap-break-words min-w-0 space-y-0.5"
           style={{ color: GRAY }}
         >
           <div>{model}</div>

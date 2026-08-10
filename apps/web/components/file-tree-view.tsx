@@ -24,7 +24,7 @@ interface FileTreeViewProps {
 // this keeps the code in the server-rendered HTML instead of popping in
 // after hydration via an effect.
 const CodePanel = ({ entry }: { entry: EntryData }) => (
-  <div className="code-panel max-h-[60vh] overflow-auto scroll-fade">
+  <div className="code-panel scroll-fade max-h-[60vh] overflow-auto">
     <div
       className="dark:hidden"
       // oxlint-disable-next-line no-danger -- build-time shiki output
@@ -50,7 +50,7 @@ const DesktopLayout = ({
   const activeEntry = entries[activeIndex];
 
   return (
-    <div className="hidden sm:flex w-full min-h-0">
+    <div className="hidden min-h-0 w-full sm:flex">
       <div className="w-[34%] shrink-0 py-2.5 pr-2 pl-1.5">
         {entries.map((entry, i) => (
           <button
@@ -59,8 +59,8 @@ const DesktopLayout = ({
             onClick={() => onSelect(i)}
             aria-pressed={i === activeIndex}
             className={cn(
-              "flex items-center w-full text-left gap-2 rounded-sm px-1.5 py-[3px]",
-              "transition-[transform,colors] duration-100 ease-out relative isolate",
+              "flex w-full items-center gap-2 rounded-sm px-1.5 py-[3px] text-left",
+              "relative isolate transition-[transform,colors] duration-100 ease-out",
               "hover:bg-muted/30",
               "active:scale-[0.98]"
             )}
@@ -69,22 +69,22 @@ const DesktopLayout = ({
               <>
                 <m.span
                   layoutId="active-bg-desktop"
-                  className="absolute inset-0 bg-muted/40 rounded-sm -z-10"
+                  className="bg-muted/40 absolute inset-0 -z-10 rounded-sm"
                   transition={{ damping: 30, stiffness: 380, type: "spring" }}
                 />
                 <m.span
                   layoutId="active-indicator-desktop"
-                  className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full bg-foreground/70"
+                  className="bg-foreground/70 absolute top-1 bottom-1 left-0 w-[2px] rounded-full"
                   transition={{ damping: 30, stiffness: 380, type: "spring" }}
                 />
               </>
             )}
-            <span className="flex items-center justify-center size-4 shrink-0 text-muted-foreground/70 [&>svg]:size-full">
+            <span className="text-muted-foreground/70 flex size-4 shrink-0 items-center justify-center [&>svg]:size-full">
               {entry.icon}
             </span>
             <span
               className={cn(
-                "font-mono text-[12px] tracking-tight transition-colors duration-100 ease-out truncate",
+                "truncate font-mono text-[12px] tracking-tight transition-colors duration-100 ease-out",
                 i === activeIndex
                   ? "text-foreground font-medium"
                   : "text-muted-foreground/80"
@@ -96,15 +96,15 @@ const DesktopLayout = ({
         ))}
       </div>
 
-      <div className="flex-1 min-w-0 border-l border-dashed border-border/50">
-        <div className="pl-5 py-3 pr-1">
+      <div className="border-border/50 min-w-0 flex-1 border-l border-dashed">
+        <div className="py-3 pr-1 pl-5">
           <CodePanel key={activeEntry.path} entry={activeEntry} />
 
           <div className="mt-3 pl-[calc(2ch+1.25rem)]">
-            <p className="text-[13px] text-pretty text-muted-foreground leading-relaxed">
+            <p className="text-muted-foreground text-[13px] leading-relaxed text-pretty">
               {activeEntry.description}
             </p>
-            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground/40">
+            <p className="text-muted-foreground/40 mt-0.5 font-mono text-[11px]">
               {activeEntry.label}
             </p>
           </div>
@@ -126,9 +126,9 @@ const MobileLayout = ({
   const activeEntry = entries[activeIndex];
 
   return (
-    <div className="flex sm:hidden flex-col w-full">
-      <div className="max-h-[40vh] overflow-y-auto border-b border-dashed border-border/50">
-        <div className="py-1 px-0.5">
+    <div className="flex w-full flex-col sm:hidden">
+      <div className="border-border/50 max-h-[40vh] overflow-y-auto border-b border-dashed">
+        <div className="px-0.5 py-1">
           {entries.map((entry, i) => (
             <button
               type="button"
@@ -136,7 +136,7 @@ const MobileLayout = ({
               onClick={() => onSelect(i)}
               aria-pressed={i === activeIndex}
               className={cn(
-                "flex items-center w-full text-left gap-2.5 rounded-lg px-2.5 min-h-10 relative isolate",
+                "relative isolate flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left",
                 "transition-[transform,colors] duration-100 ease-out",
                 "active:scale-[0.98]",
                 i !== activeIndex && "hover:bg-muted/20"
@@ -145,16 +145,16 @@ const MobileLayout = ({
               {i === activeIndex && (
                 <m.span
                   layoutId="active-bg-mobile"
-                  className="absolute inset-0 bg-muted/50 rounded-lg -z-10"
+                  className="bg-muted/50 absolute inset-0 -z-10 rounded-lg"
                   transition={{ damping: 30, stiffness: 380, type: "spring" }}
                 />
               )}
-              <span className="flex items-center justify-center size-4 shrink-0 text-muted-foreground/60 [&>svg]:size-full">
+              <span className="text-muted-foreground/60 flex size-4 shrink-0 items-center justify-center [&>svg]:size-full">
                 {entry.icon}
               </span>
               <span
                 className={cn(
-                  "font-mono text-xs tracking-tight truncate flex-1",
+                  "flex-1 truncate font-mono text-xs tracking-tight",
                   i === activeIndex
                     ? "text-foreground font-medium"
                     : "text-muted-foreground/70"
@@ -167,15 +167,15 @@ const MobileLayout = ({
         </div>
       </div>
 
-      <div className="flex flex-col px-2.5 pt-3 pb-4 overflow-y-auto">
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="flex items-center justify-center size-4 shrink-0 text-muted-foreground/60 [&>svg]:size-full">
+      <div className="flex flex-col overflow-y-auto px-2.5 pt-3 pb-4">
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="text-muted-foreground/60 flex size-4 shrink-0 items-center justify-center [&>svg]:size-full">
             {activeEntry.icon}
           </span>
-          <span className="font-mono text-sm font-medium text-foreground">
+          <span className="text-foreground font-mono text-sm font-medium">
             {activeEntry.label}
           </span>
-          <span className="font-mono text-[10px] text-muted-foreground/30 ml-auto">
+          <span className="text-muted-foreground/30 ml-auto font-mono text-[10px]">
             {activeEntry.path}
           </span>
         </div>
@@ -184,7 +184,7 @@ const MobileLayout = ({
           <CodePanel key={activeEntry.path} entry={activeEntry} />
         </div>
 
-        <p className="mt-3 text-xs text-pretty text-muted-foreground leading-relaxed px-0">
+        <p className="text-muted-foreground mt-3 px-0 text-xs leading-relaxed text-pretty">
           {activeEntry.description}
         </p>
       </div>
@@ -201,7 +201,7 @@ export const FileTreeView = ({ entries }: FileTreeViewProps) => {
 
   return (
     <LazyMotion features={domAnimation}>
-      <div className="flex flex-col w-full">
+      <div className="flex w-full flex-col">
         <DesktopLayout
           entries={entries}
           activeIndex={activeIndex}

@@ -26,7 +26,7 @@ export const Heading2 = ({
 }: ComponentProps<"h2">) => (
   <h2
     className={cn(
-      "mt-12 mb-4 scroll-mt-24 font-serif font-normal text-2xl tracking-tight",
+      "mt-12 mb-4 scroll-mt-24 font-serif text-2xl font-normal tracking-tight",
       className
     )}
     {...props}
@@ -42,7 +42,7 @@ export const Heading3 = ({
 }: ComponentProps<"h3">) => (
   <h3
     className={cn(
-      "mt-8 mb-3 scroll-mt-24 font-serif font-normal text-xl tracking-tight",
+      "mt-8 mb-3 scroll-mt-24 font-serif text-xl font-normal tracking-tight",
       className
     )}
     {...props}
@@ -53,7 +53,7 @@ export const Heading3 = ({
 
 export const Paragraph = ({ className, ...props }: ComponentProps<"p">) => (
   <p
-    className={cn("my-4 text-foreground/90 leading-7", className)}
+    className={cn("text-foreground/90 my-4 leading-7", className)}
     {...props}
   />
 );
@@ -111,11 +111,11 @@ export const Anchor = ({
 export const Code = ({ className, ...props }: ComponentProps<"code">) => (
   <code
     className={cn(
-      "rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[13px] text-foreground",
+      "bg-muted text-foreground rounded-md border px-1.5 py-0.5 font-mono text-[13px]",
       // Reset the inline-code chip when this `code` is the child of a `pre`
       // (a fenced/highlighted block) so shiki's own token colors show
       // through untouched.
-      "in-[pre]:rounded-none in-[pre]:border-0 in-[pre]:bg-transparent in-[pre]:p-0 in-[pre]:font-inherit in-[pre]:text-inherit",
+      "in-[pre]:font-inherit in-[pre]:rounded-none in-[pre]:border-0 in-[pre]:bg-transparent in-[pre]:p-0 in-[pre]:text-inherit",
       className
     )}
     {...props}
@@ -130,7 +130,7 @@ export const Pre = ({
   const code = getNodeText(children);
 
   return (
-    <div className="group relative my-6 overflow-hidden rounded-xl bg-background shadow-border">
+    <div className="group bg-background shadow-border relative my-6 overflow-hidden rounded-xl">
       <pre
         className={cn("overflow-x-auto p-4 font-mono text-sm", className)}
         {...props}
@@ -148,7 +148,7 @@ export const Pre = ({
 };
 
 export const Table = ({ className, ...props }: ComponentProps<"table">) => (
-  <div className="my-6 overflow-x-auto rounded-xl shadow-border">
+  <div className="shadow-border my-6 overflow-x-auto rounded-xl">
     <table className={cn("w-full text-sm", className)} {...props} />
   </div>
 );
@@ -159,7 +159,7 @@ export const TableHeaderCell = ({
 }: ComponentProps<"th">) => (
   <th
     className={cn(
-      "border-b bg-muted/50 px-4 py-2 text-left font-medium",
+      "bg-muted/50 border-b px-4 py-2 text-left font-medium",
       className
     )}
     {...props}
@@ -168,7 +168,7 @@ export const TableHeaderCell = ({
 
 export const TableCell = ({ className, ...props }: ComponentProps<"td">) => (
   <td
-    className={cn("border-b border-border/60 px-4 py-2", className)}
+    className={cn("border-border/60 border-b px-4 py-2", className)}
     {...props}
   />
 );
@@ -184,7 +184,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
   const content = (
     <>
       {icon ? (
-        <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground [&>svg]:size-4">
+        <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg [&>svg]:size-4">
           {icon}
         </div>
       ) : null}
@@ -193,7 +193,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
         // `children` is the card body from MDX, already wrapped in our
         // custom `p` (Paragraph) component — use a `div` here so we don't
         // nest a `<p>` inside another `<p>`.
-        <div className="mt-1 text-muted-foreground text-sm [&>p]:my-0">
+        <div className="text-muted-foreground mt-1 text-sm [&>p]:my-0">
           {children}
         </div>
       ) : null}
@@ -204,8 +204,8 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
     return (
       <Link
         className={cn(
-          "rounded-xl bg-card p-4 shadow-custom",
-          "block transition-colors hover:bg-muted/30"
+          "bg-card shadow-custom rounded-xl p-4",
+          "hover:bg-muted/30 block transition-colors"
         )}
         href={href}
       >
@@ -214,7 +214,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
     );
   }
 
-  return <div className="rounded-xl bg-card p-4 shadow-custom">{content}</div>;
+  return <div className="bg-card shadow-custom rounded-xl p-4">{content}</div>;
 };
 
 export const Cards = ({ children }: { readonly children: ReactNode }) => (

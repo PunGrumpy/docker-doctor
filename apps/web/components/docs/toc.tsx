@@ -53,7 +53,7 @@ const TocThumb = ({
   return (
     <span
       aria-hidden="true"
-      className="absolute -inset-px w-px bg-foreground transition-[transform,height] duration-200 ease-[var(--ease-out)]"
+      className="bg-foreground absolute -inset-px w-px transition-[transform,height] duration-200 ease-[var(--ease-out)]"
       style={{
         height: position.height,
         transform: `translateY(${position.top}px)`,
@@ -73,7 +73,7 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
     <aside className="hidden w-56 shrink-0 xl:block">
       <div className="sticky top-24">
         <p
-          className="mb-3 font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wider"
+          className="text-muted-foreground mb-3 text-[0.6875rem] font-medium tracking-wider uppercase"
           id="toc-heading"
         >
           On this page
@@ -87,7 +87,7 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
             <TocThumb containerRef={navRef} />
             {toc.map((item) => (
               <TOCItem
-                className="py-1 text-muted-foreground text-sm hover:text-foreground data-[active=true]:text-foreground"
+                className="text-muted-foreground hover:text-foreground data-[active=true]:text-foreground py-1 text-sm"
                 href={item.url}
                 key={item.url}
                 style={{

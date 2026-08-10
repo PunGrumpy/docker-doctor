@@ -2,9 +2,9 @@ import { Badge } from "@/components/badge";
 import { Section } from "@/components/section";
 
 export const Hero = () => (
-  <Section className="pt-32 pb-16 lg:pb-24 gap-4">
+  <Section className="gap-4 pt-32 pb-16 lg:pb-24">
     <div className="group relative inline-block">
-      <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-5xl">
+      <h1 className="text-foreground font-serif text-3xl font-normal tracking-tight sm:text-5xl">
         Docker Doctor
       </h1>
       <span
@@ -13,36 +13,36 @@ export const Hero = () => (
       />
       <span
         aria-hidden="true"
-        className="absolute top-[-2.5px] left-[-6.5px] size-1.5 border border-blue-500 bg-background"
+        className="bg-background absolute top-[-2.5px] left-[-6.5px] size-1.5 border border-blue-500"
       />
       <span
         aria-hidden="true"
-        className="absolute top-[-2.5px] right-[-6.5px] size-1.5 border border-blue-500 bg-background"
+        className="bg-background absolute top-[-2.5px] right-[-6.5px] size-1.5 border border-blue-500"
       />
       <span
         aria-hidden="true"
-        className="absolute bottom-[-2.5px] left-[-6.5px] size-1.5 border border-blue-500 bg-background"
+        className="bg-background absolute bottom-[-2.5px] left-[-6.5px] size-1.5 border border-blue-500"
       />
       <span
         aria-hidden="true"
-        className="absolute bottom-[-2.5px] right-[-6.5px] size-1.5 border border-blue-500 bg-background"
+        className="bg-background absolute right-[-6.5px] bottom-[-2.5px] size-1.5 border border-blue-500"
       />
       <Badge
         aria-hidden="true"
         className="bottom-full left-1/2 mb-7 -translate-x-1/2"
       >
-        <span className="block px-1.5 py-1 font-mono text-xs select-none whitespace-nowrap rounded-lg bg-card text-muted-foreground tracking-normal shadow-custom">
+        <span className="bg-card text-muted-foreground shadow-custom block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
           diagnostics
         </span>
-        <span className="absolute flex items-center top-full left-1/2 -translate-x-1/2 flex-col">
-          <span className="border-dashed h-3 border-l" />
-          <span className="block shrink-0 rounded-full bg-border p-0.5">
-            <span className="block size-[5px] shrink-0 rounded-full bg-background" />
+        <span className="absolute top-full left-1/2 flex -translate-x-1/2 flex-col items-center">
+          <span className="h-3 border-l border-dashed" />
+          <span className="bg-border block shrink-0 rounded-full p-0.5">
+            <span className="bg-background block size-[5px] shrink-0 rounded-full" />
           </span>
         </span>
       </Badge>
     </div>
-    <div className="text-center text-muted-foreground">
+    <div className="text-muted-foreground text-center">
       Diagnostics your infrastructure with&nbsp;
       <span className="relative inline-block">
         Docker and Docker Compose
@@ -52,19 +52,19 @@ export const Hero = () => (
         />
         <span
           aria-hidden="true"
-          className="absolute bottom-[6px] -right-0.5 -left-0.5 h-[0.5px] bg-cyan-300"
+          className="absolute -right-0.5 bottom-[6px] -left-0.5 h-[0.5px] bg-cyan-300"
         />
         <Badge
           aria-hidden="true"
-          className="bottom-full -right-1/4 mb-7 -translate-x-1/2"
+          className="-right-1/4 bottom-full mb-7 -translate-x-1/2"
         >
-          <span className="block px-1.5 py-1 font-mono text-xs select-none whitespace-nowrap rounded-lg bg-card text-muted-foreground tracking-normal shadow-custom">
+          <span className="bg-card text-muted-foreground shadow-custom block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
             opinionated
           </span>
-          <span className="absolute flex items-center top-full left-1/2 -translate-x-1/2 flex-col">
-            <span className="border-dashed h-3 border-l" />
-            <span className="block shrink-0 rounded-full bg-border p-0.5">
-              <span className="block size-[5px] shrink-0 rounded-full bg-background" />
+          <span className="absolute top-full left-1/2 flex -translate-x-1/2 flex-col items-center">
+            <span className="h-3 border-l border-dashed" />
+            <span className="bg-border block shrink-0 rounded-full p-0.5">
+              <span className="bg-background block size-[5px] shrink-0 rounded-full" />
             </span>
           </span>
         </Badge>

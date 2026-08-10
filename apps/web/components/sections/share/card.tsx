@@ -18,7 +18,7 @@ interface PillProps {
 }
 
 const Pill = ({ children }: PillProps) => (
-  <div className="flex h-7 shrink-0 items-center justify-center rounded-full bg-muted px-3">
+  <div className="bg-muted flex h-7 shrink-0 items-center justify-center rounded-full px-3">
     <span className="text-sm font-medium">{children}</span>
   </div>
 );
@@ -59,7 +59,7 @@ const ShareButton = ({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "flex flex-1 items-center justify-center h-10 rounded-full bg-card shadow-custom text-sm",
+          "bg-card shadow-custom flex h-10 flex-1 items-center justify-center rounded-full text-sm",
           "hover:bg-accent transition-[background-color,transform,scale] duration-300 ease-[var(--ease-out)] active:scale-[0.96]"
         )}
       >
@@ -74,7 +74,7 @@ const ShareButton = ({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-1 items-center justify-center h-10 rounded-full bg-card shadow-custom text-sm",
+        "bg-card shadow-custom flex h-10 flex-1 items-center justify-center rounded-full text-sm",
         "hover:bg-accent transition-[background-color,transform,scale] duration-300 ease-[var(--ease-out)] active:scale-[0.96]"
       )}
     >
@@ -114,12 +114,12 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
   }, [shareUrl]);
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl bg-card/20 p-1 shadow-custom group-focus-visible:ring-2">
-      <div className="relative flex size-full flex-col overflow-hidden rounded-xl preview-card">
+    <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1 group-focus-visible:ring-2">
+      <div className="preview-card relative flex size-full flex-col overflow-hidden rounded-xl">
         <div className="flex w-full grow flex-col items-center justify-center gap-5.5 pt-9.75 pb-6">
           <div className="flex flex-col items-center gap-2.25">
             <Pill>{label}</Pill>
-            <p className="text-balance text-2xl font-semibold tracking-[-0.01em]">
+            <p className="text-2xl font-semibold tracking-[-0.01em] text-balance">
               My Infrastructure Setup
             </p>
           </div>
@@ -130,8 +130,8 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
               border
             )}
           >
-            <div className="relative flex size-18 items-center justify-center rounded-full bg-card shadow-custom select-none">
-              <span className="text-3xl font-medium tabular-nums text-white">
+            <div className="bg-card shadow-custom relative flex size-18 items-center justify-center rounded-full select-none">
+              <span className="text-3xl font-medium text-white tabular-nums">
                 {score}
               </span>
             </div>
@@ -145,7 +145,7 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
           </div>
         </div>
 
-        <div className="flex w-full items-center gap-2 px-4 pb-3.75 pt-3 [border-top-width:0.5px] border-border">
+        <div className="border-border flex w-full items-center gap-2 [border-top-width:0.5px] px-4 pt-3 pb-3.75">
           <ShareButton channel="x" href={twitterUrl}>
             Share on X
           </ShareButton>

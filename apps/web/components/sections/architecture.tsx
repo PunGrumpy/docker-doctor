@@ -256,36 +256,36 @@ export const Architecture = async () => {
 
   return (
     <Section className="pt-8 pb-16">
-      <h1 className="flex flex-col items-center justify-center text-3xl font-normal tracking-tight text-foreground sm:text-5xl">
-        <span className="relative top-[-0.08em] ml-1 inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-[0.04em] pr-4 align-baseline font-serif">
+      <h1 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
+        <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-2 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
           <FileContent
             aria-hidden="true"
-            className="size-8 text-muted-foreground"
+            className="text-muted-foreground size-8"
           />
           packages/core/
         </span>
         <Badge
           aria-hidden="true"
-          className="-top-7 left-1/4 -translate-x-1/4 mb-7"
+          className="-top-7 left-1/4 mb-7 -translate-x-1/4"
         >
-          <span className="block px-1.5 py-1 font-mono text-xs select-none whitespace-nowrap rounded-lg bg-card text-muted-foreground tracking-normal shadow-custom">
+          <span className="bg-card text-muted-foreground shadow-custom block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
             the engine
           </span>
-          <span className="absolute flex items-center top-full left-1/2 -translate-x-1/2 flex-col">
-            <span className="border-dashed h-3 border-l" />
-            <span className="block shrink-0 rounded-full bg-border p-0.5">
-              <span className="block size-[5px] shrink-0 rounded-full bg-background" />
+          <span className="absolute top-full left-1/2 flex -translate-x-1/2 flex-col items-center">
+            <span className="h-3 border-l border-dashed" />
+            <span className="bg-border block shrink-0 rounded-full p-0.5">
+              <span className="bg-background block size-[5px] shrink-0 rounded-full" />
             </span>
           </span>
         </Badge>
       </h1>
 
-      <p className="mx-auto mt-4 max-w-2xl text-balance text-center text-sm text-muted-foreground">
+      <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm text-balance">
         A visual tour through the Docker Doctor monorepo, from file discovery
         and parsing to rule evaluation and health scoring.
       </p>
 
-      <div className="mt-8 w-full rounded-xl shadow-border">
+      <div className="shadow-border mt-8 w-full rounded-xl">
         <FileTreeView entries={entries} />
       </div>
     </Section>

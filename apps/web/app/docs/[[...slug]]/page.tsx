@@ -43,12 +43,12 @@ const Page = async ({ params }: DocPageProps) => {
 
   return (
     <div className="flex gap-12">
-      <article className="min-w-0 max-w-3xl flex-1">
+      <article className="max-w-3xl min-w-0 flex-1">
         <h1 className="font-serif text-4xl font-normal tracking-tight">
           {page.data.title}
         </h1>
         {page.data.description ? (
-          <p className="mt-2 text-muted-foreground">{page.data.description}</p>
+          <p className="text-muted-foreground mt-2">{page.data.description}</p>
         ) : null}
         <DocsMobileToc toc={page.data.toc} />
         <div className="mt-8">

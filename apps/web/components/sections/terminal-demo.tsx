@@ -21,7 +21,7 @@ const Cursor = ({ visible }: { readonly visible: boolean }) => {
     return null;
   }
   return (
-    <span className="w-2 h-4 bg-foreground inline-block animate-pulse shrink-0" />
+    <span className="bg-foreground inline-block h-4 w-2 shrink-0 animate-pulse" />
   );
 };
 
@@ -46,8 +46,8 @@ const PromptLine = ({
         animation: "fadeInUp 300ms var(--ease-out) forwards",
       }}
     >
-      <div className="flex items-center gap-2 text-foreground">
-        <span className="text-emerald-500 font-bold select-none">$</span>
+      <div className="text-foreground flex items-center gap-2">
+        <span className="font-bold text-emerald-500 select-none">$</span>
         <span>{commandText}</span>
         <Cursor visible={cursorVisible} />
       </div>
@@ -105,7 +105,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
       <div className="text-muted-foreground transition-opacity duration-200">
         {ticks < 36 ? (
           <div className="flex items-center gap-2">
-            <span className="text-cyan-500 font-bold">{currentSpinner}</span>
+            <span className="font-bold text-cyan-500">{currentSpinner}</span>
             <span>
               {ticks < 23 && "Discovering workspace..."}
               {ticks >= 23 && ticks < 29 && "Analyzing 1 Dockerfile(s)..."}
@@ -113,7 +113,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
             </span>
           </div>
         ) : (
-          <div className="text-emerald-500 flex items-center gap-2">
+          <div className="flex items-center gap-2 text-emerald-500">
             <Check className="size-3.5 text-emerald-500" />
             <span>Scanning files completed!</span>
           </div>
@@ -121,13 +121,13 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
       </div>
 
       {ticks >= 36 && (
-        <div className="flex flex-col gap-1 transition-opacity duration-200 stagger-enter">
-          <div className="font-semibold text-foreground">Found 3 issue(s):</div>
-          <div className="text-yellow-600 dark:text-yellow-400 pl-4 flex items-center gap-2">
+        <div className="stagger-enter flex flex-col gap-1 transition-opacity duration-200">
+          <div className="text-foreground font-semibold">Found 3 issue(s):</div>
+          <div className="flex items-center gap-2 pl-4 text-yellow-600 dark:text-yellow-400">
             <AlertTriangle className="size-3.5" />
             <span>Security › 1 warning</span>
           </div>
-          <div className="text-yellow-600 dark:text-yellow-400 pl-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4 text-yellow-600 dark:text-yellow-400">
             <AlertTriangle className="size-3.5" />
             <span>Best Practices › 1 warning</span>
           </div>
@@ -137,69 +137,69 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
       {ticks >= 56 && (
         <div className="space-y-4">
           <div
-            className="underline font-bold text-foreground stagger-enter"
+            className="text-foreground stagger-enter font-bold underline"
             style={{ animationDelay: "0ms" }}
           >
             Dockerfile
           </div>
 
           <div
-            className="border border-yellow-500/25 bg-yellow-500/5 rounded-xl p-4 space-y-2 stagger-enter"
+            className="stagger-enter space-y-2 rounded-xl border border-yellow-500/25 bg-yellow-500/5 p-4"
             style={{ animationDelay: "50ms" }}
           >
-            <div className="flex items-center justify-between text-yellow-600 dark:text-yellow-400 font-bold">
+            <div className="flex items-center justify-between font-bold text-yellow-600 dark:text-yellow-400">
               <span>⚠ WARN [docker-doctor/pin-image-version]:1</span>
             </div>
-            <div className="pl-4 border-l-2 border-yellow-500/40 text-muted-foreground text-xs leading-relaxed space-y-1">
+            <div className="text-muted-foreground space-y-1 border-l-2 border-yellow-500/40 pl-4 text-xs leading-relaxed">
               <div className="flex font-mono">
-                <span className="text-muted-foreground/45 select-none w-10">
+                <span className="text-muted-foreground/45 w-10 select-none">
                   {" "}
                   1 │{" "}
                 </span>
                 <span className="text-foreground">FROM node:latest</span>
               </div>
               <div className="flex font-mono opacity-50">
-                <span className="text-muted-foreground/45 select-none w-10">
+                <span className="text-muted-foreground/45 w-10 select-none">
                   {" "}
                   2 │{" "}
                 </span>
                 <span>COPY . .</span>
               </div>
             </div>
-            <div className="text-xs text-foreground font-medium pl-4">
+            <div className="text-foreground pl-4 text-xs font-medium">
               Base image &apos;node&apos; uses the mutable &apos;latest&apos;
               tag. This makes builds non-deterministic.
             </div>
-            <div className="text-xs text-muted-foreground pl-4">
-              <span className="font-semibold text-foreground">Help:</span>{" "}
+            <div className="text-muted-foreground pl-4 text-xs">
+              <span className="text-foreground font-semibold">Help:</span>{" "}
               Specify a concrete tag instead of &apos;latest&apos; or no tag
               (e.g., &apos;node:22.2.0-alpine&apos;).
             </div>
           </div>
 
           <div
-            className="border bg-muted/10 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-center stagger-enter"
+            className="bg-muted/10 stagger-enter flex flex-col items-center gap-4 rounded-xl border p-4 sm:flex-row"
             style={{ animationDelay: "100ms" }}
           >
-            <div className="flex flex-col font-mono text-red-500/80 dark:text-red-500/60 leading-none font-bold text-center sm:text-left shrink-0">
+            <div className="flex shrink-0 flex-col text-center font-mono leading-none font-bold text-red-500/80 sm:text-left dark:text-red-500/60">
               <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
               <span>&nbsp;.---.&nbsp;&nbsp;</span>
               <span>(&nbsp;x&nbsp;x&nbsp;)&gt;</span>
               <span>&nbsp;\___/&nbsp;&nbsp;</span>
             </div>
-            <div className="flex-1 w-full space-y-1 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <span className="font-bold text-red-500 dark:text-red-400 font-mono tabular-nums">
+            <div className="w-full flex-1 space-y-1 text-center sm:text-left">
+              <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
+                <span className="font-mono font-bold text-red-500 tabular-nums dark:text-red-400">
                   45 / 100
                 </span>
-                <span className="text-xs text-muted-foreground font-medium">
+                <span className="text-muted-foreground text-xs font-medium">
                   Needs work
                 </span>
               </div>
-              <div className="w-full overflow-hidden text-[11px] select-none text-left">
+              <div className="w-full overflow-hidden text-left text-[11px] select-none">
                 {getProgressBar(45)}
               </div>
-              <div className="text-[10px] text-muted-foreground font-mono">
+              <div className="text-muted-foreground font-mono text-[10px]">
                 Docker Doctor (https://docker-doctor.vercel.app)
               </div>
             </div>
@@ -217,7 +217,7 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
 
   return (
     <div
-      className="space-y-4 flex flex-col w-full stagger-enter"
+      className="stagger-enter flex w-full flex-col space-y-4"
       style={{ animationDelay: "0ms" }}
     >
       <ClaudeHeader
@@ -263,7 +263,7 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
 
       {ticks >= 118 && (
         <div
-          className="space-y-4 w-full stagger-enter"
+          className="stagger-enter w-full space-y-4"
           style={{ animationDelay: "50ms" }}
         >
           <ClaudeDiff
@@ -277,14 +277,14 @@ const Command2Outputs = ({ ticks }: { readonly ticks: number }) => {
               { n: 4, text: "USER node", type: "add" },
               { n: 5, text: 'CMD ["npm", "start"]', type: "ctx" },
             ]}
-            className="w-full text-foreground dark:text-[#c0caf5]"
+            className="text-foreground w-full dark:text-[#c0caf5]"
           />
 
           <div
-            className="whitespace-nowrap text-[#424242] dark:text-[#C6C6C6] text-xs flex items-center gap-1.5 stagger-enter"
+            className="stagger-enter flex items-center gap-1.5 text-xs whitespace-nowrap text-[#424242] dark:text-[#C6C6C6]"
             style={{ animationDelay: "100ms" }}
           >
-            <span className="inline-block w-[1ch] text-center text-[#cd694a] font-bold">
+            <span className="inline-block w-[1ch] text-center font-bold text-[#cd694a]">
               ✻
             </span>
             <span className="font-mono text-[13px]">Done in 1.4s</span>
@@ -304,21 +304,21 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
     <div className="space-y-4">
       {ticks < 166 ? (
         <div className="text-muted-foreground flex items-center gap-2">
-          <span className="text-cyan-500 font-bold">{currentSpinner}</span>
+          <span className="font-bold text-cyan-500">{currentSpinner}</span>
           <span>Analyzing workspace...</span>
         </div>
       ) : (
         <div className="space-y-4">
           <div
-            className="border border-emerald-500/25 bg-emerald-500/5 rounded-xl p-4 flex items-start gap-3 stagger-enter"
+            className="stagger-enter flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4"
             style={{ animationDelay: "0ms" }}
           >
-            <Check className="size-5 text-emerald-500 shrink-0 mt-0.5" />
+            <Check className="mt-0.5 size-5 shrink-0 text-emerald-500" />
             <div className="space-y-1">
               <div className="font-bold text-emerald-600 dark:text-emerald-400">
                 ✔ No issues found! Your Docker setup looks healthy.
               </div>
-              <div className="text-xs text-muted-foreground text-wrap-pretty">
+              <div className="text-muted-foreground text-wrap-pretty text-xs">
                 Verified building with Docker engine. All safety, performance,
                 and best practices rules passed successfully.
               </div>
@@ -326,7 +326,7 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
           </div>
 
           <div
-            className="flex flex-col items-start gap-1 font-mono text-sm leading-relaxed text-muted-foreground stagger-enter"
+            className="text-muted-foreground stagger-enter flex flex-col items-start gap-1 font-mono text-sm leading-relaxed"
             style={{ animationDelay: "50ms" }}
           >
             <div className="text-foreground font-semibold">
@@ -334,12 +334,12 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
             </div>
             <div className="flex items-center gap-1.5">
               <span>Docker Doctor score:</span>
-              <span className="relative inline-block whitespace-nowrap font-bold">
+              <span className="relative inline-block font-bold whitespace-nowrap">
                 <span
                   aria-hidden="true"
-                  className="absolute inset-y-0 -inset-x-[3px] origin-left bg-muted/40 dark:bg-muted/30"
+                  className="bg-muted/40 dark:bg-muted/30 absolute -inset-x-[3px] inset-y-0 origin-left"
                 />
-                <span className="relative text-foreground dark:text-foreground">
+                <span className="text-foreground dark:text-foreground relative">
                   100/100
                 </span>
               </span>
@@ -347,10 +347,10 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
           </div>
 
           <div
-            className="border bg-muted/10 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-center stagger-enter"
+            className="bg-muted/10 stagger-enter flex flex-col items-center gap-4 rounded-xl border p-4 sm:flex-row"
             style={{ animationDelay: "100ms" }}
           >
-            <div className="flex flex-col font-mono text-emerald-500/80 dark:text-emerald-500/60 leading-none font-bold text-center sm:text-left shrink-0">
+            <div className="flex shrink-0 flex-col text-center font-mono leading-none font-bold text-emerald-500/80 sm:text-left dark:text-emerald-500/60">
               <span className="text-cyan-500/80">
                 &nbsp;&nbsp;&quot;:&quot;&nbsp;&nbsp;&nbsp;
               </span>
@@ -358,26 +358,26 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
               <span>(&nbsp;◠&nbsp;◠&nbsp;)&gt;</span>
               <span>&nbsp;\___/&nbsp;&nbsp;</span>
             </div>
-            <div className="flex-1 w-full space-y-1 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <span className="font-bold text-emerald-500 dark:text-emerald-400 font-mono tabular-nums">
+            <div className="w-full flex-1 space-y-1 text-center sm:text-left">
+              <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
+                <span className="font-mono font-bold text-emerald-500 tabular-nums dark:text-emerald-400">
                   100 / 100
                 </span>
-                <span className="text-xs text-muted-foreground font-medium">
+                <span className="text-muted-foreground text-xs font-medium">
                   Healthy
                 </span>
               </div>
-              <div className="w-full overflow-hidden text-[11px] select-none text-left">
+              <div className="w-full overflow-hidden text-left text-[11px] select-none">
                 {getProgressBar(100)}
               </div>
-              <div className="text-[10px] text-muted-foreground font-mono">
+              <div className="text-muted-foreground font-mono text-[10px]">
                 Docker Doctor (https://docker-doctor.vercel.app)
               </div>
             </div>
           </div>
 
           <div
-            className="text-xs text-muted-foreground/60 italic pt-2 text-center select-none flex items-center justify-center gap-1.5 stagger-enter"
+            className="text-muted-foreground/60 stagger-enter flex items-center justify-center gap-1.5 pt-2 text-center text-xs italic select-none"
             style={{ animationDelay: "150ms" }}
           >
             <span>Completed loop. Restarting in a few seconds...</span>
@@ -433,28 +433,28 @@ export const TerminalDemo = () => {
   const currentSpinner = SPINNERFRAMES[ticks % SPINNERFRAMES.length];
 
   return (
-    <Section className="pt-8 pb-16 lg:pb-32 flex flex-col items-center w-full">
-      <div className="relative w-full max-w-2xl bg-card rounded-3xl shadow-border overflow-hidden">
-        <div className="flex items-center justify-center w-full h-[45px] shrink-0 relative border-b border-b-[#EBEBEB] dark:border-b-[#1f1f1f] select-none">
-          <div className="text-[17px] leading-[145%] text-center w-max font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
+    <Section className="flex w-full flex-col items-center pt-8 pb-16 lg:pb-32">
+      <div className="bg-card shadow-border relative w-full max-w-2xl overflow-hidden rounded-3xl">
+        <div className="relative flex h-[45px] w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
+          <div className="w-max text-center text-[17px] leading-[145%] font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
             Terminal - 592x648
           </div>
-          <div className="flex items-start gap-2 w-fit absolute left-[18px] top-[15px]">
-            <div className="size-[17px] rounded-full shrink-0 bg-[oklch(71.3%_0.171_26)] dark:bg-[#323232]" />
-            <div className="size-[17px] rounded-full shrink-0 bg-[oklch(82.5%_0.159_80.9)] dark:bg-[#323232]" />
-            <div className="size-[17px] rounded-full shrink-0 bg-[oklch(88.4%_0_0)] dark:bg-[#323232]" />
+          <div className="absolute top-[15px] left-[18px] flex w-fit items-start gap-2">
+            <div className="size-[17px] shrink-0 rounded-full bg-[oklch(71.3%_0.171_26)] dark:bg-[#323232]" />
+            <div className="size-[17px] shrink-0 rounded-full bg-[oklch(82.5%_0.159_80.9)] dark:bg-[#323232]" />
+            <div className="size-[17px] shrink-0 rounded-full bg-[oklch(88.4%_0_0)] dark:bg-[#323232]" />
           </div>
         </div>
 
-        <div className="flex w-full h-[38px] shrink-0 select-none">
-          <div className="flex items-center justify-center h-[38px] border-b border-b-[#EBEBEB] dark:border-b-[#1f1f1f] flex-1">
-            <span className="text-[16px] leading-[145%] text-center shrink-0 font-medium text-[#464646] dark:text-[#F1F1F1]">
+        <div className="flex h-[38px] w-full shrink-0 select-none">
+          <div className="flex h-[38px] flex-1 items-center justify-center border-b border-b-[#EBEBEB] dark:border-b-[#1f1f1f]">
+            <span className="shrink-0 text-center text-[16px] leading-[145%] font-medium text-[#464646] dark:text-[#F1F1F1]">
               docker-doctor
             </span>
           </div>
-          <div className="flex items-center justify-center w-10 h-[38px] shrink-0 bg-[#F9F9F9] border-l border-l-[#EBEBEB] border-b border-b-[#EBEBEB] dark:bg-[#08090a] dark:border-l-[#1f1f1f] dark:border-b-[#1f1f1f]">
+          <div className="flex h-[38px] w-10 shrink-0 items-center justify-center border-b border-l border-b-[#EBEBEB] border-l-[#EBEBEB] bg-[#F9F9F9] dark:border-b-[#1f1f1f] dark:border-l-[#1f1f1f] dark:bg-[#08090a]">
             <Plus
-              className="size-5 text-[#AFAFAF] shrink-0"
+              className="size-5 shrink-0 text-[#AFAFAF]"
               aria-hidden="true"
             />
           </div>
@@ -462,10 +462,10 @@ export const TerminalDemo = () => {
 
         <div
           ref={terminalBodyRef}
-          className="p-6 font-mono text-sm sm:text-[13px] leading-relaxed h-[500px] overflow-hidden bg-card select-text antialiased space-y-4"
+          className="bg-card h-[500px] space-y-4 overflow-hidden p-6 font-mono text-sm leading-relaxed antialiased select-text sm:text-[13px]"
         >
-          <div className="flex items-center gap-2 text-foreground">
-            <span className="text-emerald-500 font-bold select-none">$</span>
+          <div className="text-foreground flex items-center gap-2">
+            <span className="font-bold text-emerald-500 select-none">$</span>
             <span>{commandText1}</span>
             <Cursor visible={ticks < 16} />
           </div>
@@ -489,10 +489,10 @@ export const TerminalDemo = () => {
           <Command3Outputs ticks={ticks} currentSpinner={currentSpinner} />
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3.5 border-t bg-muted/20 dark:bg-muted/5 text-xs select-none">
-          <div className="text-muted-foreground/60 font-mono flex items-center gap-2">
+        <div className="bg-muted/20 dark:bg-muted/5 flex items-center justify-between border-t px-5 py-3.5 text-xs select-none">
+          <div className="text-muted-foreground/60 flex items-center gap-2 font-mono">
             <span>Tick:</span>
-            <span className="font-semibold tabular-nums w-8 text-foreground">
+            <span className="text-foreground w-8 font-semibold tabular-nums">
               {ticks}
             </span>
           </div>
@@ -502,20 +502,20 @@ export const TerminalDemo = () => {
               type="button"
               onClick={() => setIsPaused(!isPaused)}
               className={cn(
-                "flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border font-medium",
+                "flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 font-medium",
                 "bg-card hover:bg-muted/40",
-                "active:scale-[0.96] transition-[transform,background-color,border-color] duration-150 ease-out"
+                "transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]"
               )}
               aria-label={isPaused ? "Play simulation" : "Pause simulation"}
             >
               {isPaused ? (
                 <>
-                  <Play className="size-3.5 fill-foreground" />
+                  <Play className="fill-foreground size-3.5" />
                   <span>Resume</span>
                 </>
               ) : (
                 <>
-                  <Pause className="size-3.5 fill-foreground" />
+                  <Pause className="fill-foreground size-3.5" />
                   <span>Pause</span>
                 </>
               )}
@@ -528,8 +528,8 @@ export const TerminalDemo = () => {
                 setIsPaused(false);
               }}
               className={cn(
-                "flex items-center justify-center size-9 rounded-lg border bg-card hover:bg-muted/40",
-                "active:scale-[0.96] transition-[transform,background-color,border-color] duration-150 ease-out"
+                "bg-card hover:bg-muted/40 flex size-9 items-center justify-center rounded-lg border",
+                "transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]"
               )}
               aria-label="Restart simulation"
             >
