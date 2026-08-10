@@ -56,9 +56,6 @@ Hunt for: `ease-in` anywhere, bare `ease`/`linear` on entrances, durations > 300
 - **Popovers/dropdowns/tooltips scale from their trigger**, not center:
   ```css
   .popover {
-    transform-origin: var(--radix-popover-content-transform-origin);
-  } /* Radix */
-  .popover {
     transform-origin: var(--transform-origin);
   } /* Base UI */
   ```

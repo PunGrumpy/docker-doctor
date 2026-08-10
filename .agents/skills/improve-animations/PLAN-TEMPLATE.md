@@ -21,7 +21,7 @@ What is wrong, where, and why it matters to how the product feels. Cite every lo
 
 The exact end state. Every value spelled out — curves, durations, spring configs, media queries. Never "use a nicer easing":
 
-​`css /* target */ .dropdown {   transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);   transform-origin: var(--radix-dropdown-menu-content-transform-origin); } ​`
+​`css /* target */ .dropdown {   transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);   transform-origin: var(--transform-origin); } ​`
 
 ## Repo conventions to follow
 

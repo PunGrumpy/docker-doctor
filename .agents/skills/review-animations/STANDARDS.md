@@ -65,9 +65,6 @@ Find curves at [easing.dev](https://easing.dev/) or [easings.co](https://easings
 - **Origin-aware popovers.** Scale from the trigger, not center:
   ```css
   .popover {
-    transform-origin: var(--radix-popover-content-transform-origin);
-  } /* Radix */
-  .popover {
     transform-origin: var(--transform-origin);
   } /* Base UI */
   ```
