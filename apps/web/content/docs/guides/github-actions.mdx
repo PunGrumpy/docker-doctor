@@ -28,35 +28,13 @@ That's the whole setup. The action is advisory by default — it reports finding
 
 ## What the comment shows
 
-<div className="my-6 rounded-xl bg-background p-4 shadow-border">
+Every pull request gets one sticky comment that updates in place on each push:
 
-The latest Docker Doctor scan for this pull request. Learn more about [Docker Doctor](/).
+- A per-file status table — status dot, issue counts, and when the scan ran — sorted worst-first, with every file linked at the scanned commit.
+- The health score, linking to a shareable score card.
+- Every finding grouped by file with a link to the exact line, the message, and the rule id. Findings stay collapsed unless there are errors.
 
-| File | Status | Issues | Updated (UTC) |
-| :-- | :-- | :-- | :-- |
-| [`Dockerfile`](https://github.com/PunGrumpy/docker-doctor/pull/38) | <img className="inline" src="/status/error.svg" alt="" /> Error | 1 error, 1 info | Aug 10, 2026 1:11pm |
-| [`compose.yml`](https://github.com/PunGrumpy/docker-doctor/pull/38) | <img className="inline" src="/status/clean.svg" alt="" /> Clean | — | Aug 10, 2026 1:11pm |
-
-**Score:** [84 / 100](/share?s=84&w=0&e=1) · <img className="inline" src="/status/good.svg" alt="" /> Good
-
-**`Dockerfile`**
-
-- <img className="inline" src="/status/error.svg" alt="error" />
-  [`Dockerfile:2`](https://github.com/PunGrumpy/docker-doctor/pull/38) Potential
-  secret found in ENV: 'DB_PASSWORD'. `no-secrets-in-env`
-- <img className="inline" src="/status/info.svg" alt="info" />
-  [`Dockerfile:1`](https://github.com/PunGrumpy/docker-doctor/pull/38) No
-  HEALTHCHECK instruction found. `require-healthcheck`
-
-<span className="text-muted-foreground text-xs">
-  Scanned by Docker Doctor for commit <code>4f69cb4</code>.
-</span>
-
-</div>
-
-- The per-file table is sorted worst-first, and every file links to it at the scanned commit (the links above lead to a [live example](https://github.com/PunGrumpy/docker-doctor/pull/38)).
-- The score links to a shareable score card.
-- Findings are grouped by file with a link to the exact line, the message, and the rule id — collapsed unless there are errors.
+See a live comment on [this pull request](https://github.com/PunGrumpy/docker-doctor/pull/38).
 
 The same summary is mirrored to the workflow's job summary. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there — pushes never fail the check either way.
 
