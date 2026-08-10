@@ -48,10 +48,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: "" # Workaround for https://github.com/changesets/action/pull/545
-      # The GitHub Action (action.yml) is versioned in lockstep with the CLI:
-      # each changeset publish also moves a plain v<version> tag that `uses:`
-      # references can point at (changesets' own @docker-doctor/cli@x.y.z tag
-      # contains characters `uses:` can't resolve).
+      # The GitHub Action (action.yml) is versioned in lockstep with the CLI.
+      # Each changeset publish moves two `uses:`-resolvable tags (changesets'
+      # own @docker-doctor/cli@x.y.z tag contains characters `uses:` can't
+      # resolve): an exact v<version> for reproducible pins, and a floating
+      # major (v0, later v1) that always points at the latest release.
       - name: Tag the GitHub Action with the published version
         if: steps.changesets.outputs.published == 'true'
         env:
@@ -60,5 +61,6 @@ jobs:
           version=$(echo "$PUBLISHED_PACKAGES" | jq -r '.[] | select(.name == "@docker-doctor/cli") | .version')
           if [ -n "$version" ]; then
             git tag -f "v$version"
-            git push -f origin "v$version"
+            git tag -f "v${version%%.*}"
+            git push -f origin "v$version" "v${version%%.*}"
           fi

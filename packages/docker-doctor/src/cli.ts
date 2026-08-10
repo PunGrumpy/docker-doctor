@@ -429,8 +429,10 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
       const workflowDir = path.resolve(".github/workflows");
       await fs.mkdir(workflowDir, { recursive: true });
       const workflowPath = path.join(workflowDir, "docker-doctor.yml");
-      // The GitHub Action is versioned in lockstep with the CLI, so this
-      // CLI's own version always has a matching v<version> tag.
+      // The GitHub Action is versioned in lockstep with the CLI, and every
+      // release moves a floating major tag (v0, later v1) — reference that so
+      // scaffolded workflows keep picking up action fixes.
+      const [actionMajor] = packageJson.version.split(".");
       const workflowYaml = `name: Docker Doctor
 on:
   pull_request:
@@ -443,7 +445,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v${packageJson.version}
+      - uses: PunGrumpy/docker-doctor@v${actionMajor}
 `;
       await fs.writeFile(workflowPath, workflowYaml, "utf-8");
       console.log(

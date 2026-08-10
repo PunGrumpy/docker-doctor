@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v0.3.2
+      - uses: PunGrumpy/docker-doctor@v0
 ```
 
 That's the whole setup. The action is advisory by default — it reports findings on every pull request but never fails the check, so it won't red-X a teammate's PR on day one.
@@ -49,7 +49,7 @@ The same summary is mirrored to the workflow's job summary, so runs on pushes ar
 Every run exposes step outputs for downstream jobs: `score`, `label`, `error-count`, `warning-count`, `info-count`, and `total-issues`.
 
 ```yaml
-- uses: PunGrumpy/docker-doctor@v0.3.2
+- uses: PunGrumpy/docker-doctor@v0
   id: doctor
 - run: echo "Score is ${{ steps.doctor.outputs.score }}"
 ```
@@ -59,7 +59,7 @@ Every run exposes step outputs for downstream jobs: `score`, `label`, `error-cou
 When your team trusts the signal, raise `blocking`:
 
 ```yaml
-- uses: PunGrumpy/docker-doctor@v0.3.2
+- uses: PunGrumpy/docker-doctor@v0
   with:
     blocking: error # fail on error-severity findings ("warning" fails on warnings too)
 ```
@@ -71,4 +71,9 @@ Two rules always hold:
 
 ## Versioning
 
-The action is versioned in lockstep with the CLI: every release moves a matching `v<version>` tag (for example `v0.3.2`), so the action ref and the npm version always line up. The `version` input controls the CLI independently — by default it runs `latest`, so pinned action refs still scan with the newest rules.
+The action is versioned in lockstep with the CLI, and every release moves two tags:
+
+- A floating major — `v0` today, `v1` once the CLI reaches 1.0 — that always points at the latest release. Use this (as the examples above do) to pick up fixes automatically.
+- An exact `v<version>` (for example `v0.3.2`) matching the npm release, for reproducible pins.
+
+The `version` input controls the CLI independently — by default it runs `latest`, so pinned action refs still scan with the newest rules.
