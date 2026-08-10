@@ -36,12 +36,7 @@ export const ActionDemo = () => (
 
     <div className="mt-8 w-full max-w-185 @container">
       <div className="relative w-full aspect-740/357">
-        <div className="absolute top-0 left-0 w-185 h-89.25 origin-top-left scale-[calc(tan(atan2(100cqw,740px)))] rounded-lg bg-card shadow-border select-none">
-          <div
-            aria-hidden="true"
-            className="absolute -left-px -top-px w-185 h-89.25 rounded-lg shadow-border bg-linear-to-b from-muted/40 to-transparent"
-          />
-
+        <div className="absolute top-0 left-0 w-185 h-89.25 origin-top-left scale-[calc(tan(atan2(100cqw,740px)))] rounded-lg shadow-border select-none">
           <div
             aria-hidden="true"
             className="absolute left-25 top-0 w-0.5 h-9 bg-linear-to-b from-transparent to-border"
