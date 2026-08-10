@@ -1,0 +1,145 @@
+name: "Docker Doctor"
+description: "Scan Dockerfiles and Compose files for security, performance, and best-practice issues, with a sticky PR summary comment"
+author: "PunGrumpy"
+
+branding:
+  icon: "anchor"
+  color: "blue"
+
+inputs:
+  directory:
+    description: "Directory to scan, relative to the repository root"
+    required: false
+    default: "."
+  version:
+    description: "@docker-doctor/cli version to run (an npm version or dist-tag such as 'latest')"
+    required: false
+    default: "latest"
+  blocking:
+    description: "Which severities fail the check on pull requests: 'none' (advisory), 'warning', or 'error'. Pushes never fail."
+    required: false
+    default: "none"
+  comment:
+    description: "Post/update a sticky summary comment on pull requests"
+    required: false
+    default: "true"
+  config:
+    description: "Path to a docker-doctor config file, passed to the CLI as --config"
+    required: false
+    default: ""
+
+outputs:
+  score:
+    description: "Overall health score (0-100)"
+    value: ${{ steps.render.outputs.score }}
+  label:
+    description: "Score label, e.g. 'Excellent 🏆'"
+    value: ${{ steps.render.outputs.label }}
+  error-count:
+    description: "Number of error-severity diagnostics"
+    value: ${{ steps.render.outputs.error-count }}
+  warning-count:
+    description: "Number of warning-severity diagnostics"
+    value: ${{ steps.render.outputs.warning-count }}
+  info-count:
+    description: "Number of info-severity diagnostics"
+    value: ${{ steps.render.outputs.info-count }}
+  total-issues:
+    description: "Total number of diagnostics"
+    value: ${{ steps.render.outputs.total-issues }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: "24"
+        package-manager-cache: false
+
+    - name: Scan with Docker Doctor
+      id: scan
+      shell: bash
+      env:
+        INPUT_DIRECTORY: ${{ inputs.directory }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        NO_COLOR: "1"
+      run: |
+        set +e
+        report_file="$RUNNER_TEMP/docker-doctor-report.json"
+        args=( "$INPUT_DIRECTORY" --json )
+        if [ -n "$INPUT_CONFIG" ]; then
+          args+=( --config "$INPUT_CONFIG" )
+        fi
+        npx --yes "@docker-doctor/cli@${INPUT_VERSION}" "${args[@]}" \
+          > "$report_file" 2> "$RUNNER_TEMP/docker-doctor-stderr.log"
+        status=$?
+        # Exit 1 with a report present just means error-severity findings —
+        # the gate step decides whether that fails the job.
+        echo "report-file=$report_file" >> "$GITHUB_OUTPUT"
+        if [ ! -s "$report_file" ]; then
+          echo "::warning::Docker Doctor exited with status $status without producing a JSON report"
+          cat "$RUNNER_TEMP/docker-doctor-stderr.log" >&2 || true
+        fi
+        exit 0
+
+    - name: Render summary
+      id: render
+      if: always()
+      shell: bash
+      env:
+        DOCTOR_REPORT_FILE: ${{ steps.scan.outputs.report-file }}
+        DOCTOR_DIRECTORY: ${{ inputs.directory }}
+        DOCTOR_BLOCKING: ${{ inputs.blocking }}
+        DOCTOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: node "$GITHUB_ACTION_PATH/scripts/render-github-action-comment.mjs"
+
+    - name: Comment on pull request
+      if: always() && github.event_name == 'pull_request' && inputs.comment == 'true'
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+      env:
+        DOCTOR_COMMENT_FILE: ${{ steps.render.outputs.comment-file }}
+      with:
+        script: |
+          const fs = require("node:fs");
+          const marker = "<!-- docker-doctor:summary -->";
+          const body = fs.readFileSync(process.env.DOCTOR_COMMENT_FILE, "utf8");
+          try {
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const previous = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+          } catch (error) {
+            core.warning(
+              `Docker Doctor could not post the PR comment (grant 'pull-requests: write' and 'issues: write'): ${error.message}`
+            );
+          }
+
+    - name: Enforce gate
+      if: always()
+      shell: bash
+      env:
+        GATE_STATUS: ${{ steps.render.outputs.gate-status }}
+        EVENT_NAME: ${{ github.event_name }}
+      run: |
+        # Advisory on pushes: findings only ever fail pull requests.
+        if [ "$EVENT_NAME" != "pull_request" ]; then
+          exit 0
+        fi
+        exit "${GATE_STATUS:-1}"
