@@ -22,13 +22,22 @@ const MAX_MESSAGE_LENGTH = 180;
 const SHORT_SHA_LENGTH = 7;
 
 const SEVERITY_RANK = { error: 3, info: 1, warning: 2 };
+
+// Status dots are tiny SVG circles served from the site (same approach as
+// Vercel's bot comments — https://vercel.com/static/status/ready.svg).
+const statusDot = (kind, alt) =>
+  `![${alt}](${SITE_URL}/static/status/${kind}.svg)`;
 const STATUS_BY_SEVERITY = {
-  error: "🔴 Error",
-  info: "🔵 Info",
-  warning: "🟡 Warning",
+  error: `${statusDot("error", "Error")} Error`,
+  info: `${statusDot("info", "Info")} Info`,
+  warning: `${statusDot("warning", "Warning")} Warning`,
 };
-const ICON_BY_SEVERITY = { error: "❌", info: "ℹ️", warning: "⚠️" };
-const CLEAN_STATUS = "🟢 Clean";
+const ICON_BY_SEVERITY = {
+  error: statusDot("error", "error"),
+  info: statusDot("info", "info"),
+  warning: statusDot("warning", "warning"),
+};
+const CLEAN_STATUS = `${statusDot("clean", "Clean")} Clean`;
 
 const env = (name, fallback = "") => process.env[name] ?? fallback;
 
