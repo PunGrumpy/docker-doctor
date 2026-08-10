@@ -429,30 +429,31 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
       const workflowDir = path.resolve(".github/workflows");
       await fs.mkdir(workflowDir, { recursive: true });
       const workflowPath = path.join(workflowDir, "docker-doctor.yml");
-      const workflowYaml = `name: Docker Doctor Scan
+      // The GitHub Action is versioned in lockstep with the CLI, so this
+      // CLI's own version always has a matching v<version> tag.
+      const workflowYaml = `name: Docker Doctor
 on:
-  push:
-    branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 jobs:
   docker-doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-      - name: Install dependencies
-        run: bun install
-      - name: Run docker-doctor
-        run: bunx docker-doctor .
+      - uses: actions/checkout@v5
+      - uses: PunGrumpy/docker-doctor@v${packageJson.version}
 `;
       await fs.writeFile(workflowPath, workflowYaml, "utf-8");
       console.log(
         `\n  ${chalk.green("✨")} Created ${chalk.cyan(".github/workflows/docker-doctor.yml")}!`
       );
       console.log(
-        `    Scan every pull request to prevent new Docker issues while you fix the backlog.`
+        `    Every pull request gets scanned and a sticky summary comment — advisory by default.`
+      );
+      console.log(
+        `    Inputs and gating: ${chalk.cyan("https://docker-doctor.vercel.app/docs/guides/github-actions")}`
       );
     }
 
