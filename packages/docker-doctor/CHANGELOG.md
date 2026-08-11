@@ -1,5 +1,12 @@
 # @docker-doctor/cli
 
+## 0.3.3
+
+### Patch Changes
+
+- 42088be: Update tsdown dts generator config for typescript 7 support
+- 78ae451: The post-scan wizard scaffolds workflows against `PunGrumpy/docker-doctor@v1` — the GitHub Action is now versioned independently of the CLI, with a floating major tag that moves only when the action itself changes.
+
 ## 0.3.2
 
 ### Patch Changes
