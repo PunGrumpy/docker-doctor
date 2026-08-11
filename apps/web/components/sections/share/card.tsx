@@ -1,5 +1,6 @@
 "use client";
 
+import { trackError } from "@databuddy/sdk/react";
 import type { ReactNode } from "react";
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -108,8 +109,11 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
     const badge = `[![Docker Doctor](${badgeUrl})](${shareUrl})`;
     try {
       await navigator.clipboard.writeText(badge);
-    } catch {
-      // clipboard not available
+    } catch (error) {
+      trackError(
+        error instanceof Error ? error.message : "clipboard write failed",
+        { error_type: "clipboard_badge_copy" }
+      );
     }
   }, [shareUrl]);
 
