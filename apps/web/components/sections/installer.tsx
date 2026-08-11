@@ -20,6 +20,7 @@ export const Installer = () => (
     </div>
     <a
       href="https://github.com/PunGrumpy/docker-doctor"
+      data-track="github_clicked"
       target="_blank"
       rel="noopener noreferrer"
       className={cn(

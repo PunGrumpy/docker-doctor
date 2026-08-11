@@ -19,6 +19,19 @@ const getNodeText = (node: ReactNode): string => {
   return "";
 };
 
+const SNIPPET_LABEL_MAX_LENGTH = 64;
+
+// Databuddy already attaches `path` and `title` to every event, so the only
+// thing it can't infer is *which* block on the page was copied — the first
+// line identifies it (`npx @docker-doctor/cli@latest`, `FROM node:22`, …).
+const getSnippetLabel = (code: string): string => {
+  const [firstLine = ""] = code.split("\n");
+  const trimmed = firstLine.trim();
+  return trimmed.length > SNIPPET_LABEL_MAX_LENGTH
+    ? `${trimmed.slice(0, SNIPPET_LABEL_MAX_LENGTH)}…`
+    : trimmed;
+};
+
 export const Heading2 = ({
   className,
   children,
@@ -140,6 +153,7 @@ export const Pre = ({
       <CopyButton
         aria-label="Copy code"
         className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        data-snippet={getSnippetLabel(code)}
         data-track="docs_code_copied"
         value={code}
       />
