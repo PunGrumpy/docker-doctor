@@ -194,7 +194,17 @@ const printScoreBox = async (
   const border = scoreColor;
   const whaleLines = getWhaleMascot(score, border);
 
-  const shareUrl = `https://docker-doctor.vercel.app/share?s=${score}&w=${warningsCount}&e=${errorsCount}`;
+  // The utm tags let site analytics separate the person who ran the scan
+  // from the visitors who follow their shared link — without them both land
+  // on /share as untagged direct traffic.
+  const shareQuery = new URLSearchParams({
+    e: String(errorsCount),
+    s: String(score),
+    utm_medium: "terminal",
+    utm_source: "cli",
+    w: String(warningsCount),
+  });
+  const shareUrl = `https://docker-doctor.vercel.app/share?${shareQuery.toString()}`;
 
   if (shouldAnimate) {
     const frameCount = 20;
