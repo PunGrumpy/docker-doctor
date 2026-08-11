@@ -1,5 +1,6 @@
 "use client";
 
+import { trackError } from "@databuddy/sdk/react";
 import { useCallback, useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 
@@ -18,8 +19,11 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-    } catch {
-      // clipboard not available
+    } catch (error) {
+      trackError(
+        error instanceof Error ? error.message : "clipboard write failed",
+        { error_type: "clipboard_copy" }
+      );
     }
   }, [value]);
 

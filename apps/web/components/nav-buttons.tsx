@@ -10,6 +10,8 @@ export const ChangelogButton = () => (
       "before:absolute before:inset-x-0 before:-inset-y-1",
       "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
     )}
+    data-destination="changelog"
+    data-track="nav_clicked"
     href="/changelog"
   >
     <span className="contents select-none">Changelog</span>
@@ -25,6 +27,8 @@ export const DocsButton = () => (
       "bg-linear-to-b from-blue-400 to-blue-500 font-medium text-white shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]",
       "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
     )}
+    data-destination="docs"
+    data-track="nav_clicked"
     href="/docs"
   >
     <span className="contents select-none">Docs</span>
