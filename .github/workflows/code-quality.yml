@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SKIP_ENV_VALIDATION: "1"
+
 jobs:
   code-quality:
     name: ${{ matrix.name }}
