@@ -142,7 +142,7 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
             )}
           >
             <div className="bg-card shadow-custom relative flex size-18 items-center justify-center rounded-full select-none">
-              <span className="text-3xl font-medium text-white tabular-nums">
+              <span className="text-foreground text-3xl font-medium tabular-nums">
                 {score}
               </span>
             </div>
