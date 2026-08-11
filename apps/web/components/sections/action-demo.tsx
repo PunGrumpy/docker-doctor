@@ -29,7 +29,7 @@ export const ActionDemo = () => (
     </h1>
 
     <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm text-balance">
-      Add <span className="font-mono">PunGrumpy/docker-doctor@v0</span> to your
+      Add <span className="font-mono">PunGrumpy/docker-doctor@v1</span> to your
       workflow and every pull request gets one sticky summary comment — advisory
       by default, gate when you trust it.
     </p>

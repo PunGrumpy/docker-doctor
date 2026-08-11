@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: PunGrumpy/docker-doctor@v0
+      - uses: PunGrumpy/docker-doctor@v1
 ```
 
 That's the whole setup. The action is advisory by default — it reports findings on every pull request but never fails the check, so it won't red-X a teammate's PR on day one.
@@ -53,7 +53,7 @@ The same summary is mirrored to the workflow's job summary. Add a `push` trigger
 Every run exposes step outputs for downstream jobs: `score`, `label`, `error-count`, `warning-count`, `info-count`, and `total-issues`.
 
 ```yaml
-- uses: PunGrumpy/docker-doctor@v0
+- uses: PunGrumpy/docker-doctor@v1
   id: doctor
 - run: echo "Score is ${{ steps.doctor.outputs.score }}"
 ```
@@ -63,7 +63,7 @@ Every run exposes step outputs for downstream jobs: `score`, `label`, `error-cou
 When your team trusts the signal, raise `blocking`:
 
 ```yaml
-- uses: PunGrumpy/docker-doctor@v0
+- uses: PunGrumpy/docker-doctor@v1
   with:
     blocking: error # fail on error-severity findings ("warning" fails on warnings too)
 ```
@@ -75,9 +75,6 @@ Two rules always hold:
 
 ## Versioning
 
-The action is versioned in lockstep with the CLI, and every release moves two tags:
+The action is versioned independently of the CLI. The floating major tag — `v1` today — always points at the latest action release and moves only when the action itself changes; breaking changes get a new major. Pin a commit SHA if you need full reproducibility.
 
-- A floating major — `v0` today, `v1` once the CLI reaches 1.0 — that always points at the latest release. Use this (as the examples above do) to pick up fixes automatically.
-- An exact `v<version>` (for example `v0.3.2`) matching the npm release, for reproducible pins.
-
-The `version` input controls the CLI independently — by default it runs `latest`, so pinned action refs still scan with the newest rules.
+The `version` input controls the CLI independently — by default it runs `latest`, so the action always scans with the newest rules.
