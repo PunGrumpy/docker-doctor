@@ -24,12 +24,12 @@
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
     "husky": "^9.1.7",
-    "oxfmt": "^0.60.0",
-    "oxlint": "^1.75.0",
-    "react-doctor": "^0.9.1",
-    "turbo": "^2.10.7",
-    "typescript": "^6",
-    "ultracite": "7.9.4"
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "react-doctor": "^0.9.11",
+    "turbo": "^2.10.9",
+    "typescript": "^7.0.2",
+    "ultracite": "7.10.2"
   },
   "engines": {
     "node": ">=18"

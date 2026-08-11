@@ -199,7 +199,7 @@
   input:focus,
   textarea:focus,
   a:focus {
-    @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply focus-visible:ring-primary focus-visible:ring-offset-background focus-visible:ring-1 focus-visible:ring-offset-2 focus-visible:outline-none;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -248,7 +248,7 @@
 @layer base {
   ul,
   ol {
-    @apply flex text-base leading-relaxed flex-col gap-2 pl-5 list-disc text-muted-foreground sm:text-sm;
+    @apply text-muted-foreground flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed sm:text-sm;
   }
 
   li::marker {

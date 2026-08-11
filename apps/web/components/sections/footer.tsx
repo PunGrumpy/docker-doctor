@@ -5,9 +5,9 @@ import { Section } from "@/components/section";
 export const Footer = () => (
   <Section className="pt-8 pb-16">
     <footer className="flex w-full items-center justify-between">
-      <div className="select-none rounded-full bg-muted text-muted-foreground px-3 py-1.5 font-medium text-sm">
+      <div className="bg-muted text-muted-foreground rounded-full px-3 py-1.5 text-sm font-medium select-none">
         v
-        <span className="tabular-nums text-foreground">
+        <span className="text-foreground tabular-nums">
           {packageJson.version}
         </span>
       </div>
@@ -17,7 +17,7 @@ export const Footer = () => (
           href="https://www.pungrumpy.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="py-2.5 transition-colors hover:text-foreground"
+          className="hover:text-foreground py-2.5 transition-colors"
         >
           Noppakorn Kaewsalabnil
         </a>

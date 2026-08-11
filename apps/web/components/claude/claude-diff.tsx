@@ -30,27 +30,27 @@ export const ClaudeDiff = ({
       >
         ⏺
       </span>
-      <span className="font-medium text-foreground">Update</span>
-      <span className="min-w-0 break-all font-mono">
+      <span className="text-foreground font-medium">Update</span>
+      <span className="min-w-0 font-mono break-all">
         <span className="text-muted-foreground">(</span>
         <span className="text-blue-600 dark:text-[#7dcfff]">{file}</span>
         <span className="text-muted-foreground">)</span>
       </span>
     </div>
     {summary ? (
-      <div className="flex min-w-0 items-baseline gap-2 text-muted-foreground">
+      <div className="text-muted-foreground flex min-w-0 items-baseline gap-2">
         {/* invisible status glyph spacer: aligns ⎿ under "Update" */}
         <span aria-hidden className="invisible shrink-0">
           ⏺
         </span>
-        <span aria-hidden className="shrink-0 text-muted-foreground/60">
+        <span aria-hidden className="text-muted-foreground/60 shrink-0">
           ⎿
         </span>
-        <span className="min-w-0 wrap-break-words">{summary}</span>
+        <span className="wrap-break-words min-w-0">{summary}</span>
       </div>
     ) : null}
 
-    <pre className="mt-1 min-w-0 overflow-x-auto rounded-md border border-border bg-muted/30 py-1.5 pl-2 pr-3">
+    <pre className="border-border bg-muted/30 mt-1 min-w-0 overflow-x-auto rounded-md border py-1.5 pr-3 pl-2">
       {lines.map((l) => {
         let mark = " ";
         if (l.type === "add") {
@@ -71,7 +71,7 @@ export const ClaudeDiff = ({
               l.type === "ctx" && "bg-transparent"
             )}
           >
-            <span className="w-9 shrink-0 select-none pr-2 text-right text-muted-foreground/50">
+            <span className="text-muted-foreground/50 w-9 shrink-0 pr-2 text-right select-none">
               {l.n ?? ""}
             </span>
             <span
@@ -86,7 +86,7 @@ export const ClaudeDiff = ({
             </span>
             <span
               className={cn(
-                "min-w-0 break-all font-mono",
+                "min-w-0 font-mono break-all",
                 l.type === "ctx" ? "text-muted-foreground" : "text-foreground"
               )}
             >

@@ -54,7 +54,7 @@ const SidebarNode = ({ node, pathname }: SidebarNodeProps) => {
   if (node.type === "folder") {
     return (
       <div className="mt-6 first:mt-0">
-        <p className="px-3 pb-1.5 font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wider">
+        <p className="text-muted-foreground px-3 pb-1.5 text-[0.6875rem] font-medium tracking-wider uppercase">
           {node.name}
         </p>
         <div className="flex flex-col gap-0.5">

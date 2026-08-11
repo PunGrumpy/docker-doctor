@@ -11,7 +11,7 @@ interface DocsRootLayoutProps {
 const DocsRootLayout = ({ children }: DocsRootLayoutProps) => (
   <div className="flex min-h-dvh flex-col">
     <a
-      className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-background focus:px-3 focus:py-2 focus:font-medium focus:text-sm focus:shadow-custom"
+      className="focus:bg-background focus:shadow-custom sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-4 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
       href="#docs-content"
     >
       Skip to content
@@ -32,7 +32,7 @@ const DocsRootLayout = ({ children }: DocsRootLayoutProps) => (
     <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 px-4 pt-14 lg:px-8">
       <div className="grid w-full grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
         <aside className="hidden lg:block">
-          <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto py-8 pe-4 ps-4">
+          <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto py-8 ps-4 pe-4">
             <DocsSidebar tree={source.getPageTree()} />
           </div>
         </aside>

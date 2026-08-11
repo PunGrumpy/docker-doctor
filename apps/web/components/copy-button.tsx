@@ -38,8 +38,8 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
       type="button"
       onClick={handleCopy}
       className={cn(
-        "relative size-9 flex items-center justify-center rounded-md shadow-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "active:scale-[0.96] transition-[transform,background-color,border-color] duration-150 ease-out",
+        "shadow-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:ring-primary focus-visible:ring-offset-background relative flex size-9 cursor-pointer items-center justify-center rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-offset-2",
+        "transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]",
         // Hit area extended to 40x40px
         "after:absolute after:-inset-0.5 after:content-['']",
         className
@@ -51,16 +51,16 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
         className={cn(
           "size-4 transition-all duration-200 ease-[var(--ease-out)]",
           copied
-            ? "opacity-0 scale-[0.6] blur-xs"
-            : "opacity-100 scale-100 blur-0"
+            ? "scale-[0.6] opacity-0 blur-xs"
+            : "blur-0 scale-100 opacity-100"
         )}
       />
       <Check
         className={cn(
-          "absolute inset-0 size-4 m-auto transition-all duration-200 ease-[var(--ease-out)]",
+          "absolute inset-0 m-auto size-4 transition-all duration-200 ease-[var(--ease-out)]",
           copied
-            ? "opacity-100 scale-100 blur-0"
-            : "opacity-0 scale-[0.6] blur-xs"
+            ? "blur-0 scale-100 opacity-100"
+            : "scale-[0.6] opacity-0 blur-xs"
         )}
       />
     </button>
