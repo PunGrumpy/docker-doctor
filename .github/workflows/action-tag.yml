@@ -1,0 +1,29 @@
+# The GitHub Action (action.yml + scripts/) is versioned independently of
+# the CLI: the floating major tag (v1) moves whenever the action surface
+# changes on main, so `uses: PunGrumpy/docker-doctor@v1` always resolves to
+# the latest action release. Breaking changes get a new major tag, created
+# manually (and this workflow's tag updated to match).
+
+name: Action Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - action.yml
+      - "scripts/**"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Move the floating major tag
+        run: |
+          git tag -f v1
+          git push -f origin v1
