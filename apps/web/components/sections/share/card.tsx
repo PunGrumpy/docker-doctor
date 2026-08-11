@@ -29,6 +29,7 @@ interface ShareButtonProps {
   channel: string;
   href?: string;
   onClick?: () => void;
+  score: number;
 }
 
 // window.location.origin is fixed for the lifetime of the page, so the
@@ -45,16 +46,21 @@ const useOrigin = () =>
     () => ""
   );
 
+// The tracked path is just `/share` (Databuddy drops the query string), so
+// the score has to ride along on the event itself — that is what makes
+// "which score bands actually share" answerable.
 const ShareButton = ({
   channel,
   href,
   onClick,
+  score,
   children,
 }: ShareButtonProps) => {
   if (href) {
     return (
       <a
         data-channel={channel}
+        data-score={score}
         data-track="share_clicked"
         href={href}
         target="_blank"
@@ -71,6 +77,7 @@ const ShareButton = ({
   return (
     <button
       data-channel={channel}
+      data-score={score}
       data-track="share_clicked"
       type="button"
       onClick={onClick}
@@ -150,13 +157,13 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
         </div>
 
         <div className="border-border flex w-full items-center gap-2 [border-top-width:0.5px] px-4 pt-3 pb-3.75">
-          <ShareButton channel="x" href={twitterUrl}>
+          <ShareButton channel="x" href={twitterUrl} score={score}>
             Share on X
           </ShareButton>
-          <ShareButton channel="linkedin" href={linkedinUrl}>
+          <ShareButton channel="linkedin" href={linkedinUrl} score={score}>
             Share on LinkedIn
           </ShareButton>
-          <ShareButton channel="badge" onClick={handleCopyBadge}>
+          <ShareButton channel="badge" onClick={handleCopyBadge} score={score}>
             Copy GitHub badge
           </ShareButton>
         </div>
