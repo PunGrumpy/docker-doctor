@@ -1,5 +1,11 @@
 # @docker-doctor/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- d2a7a45: Add `--global` flag to `docker-doctor install` — installs the agent skill into each agent's global skills directory (e.g. `~/.claude/skills`) instead of the current project. Groundwork for the Docker Sandboxes kit.
+
 ## 0.3.4
 
 ### Patch Changes
