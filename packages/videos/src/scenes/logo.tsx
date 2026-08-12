@@ -7,7 +7,10 @@ import { Mark } from "../components/mark";
 
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 
-export const Logo = () => {
+// `urlSize` exists because the lockup is authored once and used on two
+// stages: the 16:9 cut scales it 1.5x on the way to 1920, the square cut
+// renders it 1:1, so the URL needs sizing up there to stay readable.
+export const Logo = ({ urlSize = 17 }: { readonly urlSize?: number }) => {
   const frame = useCurrentFrame();
   const clamp = {
     easing: EASE,
@@ -44,7 +47,7 @@ export const Logo = () => {
           color: "rgba(0,0,0,0.55)",
           fontFamily:
             "var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace",
-          fontSize: 17,
+          fontSize: urlSize,
           ...rise(14),
         }}
       >

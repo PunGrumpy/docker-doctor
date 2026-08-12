@@ -21,7 +21,6 @@ import { SANDBOX_RUN_DURATION, SandboxRun } from "./scenes/sandbox-terminal";
 // the launch video; a different story: the agent lints itself, unprompted.
 
 const INK = "rgba(0,0,0,0.85)";
-const MUTED = "rgba(0,0,0,0.55)";
 const ACCENT = "#2563eb";
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 
@@ -45,21 +44,24 @@ const Positioned = ({
 );
 
 // ─── Scene 1 · The setup ────────────────────────────────────────────────────
-// The post's hook, in the launch video's two-line rhythm: the statement lands,
-// then the question follows a beat later.
+// The post's hook, in the launch video's rhythm: one size, one color, and the
+// timing alone carries the beat — a smaller, dimmer last line would read as a
+// subtitle when it is the actual question.
+const LINE_SIZE = 52;
+
 const SceneHook = () => (
   <>
-    <Positioned dy={-40}>
-      <SoftBlurIn color={INK} fontSize={54} text="Your agent writes" />
+    <Positioned dy={-58}>
+      <SoftBlurIn color={INK} fontSize={LINE_SIZE} text="Your agent writes" />
     </Positioned>
     <Sequence from={6} layout="none">
-      <Positioned dy={16}>
-        <SoftBlurIn color={INK} fontSize={54} text="Dockerfiles now." />
+      <Positioned dy={0}>
+        <SoftBlurIn color={INK} fontSize={LINE_SIZE} text="Dockerfiles now." />
       </Positioned>
     </Sequence>
     <Sequence from={26} layout="none">
-      <Positioned dy={78}>
-        <SoftBlurIn color={MUTED} fontSize={44} text="Who reviews them?" />
+      <Positioned dy={58}>
+        <SoftBlurIn color={INK} fontSize={LINE_SIZE} text="Who reviews them?" />
       </Positioned>
     </Sequence>
   </>
@@ -70,12 +72,16 @@ const PAYOFF_DURATION = 68;
 
 const ScenePayoff = () => (
   <>
-    <Positioned dy={-26}>
-      <SoftBlurIn color={INK} fontSize={58} text="Nobody asked it to." />
+    <Positioned dy={-29}>
+      <SoftBlurIn color={INK} fontSize={LINE_SIZE} text="Nobody asked it to." />
     </Positioned>
     <Sequence from={10} layout="none">
-      <Positioned dy={40}>
-        <SoftBlurIn color={MUTED} fontSize={40} text="The kit already did." />
+      <Positioned dy={29}>
+        <SoftBlurIn
+          color={INK}
+          fontSize={LINE_SIZE}
+          text="The kit already did."
+        />
       </Positioned>
     </Sequence>
   </>
@@ -133,7 +139,7 @@ const CommandPill = () => {
 const SceneCta = () => (
   <>
     <Positioned dy={-56}>
-      <SoftBlurIn color={INK} fontSize={52} text="One command." />
+      <SoftBlurIn color={INK} fontSize={LINE_SIZE} text="One command." />
     </Positioned>
     <Sequence from={10} layout="none">
       <CommandPill />
@@ -204,7 +210,7 @@ export const SandboxKit = () => {
             <SceneCta />
           </Sequence>
           <Sequence durationInFrames={62} from={CTA_END} layout="none">
-            <Logo />
+            <Logo urlSize={30} />
           </Sequence>
         </div>
       </AbsoluteFill>
