@@ -1,5 +1,11 @@
 # @docker-doctor/cli
 
+## 0.3.4
+
+### Patch Changes
+
+- 23be7e4: Tag the shared score URL with `utm_source=cli&utm_medium=terminal` so site analytics can tell the person who ran the scan apart from the visitors who follow their shared link.
+
 ## 0.3.3
 
 ### Patch Changes
