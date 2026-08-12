@@ -410,7 +410,9 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   }
 
   const agentId = launchable[choice];
-  const installResult = await installSkillForAgents([agentId], context.rootDir);
+  const installResult = await installSkillForAgents([agentId], {
+    projectRoot: context.rootDir,
+  });
   if (installResult && installResult.installed.length > 0) {
     console.log(
       `\n  ${chalk.green("✔")} Installed the docker-doctor skill for ${agentDisplayName(agentId)}`
@@ -784,7 +786,11 @@ program
     "-a, --agent <agents...>",
     "agent id(s) to install for (e.g. claude-code codex cursor)"
   )
-  .action(async (options: { agent?: string[] }) => {
+  .option(
+    "-g, --global",
+    "install into each agent's global skills directory (e.g. ~/.claude/skills) instead of the current project"
+  )
+  .action(async (options: { agent?: string[]; global?: boolean }) => {
     const source = getSkillSourceDirectory();
     if (!source) {
       console.error(
@@ -802,7 +808,10 @@ program
       return;
     }
 
-    const result = await installSkillForAgents(agents, process.cwd());
+    const result = await installSkillForAgents(agents, {
+      global: options.global,
+      projectRoot: process.cwd(),
+    });
     if (!result) {
       console.error("Failed to install the skill.");
       process.exit(1);
@@ -818,8 +827,9 @@ program
       );
     }
     if (result.installed.length > 0) {
+      const scope = options.global ? "any project" : "this project";
       console.log(
-        `\n  The agent can now run ${chalk.cyan("/docker-doctor")} to scan and triage this project.`
+        `\n  The agent can now run ${chalk.cyan("/docker-doctor")} to scan and triage ${scope}.`
       );
     }
     process.exitCode = result.failed.length > 0 ? 1 : 0;
