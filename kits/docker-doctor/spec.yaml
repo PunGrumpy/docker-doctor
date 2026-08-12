@@ -1,6 +1,10 @@
 schemaVersion: "2"
 kind: mixin
 name: docker-doctor
+# The kit versions independently of the CLI it installs (see README
+# "Publishing"). CLI releases auto-bump the patch; bump this by hand for
+# kit-only changes.
+version: "0.1.0"
 displayName: Docker Doctor
 description: Static analysis for Dockerfiles and Compose files — installs the docker-doctor CLI and its agent skill, and tells the agent to lint before committing Docker changes.
 sourceURL: https://github.com/PunGrumpy/docker-doctor

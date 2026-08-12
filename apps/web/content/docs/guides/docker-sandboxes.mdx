@@ -15,7 +15,7 @@ Kits extend a sandbox at creation time. The Docker Doctor kit is published to Do
 sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
 ```
 
-The tag is required — sbx does not default to `:latest` for registry kits. Pin a specific release instead if you want reproducible sandboxes: the kit is tagged with the CLI version it installs, e.g. `docker.io/pungrumpy/docker-doctor-kit:0.4.0`.
+The tag is required — sbx does not default to `:latest` for registry kits. Pin a specific kit release instead if you want reproducible sandboxes, e.g. `docker.io/pungrumpy/docker-doctor-kit:0.1.0`. Each kit release installs an exact, pinned CLI version.
 
 It's a `mixin` kit, so it composes with any agent (`claude`, `codex`, `gemini`, `opencode`, …) and stacks with your other kits.
 

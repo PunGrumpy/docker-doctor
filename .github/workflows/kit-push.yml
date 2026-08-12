@@ -1,0 +1,116 @@
+name: Kit Push
+
+# The kit's version lives in spec.yaml (version:) — the changeset-equivalent
+# for this artifact:
+#
+#   - pull_request: fail if the kit changed without a version bump
+#   - push to main: publish the version automatically if its tag is new
+#     (the release workflow's pin commits carry [skip ci], so they never
+#     double-trigger this — release.yml pushes those itself)
+#   - workflow_dispatch: backfill or deliberately overwrite (force)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "kits/docker-doctor/**"
+  pull_request:
+    paths:
+      - "kits/docker-doctor/**"
+  workflow_dispatch:
+    inputs:
+      latest:
+        description: "Also push :latest"
+        type: boolean
+        default: true
+      force:
+        description: "Overwrite the tag if it already exists on Docker Hub"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  KIT_DIR: ./kits/docker-doctor
+  KIT_REPO: docker.io/pungrumpy/docker-doctor-kit
+
+jobs:
+  require-version-bump:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Require a version bump when the kit changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "$BASE_SHA"
+          base="$(git show "$BASE_SHA:kits/docker-doctor/spec.yaml" 2>/dev/null | awk -F'"' '/^version:/ { print $2; exit }')"
+          head="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DIR/spec.yaml")"
+          if [ -z "$head" ]; then
+            echo "::error::No version field in $KIT_DIR/spec.yaml"
+            exit 1
+          fi
+          if [ "$head" = "$base" ]; then
+            echo "::error::This PR changes the kit but leaves version: at $head — bump it in spec.yaml (minor for new behavior, patch for fixes)."
+            exit 1
+          fi
+          if [ -n "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$head" | sort -V | tail -n1)" != "$head" ]; then
+            echo "::error::version: went backwards ($base -> $head)."
+            exit 1
+          fi
+          echo "Kit version: ${base:-<none>} -> $head"
+
+  push:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Read kit version from spec.yaml
+        id: kit
+        run: |
+          version="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DIR/spec.yaml")"
+          if [ -z "$version" ]; then
+            echo "::error::No version field found in $KIT_DIR/spec.yaml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Install Docker Sandboxes CLI
+        run: |
+          curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
+          sudo apt-get install -y docker-sbx
+      - name: Check whether the tag already exists
+        id: exists
+        run: |
+          if sbx kit inspect "$KIT_REPO:${{ steps.kit.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Refuse to overwrite an existing tag
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.exists.outputs.exists == 'true' && !inputs.force }}
+        run: |
+          echo "::error::$KIT_REPO:${{ steps.kit.outputs.version }} already exists. Bump version in spec.yaml, or re-run with force to overwrite."
+          exit 1
+      - name: Already published — nothing to do
+        if: ${{ github.event_name == 'push' && steps.exists.outputs.exists == 'true' }}
+        run: echo "::notice::$KIT_REPO:${{ steps.kit.outputs.version }} is already on Docker Hub; skipping."
+      - name: Log in to Docker Hub
+        if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Validate kit
+        if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
+        run: sbx kit validate "$KIT_DIR"
+      - name: Push kit
+        if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
+        run: sbx kit push "$KIT_DIR" "$KIT_REPO:${{ steps.kit.outputs.version }}"
+      - name: Push latest
+        if: ${{ (steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force)) && (github.event_name == 'push' || inputs.latest) }}
+        run: sbx kit push "$KIT_DIR" "$KIT_REPO:latest"

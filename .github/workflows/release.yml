@@ -11,6 +11,11 @@ permissions:
   pull-requests: write
   issues: write
 
+# One release at a time; never cancel a run that may already have published.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
   SKIP_ENV_VALIDATION: "1"
 
@@ -46,8 +51,63 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: bun run changeset version
-          publish: bun run changeset publish
+          # changeset:version also resyncs bun.lock so the Version Packages
+          # PR doesn't fail the Format CI job with a stale lockfile.
+          version: bun run changeset:version
+          publish: bun run changeset:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: "" # Workaround for https://github.com/changesets/action/pull/545
+      # Kit release: when a new CLI version reaches npm, re-pin the Docker
+      # Sandboxes kit to it, bump the kit's own patch version, and push the
+      # kit to Docker Hub in the same run. The kit versions independently of
+      # the CLI (spec.yaml `version:`); manual bumps and kit-only changes go
+      # through the Kit Push workflow (kit-push.yml).
+      - name: Detect published CLI version
+        id: cli
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          version="$(jq -r '.[] | select(.name == "@docker-doctor/cli") | .version' <<<"$PUBLISHED")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Re-pin kit and bump its patch version
+        id: kit
+        if: steps.cli.outputs.version != ''
+        run: |
+          spec=kits/docker-doctor/spec.yaml
+          sed -i "s#@docker-doctor/cli@[0-9.]*#@docker-doctor/cli@${{ steps.cli.outputs.version }}#" "$spec"
+          if git diff --quiet "$spec"; then
+            kit_version="$(awk -F'"' '/^version:/ { print $2; exit }' "$spec")"
+            echo "Kit pin already at ${{ steps.cli.outputs.version }}; keeping kit version $kit_version"
+          else
+            current="$(awk -F'"' '/^version:/ { print $2; exit }' "$spec")"
+            kit_version="$(echo "$current" | awk -F. '{ print $1 "." $2 "." $3 + 1 }')"
+            sed -i "s#^version: \"$current\"#version: \"$kit_version\"#" "$spec"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$spec"
+            git commit -m "chore(kits): kit $kit_version — pin @docker-doctor/cli@${{ steps.cli.outputs.version }} [skip ci]"
+            # main may have advanced while this run was publishing
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
+          echo "version=$kit_version" >> "$GITHUB_OUTPUT"
+      - name: Install Docker Sandboxes CLI
+        if: steps.kit.outputs.version != ''
+        run: |
+          curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
+          sudo apt-get install -y docker-sbx
+      - name: Log in to Docker Hub
+        if: steps.kit.outputs.version != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push kit to Docker Hub
+        if: steps.kit.outputs.version != ''
+        run: |
+          sbx kit validate ./kits/docker-doctor
+          sbx kit push ./kits/docker-doctor "docker.io/pungrumpy/docker-doctor-kit:${{ steps.kit.outputs.version }}"
+          sbx kit push ./kits/docker-doctor docker.io/pungrumpy/docker-doctor-kit:latest

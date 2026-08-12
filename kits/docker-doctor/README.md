@@ -45,3 +45,12 @@ $ sbx settings set kit.allowedSources '["docker.io/","github.com/PunGrumpy/"]'
 ## Cleanup
 
 None — the kit writes only inside the sandbox (global npm install + home-directory skill files). Your mounted workspace and host stay untouched.
+
+## Publishing (maintainers)
+
+The kit versions independently of the CLI it installs — its own semver lives in `spec.yaml` (`version:`), the same way the GitHub Action's `v1` tag is independent of the npm package. Docker Hub tags are immutable by policy: every push gets a fresh version, `:latest` floats.
+
+- **CLI release (automatic)** — when the Release workflow publishes `@docker-doctor/cli` to npm, it re-pins `spec.yaml`, bumps the kit's **patch** version, commits both back to `main`, and pushes `:<kit-version>` + `:latest`.
+- **Kit-only change (automatic)** — bump `version:` in the same PR (minor for new behavior, patch for fixes; CI fails the PR if you forget) and merging publishes it. The manual **Kit Push** workflow (`Actions → Kit Push → Run workflow`) remains for backfills and deliberate overwrites (`force`).
+
+Both paths authenticate with the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repository secrets.

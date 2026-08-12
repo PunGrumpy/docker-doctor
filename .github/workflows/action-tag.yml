@@ -1,8 +1,14 @@
 # The GitHub Action (action.yml + scripts/) is versioned independently of
-# the CLI: the floating major tag (v1) moves whenever the action surface
-# changes on main, so `uses: PunGrumpy/docker-doctor@v1` always resolves to
-# the latest action release. Breaking changes get a new major tag, created
-# manually (and this workflow's tag updated to match).
+# the CLI, with two tag tiers (pattern adapted from millionco/react-doctor):
+#
+#   - immutable vX.Y.Z per release, bumped from the merged PR's conventional
+#     title: feat → minor, everything else → patch
+#   - floating major (v1) moved to every release, so
+#     `uses: PunGrumpy/docker-doctor@v1` always resolves to the latest
+#
+# Breaking changes (feat!: / BREAKING CHANGE) fail this workflow on purpose:
+# a new major tag is cut manually, and this workflow's floating tag is
+# updated to match.
 
 name: Action Tag
 
@@ -17,13 +23,100 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: action-tag
+  cancel-in-progress: false
+
 jobs:
   tag:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Move the floating major tag
+      # Smoke-test the action at this exact SHA before pointing every
+      # consumer at it: scan a fixture with known findings and require a
+      # non-empty result.
+      - name: Smoke-test the action
+        id: smoke
+        uses: ./
+        with:
+          directory: packages/docker-doctor/test/fixtures/with-error
+          blocking: none
+          comment: "false"
+
+      - name: Assert the smoke test produced results
         run: |
-          git tag -f v1
+          if [ -z "${{ steps.smoke.outputs.score }}" ] || [ "${{ steps.smoke.outputs.total-issues }}" -lt 1 ]; then
+            echo "::error::Action smoke test returned no results (score='${{ steps.smoke.outputs.score }}', total-issues='${{ steps.smoke.outputs.total-issues }}') — not tagging"
+            exit 1
+          fi
+
+      # Classify from the merged PR's title — a merge commit subject like
+      # "Merge pull request #N" would silently downgrade every bump to a
+      # patch. Fall back to the commit subject for direct pushes.
+      - name: Classify the bump from the merged PR title
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          subject="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0].title // ""' 2>/dev/null || true)"
+          [ -n "$subject" ] || subject="$(printf '%s' "$HEAD_COMMIT_MESSAGE" | head -n1)"
+          echo "Classifying: $subject"
+          if printf '%s' "$subject" | grep -qiE '^[a-z]+(\([^)]*\))?!:' || printf '%s' "$subject" | grep -q 'BREAKING[ -]CHANGE'; then
+            echo "::error::'$subject' is a breaking change — cut the new major tag manually and update this workflow's floating tag."
+            exit 1
+          fi
+          if printf '%s' "$subject" | grep -qiE '^feat(\([^)]*\))?:'; then
+            echo "level=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "level=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute the next version from existing tags
+        id: next
+        env:
+          LEVEL: ${{ steps.bump.outputs.level }}
+        run: |
+          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)"
+          if [ -z "$latest" ]; then
+            next="v1.0.0"
+          else
+            v="${latest#v}"
+            maj="${v%%.*}"
+            rest="${v#*.}"
+            min="${rest%%.*}"
+            pat="${rest#*.}"
+            if [ "$LEVEL" = "minor" ]; then
+              next="v${maj}.$((min + 1)).0"
+            else
+              next="v${maj}.${min}.$((pat + 1))"
+            fi
+          fi
+          if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+            echo "::error::$next already exists — tags are immutable, refusing to overwrite."
+            exit 1
+          fi
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the release and move the floating major
+        env:
+          NEXT_TAG: ${{ steps.next.outputs.next }}
+          LEVEL: ${{ steps.bump.outputs.level }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -c tag.gpgsign=false tag -a "$NEXT_TAG" -m "docker-doctor action $NEXT_TAG ($LEVEL)"
+          git push origin "$NEXT_TAG"
+          # Queued runs are not guaranteed to execute in commit order — never
+          # move the floating major backwards.
+          if git rev-parse -q --verify "refs/tags/v1^{commit}" >/dev/null \
+            && ! git merge-base --is-ancestor v1^{commit} "$GITHUB_SHA"; then
+            echo "::warning::v1 points at a commit that is not an ancestor of ${GITHUB_SHA}; tagged $NEXT_TAG without moving v1."
+            exit 0
+          fi
+          git -c tag.gpgsign=false tag -fa v1 -m "docker-doctor action v1 (floating major -> $NEXT_TAG)"
           git push -f origin v1
