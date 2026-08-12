@@ -82,7 +82,7 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Badge ramp, ported from Geist so the pill tints match exactly.
+  /* Badge ramp, ported the pill tints match exactly.
      Light values.
      `-200` seeds the subtle fill (the recipe keeps its chroma and hue and
      pins lightness); `-900` is the label colour. */
@@ -156,7 +156,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Badge ramp, ported from Geist so the pill tints match exactly.
+  /* Badge ramp, ported the pill tints match exactly.
      Dark values; the ramp flips so one class serves both themes.
      `-200` seeds the subtle fill (the recipe keeps its chroma and hue and
      pins lightness); `-900` is the label colour. */
@@ -368,7 +368,6 @@
   }
 }
 
-/* Global custom scrollbars — layered so utilities (e.g. no-scrollbar) can override */
 @layer base {
   * {
     scrollbar-width: thin;
@@ -396,7 +395,6 @@
   }
 }
 
-/* Keep the element scrollable but render no scrollbar */
 @utility no-scrollbar {
   scrollbar-width: none;
 
