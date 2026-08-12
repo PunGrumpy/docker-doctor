@@ -45,7 +45,7 @@ Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interac
 Running coding agents unattended in [Docker Sandboxes](https://www.docker.com/products/docker-sandboxes/)? The Docker Doctor kit preinstalls the CLI and skill in every sandbox and tells the agent to lint its own Dockerfile and Compose changes before committing:
 
 ```bash
-sbx run --kit docker.io/pungrumpy/docker-doctor-kit claude
+sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
 ```
 
 See [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) for what the kit installs and how it works.
