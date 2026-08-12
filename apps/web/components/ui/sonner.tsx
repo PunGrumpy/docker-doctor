@@ -1,49 +1,47 @@
-"use client"
+"use client";
 
-import { useTheme } from "next-themes"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { useTheme } from "next-themes";
+import type { CSSProperties } from "react";
+import { Toaster as Sonner, type ToasterProps } from "sonner";
+
+import { Ban } from "@/components/icons/ban";
+import { CircleCheck } from "@/components/icons/circle-check";
+import { CircleInfo } from "@/components/icons/circle-info";
+import { Loader } from "@/components/icons/loader";
+import { TriangleWarning } from "@/components/icons/triangle-warning";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const { theme = "system" } = useTheme();
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
       className="toaster group"
       icons={{
-        success: (
-          <CircleCheckIcon className="size-4" />
-        ),
-        info: (
-          <InfoIcon className="size-4" />
-        ),
-        warning: (
-          <TriangleAlertIcon className="size-4" />
-        ),
-        error: (
-          <OctagonXIcon className="size-4" />
-        ),
-        loading: (
-          <Loader2Icon className="size-4 animate-spin" />
-        ),
+        success: <CircleCheck className="size-5 shrink-0" />,
+        info: <CircleInfo className="size-5 shrink-0" />,
+        warning: <TriangleWarning className="size-5 shrink-0" />,
+        error: <Ban className="size-5 shrink-0" />,
+        loading: <Loader className="size-5 shrink-0 animate-spin" />,
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
+          "--normal-bg": "var(--card)",
+          "--normal-text": "var(--foreground)",
+          "--normal-border": "transparent",
+          "--border-radius": "var(--radius-xl)",
+        } as CSSProperties
       }
+      theme={theme as ToasterProps["theme"]}
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          toast: "shadow-custom!",
+          title: "text-sm font-medium",
+          description: "text-muted-foreground text-sm",
         },
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
-export { Toaster }
+export { Toaster };

@@ -3,8 +3,10 @@
 import { trackError } from "@databuddy/sdk/react";
 import type { ReactNode } from "react";
 import { useCallback, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 
 import { Cursor } from "@/components/icons/cursor";
+import { Pill } from "@/components/pill";
 import { getScoreData } from "@/lib/score";
 import { cn, pluralize } from "@/lib/utils";
 
@@ -13,16 +15,6 @@ interface CardProps {
   warnings: number;
   errors: number;
 }
-
-interface PillProps {
-  children: ReactNode;
-}
-
-const Pill = ({ children }: PillProps) => (
-  <div className="bg-muted flex h-7 shrink-0 items-center justify-center rounded-full px-3">
-    <span className="text-sm font-medium">{children}</span>
-  </div>
-);
 
 interface ShareButtonProps {
   children: ReactNode;
@@ -46,9 +38,6 @@ const useOrigin = () =>
     () => ""
   );
 
-// The tracked path is just `/share` (Databuddy drops the query string), so
-// the score has to ride along on the event itself — that is what makes
-// "which score bands actually share" answerable.
 const ShareButton = ({
   channel,
   href,
@@ -66,7 +55,7 @@ const ShareButton = ({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "bg-card shadow-custom flex h-10 flex-1 items-center justify-center rounded-full text-sm",
+          "bg-card shadow-custom flex h-10 w-full items-center justify-center rounded-full text-sm sm:w-auto sm:flex-1",
           "hover:bg-accent transition-[background-color,transform,scale] duration-300 ease-[var(--ease-out)] active:scale-[0.96]"
         )}
       >
@@ -82,7 +71,7 @@ const ShareButton = ({
       type="button"
       onClick={onClick}
       className={cn(
-        "bg-card shadow-custom flex h-10 flex-1 items-center justify-center rounded-full text-sm",
+        "bg-card shadow-custom flex h-10 w-full items-center justify-center rounded-full text-sm sm:w-auto sm:flex-1",
         "hover:bg-accent transition-[background-color,transform,scale] duration-300 ease-[var(--ease-out)] active:scale-[0.96]"
       )}
     >
@@ -116,7 +105,11 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
     const badge = `[![Docker Doctor](${badgeUrl})](${shareUrl})`;
     try {
       await navigator.clipboard.writeText(badge);
+      toast.success("Badge copied");
     } catch (error) {
+      toast.error(
+        "Unable to copy. Check your browser's clipboard permissions and try again."
+      );
       trackError(
         error instanceof Error ? error.message : "clipboard write failed",
         { error_type: "clipboard_badge_copy" }
@@ -125,14 +118,14 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
   }, [shareUrl]);
 
   return (
-    <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1 group-focus-visible:ring-2">
+    <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1">
       <div className="preview-card relative flex size-full flex-col overflow-hidden rounded-xl">
         <div className="flex w-full grow flex-col items-center justify-center gap-5.5 pt-9.75 pb-6">
           <div className="flex flex-col items-center gap-2.25">
-            <Pill>{label}</Pill>
-            <p className="text-2xl font-semibold tracking-[-0.01em] text-balance">
+            <Pill className="shadow-custom">{label}</Pill>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-balance">
               My Infrastructure Setup
-            </p>
+            </h2>
           </div>
 
           <div
@@ -141,22 +134,30 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
               border
             )}
           >
-            <div className="bg-card shadow-custom relative flex size-18 items-center justify-center rounded-full select-none">
+            <div className="bg-card shadow-custom relative flex size-18 items-center justify-center rounded-full">
               <span className="text-foreground text-3xl font-medium tabular-nums">
                 {score}
+                <span className="sr-only"> out of 100</span>
               </span>
             </div>
             <div className={cn("absolute inset-0", background)} />
-            <Cursor className="absolute -right-3 -bottom-3 size-8" />
+            <Cursor
+              aria-hidden="true"
+              className="absolute -right-3 -bottom-3 size-8"
+            />
           </div>
 
           <div className="flex gap-1.5">
-            <Pill>{pluralize(errors, "error")}</Pill>
-            <Pill>{pluralize(warnings, "warning")}</Pill>
+            <Pill contrast="low" variant={errors > 0 ? "red" : "gray"}>
+              {pluralize(errors, "error")}
+            </Pill>
+            <Pill contrast="low" variant={warnings > 0 ? "amber" : "gray"}>
+              {pluralize(warnings, "warning")}
+            </Pill>
           </div>
         </div>
 
-        <div className="border-border flex w-full items-center gap-2 [border-top-width:0.5px] px-4 pt-3 pb-3.75">
+        <div className="border-border flex w-full flex-col items-stretch gap-2 [border-top-width:0.5px] px-4 pt-3 pb-3.75 sm:flex-row sm:items-center">
           <ShareButton channel="x" href={twitterUrl} score={score}>
             Share on X
           </ShareButton>

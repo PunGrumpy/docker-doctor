@@ -1,16 +1,14 @@
 import packageJson from "@docker-doctor/docker-doctor/package.json";
 
+import { Pill } from "@/components/pill";
 import { Section } from "@/components/section";
 
 export const Footer = () => (
   <Section className="pt-8 pb-16">
     <footer className="flex w-full items-center justify-between">
-      <div className="bg-muted text-muted-foreground rounded-full px-3 py-1.5 text-sm font-medium select-none">
-        v
-        <span className="text-foreground tabular-nums">
-          {packageJson.version}
-        </span>
-      </div>
+      <Pill className="text-muted-foreground gap-0! select-none">
+        v<span className="text-foreground">{packageJson.version}</span>
+      </Pill>
       <div className="text-muted-foreground text-sm">
         Created by&nbsp;
         <a
