@@ -74,6 +74,10 @@ jobs:
       - name: Re-pin kit and bump its patch version
         id: kit
         if: steps.cli.outputs.version != ''
+        env:
+          # The husky pre-commit hook (format + build) is pointless in CI and
+          # leaves regenerated files unstaged, which then breaks the rebase.
+          HUSKY: "0"
         run: |
           spec=kits/docker-doctor/spec.yaml
           sed -i "s#@docker-doctor/cli@[0-9.]*#@docker-doctor/cli@${{ steps.cli.outputs.version }}#" "$spec"
@@ -88,9 +92,11 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$spec"
             git commit -m "chore(kits): kit $kit_version — pin @docker-doctor/cli@${{ steps.cli.outputs.version }} [skip ci]"
-            # main may have advanced while this run was publishing
+            # main may have advanced while this run was publishing; autoStash
+            # rides over any files earlier steps left modified in the tree
+            # (rebase, not pull — the CI checkout is a detached HEAD)
             git fetch origin main
-            git rebase origin/main
+            git -c rebase.autoStash=true rebase FETCH_HEAD
             git push origin HEAD:main
           fi
           echo "version=$kit_version" >> "$GITHUB_OUTPUT"
