@@ -45,3 +45,7 @@ $ sbx settings set kit.allowedSources '["docker.io/","github.com/PunGrumpy/"]'
 ## Cleanup
 
 None — the kit writes only inside the sandbox (global npm install + home-directory skill files). Your mounted workspace and host stay untouched.
+
+## Publishing (maintainers)
+
+Push a new kit version to Docker Hub via the **Kit Push** GitHub Action (`Actions → Kit Push → Run workflow`). The tag must match the `@docker-doctor/cli` version pinned in `spec.yaml` — the workflow refuses to push on a mismatch. It authenticates with the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repository secrets and pushes `:<tag>` plus `:latest` (untick to skip).

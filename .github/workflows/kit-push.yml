@@ -1,0 +1,50 @@
+name: Kit Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to push (must match the CLI version pinned in spec.yaml, e.g. 0.4.0)"
+        required: true
+        type: string
+      latest:
+        description: "Also push :latest"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  KIT_DIR: ./kits/docker-doctor
+  KIT_REPO: docker.io/pungrumpy/docker-doctor-kit
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check tag matches the pinned CLI version
+        run: |
+          pinned="$(grep -o '@docker-doctor/cli@[0-9.]*' "$KIT_DIR/spec.yaml" | cut -d@ -f3)"
+          if [ "$pinned" != "${{ inputs.tag }}" ]; then
+            echo "::error::Tag '${{ inputs.tag }}' does not match the CLI version pinned in spec.yaml ('$pinned'). Bump the pin first or fix the tag."
+            exit 1
+          fi
+      - name: Install Docker Sandboxes CLI
+        run: |
+          curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
+          sudo apt-get install -y docker-sbx
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Validate kit
+        run: sbx kit validate "$KIT_DIR"
+      - name: Push kit
+        run: sbx kit push "$KIT_DIR" "$KIT_REPO:${{ inputs.tag }}"
+      - name: Push latest
+        if: ${{ inputs.latest }}
+        run: sbx kit push "$KIT_DIR" "$KIT_REPO:latest"
