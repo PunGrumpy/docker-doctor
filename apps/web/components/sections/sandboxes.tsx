@@ -13,7 +13,7 @@ import { Cube } from "@/components/icons/cube";
 import { Section } from "@/components/section";
 
 const KIT_COMMAND =
-  "sbx run --kit docker.io/pungrumpy/docker-doctor-kit claude";
+  "sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude";
 
 const TrafficLights = ({ dotClass }: { readonly dotClass: string }) => (
   <div aria-hidden="true" className="flex items-start gap-2">
