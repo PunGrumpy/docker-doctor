@@ -51,3 +51,44 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: "" # Workaround for https://github.com/changesets/action/pull/545
+      # Kit release: when a new CLI version reaches npm, re-pin the Docker
+      # Sandboxes kit to it and push the kit to Docker Hub in the same run.
+      # Manual fallback/backfill: the Kit Push workflow (kit-push.yml).
+      - name: Detect published CLI version
+        id: cli
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          version="$(jq -r '.[] | select(.name == "@docker-doctor/cli") | .version' <<<"$PUBLISHED")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Pin kit to the published CLI
+        if: steps.cli.outputs.version != ''
+        run: |
+          sed -i "s#@docker-doctor/cli@[0-9.]*#@docker-doctor/cli@${{ steps.cli.outputs.version }}#" kits/docker-doctor/spec.yaml
+          if git diff --quiet kits/docker-doctor/spec.yaml; then
+            echo "Kit pin already at ${{ steps.cli.outputs.version }}"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add kits/docker-doctor/spec.yaml
+            git commit -m "chore(kits): pin @docker-doctor/cli@${{ steps.cli.outputs.version }} [skip ci]"
+            git push origin HEAD:main
+          fi
+      - name: Install Docker Sandboxes CLI
+        if: steps.cli.outputs.version != ''
+        run: |
+          curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
+          sudo apt-get install -y docker-sbx
+      - name: Log in to Docker Hub
+        if: steps.cli.outputs.version != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push kit to Docker Hub
+        if: steps.cli.outputs.version != ''
+        run: |
+          sbx kit validate ./kits/docker-doctor
+          sbx kit push ./kits/docker-doctor "docker.io/pungrumpy/docker-doctor-kit:${{ steps.cli.outputs.version }}"
+          sbx kit push ./kits/docker-doctor docker.io/pungrumpy/docker-doctor-kit:latest
