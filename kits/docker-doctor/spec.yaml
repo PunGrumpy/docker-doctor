@@ -1,0 +1,50 @@
+schemaVersion: "2"
+kind: mixin
+name: docker-doctor
+displayName: Docker Doctor
+description: Static analysis for Dockerfiles and Compose files — installs the docker-doctor CLI and its agent skill, and tells the agent to lint before committing Docker changes.
+sourceURL: https://github.com/PunGrumpy/docker-doctor
+licenses:
+  - MIT
+
+permissions:
+  network:
+    allow:
+      # npm tarballs at install time; npm verifies content against the
+      # registry's sha512 integrity metadata, so the version pin below
+      # pins content too.
+      - "registry.npmjs.org:443"
+
+setup:
+  install:
+    # Root: global npm install. Guard mirrors the playwright kit — every
+    # standard agent template ships Node.js except claude-code-minimal.
+    - command: |
+        set -eu
+        command -v npm >/dev/null || { echo "npm not found: this kit needs a base image with Node.js (all standard agent templates ship it; claude-code-minimal does not)" >&2; exit 1; }
+        if [ -n "${HTTP_PROXY:-}" ]; then
+          npm config set proxy "$HTTP_PROXY"
+          npm config set https-proxy "$HTTP_PROXY"
+        fi
+        npm install -g @docker-doctor/cli@0.4.0
+        docker-doctor --version
+      user: "0"
+      description: "Install pinned @docker-doctor/cli from registry.npmjs.org"
+    # Agent user: install the bundled skill into the sandbox home (global
+    # scope), never the workspace — the workspace is the user's host-mounted
+    # repo and must stay clean.
+    - command: |
+        set -eu
+        docker-doctor install --global --agent claude-code codex cursor opencode gemini-cli github-copilot droid kiro-cli
+      user: "1000"
+      description: "Install the docker-doctor agent skill globally for all supported agents"
+
+agentInstructions:
+  content: |
+    ## Docker Doctor
+
+    The `docker-doctor` CLI (static analysis for Dockerfiles and Docker
+    Compose files) is installed. After editing any Dockerfile or Compose
+    file, run `docker-doctor` from the project root and fix the reported
+    diagnostics before committing. For the full triage workflow, use the
+    installed `docker-doctor` skill (`/docker-doctor`).
