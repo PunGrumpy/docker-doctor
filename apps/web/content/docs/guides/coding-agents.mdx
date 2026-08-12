@@ -25,6 +25,16 @@ npx @docker-doctor/cli@latest install --agent claude-code cursor
 
 Any `agent-install` agent id is accepted. Unknown ids fail with the full list of valid ones.
 
+### Global install
+
+Pass `--global` to install the skill once for your whole machine instead of the current project — into each agent's global skills directory (for example `~/.claude/skills/` for Claude Code):
+
+```bash
+npx @docker-doctor/cli@latest install --global --agent claude-code cursor
+```
+
+This is also what the [Docker Sandboxes kit](/docs/guides/docker-sandboxes) uses inside sandboxes, so the mounted workspace stays clean.
+
 ## Hand issues to an agent after a scan
 
 When an interactive scan finds issues, Docker Doctor asks what to do next:

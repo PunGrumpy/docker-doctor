@@ -255,7 +255,7 @@ export const Architecture = async () => {
   });
 
   return (
-    <Section className="pt-8 pb-16">
+    <Section className="pt-8 pb-16 lg:pb-32">
       <h2 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
         <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-2 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
           <FileContent

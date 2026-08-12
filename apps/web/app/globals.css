@@ -82,7 +82,7 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Badge ramp, ported from Geist so the pill tints match exactly.
+  /* Badge ramp, ported the pill tints match exactly.
      Light values.
      `-200` seeds the subtle fill (the recipe keeps its chroma and hue and
      pins lightness); `-900` is the label colour. */
@@ -156,7 +156,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Badge ramp, ported from Geist so the pill tints match exactly.
+  /* Badge ramp, ported the pill tints match exactly.
      Dark values; the ramp flips so one class serves both themes.
      `-200` seeds the subtle fill (the recipe keeps its chroma and hue and
      pins lightness); `-900` is the label colour. */
@@ -368,28 +368,37 @@
   }
 }
 
-/* Global custom scrollbars */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
-  border-radius: 9999px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scrollbar-thumb-hover);
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
