@@ -256,7 +256,7 @@ export const Architecture = async () => {
 
   return (
     <Section className="pt-8 pb-16">
-      <h1 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
+      <h2 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
         <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-2 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
           <FileContent
             aria-hidden="true"
@@ -278,7 +278,7 @@ export const Architecture = async () => {
             </span>
           </span>
         </Badge>
-      </h1>
+      </h2>
 
       <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm text-balance">
         A visual tour through the Docker Doctor monorepo, from file discovery

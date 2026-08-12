@@ -7,7 +7,7 @@ import { Section } from "@/components/section";
 
 export const ActionDemo = () => (
   <Section className="flex w-full flex-col items-center pt-8 pb-16">
-    <h1 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
+    <h2 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
       <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-3 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
         <Bot aria-hidden="true" className="text-muted-foreground size-8" />
         every pull request
@@ -26,7 +26,7 @@ export const ActionDemo = () => (
           </span>
         </span>
       </Badge>
-    </h1>
+    </h2>
 
     <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm text-balance">
       Add <span className="font-mono">PunGrumpy/docker-doctor@v1</span> to your
@@ -35,8 +35,90 @@ export const ActionDemo = () => (
     </p>
 
     <div className="@container mt-8 w-full max-w-185">
-      <div className="relative aspect-740/357 w-full">
-        <div className="shadow-border absolute top-0 left-0 h-89.25 w-185 origin-top-left scale-[calc(tan(atan2(100cqw,740px)))] rounded-xl select-none">
+      <div className="shadow-border rounded-xl p-4 @xl:hidden">
+        <div className="flex items-center gap-2.5">
+          <div className="bg-card shadow-custom flex size-9 shrink-0 items-center justify-center rounded-[10px]">
+            <Stethoscope
+              aria-hidden="true"
+              className="text-muted-foreground size-4.5"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-foreground text-sm font-medium">
+              docker-doctor
+            </span>
+            <span className="bg-muted text-muted-foreground rounded-full px-2 text-xs font-medium">
+              Bot
+            </span>
+            <span className="text-muted-foreground text-sm">
+              reviewed 2 days ago
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-background shadow-border mt-4 overflow-hidden rounded-[11px]">
+          <div className="text-muted-foreground px-3 py-2 text-sm font-medium">
+            Dockerfile
+          </div>
+          <div className="font-mono text-[13px]/7">
+            <div className="bg-muted/40 flex gap-3 overflow-x-auto px-3">
+              <span
+                aria-hidden="true"
+                className="text-muted-foreground/60 select-none"
+              >
+                1
+              </span>
+              <span className="whitespace-nowrap">
+                <span className="text-[#d73a49] dark:text-[#f97583]">FROM</span>{" "}
+                <span className="text-[#24292e] dark:text-[#e1e4e8]">
+                  node:latest
+                </span>
+              </span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto bg-red-500/10 px-3">
+              <span
+                aria-hidden="true"
+                className="text-muted-foreground/60 select-none"
+              >
+                2
+              </span>
+              <span className="whitespace-nowrap">
+                <span className="text-[#d73a49] dark:text-[#f97583]">ENV</span>{" "}
+                <span className="text-[#24292e] dark:text-[#e1e4e8]">
+                  DB_PASSWORD=hunter2
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="text-sm font-medium text-red-600 dark:text-red-400">
+            Docker Doctor
+          </span>
+          <span className="bg-muted text-foreground rounded-[5px] px-2 py-0.5 font-mono text-[13px] font-medium">
+            no-secrets-in-env
+          </span>
+          <span className="text-sm font-medium text-red-600 dark:text-red-400">
+            (error)
+          </span>
+        </div>
+
+        <p className="text-muted-foreground mt-2 text-sm/6">
+          Fix -&gt; use Docker Secrets or runtime environment variables instead
+          of baking credentials into the image.
+        </p>
+
+        <Link
+          className="text-foreground relative mt-4 inline-block text-sm underline decoration-1 transition-opacity [text-underline-position:from-font] after:absolute after:-inset-x-4 after:-inset-y-3 hover:opacity-70"
+          href="/docs/reference/rules"
+        >
+          See docs
+        </Link>
+      </div>
+
+      <div className="relative hidden aspect-740/357 w-full @xl:block">
+        <div className="shadow-border absolute top-0 left-0 h-89.25 w-185 origin-top-left scale-[calc(tan(atan2(100cqw,740px)))] rounded-xl">
           <div
             aria-hidden="true"
             className="to-border absolute top-0 left-25 h-9 w-0.5 bg-linear-to-b from-transparent"
@@ -93,10 +175,16 @@ export const ActionDemo = () => (
             className="absolute top-41.25 left-33.5 h-7.75 w-15.25 bg-red-500/15"
           />
 
-          <div className="text-muted-foreground/60 absolute top-34.5 left-37.75 font-mono text-[13px]/[23.29px]">
+          <div
+            aria-hidden="true"
+            className="text-muted-foreground/60 absolute top-34.5 left-37.75 font-mono text-[13px]/[23.29px] select-none"
+          >
             1
           </div>
-          <div className="text-muted-foreground/60 absolute top-42.25 left-37.75 font-mono text-[13px]/[23.29px]">
+          <div
+            aria-hidden="true"
+            className="text-muted-foreground/60 absolute top-42.25 left-37.75 font-mono text-[13px]/[23.29px] select-none"
+          >
             2
           </div>
 
@@ -131,7 +219,7 @@ export const ActionDemo = () => (
             instead of baking credentials into the image.
           </div>
           <Link
-            className="text-foreground absolute top-72 left-38.5 text-sm/[23.29px] underline decoration-1 transition-opacity select-auto [text-underline-position:from-font] after:absolute after:-inset-x-6 after:-inset-y-5 hover:opacity-70"
+            className="text-foreground absolute top-72 left-38.5 text-sm/[23.29px] underline decoration-1 transition-opacity [text-underline-position:from-font] after:absolute after:-inset-x-6 after:-inset-y-5 hover:opacity-70"
             href="/docs/reference/rules"
           >
             See docs
