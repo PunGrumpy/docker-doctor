@@ -788,7 +788,7 @@ program
   )
   .option(
     "-g, --global",
-    "install into the home directory (~/.agents/skills and each agent's global dir) instead of the current project"
+    "install into each agent's global skills directory (e.g. ~/.claude/skills) instead of the current project"
   )
   .action(async (options: { agent?: string[]; global?: boolean }) => {
     const source = getSkillSourceDirectory();

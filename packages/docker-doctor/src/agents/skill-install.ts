@@ -26,7 +26,8 @@ export const getSkillSourceDirectory = (): string | null => {
 
 // Copies the bundled docker-doctor skill into each agent's skills dir so the
 // agent already knows the /docker-doctor triage workflow — project-level by
-// default, or the agent's global dir (~/.agents/skills etc.) when `global`.
+// default, or each agent's global dir (e.g. ~/.claude/skills; universal
+// agents share ~/.agents/skills) when `global`.
 // Best-effort: returns null when the bundled skill is missing or the install
 // throws — callers treat that as "skill not installed", never as a failure.
 export const installSkillForAgents = async (
@@ -41,7 +42,7 @@ export const installSkillForAgents = async (
     return await installSkillsFromSource({
       agents,
       cwd: options.projectRoot,
-      global: options.global ?? false,
+      global: options.global,
       mode: "copy",
       source,
     });

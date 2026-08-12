@@ -186,6 +186,16 @@ const makeTempDirs = () => {
       fs.rmSync(home, { force: true, recursive: true });
       fs.rmSync(project, { force: true, recursive: true });
     },
+    // agent-install resolves some agent dirs from env vars before falling
+    // back to HOME (CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_CONFIG_HOME). Pin
+    // them all inside the temp home, or a developer's real config dirs get
+    // written to — and clobbered — by the --global test.
+    env: {
+      CLAUDE_CONFIG_DIR: "",
+      CODEX_HOME: "",
+      HOME: home,
+      XDG_CONFIG_HOME: path.join(home, ".config"),
+    },
     home,
     project,
   };
@@ -193,11 +203,11 @@ const makeTempDirs = () => {
 
 describe("install", () => {
   test("--global installs into HOME and leaves the project untouched", async () => {
-    const { home, project, cleanup } = makeTempDirs();
+    const { home, project, env, cleanup } = makeTempDirs();
     try {
       const { exitCode } = await runCli(
         ["install", "--global", "--agent", "claude-code", "opencode"],
-        { cwd: project, env: { HOME: home } }
+        { cwd: project, env }
       );
       expect(exitCode).toBe(0);
       expect(
@@ -217,11 +227,11 @@ describe("install", () => {
   });
 
   test("without --global installs into the project and leaves HOME untouched", async () => {
-    const { home, project, cleanup } = makeTempDirs();
+    const { home, project, env, cleanup } = makeTempDirs();
     try {
       const { exitCode } = await runCli(
         ["install", "--agent", "claude-code", "opencode"],
-        { cwd: project, env: { HOME: home } }
+        { cwd: project, env }
       );
       expect(exitCode).toBe(0);
       expect(
@@ -241,11 +251,11 @@ describe("install", () => {
   });
 
   test("non-interactive run without --agent exits 1 with guidance", async () => {
-    const { home, project, cleanup } = makeTempDirs();
+    const { project, env, cleanup } = makeTempDirs();
     try {
       const { exitCode, stderr } = await runCli(["install", "--global"], {
         cwd: project,
-        env: { HOME: home },
+        env,
       });
       expect(exitCode).toBe(1);
       expect(stderr).toContain("--agent");
