@@ -16,6 +16,7 @@
     "@databuddy/sdk": "^2.6.0",
     "@docker-doctor/core": "workspace:*",
     "@t3-oss/env-nextjs": "^0.13.11",
+    "class-variance-authority": "^0.7.1",
     "cnfast": "^0.1.0",
     "date-fns": "^4.4.0",
     "fumadocs-core": "^16.14.3",
