@@ -1,5 +1,11 @@
 # @docker-doctor/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- 152c0c8: Update document the `--global` install flag and the Docker Sandboxes kit.
+
 ## 0.4.0
 
 ### Minor Changes
