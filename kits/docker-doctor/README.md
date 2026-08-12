@@ -51,6 +51,6 @@ None — the kit writes only inside the sandbox (global npm install + home-direc
 The kit versions independently of the CLI it installs — its own semver lives in `spec.yaml` (`version:`), the same way the GitHub Action's `v1` tag is independent of the npm package. Docker Hub tags are immutable by policy: every push gets a fresh version, `:latest` floats.
 
 - **CLI release (automatic)** — when the Release workflow publishes `@docker-doctor/cli` to npm, it re-pins `spec.yaml`, bumps the kit's **patch** version, commits both back to `main`, and pushes `:<kit-version>` + `:latest`.
-- **Kit-only change (manual)** — edit the spec, bump `version:` yourself in the same PR (minor for new behavior, patch for fixes), then run the **Kit Push** workflow (`Actions → Kit Push → Run workflow`). It pushes whatever version `spec.yaml` declares and refuses to overwrite an existing tag unless you tick `force`.
+- **Kit-only change (automatic)** — bump `version:` in the same PR (minor for new behavior, patch for fixes; CI fails the PR if you forget) and merging publishes it. The manual **Kit Push** workflow (`Actions → Kit Push → Run workflow`) remains for backfills and deliberate overwrites (`force`).
 
 Both paths authenticate with the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repository secrets.
