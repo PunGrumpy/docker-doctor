@@ -2,14 +2,14 @@ import { Eye, Stethoscope } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/badge";
-import { GitHub } from "@/components/icons/github";
+import { Bot } from "@/components/icons/bot";
 import { Section } from "@/components/section";
 
 export const ActionDemo = () => (
   <Section className="flex w-full flex-col items-center pt-8 pb-16">
     <h1 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
       <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-3 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
-        <GitHub aria-hidden="true" className="text-muted-foreground size-8" />
+        <Bot aria-hidden="true" className="text-muted-foreground size-8" />
         every pull request
       </span>
       <Badge
