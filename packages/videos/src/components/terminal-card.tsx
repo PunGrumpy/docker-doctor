@@ -19,9 +19,11 @@ export const INK = "rgba(0,0,0,0.85)";
 export const MUTED = "rgba(0,0,0,0.55)";
 export const FAINT = "rgba(0,0,0,0.34)";
 export const ACCENT = "#2563eb";
-export const ERROR = "#d64545";
+export const ERROR = "#c93a3a";
 export const WARNING = "#b45309";
-export const GREEN = "#1a9950";
+export const GREEN = "#15803d";
+// Kept at the brand terracotta: it only ever carries glyphs and marks that
+// sit beside text in INK, never information on its own.
 export const CLAUDE = "#cd694a";
 
 const CHROME_BORDER = "rgba(90,100,120,0.14)";
@@ -44,6 +46,9 @@ export interface BaseLine {
   /** `cmd` types out and `working` spins; every other kind is the scene's. */
   kind: string;
   text?: string;
+  /** cmd lines: the gutter mark. Defaults to `$`; pass " " to continue the
+      previous command onto another line. */
+  prefix?: string;
   /** Frames after the previous line finishes before this one lands. */
   delay: number;
   /** Extra hold after this line, before the next starts. */
@@ -263,7 +268,9 @@ export const TerminalCard = <L extends BaseLine>({
                       whiteSpace: "pre",
                     }}
                   >
-                    <span style={{ color: ACCENT, marginRight: 8 }}>$</span>
+                    <span style={{ color: ACCENT, marginRight: 8 }}>
+                      {line.prefix ?? "$"}
+                    </span>
                     <span style={{ color: INK }}>
                       {line.text?.slice(0, revealed)}
                     </span>

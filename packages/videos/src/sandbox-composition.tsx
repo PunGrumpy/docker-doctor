@@ -14,12 +14,7 @@ import { SoftBlurIn } from "./components/remocn/soft-blur-in";
 import { MONO } from "./components/terminal-card";
 import { FONT_VARS } from "./fonts";
 import { Logo } from "./scenes/logo";
-import {
-  SANDBOX_AGENT_DURATION,
-  SANDBOX_BOOT_DURATION,
-  SandboxAgent,
-  SandboxBoot,
-} from "./scenes/sandbox-terminal";
+import { SANDBOX_RUN_DURATION, SandboxRun } from "./scenes/sandbox-terminal";
 
 // The Docker Sandboxes kit announcement cut — square, so it takes the feed
 // height a 16:9 crop gives away. Same backdrop, type, and frosted terminal as
@@ -80,11 +75,7 @@ const ScenePayoff = () => (
     </Positioned>
     <Sequence from={10} layout="none">
       <Positioned dy={40}>
-        <SoftBlurIn
-          color={MUTED}
-          fontSize={40}
-          text="The kit did, once, at boot."
-        />
+        <SoftBlurIn color={MUTED} fontSize={40} text="The kit already did." />
       </Positioned>
     </Sequence>
   </>
@@ -160,9 +151,8 @@ export const SIZE = 1080;
 // Scene starts, derived so the terminal scenes can grow without hand-retiming
 // everything after them.
 const HOOK_END = 74;
-const BOOT_END = HOOK_END + SANDBOX_BOOT_DURATION;
-const AGENT_END = BOOT_END + SANDBOX_AGENT_DURATION;
-const PAYOFF_END = AGENT_END + PAYOFF_DURATION;
+const RUN_END = HOOK_END + SANDBOX_RUN_DURATION;
+const PAYOFF_END = RUN_END + PAYOFF_DURATION;
 const CTA_END = PAYOFF_END + CTA_DURATION;
 export const DURATION = CTA_END + 62;
 
@@ -193,22 +183,15 @@ export const SandboxKit = () => {
             <SceneHook />
           </Sequence>
           <Sequence
-            durationInFrames={SANDBOX_BOOT_DURATION}
+            durationInFrames={SANDBOX_RUN_DURATION}
             from={HOOK_END}
             layout="none"
           >
-            <SandboxBoot />
-          </Sequence>
-          <Sequence
-            durationInFrames={SANDBOX_AGENT_DURATION}
-            from={BOOT_END}
-            layout="none"
-          >
-            <SandboxAgent />
+            <SandboxRun />
           </Sequence>
           <Sequence
             durationInFrames={PAYOFF_DURATION}
-            from={AGENT_END}
+            from={RUN_END}
             layout="none"
           >
             <ScenePayoff />
