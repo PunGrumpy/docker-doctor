@@ -106,7 +106,7 @@ export const Sandboxes = () => (
       Dockerfile and Compose changes before committing them.
     </p>
 
-    <div className="relative mt-8 w-full max-w-185 sm:mb-12">
+    <div className="relative mt-8 mb-4 w-full max-w-185 sm:mb-12">
       <section
         aria-label="Sandbox demo"
         className="bg-card shadow-border w-full overflow-hidden rounded-3xl"
@@ -120,7 +120,7 @@ export const Sandboxes = () => (
           </div>
         </header>
 
-        <div className="space-y-3 p-6 font-mono text-[13px] leading-relaxed sm:flex sm:min-h-[460px] sm:flex-col">
+        <div className="space-y-3 p-6 font-mono text-sm leading-relaxed sm:flex sm:min-h-[460px] sm:flex-col sm:text-[13px]">
           <div className="text-foreground flex items-center gap-2">
             <span className="font-bold text-emerald-500 select-none">$</span>
             <span className="min-w-0 truncate">{KIT_COMMAND}</span>
@@ -156,7 +156,7 @@ export const Sandboxes = () => (
 
       <section
         aria-label="Agent conversation"
-        className="bg-card shadow-border mt-3 w-full overflow-hidden rounded-xl sm:absolute sm:-bottom-8 sm:-left-2 sm:mt-0 sm:max-w-56 lg:-left-6"
+        className="bg-card shadow-border mt-3 w-full overflow-hidden rounded-3xl sm:absolute sm:-bottom-8 sm:-left-2 sm:mt-0 sm:max-w-56 lg:-left-6"
       >
         <header className="relative flex h-8 w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
           <h3 className="text-muted-foreground text-center text-xs font-medium">
@@ -195,7 +195,7 @@ export const Sandboxes = () => (
 
     <div className="bg-background shadow-border flex w-full max-w-185 items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
       <span className="text-muted-foreground/60 font-mono select-none">$</span>
-      <pre className="flex-1 overflow-x-auto whitespace-nowrap select-all">
+      <pre className="no-scrollbar flex-1 overflow-x-auto whitespace-nowrap select-all">
         <code className="text-muted-foreground font-mono">{KIT_COMMAND}</code>
       </pre>
       <CopyButton
@@ -211,7 +211,7 @@ export const Sandboxes = () => (
         data-track="sandbox_guide_clicked"
         href="/docs/guides/docker-sandboxes"
       >
-        Read the Docker Sandboxes guide →
+        Read the Docker Sandboxes guide <span aria-hidden="true">→</span>
       </Link>
     </p>
   </Section>
