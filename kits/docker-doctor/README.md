@@ -4,6 +4,12 @@ Static analysis for Dockerfiles and Docker Compose files, preinstalled in your s
 
 ## Usage
 
+From Docker Hub (no configuration needed — `sbx` trusts `docker.io/` by default). The tag is required; `sbx` does not default to `:latest`:
+
+```console
+$ sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
+```
+
 From this repository (source of truth):
 
 ```console
