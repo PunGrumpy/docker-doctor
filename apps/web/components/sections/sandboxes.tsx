@@ -70,7 +70,7 @@ const AgentStep = ({ icon, label, actions }: AgentStepProps) => (
 );
 
 export const Sandboxes = () => (
-  <Section className="flex w-full flex-col items-center pt-8 pb-16">
+  <Section className="flex w-full flex-col items-center pt-8 pb-16 lg:pb-32">
     <h2 className="text-foreground flex flex-col items-center justify-center text-3xl font-normal tracking-tight sm:text-5xl">
       <span className="bg-muted relative top-[-0.08em] ml-1 inline-flex items-center gap-3 rounded-lg px-3 py-[0.04em] pr-4 align-baseline font-serif">
         <Cube aria-hidden="true" className="size-8" />
@@ -106,7 +106,7 @@ export const Sandboxes = () => (
       Dockerfile and Compose changes before committing them.
     </p>
 
-    <div className="relative mt-8 mb-24 w-full max-w-185 sm:mb-12">
+    <div className="relative mt-8 w-full max-w-185 sm:mb-12">
       <section
         aria-label="Sandbox demo"
         className="bg-card shadow-border w-full overflow-hidden rounded-3xl"
@@ -120,7 +120,7 @@ export const Sandboxes = () => (
           </div>
         </header>
 
-        <div className="space-y-3 p-6 pb-24 font-mono text-[13px] leading-relaxed sm:pb-16">
+        <div className="space-y-3 p-6 font-mono text-[13px] leading-relaxed sm:flex sm:h-[460px] sm:flex-col">
           <div className="text-foreground flex items-center gap-2">
             <span className="font-bold text-emerald-500 select-none">$</span>
             <span className="min-w-0 truncate">{KIT_COMMAND}</span>
@@ -143,7 +143,7 @@ export const Sandboxes = () => (
               <span>agent memory: lint Docker changes before committing</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1 sm:mt-auto sm:justify-end sm:pl-60 sm:text-right">
             <span className="text-foreground font-semibold">
               ✅ Committed clean:
             </span>
@@ -156,7 +156,7 @@ export const Sandboxes = () => (
 
       <section
         aria-label="Agent conversation"
-        className="bg-card shadow-border absolute -bottom-20 left-4 w-full max-w-56 overflow-hidden rounded-xl sm:-bottom-8 sm:-left-6"
+        className="bg-card shadow-border mt-3 w-full overflow-hidden rounded-xl sm:absolute sm:-bottom-8 sm:-left-6 sm:mt-0 sm:max-w-56"
       >
         <header className="relative flex h-8 w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
           <h3 className="text-center text-xs font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
