@@ -36,7 +36,7 @@ interface AgentStepProps {
 }
 
 const AgentStep = ({ icon, label, actions }: AgentStepProps) => (
-  <div className="bg-background shadow-custom flex flex-col gap-1.5 rounded-lg border px-2.5 py-2">
+  <div className="bg-background shadow-custom flex flex-col gap-1.5 rounded-lg px-2.5 py-2">
     <div className="text-foreground flex items-center gap-1.5">
       <span aria-hidden="true" className="[&_svg]:size-3 [&_svg]:min-w-3">
         {icon}
@@ -47,7 +47,7 @@ const AgentStep = ({ icon, label, actions }: AgentStepProps) => (
       <ul className="flex list-none flex-col gap-1">
         {actions.map((action) => (
           <li
-            className="text-muted-foreground flex min-w-0 items-center gap-1.5 font-mono text-[11px]"
+            className="text-muted-foreground flex min-w-0 items-center gap-1.5 font-mono text-xs"
             key={action.text}
           >
             {action.warn ? (
@@ -112,15 +112,15 @@ export const Sandboxes = () => (
         className="bg-card shadow-border w-full overflow-hidden rounded-3xl"
       >
         <header className="relative flex h-[45px] w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
-          <h3 className="w-max text-center text-[17px] leading-[145%] font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
-            Docker Sandbox — microVM
+          <h3 className="text-muted-foreground text-center text-[17px] leading-[145%] font-medium">
+            <span className="hidden sm:inline">Docker Sandbox — </span>microVM
           </h3>
           <div className="absolute top-[15px] left-[18px]">
             <TrafficLights dotClass="size-[17px]" />
           </div>
         </header>
 
-        <div className="space-y-3 p-6 font-mono text-[13px] leading-relaxed sm:flex sm:h-[460px] sm:flex-col">
+        <div className="space-y-3 p-6 font-mono text-[13px] leading-relaxed sm:flex sm:min-h-[460px] sm:flex-col">
           <div className="text-foreground flex items-center gap-2">
             <span className="font-bold text-emerald-500 select-none">$</span>
             <span className="min-w-0 truncate">{KIT_COMMAND}</span>
@@ -132,7 +132,7 @@ export const Sandboxes = () => (
             </div>
             <div className="flex items-center gap-2">
               <Check aria-hidden="true" className="size-3.5 text-emerald-500" />
-              <span>@docker-doctor/cli 0.4.0 installed</span>
+              <span>@docker-doctor/cli installed (pinned)</span>
             </div>
             <div className="flex items-center gap-2">
               <Check aria-hidden="true" className="size-3.5 text-emerald-500" />
@@ -145,7 +145,7 @@ export const Sandboxes = () => (
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1 sm:mt-auto sm:justify-end sm:pl-60 sm:text-right">
             <span className="text-foreground font-semibold">
-              ✅ Committed clean:
+              <span aria-hidden="true">✅ </span>Committed clean:
             </span>
             <span className="text-muted-foreground">
               Dockerfile scored 100/100 before it left the sandbox
@@ -156,10 +156,10 @@ export const Sandboxes = () => (
 
       <section
         aria-label="Agent conversation"
-        className="bg-card shadow-border mt-3 w-full overflow-hidden rounded-xl sm:absolute sm:-bottom-8 sm:-left-6 sm:mt-0 sm:max-w-56"
+        className="bg-card shadow-border mt-3 w-full overflow-hidden rounded-xl sm:absolute sm:-bottom-8 sm:-left-2 sm:mt-0 sm:max-w-56 lg:-left-6"
       >
         <header className="relative flex h-8 w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
-          <h3 className="text-center text-xs font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
+          <h3 className="text-muted-foreground text-center text-xs font-medium">
             Agent
           </h3>
           <div className="absolute top-[11px] left-[11px]">
@@ -195,7 +195,7 @@ export const Sandboxes = () => (
 
     <div className="bg-background shadow-border flex w-full max-w-185 items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
       <span className="text-muted-foreground/60 font-mono select-none">$</span>
-      <pre className="flex-1 truncate select-all">
+      <pre className="flex-1 overflow-x-auto whitespace-nowrap select-all">
         <code className="text-muted-foreground font-mono">{KIT_COMMAND}</code>
       </pre>
       <CopyButton
