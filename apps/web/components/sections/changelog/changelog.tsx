@@ -1,3 +1,4 @@
+import { Pill } from "@/components/pill";
 import { Section } from "@/components/section";
 import type { ChangelogData } from "@/lib/changelog";
 import { cn } from "@/lib/utils";
@@ -79,16 +80,16 @@ export const Changelog = ({ data }: ChangelogProps) => {
               />
             )}
 
-            <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1 group-focus-visible:ring-2">
+            <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1">
               <div className="preview-card relative flex size-full flex-col items-start justify-start overflow-hidden rounded-xl p-4">
                 <div className="mb-4 flex items-center gap-3">
                   <h2 className="text-lg font-semibold tracking-tight text-balance">
                     v<span className="tabular-nums">{version.version}</span>
                   </h2>
                   {index === 0 && (
-                    <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-500 select-none">
+                    <Pill contrast="low" size="md" variant="blue">
                       Latest
-                    </span>
+                    </Pill>
                   )}
                 </div>
 
