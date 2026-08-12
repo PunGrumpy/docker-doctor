@@ -11,6 +11,11 @@ permissions:
   pull-requests: write
   issues: write
 
+# One release at a time; never cancel a run that may already have published.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
   SKIP_ENV_VALIDATION: "1"
 
@@ -46,8 +51,10 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: bun run changeset version
-          publish: bun run changeset publish
+          # changeset:version also resyncs bun.lock so the Version Packages
+          # PR doesn't fail the Format CI job with a stale lockfile.
+          version: bun run changeset:version
+          publish: bun run changeset:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: "" # Workaround for https://github.com/changesets/action/pull/545
@@ -81,6 +88,9 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$spec"
             git commit -m "chore(kits): kit $kit_version — pin @docker-doctor/cli@${{ steps.cli.outputs.version }} [skip ci]"
+            # main may have advanced while this run was publishing
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
           fi
           echo "version=$kit_version" >> "$GITHUB_OUTPUT"

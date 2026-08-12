@@ -23,6 +23,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Smoke-test the action at this exact SHA before pointing every
+      # consumer at it: scan a fixture with known findings and require a
+      # non-empty result.
+      - name: Smoke-test the action
+        id: smoke
+        uses: ./
+        with:
+          directory: packages/docker-doctor/test/fixtures/with-error
+          blocking: none
+          comment: "false"
+
+      - name: Assert the smoke test produced results
+        run: |
+          if [ -z "${{ steps.smoke.outputs.score }}" ] || [ "${{ steps.smoke.outputs.total-issues }}" -lt 1 ]; then
+            echo "::error::Action smoke test returned no results (score='${{ steps.smoke.outputs.score }}', total-issues='${{ steps.smoke.outputs.total-issues }}') — not moving v1"
+            exit 1
+          fi
+
       - name: Move the floating major tag
         run: |
           git tag -f v1
