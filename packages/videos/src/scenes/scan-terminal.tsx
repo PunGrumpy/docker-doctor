@@ -1,51 +1,38 @@
+import type { BaseLine } from "../components/terminal-card";
 import {
-  AbsoluteFill,
-  Easing,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
+  ACCENT,
+  CLAUDE,
+  ERROR,
+  FAINT,
+  GREEN,
+  INK,
+  LINE_H,
+  MUTED,
+  makeScript,
+  TerminalCard,
+  viewportHeight,
+  WARNING,
+} from "../components/terminal-card";
 
-// The two scan terminal scenes, sharing one frosted-card renderer — modeled
+// The two scan terminal scenes, sharing the frosted-card renderer — modeled
 // on blume's audit-terminal:
 //   ScanReport — `docker-doctor .` prints the findings report (grouped by
 //   file, exactly the shape the real CLI prints, mascot scorecard included).
 //   ScanAgent — `claude` picks up the findings (startup banner and the echoed
 //   fix prompt), works through them, then the re-scan goes green.
 
-const MONO = "var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace";
-
-const INK = "rgba(0,0,0,0.85)";
-const MUTED = "rgba(0,0,0,0.55)";
-const FAINT = "rgba(0,0,0,0.34)";
-const ACCENT = "#2563eb";
-const ERROR = "#d64545";
-const WARNING = "#b45309";
-const GREEN = "#1a9950";
-const CLAUDE = "#cd694a";
-const CHROME_BORDER = "rgba(90,100,120,0.14)";
-
 const CARD_W = 960;
 const CARD_H = 564;
-const CHROME_H = 40;
-const PAD_X = 26;
-const PAD_TOP = 12;
-const PAD_BOTTOM = 18;
-const LINE_H = 23;
-const VIEW_H = CARD_H - CHROME_H - PAD_TOP - PAD_BOTTOM;
+const VIEW_H = viewportHeight(CARD_H);
 // Block heights for the fixed-size inserts — the scroll math and the layout
 // must agree exactly (the wrappers are sized to these).
 const BANNER_H = 104;
 const PROMPT_H = 314;
 const SCORE_H = 96;
 
-const EASE = Easing.bezier(0.22, 1, 0.36, 1);
-const CHARS_PER_FRAME = 2;
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
-
 type Severity = "error" | "warning";
 
-interface TermLine {
+interface TermLine extends BaseLine {
   kind:
     | "cmd"
     | "blank"
@@ -61,7 +48,6 @@ interface TermLine {
     | "working"
     | "ok"
     | "score";
-  text?: string;
   /** header: the dim workspace tail; finding: the dim rule key. */
   meta?: string;
   /** code lines: the dim `file:line` that the finding points at. */
@@ -69,10 +55,6 @@ interface TermLine {
   severity?: Severity;
   /** score rows: the number, verdict, and meter fill. */
   score?: { value: number; verdict: string; healthy: boolean };
-  /** Frames after the previous line finishes before this one lands. */
-  delay: number;
-  /** Extra hold after this line, before the next starts. */
-  pause?: number;
 }
 
 // The Claude Code session it opens — the startup banner and the echoed agent
@@ -189,12 +171,6 @@ const AGENT_LINES: TermLine[] = [
   },
 ];
 
-/** Frames a line spends arriving: cmd lines type, output lines just land. */
-const arrival = (line: TermLine): number =>
-  line.kind === "cmd"
-    ? Math.ceil((line.text?.length ?? 0) / CHARS_PER_FRAME)
-    : 0;
-
 const heightOf = (line: TermLine): number => {
   if (line.kind === "banner") {
     return BANNER_H;
@@ -208,42 +184,16 @@ const heightOf = (line: TermLine): number => {
   return LINE_H;
 };
 
-interface TermScript {
-  duration: number;
-  lines: TermLine[];
-  scrollSteps: { start: number; delta: number }[];
-  starts: number[];
-}
-
-// Compile a script: absolute start frames, total duration, and the terminal
-// scroll — once the content outgrows the viewport, each new line eases the
-// buffer up just far enough to stay visible (monotonic by construction).
-const makeScript = (lines: TermLine[], tailHold: number): TermScript => {
-  const starts: number[] = [];
-  let acc = 14;
-  for (const line of lines) {
-    acc += line.delay;
-    starts.push(acc);
-    acc += arrival(line) + (line.pause ?? 0);
-  }
-
-  const scrollSteps: { start: number; delta: number }[] = [];
-  let target = 0;
-  let bottom = 0;
-  for (const [i, start] of starts.entries()) {
-    bottom += heightOf(lines[i]);
-    const next = Math.max(target, bottom - VIEW_H);
-    if (next > target) {
-      scrollSteps.push({ delta: next - target, start });
-      target = next;
-    }
-  }
-
-  return { duration: acc + tailHold, lines, scrollSteps, starts };
-};
-
-const REPORT_SCRIPT = makeScript(REPORT_LINES, 70);
-const AGENT_SCRIPT = makeScript(AGENT_LINES, 56);
+const REPORT_SCRIPT = makeScript(REPORT_LINES, {
+  heightOf,
+  tailHold: 70,
+  viewHeight: VIEW_H,
+});
+const AGENT_SCRIPT = makeScript(AGENT_LINES, {
+  heightOf,
+  tailHold: 56,
+  viewHeight: VIEW_H,
+});
 
 export const SCAN_REPORT_DURATION = REPORT_SCRIPT.duration;
 export const SCAN_AGENT_DURATION = AGENT_SCRIPT.duration;
@@ -253,21 +203,6 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   warning: WARNING,
 };
 const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
-
-// Braille spinner for the working line, advanced every 3 frames.
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-const TrafficLight = ({ color }: { readonly color: string }) => (
-  <span
-    style={{
-      background: color,
-      borderRadius: 999,
-      display: "inline-block",
-      height: 11,
-      width: 11,
-    }}
-  />
-);
 
 // The Claude Code startup banner — a bordered box, like the real CLI draws.
 const ClaudeBanner = () => (
@@ -387,7 +322,7 @@ const ScoreBlock = ({
   );
 };
 
-const LineBody = ({ line }: { readonly line: TermLine }) => {
+const LineBody = (line: TermLine) => {
   switch (line.kind) {
     case "blank": {
       return null;
@@ -459,196 +394,24 @@ const LineBody = ({ line }: { readonly line: TermLine }) => {
   }
 };
 
-const TerminalCard = ({ script }: { readonly script: TermScript }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { lines, scrollSteps, starts } = script;
+export const ScanReport = () => (
+  <TerminalCard
+    height={CARD_H}
+    heightOf={heightOf}
+    renderLine={LineBody}
+    script={REPORT_SCRIPT}
+    title="~/PunGrumpy"
+    width={CARD_W}
+  />
+);
 
-  const cardOpacity = interpolate(frame, [0, 14], [0, 1], clamp);
-  const cardScale = interpolate(frame, [0, 20], [0.985, 1], {
-    ...clamp,
-    easing: EASE,
-  });
-  const cardY = interpolate(frame, [0, 20], [18, 0], {
-    ...clamp,
-    easing: EASE,
-  });
-
-  const scroll = scrollSteps.reduce(
-    (acc, step) =>
-      acc +
-      interpolate(frame, [step.start, step.start + 16], [0, step.delta], {
-        ...clamp,
-        easing: EASE,
-      }),
-    0
-  );
-
-  const cursorOn = Math.floor((frame / fps) * 2) % 2 === 0;
-  let activeIndex = -1;
-  for (const [i, start] of starts.entries()) {
-    if (frame >= start) {
-      activeIndex = i;
-    }
-  }
-
-  const cardStyle = {
-    WebkitBackdropFilter: "blur(16px)",
-    backdropFilter: "blur(16px)",
-    background: "rgba(255,255,255,0.82)",
-    border: "1px solid rgba(255,255,255,0.85)",
-    borderRadius: 14,
-    boxShadow:
-      "0 30px 70px rgba(30,40,60,0.24), inset 0 1px 0 rgba(255,255,255,0.8)",
-    height: CARD_H,
-    opacity: cardOpacity,
-    overflow: "hidden",
-    transform: `translateY(${cardY}px) scale(${cardScale})`,
-    width: CARD_W,
-  } as const;
-
-  return (
-    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-      <div style={cardStyle}>
-        {/* terminal chrome */}
-        <div
-          style={{
-            alignItems: "center",
-            borderBottom: `1px solid ${CHROME_BORDER}`,
-            display: "flex",
-            gap: 8,
-            height: CHROME_H,
-            padding: "0 16px",
-            position: "relative",
-          }}
-        >
-          <TrafficLight color="#ff5f57" />
-          <TrafficLight color="#febc2e" />
-          <TrafficLight color="#28c840" />
-          <div
-            style={{
-              color: MUTED,
-              fontFamily: MONO,
-              fontSize: 13,
-              left: 0,
-              position: "absolute",
-              right: 0,
-              textAlign: "center",
-            }}
-          >
-            ~/PunGrumpy
-          </div>
-        </div>
-
-        {/* scrolling buffer */}
-        <div
-          style={{
-            height: VIEW_H,
-            marginTop: PAD_TOP,
-            overflow: "hidden",
-            padding: `0 ${PAD_X}px`,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: MONO,
-              fontSize: 14.5,
-              lineHeight: `${LINE_H}px`,
-              transform: `translateY(${-scroll}px)`,
-            }}
-          >
-            {lines.map((line, i) => {
-              if (frame < starts[i]) {
-                return null;
-              }
-              const local = frame - starts[i];
-              const landed = interpolate(local, [0, 4], [0, 1], clamp);
-
-              if (line.kind === "cmd") {
-                const revealed = Math.min(
-                  line.text?.length ?? 0,
-                  Math.floor(local * CHARS_PER_FRAME)
-                );
-                const typing = revealed < (line.text?.length ?? 0);
-                const showCursor = i === activeIndex && typing && cursorOn;
-                return (
-                  <div
-                    key={`${line.kind}-${i}`}
-                    style={{
-                      alignItems: "center",
-                      display: "flex",
-                      height: LINE_H,
-                      whiteSpace: "pre",
-                    }}
-                  >
-                    <span style={{ color: ACCENT, marginRight: 8 }}>$</span>
-                    <span style={{ color: INK }}>
-                      {line.text?.slice(0, revealed)}
-                    </span>
-                    {showCursor ? (
-                      <span
-                        style={{
-                          background: INK,
-                          display: "inline-block",
-                          height: 15,
-                          marginLeft: 2,
-                          transform: "translateY(2px)",
-                          width: 8,
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                );
-              }
-
-              if (line.kind === "working") {
-                // Spins until the completion line lands, then settles to a
-                // dim bullet.
-                const doneIndex = lines.findIndex(
-                  (next, j) => j > i && next.kind === "ok"
-                );
-                const stopped = doneIndex !== -1 && frame >= starts[doneIndex];
-                const glyph = stopped
-                  ? "•"
-                  : SPINNER[Math.floor(local / 3) % SPINNER.length];
-                return (
-                  <div
-                    key={`${line.kind}-${i}`}
-                    style={{
-                      height: LINE_H,
-                      opacity: landed,
-                      whiteSpace: "pre",
-                    }}
-                  >
-                    <span style={{ color: stopped ? FAINT : CLAUDE }}>
-                      {`  ${glyph} `}
-                    </span>
-                    <span style={{ color: stopped ? MUTED : INK }}>
-                      {line.text}
-                    </span>
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={`${line.kind}-${i}`}
-                  style={{
-                    height: heightOf(line),
-                    opacity: landed,
-                    whiteSpace: "pre",
-                  }}
-                >
-                  <LineBody line={line} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-export const ScanReport = () => <TerminalCard script={REPORT_SCRIPT} />;
-export const ScanAgent = () => <TerminalCard script={AGENT_SCRIPT} />;
+export const ScanAgent = () => (
+  <TerminalCard
+    height={CARD_H}
+    heightOf={heightOf}
+    renderLine={LineBody}
+    script={AGENT_SCRIPT}
+    title="~/PunGrumpy"
+    width={CARD_W}
+  />
+);

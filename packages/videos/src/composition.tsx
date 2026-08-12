@@ -1,7 +1,4 @@
-import { loadFont as loadGeistSans } from "@remotion/google-fonts/Geist";
-import { loadFont as loadGeistMono } from "@remotion/google-fonts/GeistMono";
-import { loadFont as loadInstrumentSerif } from "@remotion/google-fonts/InstrumentSerif";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   AbsoluteFill,
   Img,
@@ -13,6 +10,7 @@ import {
 import { SharedAxisY } from "./components/remocn/shared-axis-y";
 import { SoftBlurIn } from "./components/remocn/soft-blur-in";
 import { Typewriter } from "./components/remocn/typewriter";
+import { FONT_VARS, SANS } from "./fonts";
 import { Logo } from "./scenes/logo";
 import {
   SCAN_AGENT_DURATION,
@@ -26,22 +24,7 @@ import {
 // derived timeline so the terminal scenes can grow without hand-retiming
 // everything after them.
 
-const { fontFamily: GEIST_SANS } = loadGeistSans("normal", {
-  subsets: ["latin"],
-  weights: ["400", "500", "600", "700"],
-});
-const { fontFamily: GEIST_MONO } = loadGeistMono("normal", {
-  subsets: ["latin"],
-  weights: ["400", "500", "600", "700"],
-});
-const { fontFamily: INSTRUMENT_SERIF } = loadInstrumentSerif("normal", {
-  subsets: ["latin"],
-  weights: ["400"],
-});
-
 const INK = "rgba(0,0,0,0.85)";
-const SANS =
-  "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
 
 // Nudge a full-frame, self-centering component off-center without touching
 // its internals: translate the frame it lays itself out in.
@@ -170,15 +153,6 @@ const SceneCta = () => (
     />
   </Sequence>
 );
-
-// Wire the loaded faces to the CSS variables every component reads
-// (`var(--font-geist-sans)` / `var(--font-geist-mono)` / `var(--font-serif)`).
-// Asserted because CSSProperties doesn't type custom `--*` keys.
-const FONT_VARS = {
-  "--font-geist-mono": GEIST_MONO,
-  "--font-geist-sans": GEIST_SANS,
-  "--font-serif": INSTRUMENT_SERIF,
-} as CSSProperties;
 
 // Every scene is authored against this reference stage; the whole tree is
 // scaled uniformly to whatever 16:9 resolution the composition is set to
