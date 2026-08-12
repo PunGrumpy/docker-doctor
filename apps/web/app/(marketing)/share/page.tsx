@@ -59,7 +59,7 @@ const SharePage = async ({
   return (
     <>
       <Hero />
-      <Section className="items-stretch pt-8 pb-16">
+      <Section className="grow items-stretch justify-center pb-8 sm:pb-16">
         <Card score={score} errors={errors} warnings={warnings} />
       </Section>
     </>
