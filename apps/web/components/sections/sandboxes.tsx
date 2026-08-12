@@ -15,11 +15,17 @@ import { Section } from "@/components/section";
 const KIT_COMMAND =
   "sbx run --kit docker.io/pungrumpy/docker-doctor-kit claude";
 
-const TrafficLights = () => (
-  <div aria-hidden="true" className="flex items-center gap-1.5">
-    <div className="size-2 shrink-0 rounded-full bg-[#EE6D5E]" />
-    <div className="size-2 shrink-0 rounded-full bg-[#F3BF4A]" />
-    <div className="size-2 shrink-0 rounded-full bg-[#5DC753]" />
+const TrafficLights = ({ dotClass }: { readonly dotClass: string }) => (
+  <div aria-hidden="true" className="flex items-start gap-2">
+    <div
+      className={`shrink-0 rounded-full bg-[oklch(71.3%_0.171_26)] dark:bg-[#323232] ${dotClass}`}
+    />
+    <div
+      className={`shrink-0 rounded-full bg-[oklch(82.5%_0.159_80.9)] dark:bg-[#323232] ${dotClass}`}
+    />
+    <div
+      className={`shrink-0 rounded-full bg-[oklch(88.4%_0_0)] dark:bg-[#323232] ${dotClass}`}
+    />
   </div>
 );
 
@@ -105,13 +111,13 @@ export const Sandboxes = () => (
         aria-label="Sandbox demo"
         className="bg-card shadow-border w-full overflow-hidden rounded-3xl"
       >
-        <header className="relative flex h-9 items-center justify-between border-b px-3 select-none">
-          <TrafficLights />
-          <h3 className="text-muted-foreground flex items-center gap-1.5 font-mono text-xs">
-            <Cube aria-hidden="true" className="size-3.5" />
-            dd-sandbox — microVM
+        <header className="relative flex h-[45px] w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
+          <h3 className="w-max text-center text-[17px] leading-[145%] font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
+            Docker Sandbox — microVM
           </h3>
-          <div className="min-w-[52px]" />
+          <div className="absolute top-[15px] left-[18px]">
+            <TrafficLights dotClass="size-[17px]" />
+          </div>
         </header>
 
         <div className="space-y-3 p-6 pb-24 font-mono text-[13px] leading-relaxed sm:pb-16">
@@ -152,10 +158,13 @@ export const Sandboxes = () => (
         aria-label="Agent conversation"
         className="bg-card shadow-border absolute -bottom-20 left-4 w-full max-w-56 overflow-hidden rounded-xl sm:-bottom-8 sm:-left-6"
       >
-        <header className="relative flex h-8 items-center justify-between border-b px-2.5 select-none">
-          <TrafficLights />
-          <h3 className="text-muted-foreground text-xs font-medium">Agent</h3>
-          <div className="min-w-[38px]" />
+        <header className="relative flex h-8 w-full shrink-0 items-center justify-center border-b border-b-[#EBEBEB] select-none dark:border-b-[#1f1f1f]">
+          <h3 className="text-center text-xs font-medium text-[#6E6E6E] dark:text-[#7A7A7A]">
+            Agent
+          </h3>
+          <div className="absolute top-[11px] left-[11px]">
+            <TrafficLights dotClass="size-2.5" />
+          </div>
         </header>
         <div className="flex flex-col gap-2 p-3">
           <div className="bg-muted text-foreground ml-6 rounded-lg px-2.5 py-1.5 text-xs">
