@@ -1,11 +1,18 @@
 import { beforeAll, describe, expect, test } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
 
-const runCli = async (args: string[]) => {
+const runCli = async (
+  args: string[],
+  options: { cwd?: string; env?: Record<string, string> } = {}
+) => {
   const proc = Bun.spawn(["node", CLI, ...args], {
+    cwd: options.cwd,
+    env: options.env ? { ...process.env, ...options.env } : undefined,
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -168,5 +175,82 @@ describe("heredoc fixture", () => {
     const { stdout } = await runCli([fixture("heredoc"), "--json"]);
     const report = JSON.parse(stdout);
     expect(report.diagnostics.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+const makeTempDirs = () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "dd-home-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "dd-project-"));
+  return {
+    cleanup: () => {
+      fs.rmSync(home, { force: true, recursive: true });
+      fs.rmSync(project, { force: true, recursive: true });
+    },
+    home,
+    project,
+  };
+};
+
+describe("install", () => {
+  test("--global installs into HOME and leaves the project untouched", async () => {
+    const { home, project, cleanup } = makeTempDirs();
+    try {
+      const { exitCode } = await runCli(
+        ["install", "--global", "--agent", "claude-code", "opencode"],
+        { cwd: project, env: { HOME: home } }
+      );
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(
+          path.join(home, ".claude", "skills", "docker-doctor", "SKILL.md")
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(home, ".agents", "skills", "docker-doctor", "SKILL.md")
+        )
+      ).toBe(true);
+      expect(fs.readdirSync(project)).toEqual([]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("without --global installs into the project and leaves HOME untouched", async () => {
+    const { home, project, cleanup } = makeTempDirs();
+    try {
+      const { exitCode } = await runCli(
+        ["install", "--agent", "claude-code", "opencode"],
+        { cwd: project, env: { HOME: home } }
+      );
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(
+          path.join(project, ".claude", "skills", "docker-doctor", "SKILL.md")
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(project, ".agents", "skills", "docker-doctor", "SKILL.md")
+        )
+      ).toBe(true);
+      expect(fs.readdirSync(home)).toEqual([]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("non-interactive run without --agent exits 1 with guidance", async () => {
+    const { home, project, cleanup } = makeTempDirs();
+    try {
+      const { exitCode, stderr } = await runCli(["install", "--global"], {
+        cwd: project,
+        env: { HOME: home },
+      });
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain("--agent");
+    } finally {
+      cleanup();
+    }
   });
 });
