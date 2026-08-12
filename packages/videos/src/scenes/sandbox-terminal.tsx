@@ -71,7 +71,7 @@ const RUN_LINES: SandboxLine[] = [
   {
     delay: 8,
     kind: "ok",
-    pause: 10,
+    pause: 8,
     text: "agent memory: lint before committing",
     tone: "good",
   },
@@ -79,16 +79,16 @@ const RUN_LINES: SandboxLine[] = [
   {
     delay: 4,
     kind: "note",
-    pause: 24,
+    pause: 14,
     text: "✻ Claude Code · sandbox:~/workspace",
   },
-  { delay: 8, kind: "ask", pause: 16, text: "Containerize this service." },
+  { delay: 8, kind: "ask", pause: 12, text: "Containerize this service." },
   { delay: 6, kind: "blank" },
-  { delay: 0, kind: "working", pause: 30, text: "Writing Dockerfile…" },
+  { delay: 0, kind: "working", pause: 20, text: "Writing Dockerfile…" },
   { delay: 6, kind: "ok", text: "Dockerfile written", tone: "good" },
   { delay: 8, kind: "blank" },
   // Nobody asked for this step — the agent memory did.
-  { delay: 0, kind: "working", pause: 32, text: "Running docker-doctor…" },
+  { delay: 0, kind: "working", pause: 22, text: "Running docker-doctor…" },
   { delay: 6, kind: "ok", text: "2 issues found", tone: "warn" },
   {
     delay: 6,
@@ -103,15 +103,15 @@ const RUN_LINES: SandboxLine[] = [
     severity: "warning",
     text: "Container runs as root",
   },
-  { delay: 2, kind: "key", pause: 12, text: "no-root-user" },
+  { delay: 2, kind: "key", pause: 8, text: "no-root-user" },
   { delay: 8, kind: "blank" },
-  { delay: 0, kind: "working", pause: 30, text: "Applying both fixes…" },
+  { delay: 0, kind: "working", pause: 20, text: "Applying both fixes…" },
   { delay: 6, kind: "ok", text: "Dockerfile updated", tone: "good" },
-  { delay: 8, kind: "working", pause: 26, text: "Re-scanning…" },
+  { delay: 8, kind: "working", pause: 18, text: "Re-scanning…" },
   {
     delay: 6,
     kind: "ok",
-    pause: 10,
+    pause: 8,
     text: "No issues found · 100 / 100",
     tone: "good",
   },
@@ -119,7 +119,7 @@ const RUN_LINES: SandboxLine[] = [
   {
     delay: 4,
     kind: "ok",
-    pause: 34,
+    pause: 22,
     text: "Committed — 1 file changed",
     tone: "good",
   },
@@ -130,7 +130,7 @@ const heightOf = (line: SandboxLine): number =>
 
 const RUN_SCRIPT = makeScript(RUN_LINES, {
   heightOf,
-  tailHold: 30,
+  tailHold: 20,
   viewHeight: viewportHeight(CARD_H),
 });
 

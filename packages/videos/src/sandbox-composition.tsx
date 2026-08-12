@@ -68,7 +68,11 @@ const SceneHook = () => (
 );
 
 // ─── Scene 4 · The payoff ───────────────────────────────────────────────────
-const PAYOFF_DURATION = 68;
+// SoftBlurIn spends ~27 frames per character plus a frame of stagger each, so
+// a 20-character line is not fully on screen for ~47 frames. Every text scene
+// below is sized to that arrival plus a two-second hold; at the old durations
+// the last line landed and the scene cut almost immediately.
+const PAYOFF_DURATION = 122;
 
 const ScenePayoff = () => (
   <>
@@ -90,7 +94,7 @@ const ScenePayoff = () => (
 // ─── Scene 5 · The close ────────────────────────────────────────────────────
 // The command on a pill, at a size that survives a phone screen — it already
 // typed out legibly in scene 2, so this is a reminder, not the reveal.
-const CTA_DURATION = 86;
+const CTA_DURATION = 112;
 
 const CommandPill = () => {
   const frame = useCurrentFrame();
@@ -156,11 +160,11 @@ export const SIZE = 1080;
 
 // Scene starts, derived so the terminal scenes can grow without hand-retiming
 // everything after them.
-const HOOK_END = 74;
+const HOOK_END = 132;
 const RUN_END = HOOK_END + SANDBOX_RUN_DURATION;
 const PAYOFF_END = RUN_END + PAYOFF_DURATION;
 const CTA_END = PAYOFF_END + CTA_DURATION;
-export const DURATION = CTA_END + 62;
+export const DURATION = CTA_END + 78;
 
 export const SandboxKit = () => {
   const { width } = useVideoConfig();
@@ -209,7 +213,7 @@ export const SandboxKit = () => {
           >
             <SceneCta />
           </Sequence>
-          <Sequence durationInFrames={62} from={CTA_END} layout="none">
+          <Sequence durationInFrames={78} from={CTA_END} layout="none">
             <Logo urlSize={30} />
           </Sequence>
         </div>
