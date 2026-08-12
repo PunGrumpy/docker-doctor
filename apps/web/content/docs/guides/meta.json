@@ -1,4 +1,9 @@
 {
   "title": "Guides",
-  "pages": ["getting-started", "coding-agents", "github-actions"]
+  "pages": [
+    "getting-started",
+    "coding-agents",
+    "docker-sandboxes",
+    "github-actions"
+  ]
 }

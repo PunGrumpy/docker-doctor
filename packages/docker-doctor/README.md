@@ -36,15 +36,25 @@ Once you have an audit, install the skill so your coding agent learns the `/dock
 npx @docker-doctor/cli@latest install
 ```
 
-Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interactive scan finds issues, Docker Doctor also offers to hand them straight to an agent detected on your machine.
+Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interactive scan finds issues, Docker Doctor also offers to hand them straight to an agent detected on your machine. Add `--global` to install the skill once for your whole machine instead of the current project.
 
 [Rules reference →](https://docker-doctor.vercel.app/docs/reference/rules)
 
-### 3. Run in CI
+### 3. Run in Docker Sandboxes
+
+Running coding agents unattended in [Docker Sandboxes](https://www.docker.com/products/docker-sandboxes/)? The Docker Doctor kit preinstalls the CLI and skill in every sandbox and tells the agent to lint its own Dockerfile and Compose changes before committing:
+
+```bash
+sbx run --kit docker.io/pungrumpy/docker-doctor-kit claude
+```
+
+See [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) for what the kit installs and how it works.
+
+### 4. Run in CI
 
 The GitHub Action (`PunGrumpy/docker-doctor`) scans every pull request and posts a sticky summary comment — advisory by default, with an opt-in gate. See the [GitHub Actions guide](https://docker-doctor.vercel.app/docs/guides/github-actions) for setup, inputs, and gating.
 
-### 4. Configure
+### 5. Configure
 
 ```ts
 // docker-doctor.config.ts

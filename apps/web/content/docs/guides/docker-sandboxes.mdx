@@ -1,0 +1,52 @@
+---
+title: Docker Sandboxes
+description: Preinstall Docker Doctor in every Docker Sandbox so coding agents lint their own Dockerfile and Compose changes before committing.
+---
+
+[Docker Sandboxes](https://www.docker.com/products/docker-sandboxes/) run AI coding agents unattended inside disposable, hardware-isolated microVMs — each sandbox gets its own kernel, filesystem, network policy, and a private Docker daemon. It's the natural home for "YOLO mode" agent sessions: the agent can build images, run Compose stacks, and edit anything, and the host stays safe.
+
+Safe for your **host**, that is. The Dockerfiles the agent writes still ship to production. That's the gap the Docker Doctor kit closes: every sandbox comes up with the linter preinstalled and the agent instructed to use it.
+
+## Install the kit
+
+Kits extend a sandbox at creation time. The Docker Doctor kit is published to Docker Hub, which sbx trusts by default — no configuration needed:
+
+```bash
+sbx run --kit docker.io/pungrumpy/docker-doctor-kit claude
+```
+
+It's a `mixin` kit, so it composes with any agent (`claude`, `codex`, `gemini`, `opencode`, …) and stacks with your other kits.
+
+You can also pull it straight from the repository (requires allowing the source once with `sbx settings set kit.allowedSources '["docker.io/","github.com/PunGrumpy/"]'`):
+
+```bash
+sbx run --kit "git+https://github.com/PunGrumpy/docker-doctor.git#dir=kits/docker-doctor" claude
+```
+
+## What the kit does
+
+At sandbox creation, before the agent starts:
+
+1. **Installs the CLI** — a pinned `@docker-doctor/cli` from npm. The only network access the kit needs is `registry.npmjs.org`, and npm verifies the tarball against the registry's integrity metadata, so the version pin also pins content.
+2. **Installs the agent skill** — `docker-doctor install --global` places the `/docker-doctor` triage skill in the sandbox home for Claude Code, Codex, Cursor, OpenCode, Gemini CLI, GitHub Copilot, Droid, and Kiro. Nothing is written to your mounted workspace — your `git status` stays clean.
+3. **Injects agent memory** — a short instruction: after editing any Dockerfile or Compose file, run `docker-doctor` and fix the diagnostics before committing.
+
+The result: the agent writes a Dockerfile, lints it, fixes what it finds, and only then commits — without you asking.
+
+## Verify it
+
+Inside a sandbox created with the kit:
+
+```bash
+sbx exec <sandbox> -- docker-doctor --version
+sbx exec <sandbox> -- ls ~/.claude/skills/docker-doctor
+```
+
+Or just watch the agent: ask it to containerize something and it should run `docker-doctor` on its own before committing.
+
+## Requirements
+
+- A base template with Node.js — every standard agent template ships it (`claude-code-minimal` does not).
+- sbx with kits support (kits are marked experimental by Docker; the kit tracks the v2 spec).
+
+The kit's source of truth lives at [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) in the monorepo.

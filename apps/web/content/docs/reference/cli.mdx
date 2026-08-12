@@ -53,6 +53,11 @@ Non-interactive runs must name the agents:
 npx @docker-doctor/cli@latest install --agent claude-code cursor
 ```
 
+| Flag | Alias | Description |
+| --- | --- | --- |
+| `--agent <agents...>` | `-a` | Agent id(s) to install for; required when not running in a TTY |
+| `--global` | `-g` | Install into each agent's global skills directory (e.g. `~/.claude/skills`) instead of the current project |
+
 See the [Coding Agents guide](/docs/guides/coding-agents) for details.
 
 ## Rules subcommands
