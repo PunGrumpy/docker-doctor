@@ -1,0 +1,65 @@
+---
+title: Docker VMM
+description: Docker VMM speeds up the loop your containers run in. docker-doctor makes sure your Dockerfile isn't the thing slowing it down.
+---
+
+[Docker VMM](https://www.docker.com/blog/docker-vmm-public-beta/) is the virtualization layer underneath Docker Desktop — it runs the Linux VM your containers live in, and handles the network integration and filesystem sharing between that VM and your host. Docker Desktop has always relied on a third-party VMM for this. The rebuilt, first-party one entered **public beta in Docker Desktop v4.86** on both Mac and Windows.
+
+It shows up in these docs because two of the things it makes faster — container startup and host↔container file sharing — are exactly the two things a careless Dockerfile makes slow again. Docker VMM fixes the platform half of your edit-compile-test loop. docker-doctor covers the other half.
+
+## Turn it on
+
+No feature flag and no waitlist: any Docker Desktop on v4.86 or later can switch today.
+
+- **Mac** — if you were already using Docker VMM in Settings, upgrading to v4.86 moves you onto the new engine automatically. Nothing to click.
+- **Windows** — open **Settings > General**, find the new **Docker VMM** option, and switch it on to opt in.
+
+To check which Docker Desktop you're on:
+
+```bash
+docker version --format '{{.Server.Platform.Name}}'
+```
+
+```text
+Docker Desktop 4.86.0 (209721)
+```
+
+That reports the Desktop version, not the engine choice — which VMM you're running is a Settings toggle, not something the daemon advertises.
+
+## What it changes
+
+Docker's beta announcement calls out three developer-visible wins, none of which come with published numbers yet:
+
+- **Container startup** is measurably faster across scenarios.
+- **File sharing between container and host is significantly faster** — the claim is that you feel it on every build in an edit-compile-test loop.
+- **Memory returns to the host when containers are idle**, so Docker Desktop stops sitting on RAM you aren't using.
+
+On Windows there's a fourth: it's the first Docker-maintained VMM there, pairing Hyper-V isolation with WSL2-like speed.
+
+## What it doesn't change
+
+A faster VM doesn't fix a slow image. The three wins above each have a Dockerfile-side counterpart that docker-doctor already checks:
+
+| Docker VMM makes this faster | …and this is what still wastes it |
+| --- | --- |
+| Container startup | A fat final image. `prefer-slim-base`, `avoid-dev-dependencies`, `clean-package-cache` |
+| Host↔container file sync and rebuilds | An unfiltered build context and cache-busting layer order. `use-dockerignore`, `order-layers`, `combine-apt-update-install` |
+| Idle memory returned to the host | Compose services with no ceiling to return memory from. `require-resource-limits` |
+
+Every one of those is in the [rules reference](/docs/reference/rules), and `rules explain <rule>` spells out the fix:
+
+```bash
+npx @docker-doctor/cli@latest rules explain use-dockerignore
+```
+
+docker-doctor is static analysis — it reads your Dockerfiles and Compose files and never talks to your daemon. Scans behave identically with Docker VMM on or off, and there's nothing to configure either way.
+
+## The same engine powers Docker Sandboxes
+
+Docker describes this as deliberate: the virtualization engine behind Docker VMM also powers [Docker Sandboxes](/docs/guides/docker-sandboxes), so improvements land in both products. If you run coding agents unattended in sandboxes, the [Docker Doctor kit](/docs/guides/docker-sandboxes) preinstalls the CLI and skill so the agent lints its own Dockerfile changes before committing — on the same runtime.
+
+## Timeline
+
+The beta runs through fall 2026, focused on real developer workflows: builds, file syncs, and everyday container startup patterns. GA is targeted for the end of October 2026, when Docker VMM becomes the default engine for new Docker Desktop installs across Mac, Windows, and Linux.
+
+Until then it is a beta. Worth running, worth reporting regressions to Docker — and worth keeping the score in `docker-doctor` honest so you can tell a platform regression from your own Dockerfile.

@@ -4,6 +4,7 @@
     "getting-started",
     "coding-agents",
     "docker-sandboxes",
+    "docker-vmm",
     "github-actions"
   ]
 }
