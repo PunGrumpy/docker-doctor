@@ -43,11 +43,14 @@ export const GET = async (
       {/* oxlint-disable-next-line next/no-img-element */}
       <img
         alt="Docker Doctor OpenGraph Background"
-        height={628}
+        height={630}
         src={backgroundImageData as never}
         width={1200}
       />
-      <div tw="flex flex-col absolute h-full w-full justify-center left-[91px] pr-[50px] pt-[90px] pb-[86px]">
+      {/* background.png draws a dotted baseline grid; pt-[240px] top-anchors
+          the block so the title's first line always lands on it, whatever
+          the description wraps to. */}
+      <div tw="flex flex-col absolute h-full w-full justify-start left-[91px] pr-[50px] pt-[240px] pb-[86px]">
         <div
           style={{
             textWrap: "balance",
@@ -81,7 +84,7 @@ export const GET = async (
           weight: 500,
         },
       ],
-      height: 628,
+      height: 630,
       width: 1200,
     }
   );
