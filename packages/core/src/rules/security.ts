@@ -1,5 +1,9 @@
 import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
-import type { Diagnostic, DockerfileRule } from "../types/index";
+import type {
+  Diagnostic,
+  DockerfileInstruction,
+  DockerfileRule,
+} from "../types/index";
 
 const createDiagnostic = (
   file: string,
@@ -227,9 +231,89 @@ export const noAddRemote: DockerfileRule = {
   message: "Avoid using ADD with remote URLs",
 };
 
+const SECRET_ARG_PATTERNS = [
+  /(?:^|[_-])password(?:[_-]|$)/iu,
+  /(?:^|[_-])secret(?:[_-]|$)/iu,
+  /(?:^|[_-])token(?:[_-]|$)/iu,
+  /(?:^|[_-])api_key(?:[_-]|$)/iu,
+  /(?:^|[_-])private_key(?:[_-]|$)/iu,
+  /(?:^|[_-])credentials?(?:[_-]|$)/iu,
+];
+
+const SECRET_MOUNT_PATTERN = /--mount=type=secret/u;
+
+const isSecretName = (name: string): boolean =>
+  SECRET_ARG_PATTERNS.some((pattern) => pattern.test(name));
+
+const collectSecretArgNames = (
+  instructions: DockerfileInstruction[]
+): string[] => {
+  const names: string[] = [];
+
+  for (const inst of instructions) {
+    if (inst.instruction !== "ARG") {
+      continue;
+    }
+
+    for (const part of inst.args.trim().split(/\s+/u)) {
+      const eqIndex = part.indexOf("=");
+      const name = eqIndex > 0 ? part.slice(0, eqIndex) : part;
+
+      if (name && isSecretName(name)) {
+        names.push(name);
+      }
+    }
+  }
+
+  return names;
+};
+
+const referencesArg = (args: string, name: string): boolean =>
+  new RegExp(`\\$\\{?${name}\\b`, "u").test(args);
+
+export const useSecretMount: DockerfileRule = {
+  category: "Security",
+  check(instructions, file) {
+    const diagnostics: Diagnostic[] = [];
+    const secretArgs = collectSecretArgNames(instructions);
+
+    if (secretArgs.length === 0) {
+      return diagnostics;
+    }
+
+    for (const inst of instructions) {
+      if (inst.instruction !== "RUN" || SECRET_MOUNT_PATTERN.test(inst.args)) {
+        continue;
+      }
+
+      const used = secretArgs.filter((name) => referencesArg(inst.args, name));
+
+      if (used.length > 0) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            `RUN consumes the build argument '${used[0]}' directly. Build arguments are recorded in image history, so anyone with the image can read the value back.`,
+            this.help,
+            inst.line
+          )
+        );
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: "Pass the value as a build secret instead: 'RUN --mount=type=secret,id=token cat /run/secrets/token', built with '--secret id=token,env=TOKEN'. Secret mounts are never written to a layer.",
+  key: "docker-doctor/use-secret-mount",
+  message: "Use secret mounts instead of build arguments for credentials",
+};
+
 export const securityRules = [
   noRootUser,
   noSecretsInEnv,
   pinImageVersion,
   noAddRemote,
+  useSecretMount,
 ];

@@ -14,7 +14,7 @@
 
 Your Dockerfiles are probably wrong. Docker Doctor finds out why.
 
-Docker Doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 21+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
+Docker Doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 30+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
 
 Works with any project that uses Docker.
 

@@ -32,8 +32,10 @@ Apply these when authoring. If you deviate, say why.
 | **OCI `LABEL`s** (`org.opencontainers.image.source`, `.title`, …) | `require-labels` |
 | **Sorted multi-line args** (alphabetize package lists) | `sort-multiline-args` |
 | **Ship a `.dockerignore`** (`.git`, `node_modules`, build output, secrets) | `use-dockerignore` |
+| **Cache mount for package downloads** — `RUN --mount=type=cache,target=/root/.npm npm ci` | `use-cache-mount` |
+| **Secret mount for build credentials** — never consume a token `ARG` in a `RUN` | `use-secret-mount` |
 
-Beyond the rules: enable **BuildKit** and use `RUN --mount=type=cache` for package managers (faster rebuilds without bloating layers) and `RUN --mount=type=secret` for build-time credentials (keeps them out of the image).
+Compose files get their own pass — no `privileged: true`, no `network_mode: host`, no `/var/run/docker.sock` mount, no literal secrets in `environment:`, and pinned service images (`no-privileged`, `no-host-network`, `no-docker-socket-mount`, `no-secrets-in-compose-env`, `pin-service-image`).
 
 ## Canonical multi-stage template (Node — adapt per stack)
 

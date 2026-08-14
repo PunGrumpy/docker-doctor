@@ -5,7 +5,7 @@ title: Rules
 description: Every rule docker-doctor ships, grouped by category.
 ---
 
-docker-doctor ships 25 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config.
+docker-doctor ships 32 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config.
 
 List everything docker-doctor knows about:
 
@@ -27,6 +27,7 @@ Catches Dockerfile patterns that widen your attack surface.
 - `docker-doctor/no-secrets-in-env` — Do not store secrets in ENV or ARG instructions (`error`)
 - `docker-doctor/pin-image-version` — Always pin base image versions to specific tags (`warning`)
 - `docker-doctor/no-add-remote` — Avoid using ADD with remote URLs (`warning`)
+- `docker-doctor/use-secret-mount` — Use secret mounts instead of build arguments for credentials (`warning`)
 
 ## Performance
 
@@ -36,6 +37,7 @@ Reduces build time and layer bloat.
 - `docker-doctor/order-layers` — Order layers to maximize build cache utility (`warning`)
 - `docker-doctor/minimize-layers` — Minimize the number of image layers (`info`)
 - `docker-doctor/use-dockerignore` — Ensure .dockerignore is used (`warning`)
+- `docker-doctor/use-cache-mount` — Use a BuildKit cache mount for package manager downloads (`info`)
 
 ## Best Practices
 
@@ -60,6 +62,11 @@ Docker Compose-specific checks.
 - `docker-doctor/require-resource-limits` — Define resource limits for services (`warning`)
 - `docker-doctor/require-restart-policy` — Set restart policy for services (`warning`)
 - `docker-doctor/use-depends-on-condition` — Use long-form depends_on with healthcheck conditions (`info`)
+- `docker-doctor/no-privileged` — Do not run services in privileged mode (`error`)
+- `docker-doctor/no-host-network` — Avoid host network mode (`warning`)
+- `docker-doctor/no-docker-socket-mount` — Do not mount the Docker socket into services (`error`)
+- `docker-doctor/no-secrets-in-compose-env` — Do not hardcode secrets in service environment values (`error`)
+- `docker-doctor/pin-service-image` — Pin service images to specific tags (`warning`)
 
 ## Image Size
 

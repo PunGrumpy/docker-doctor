@@ -211,9 +211,87 @@ export const useDockerignore: DockerfileRule = {
   message: "Ensure .dockerignore is used",
 };
 
+const CACHE_MOUNT_PATTERN = /--mount=type=cache/u;
+
+// Only package managers whose cache directory is stable and safe to share
+// across builds. apt-get and apk are deliberately absent: caching them also
+// requires disabling Docker's own cleanup hooks, which is too easy to get
+// wrong from a lint message.
+const CACHEABLE_INSTALLS: { pattern: RegExp; manager: string; dir: string }[] =
+  [
+    { dir: "/root/.npm", manager: "npm", pattern: /\bnpm\s+(?:ci|install)\b/u },
+    {
+      dir: "/usr/local/share/.cache/yarn",
+      manager: "yarn",
+      pattern: /\byarn\s+install\b/u,
+    },
+    {
+      dir: "/root/.local/share/pnpm/store",
+      manager: "pnpm",
+      pattern: /\bpnpm\s+(?:i|install)\b/u,
+    },
+    {
+      dir: "/root/.bun/install/cache",
+      manager: "bun",
+      pattern: /\bbun\s+install\b/u,
+    },
+    {
+      dir: "/root/.cache/pip",
+      manager: "pip",
+      pattern: /\bpip3?\s+install\b/u,
+    },
+    {
+      dir: "/go/pkg/mod",
+      manager: "go",
+      pattern: /\bgo\s+mod\s+download\b/u,
+    },
+    {
+      dir: "/usr/local/cargo/registry",
+      manager: "cargo",
+      pattern: /\bcargo\s+(?:build|fetch)\b/u,
+    },
+  ];
+
+export const useCacheMount: DockerfileRule = {
+  category: "Performance",
+  check(instructions, file) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const inst of instructions) {
+      if (inst.instruction !== "RUN" || CACHE_MOUNT_PATTERN.test(inst.args)) {
+        continue;
+      }
+
+      const install = CACHEABLE_INSTALLS.find((candidate) =>
+        candidate.pattern.test(inst.args)
+      );
+
+      if (install) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            `This ${install.manager} install re-downloads every package whenever the layer cache misses. A cache mount on '${install.dir}' keeps the downloads between builds without adding them to the image.`,
+            this.help,
+            inst.line
+          )
+        );
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "info",
+  help: "Mount the package manager cache for the length of the command, e.g. 'RUN --mount=type=cache,target=/root/.npm npm ci'. The cache lives outside the image, so rebuilds get faster without the layer getting bigger. Adjust the target if the build runs as a non-root user.",
+  key: "docker-doctor/use-cache-mount",
+  message: "Use a BuildKit cache mount for package manager downloads",
+};
+
 export const performanceRules = [
   useMultiStage,
   orderLayers,
   minimizeLayers,
   useDockerignore,
+  useCacheMount,
 ];

@@ -14,7 +14,12 @@ import {
   requireLabels,
 } from "../src/rules/best-practices";
 import {
+  noDockerSocketMount,
+  noHostNetwork,
+  noPrivileged,
+  noSecretsInComposeEnv,
   noVersionKey,
+  pinServiceImage,
   requireResourceLimits,
   requireRestartPolicy,
   useDependsOnCondition,
@@ -28,6 +33,7 @@ import {
   orderLayers,
   useMultiStage,
   minimizeLayers,
+  useCacheMount,
   useDockerignore,
 } from "../src/rules/performance";
 import {
@@ -35,6 +41,7 @@ import {
   pinImageVersion,
   noSecretsInEnv,
   noAddRemote,
+  useSecretMount,
 } from "../src/rules/security";
 
 describe("Security Rules", () => {
@@ -207,6 +214,40 @@ describe("Security Rules", () => {
     `);
     expect(noAddRemote.check(remoteAddWithChown, "Dockerfile")).toHaveLength(1);
   });
+
+  test("use-secret-mount", () => {
+    const argConsumedByRun = parseDockerfile(`
+      FROM node:22-alpine
+      ARG NPM_TOKEN
+      RUN echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > .npmrc && npm ci
+    `);
+    const diags = useSecretMount.check(argConsumedByRun, "Dockerfile");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].rule).toBe("docker-doctor/use-secret-mount");
+
+    const withSecretMount = parseDockerfile(`
+      FROM node:22-alpine
+      ARG NPM_TOKEN
+      RUN --mount=type=secret,id=npm npm ci
+    `);
+    expect(useSecretMount.check(withSecretMount, "Dockerfile")).toHaveLength(0);
+
+    const unrelatedArg = parseDockerfile(`
+      FROM node:22-alpine
+      ARG NODE_VERSION=22
+      RUN echo $NODE_VERSION
+    `);
+    expect(useSecretMount.check(unrelatedArg, "Dockerfile")).toHaveLength(0);
+
+    const declaredButUnused = parseDockerfile(`
+      FROM node:22-alpine
+      ARG GITHUB_TOKEN
+      RUN npm ci
+    `);
+    expect(useSecretMount.check(declaredButUnused, "Dockerfile")).toHaveLength(
+      0
+    );
+  });
 });
 
 describe("Performance Rules", () => {
@@ -320,6 +361,36 @@ describe("Performance Rules", () => {
       useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
     ).toHaveLength(0);
   });
+
+  test("use-cache-mount", () => {
+    const uncachedInstall = parseDockerfile(`
+      FROM node:22-alpine
+      COPY package.json package-lock.json ./
+      RUN npm ci
+    `);
+    const diags = useCacheMount.check(uncachedInstall, "Dockerfile");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].rule).toBe("docker-doctor/use-cache-mount");
+    expect(diags[0].message).toContain("/root/.npm");
+
+    const cachedInstall = parseDockerfile(`
+      FROM node:22-alpine
+      RUN --mount=type=cache,target=/root/.npm npm ci
+    `);
+    expect(useCacheMount.check(cachedInstall, "Dockerfile")).toHaveLength(0);
+
+    const buildScript = parseDockerfile(`
+      FROM node:22-alpine
+      RUN npm run build
+    `);
+    expect(useCacheMount.check(buildScript, "Dockerfile")).toHaveLength(0);
+
+    const aptInstall = parseDockerfile(`
+      FROM debian:12-slim
+      RUN apt-get update && apt-get install -y curl
+    `);
+    expect(useCacheMount.check(aptInstall, "Dockerfile")).toHaveLength(0);
+  });
 });
 
 describe("Compose Rules", () => {
@@ -416,6 +487,166 @@ describe("Compose Rules", () => {
       },
     };
     expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
+      0
+    );
+  });
+
+  test("no-privileged", () => {
+    const privileged = {
+      services: {
+        runner: { image: "docker:27-dind", privileged: true },
+      },
+    };
+    const diags = noPrivileged.check(privileged, "compose.yml");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].severity).toBe("error");
+
+    const unprivileged = {
+      services: {
+        runner: { cap_add: ["SYS_PTRACE"], image: "docker:27" },
+      },
+    };
+    expect(noPrivileged.check(unprivileged, "compose.yml")).toHaveLength(0);
+  });
+
+  test("no-host-network", () => {
+    const hostNetwork = {
+      services: {
+        proxy: { image: "nginx:1.27-alpine", network_mode: "host" },
+      },
+    };
+    expect(noHostNetwork.check(hostNetwork, "compose.yml")).toHaveLength(1);
+
+    const bridged = {
+      services: {
+        proxy: { image: "nginx:1.27-alpine", ports: ["127.0.0.1:8080:80"] },
+      },
+    };
+    expect(noHostNetwork.check(bridged, "compose.yml")).toHaveLength(0);
+  });
+
+  test("no-docker-socket-mount", () => {
+    const shortForm = {
+      services: {
+        agent: {
+          image: "app:1.0.0",
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+        },
+      },
+    };
+    expect(noDockerSocketMount.check(shortForm, "compose.yml")).toHaveLength(1);
+
+    const longForm = {
+      services: {
+        agent: {
+          image: "app:1.0.0",
+          volumes: [
+            {
+              source: "/var/run/docker.sock",
+              target: "/var/run/docker.sock",
+              type: "bind",
+            },
+          ],
+        },
+      },
+    };
+    expect(noDockerSocketMount.check(longForm, "compose.yml")).toHaveLength(1);
+
+    const ordinaryVolume = {
+      services: {
+        agent: { image: "app:1.0.0", volumes: ["./data:/app/data"] },
+      },
+    };
+    expect(
+      noDockerSocketMount.check(ordinaryVolume, "compose.yml")
+    ).toHaveLength(0);
+  });
+
+  test("no-secrets-in-compose-env", () => {
+    const mapForm = {
+      services: {
+        db: {
+          environment: { POSTGRES_PASSWORD: "hunter2" },
+          image: "postgres:17-alpine",
+        },
+      },
+    };
+    const diags = noSecretsInComposeEnv.check(mapForm, "compose.yml");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("POSTGRES_PASSWORD");
+
+    const listForm = {
+      services: {
+        db: {
+          environment: ["POSTGRES_PASSWORD=hunter2"],
+          image: "postgres:17-alpine",
+        },
+      },
+    };
+    expect(noSecretsInComposeEnv.check(listForm, "compose.yml")).toHaveLength(
+      1
+    );
+
+    const interpolated = {
+      services: {
+        db: {
+          environment: {
+            // oxlint-disable-next-line eslint/no-template-curly-in-string -- Compose interpolation, not a JS template literal.
+            POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}",
+            POSTGRES_USER: "app",
+          },
+          image: "postgres:17-alpine",
+        },
+      },
+    };
+    expect(
+      noSecretsInComposeEnv.check(interpolated, "compose.yml")
+    ).toHaveLength(0);
+
+    const passthrough = {
+      services: {
+        db: { environment: ["POSTGRES_PASSWORD"], image: "postgres:17-alpine" },
+      },
+    };
+    expect(
+      noSecretsInComposeEnv.check(passthrough, "compose.yml")
+    ).toHaveLength(0);
+  });
+
+  test("pin-service-image", () => {
+    const untagged = {
+      services: { cache: { image: "redis" } },
+    };
+    expect(pinServiceImage.check(untagged, "compose.yml")).toHaveLength(1);
+
+    const latest = {
+      services: { cache: { image: "redis:latest" } },
+    };
+    expect(pinServiceImage.check(latest, "compose.yml")).toHaveLength(1);
+
+    const pinned = {
+      services: {
+        api: { build: { context: "." } },
+        cache: { image: "redis:7.4-alpine" },
+      },
+    };
+    expect(pinServiceImage.check(pinned, "compose.yml")).toHaveLength(0);
+
+    const digest = {
+      services: {
+        cache: {
+          image:
+            "redis@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        },
+      },
+    };
+    expect(pinServiceImage.check(digest, "compose.yml")).toHaveLength(0);
+
+    const interpolatedTag = {
+      // oxlint-disable-next-line eslint/no-template-curly-in-string -- Compose interpolation, not a JS template literal.
+      services: { cache: { image: "${REDIS_IMAGE}" } },
+    };
+    expect(pinServiceImage.check(interpolatedTag, "compose.yml")).toHaveLength(
       0
     );
   });
