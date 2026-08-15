@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 import { CopyButton } from "@/components/copy-button";
 import { Section } from "@/components/section";
@@ -39,11 +42,20 @@ const ownerOf = (entry: LeaderboardEntry): string =>
 interface RowProps {
   readonly entry: LeaderboardEntry;
   readonly index: number;
+  readonly onActivate: (entry: LeaderboardEntry) => void;
+  readonly onDeactivate: () => void;
   readonly rank: number;
   readonly tied: boolean;
 }
 
-const Row = ({ entry, index, rank, tied }: RowProps) => {
+const Row = ({
+  entry,
+  index,
+  onActivate,
+  onDeactivate,
+  rank,
+  tied,
+}: RowProps) => {
   const scoreData = getScoreData(entry.score);
 
   return (
@@ -51,10 +63,14 @@ const Row = ({ entry, index, rank, tied }: RowProps) => {
       <a
         className={cn(
           ROW_GRID,
-          "-mx-4 gap-y-2 px-4 py-2.5 sm:gap-y-0",
-          "hover:bg-muted/40 transition-colors duration-200 ease-[var(--ease-out)]"
+          "-mx-3 gap-y-2 border-b border-dashed px-3 py-2.5 sm:gap-y-0",
+          "border-border/50 hover:bg-muted/40 transition-colors duration-200 ease-[var(--ease-out)]"
         )}
         href={`${entry.githubUrl}/tree/${entry.commitSha}`}
+        onBlur={onDeactivate}
+        onFocus={() => onActivate(entry)}
+        onMouseEnter={() => onActivate(entry)}
+        onMouseLeave={onDeactivate}
         rel="noopener noreferrer"
         target="_blank"
       >
@@ -111,13 +127,29 @@ const Row = ({ entry, index, rank, tied }: RowProps) => {
   );
 };
 
-const Axis = () => (
+interface AxisProps {
+  readonly active: LeaderboardEntry | null;
+  readonly visible: boolean;
+}
+
+const Axis = ({ active, visible }: AxisProps) => (
   <div aria-hidden="true" className={cn(ROW_GRID, "w-full pt-1")}>
     <span className="hidden sm:block" />
     <div className="text-muted-foreground relative col-span-2 col-start-1 h-5 font-mono text-xs tabular-nums select-none sm:col-span-1 sm:col-start-2">
       <span className="absolute left-0">0</span>
       <span className="absolute left-1/2 -translate-x-1/2">50</span>
       <span className="absolute right-0">100</span>
+      {/* floating value that tracks the hovered/focused row's bar */}
+      <span
+        className="bg-background absolute -translate-x-1/2 px-1 font-medium whitespace-nowrap transition-[left,opacity,color] duration-150 ease-[var(--ease-out)]"
+        style={{
+          color: active ? getScoreData(active.score).color : undefined,
+          left: `${active?.score ?? 0}%`,
+          opacity: visible ? 1 : 0,
+        }}
+      >
+        {active?.score}
+      </span>
     </div>
     <span className="hidden sm:block" />
   </div>
@@ -127,50 +159,63 @@ interface LeaderboardProps {
   readonly entries: LeaderboardEntry[];
 }
 
-export const Leaderboard = ({ entries }: LeaderboardProps) => (
-  <Section className="pt-8 pb-16">
-    <div className="w-full max-w-2xl">
-      <div className="bg-card/20 shadow-custom rounded-2xl p-1">
-        <div className="preview-card relative overflow-hidden rounded-xl px-4 py-2">
-          <ol className="divide-border/50 w-full list-none gap-0 divide-y divide-dashed pl-0">
-            {entries.map((entry, index) => (
-              <Row
-                entry={entry}
-                index={index}
-                key={entry.slug}
-                // Competition ranking: tied scores share the first index.
-                rank={entries.findIndex((e) => e.score === entry.score) + 1}
-                tied={entries.filter((e) => e.score === entry.score).length > 1}
-              />
-            ))}
-          </ol>
-          <Axis />
-        </div>
-      </div>
+export const Leaderboard = ({ entries }: LeaderboardProps) => {
+  const [active, setActive] = useState<LeaderboardEntry | null>(null);
+  const [visible, setVisible] = useState(false);
 
-      <div className="mt-6 flex flex-col items-center gap-4">
-        <p className="text-muted-foreground max-w-md text-center text-xs leading-relaxed">
-          Scores are static-analysis lint findings, not a vulnerability audit —
-          every Dockerfile and compose file in the repo counts, including dev
-          and test setups. Run it on your codebase:
-        </p>
-        <div className="bg-background shadow-border flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
-          <span
-            aria-hidden="true"
-            className="text-muted-foreground/60 font-mono text-sm select-none"
-          >
-            $
-          </span>
-          <code className="text-muted-foreground shimmer font-mono text-sm">
-            bunx @docker-doctor/cli
-          </code>
-          <CopyButton
-            aria-label="Copy scan command"
-            data-track="leaderboard_command_copied"
-            value="bunx @docker-doctor/cli"
-          />
+  const activate = (entry: LeaderboardEntry) => {
+    setActive(entry);
+    setVisible(true);
+  };
+  // Keep the last entry so the label fades out in place instead of
+  // snapping to 0 while it disappears.
+  const deactivate = () => setVisible(false);
+
+  return (
+    <Section className="pt-8 pb-16">
+      <div className="w-full max-w-2xl">
+        {/* w-full + list resets: globals.css styles every ul/ol for
+            prose content (flex, gap, pl-5, markers) */}
+        <ol className="w-full list-none gap-0 pl-0">
+          {entries.map((entry, index) => (
+            <Row
+              entry={entry}
+              index={index}
+              key={entry.slug}
+              onActivate={activate}
+              onDeactivate={deactivate}
+              // Competition ranking: tied scores share the first index.
+              rank={entries.findIndex((e) => e.score === entry.score) + 1}
+              tied={entries.filter((e) => e.score === entry.score).length > 1}
+            />
+          ))}
+        </ol>
+        <Axis active={active} visible={visible} />
+
+        <div className="mt-8 flex flex-col items-center gap-4">
+          <p className="text-muted-foreground max-w-md text-center text-xs leading-relaxed">
+            Scores are static-analysis lint findings, not a vulnerability audit
+            — every Dockerfile and compose file in the repo counts, including
+            dev and test setups. Run it on your codebase:
+          </p>
+          <div className="bg-background shadow-border flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
+            <span
+              aria-hidden="true"
+              className="text-muted-foreground/60 font-mono text-sm select-none"
+            >
+              $
+            </span>
+            <code className="text-muted-foreground shimmer font-mono text-sm">
+              bunx @docker-doctor/cli
+            </code>
+            <CopyButton
+              aria-label="Copy scan command"
+              data-track="leaderboard_command_copied"
+              value="bunx @docker-doctor/cli"
+            />
+          </div>
         </div>
       </div>
-    </div>
-  </Section>
-);
+    </Section>
+  );
+};
