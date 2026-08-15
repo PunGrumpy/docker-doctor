@@ -12,10 +12,10 @@ export const Header = () => (
     <nav className="flex h-16 w-full items-center justify-between">
       <Link aria-label="Home" href="/" className="flex items-center gap-1">
         <Logo aria-hidden="true" className="size-4" />
-        Docker Doctor
+        <span className="hidden sm:inline">Docker Doctor</span>
       </Link>
 
-      <div className="flex gap-2">
+      <div className="flex gap-1.5 sm:gap-2">
         <LeaderboardButton />
         <ChangelogButton />
         <DocsButton />

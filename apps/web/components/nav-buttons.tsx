@@ -6,7 +6,7 @@ export const ChangelogButton = () => (
   <Link
     aria-label="Changelog"
     className={cn(
-      "shadow-custom bg-background hover:bg-card/30 relative flex h-8 items-center justify-center rounded-full px-3 text-sm font-medium",
+      "shadow-custom bg-background hover:bg-card/30 relative flex h-8 items-center justify-center rounded-full px-2.5 text-sm font-medium sm:px-3",
       "before:absolute before:inset-x-0 before:-inset-y-1",
       "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
     )}
@@ -22,7 +22,7 @@ export const LeaderboardButton = () => (
   <Link
     aria-label="Leaderboard"
     className={cn(
-      "shadow-custom bg-background hover:bg-card/30 relative flex h-8 items-center justify-center rounded-full px-3 text-sm font-medium",
+      "shadow-custom bg-background hover:bg-card/30 relative flex h-8 items-center justify-center rounded-full px-2.5 text-sm font-medium sm:px-3",
       "before:absolute before:inset-x-0 before:-inset-y-1",
       "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
     )}
@@ -39,7 +39,7 @@ export const DocsButton = () => (
     aria-label="Docs"
     className={cn(
       "before:absolute before:inset-x-0 before:-inset-y-1",
-      "relative flex h-8 items-center justify-center rounded-full px-3 text-sm",
+      "relative flex h-8 items-center justify-center rounded-full px-2.5 text-sm sm:px-3",
       "bg-linear-to-b from-blue-400 to-blue-500 font-medium text-white shadow-[0px_0px_1px_1px_rgba(255,255,255,0.06)_inset,0px_1.5px_2px_0px_rgba(0,0,0,0.1),0px_0px_0px_1px_var(--color-blue-500)]",
       "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
     )}
