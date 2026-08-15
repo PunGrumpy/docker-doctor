@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     qualities: [75, 95],
+    remotePatterns: [
+      // GitHub org/user avatars on the leaderboard
+      { hostname: "github.com", pathname: "/*.png", protocol: "https" },
+    ],
   },
 
   rewrites: () => [

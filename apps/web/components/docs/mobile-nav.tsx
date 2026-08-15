@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 
 import { DocsSidebar } from "@/components/docs/sidebar";
 import { Logo } from "@/components/logo";
-import { ChangelogButton } from "@/components/nav-buttons";
+import { ChangelogButton, LeaderboardButton } from "@/components/nav-buttons";
 
 interface DocsMobileNavProps {
   readonly tree: PageTreeRoot;
@@ -94,7 +94,8 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
           <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-6">
             <DocsSidebar tree={tree} />
           </div>
-          <div className="border-t border-dashed p-4">
+          <div className="flex gap-2 border-t border-dashed p-4">
+            <LeaderboardButton />
             <ChangelogButton />
           </div>
         </div>
