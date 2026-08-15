@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import { CopyButton } from "@/components/copy-button";
 import { Section } from "@/components/section";
 import type { LeaderboardEntry } from "@/lib/leaderboard";
 import { getScoreData } from "@/lib/score";
@@ -198,32 +197,11 @@ export const Leaderboard = ({
         </ol>
         <Axis active={active} visible={visible} />
 
-        <div className="mt-8 flex flex-col items-center gap-4">
-          <p className="text-muted-foreground max-w-md text-center text-xs leading-relaxed">
-            Scores are static-analysis lint findings, not a vulnerability audit
-            — every Dockerfile and compose file in the repo counts, including
-            dev and test setups. Run it on your codebase:
-          </p>
-          <div className="bg-background shadow-border flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
-            <span
-              aria-hidden="true"
-              className="text-muted-foreground/60 font-mono text-sm select-none"
-            >
-              $
-            </span>
-            <code className="text-muted-foreground shimmer font-mono text-sm">
-              bunx @docker-doctor/cli
-            </code>
-            <CopyButton
-              aria-label="Copy scan command"
-              data-track="leaderboard_command_copied"
-              value="bunx @docker-doctor/cli"
-            />
-          </div>
-          <p className="text-muted-foreground text-center font-mono text-xs">
-            @docker-doctor/cli v{doctorVersion} · {generatedAt.slice(0, 10)}
-          </p>
-        </div>
+        <p className="text-muted-foreground mx-auto mt-8 max-w-md text-center text-xs leading-relaxed">
+          Lint scores from the Docker Doctor CLI v{doctorVersion} on{" "}
+          {generatedAt.slice(0, 10)} — not a vulnerability audit; every
+          Dockerfile and Compose file in the repo counts.
+        </p>
       </div>
     </Section>
   );
