@@ -15,12 +15,8 @@ export const Hero = ({ doctorVersion, generatedAt, repoCount }: HeroProps) => (
       </h1>
     </div>
     <div className="text-muted-foreground text-center">
-      {repoCount} open-source repos scanned with{" "}
-      <code className="text-foreground font-mono text-sm">
-        @docker-doctor/cli v{doctorVersion}
-      </code>{" "}
-      on {generatedAt.slice(0, 10)}. See how scoring works and add your project
-      in the{" "}
+      Docker quality scores for {repoCount} popular open-source projects,
+      refreshed monthly from the{" "}
       <a
         href="https://github.com/PunGrumpy/docker-doctor-benchmarks"
         target="_blank"
@@ -35,6 +31,11 @@ export const Hero = ({ doctorVersion, generatedAt, repoCount }: HeroProps) => (
         benchmarks repo
       </a>
       .
+      <span className="mt-3 flex justify-center">
+        <span className="bg-card shadow-custom text-muted-foreground block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
+          @docker-doctor/cli v{doctorVersion} · {generatedAt.slice(0, 10)}
+        </span>
+      </span>
     </div>
   </Section>
 );
