@@ -2,12 +2,10 @@ import { Section } from "@/components/section";
 import { cn } from "@/lib/utils";
 
 interface HeroProps {
-  readonly doctorVersion: string;
-  readonly generatedAt: string;
   readonly repoCount: number;
 }
 
-export const Hero = ({ doctorVersion, generatedAt, repoCount }: HeroProps) => (
+export const Hero = ({ repoCount }: HeroProps) => (
   <Section className="gap-8 pt-32 pb-16 lg:pt-24 lg:pb-24">
     <div className="group relative inline-block">
       <h1 className="text-foreground font-serif text-3xl font-normal tracking-tight text-balance sm:text-5xl">
@@ -31,11 +29,6 @@ export const Hero = ({ doctorVersion, generatedAt, repoCount }: HeroProps) => (
         benchmarks repo
       </a>
       .
-      <span className="mt-3 flex justify-center">
-        <span className="bg-card shadow-custom text-muted-foreground block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
-          @docker-doctor/cli v{doctorVersion} · {generatedAt.slice(0, 10)}
-        </span>
-      </span>
     </div>
   </Section>
 );

@@ -15,12 +15,12 @@ const LeaderboardPage = async () => {
 
   return (
     <>
-      <Hero
+      <Hero repoCount={entries.length} />
+      <Leaderboard
         doctorVersion={doctorVersion}
+        entries={entries}
         generatedAt={generatedAt}
-        repoCount={entries.length}
       />
-      <Leaderboard entries={entries} />
     </>
   );
 };

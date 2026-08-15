@@ -156,10 +156,16 @@ const Axis = ({ active, visible }: AxisProps) => (
 );
 
 interface LeaderboardProps {
+  readonly doctorVersion: string;
   readonly entries: LeaderboardEntry[];
+  readonly generatedAt: string;
 }
 
-export const Leaderboard = ({ entries }: LeaderboardProps) => {
+export const Leaderboard = ({
+  doctorVersion,
+  entries,
+  generatedAt,
+}: LeaderboardProps) => {
   const [active, setActive] = useState<LeaderboardEntry | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -214,6 +220,9 @@ export const Leaderboard = ({ entries }: LeaderboardProps) => {
               value="bunx @docker-doctor/cli"
             />
           </div>
+          <p className="text-muted-foreground text-center font-mono text-xs">
+            @docker-doctor/cli v{doctorVersion} · {generatedAt.slice(0, 10)}
+          </p>
         </div>
       </div>
     </Section>
