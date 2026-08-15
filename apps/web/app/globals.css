@@ -257,19 +257,6 @@
   }
 }
 
-@keyframes codeEnter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-}
-
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -301,6 +288,35 @@
   animation: growBar 600ms var(--ease-out) both;
 }
 
+/* Draws the architecture diagram's active route in, once, on entrance. The
+   paths declare `pathLength="1"`, so the offset runs in that same 0–1 space
+   and the drawn state (offset 0) is also the resting state. */
+@keyframes routeBeam {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@utility route-beam {
+  animation: routeBeam 900ms var(--ease-out) both;
+  animation-delay: var(--beam-delay, 0s);
+
+  /* The diagram sits far below the fold, so a load-time entrance would finish
+     unseen. Where view timelines exist, the draw follows the scroll instead;
+     elsewhere the time-based run above stays as the fallback. */
+  @supports (animation-timeline: view()) {
+    animation-timeline: view();
+    animation-range: entry var(--beam-start, 15%) cover var(--beam-end, 40%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @layer base {
   ul,
   ol {
@@ -326,47 +342,6 @@
   .dark .shiki,
   .dark .shiki span {
     color: var(--shiki-dark);
-  }
-
-  .code-panel {
-    max-width: 100%;
-    overflow-x: hidden;
-    counter-reset: code-line;
-    animation: codeEnter 200ms var(--ease-out);
-  }
-  .code-panel .shiki {
-    margin: 0;
-    padding: 0;
-    background: transparent !important;
-    overflow-x: hidden !important;
-    max-width: 100%;
-  }
-  .code-panel .shiki code {
-    max-width: 100%;
-    box-sizing: border-box;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    min-width: 0;
-    width: 100%;
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-  .code-panel .line {
-    counter-increment: code-line;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  .code-panel .line::before {
-    content: counter(code-line);
-    display: inline-block;
-    width: 2ch;
-    text-align: right;
-    margin-right: 1.25rem;
-    color: inherit;
-    opacity: 0.25;
-    font-variant-numeric: tabular-nums;
-    -webkit-user-select: none;
-    user-select: none;
-    font-size: 11px;
   }
 
   .preview-card {
