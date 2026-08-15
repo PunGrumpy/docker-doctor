@@ -287,6 +287,20 @@
   animation: fadeInUp 400ms var(--ease-out) forwards;
 }
 
+@keyframes growBar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@utility bar-grow {
+  transform-origin: left;
+  animation: growBar 600ms var(--ease-out) both;
+}
+
 @layer base {
   ul,
   ol {
