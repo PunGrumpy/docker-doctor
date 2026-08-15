@@ -1,3 +1,4 @@
+import { CopyButton } from "@/components/copy-button";
 import { Section } from "@/components/section";
 import type { LeaderboardEntry } from "@/lib/leaderboard";
 import { getScoreData } from "@/lib/score";
@@ -43,12 +44,13 @@ const Row = ({ entry, rank }: RowProps) => {
           className={cn(
             "text-foreground/85 hover:text-foreground block truncate text-sm font-medium",
             "transition-colors duration-200 ease-[var(--ease-out)]",
+            "will-change-transform active:scale-[0.96]",
             "py-1"
           )}
         >
           {entry.name}
         </a>
-        <span className="text-muted-foreground/60 block truncate text-xs">
+        <span className="text-muted-foreground block truncate text-xs">
           {formatFiles(entry)}
         </span>
       </div>
@@ -94,14 +96,29 @@ export const Leaderboard = ({ entries }: LeaderboardProps) => (
         </div>
       </div>
 
-      <p className="text-muted-foreground/70 mt-6 text-center text-xs leading-relaxed">
-        Scores are static-analysis lint findings, not a vulnerability audit —
-        every Dockerfile and compose file in the repo counts, including dev and
-        test setups. Run it on your codebase:{" "}
-        <code className="text-muted-foreground font-mono">
-          bunx @docker-doctor/cli
-        </code>
-      </p>
+      <div className="mt-6 flex flex-col items-center gap-4">
+        <p className="text-muted-foreground max-w-md text-center text-xs leading-relaxed">
+          Scores are static-analysis lint findings, not a vulnerability audit —
+          every Dockerfile and compose file in the repo counts, including dev
+          and test setups. Run it on your codebase:
+        </p>
+        <div className="bg-background shadow-border flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-4">
+          <span
+            aria-hidden="true"
+            className="text-muted-foreground/60 font-mono text-sm select-none"
+          >
+            $
+          </span>
+          <code className="text-muted-foreground font-mono text-sm">
+            bunx @docker-doctor/cli
+          </code>
+          <CopyButton
+            aria-label="Copy scan command"
+            data-track="leaderboard_command_copied"
+            value="bunx @docker-doctor/cli"
+          />
+        </div>
+      </div>
     </div>
   </Section>
 );

@@ -19,7 +19,8 @@ export const Hero = ({ doctorVersion, generatedAt, repoCount }: HeroProps) => (
       <code className="text-foreground font-mono text-sm">
         @docker-doctor/cli v{doctorVersion}
       </code>{" "}
-      on {generatedAt.slice(0, 10)}. Methodology and opt-in via the{" "}
+      on {generatedAt.slice(0, 10)}. See how scoring works and add your project
+      in the{" "}
       <a
         href="https://github.com/PunGrumpy/docker-doctor-benchmarks"
         target="_blank"
