@@ -11,9 +11,14 @@ const BAR_STAGGER_MS = 40;
 // Shared by rows and the axis footer so the bars sit on one aligned
 // 0-100 track. Below sm the bar drops to a full-width second row.
 const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-3 sm:grid-cols-[11rem_minmax(0,1fr)_2.5rem]";
+  "grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_2.5rem]";
 
 const formatFiles = (entry: LeaderboardEntry): string => {
+  const total = entry.dockerfileCount + entry.composeFileCount;
+  return `${total} Docker file${total === 1 ? "" : "s"}`;
+};
+
+const formatFilesDetail = (entry: LeaderboardEntry): string => {
   const parts: string[] = [];
   if (entry.dockerfileCount > 0) {
     parts.push(
@@ -74,7 +79,10 @@ const Row = ({ entry, index, rank, tied }: RowProps) => {
             <span className="text-foreground/85 block truncate text-sm font-medium">
               {entry.name}
             </span>
-            <span className="text-muted-foreground block truncate text-xs">
+            <span
+              className="text-muted-foreground block truncate text-xs"
+              title={formatFilesDetail(entry)}
+            >
               {formatFiles(entry)}
             </span>
           </span>
@@ -104,7 +112,7 @@ const Row = ({ entry, index, rank, tied }: RowProps) => {
 };
 
 const Axis = () => (
-  <div aria-hidden="true" className={cn(ROW_GRID, "-mx-4 px-4 pt-1")}>
+  <div aria-hidden="true" className={cn(ROW_GRID, "w-full pt-1")}>
     <span className="hidden sm:block" />
     <div className="text-muted-foreground relative col-span-2 col-start-1 h-5 font-mono text-xs tabular-nums select-none sm:col-span-1 sm:col-start-2">
       <span className="absolute left-0">0</span>
@@ -124,8 +132,7 @@ export const Leaderboard = ({ entries }: LeaderboardProps) => (
     <div className="w-full max-w-2xl">
       <div className="bg-card/20 shadow-custom rounded-2xl p-1">
         <div className="preview-card relative overflow-hidden rounded-xl px-4 py-2">
-          {/* opt out of the global content-list styling in globals.css */}
-          <ol className="divide-border/50 list-none gap-0 divide-y divide-dashed pl-0">
+          <ol className="divide-border/50 w-full list-none gap-0 divide-y divide-dashed pl-0">
             {entries.map((entry, index) => (
               <Row
                 entry={entry}
