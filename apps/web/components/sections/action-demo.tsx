@@ -14,7 +14,7 @@ export const ActionDemo = () => (
       </span>
       <Badge
         aria-hidden="true"
-        className="-top-7 left-1/4 mb-7 -translate-x-1/4"
+        className="-top-7 right-1/8 mb-7 -translate-x-1/4"
       >
         <span className="bg-card text-muted-foreground shadow-custom block rounded-lg px-1.5 py-1 font-mono text-xs tracking-normal whitespace-nowrap select-none">
           the action
