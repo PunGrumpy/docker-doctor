@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import { DocsMobileNav } from "@/components/docs/mobile-nav";
 import { Logo } from "@/components/logo";
-import { ChangelogButton, DocsButton } from "@/components/nav-buttons";
+import {
+  ChangelogButton,
+  DocsButton,
+  LeaderboardButton,
+} from "@/components/nav-buttons";
 import { source } from "@/lib/source";
 
 export const Header = () => (
@@ -19,6 +23,7 @@ export const Header = () => (
       </div>
 
       <div className="hidden gap-2 lg:flex">
+        <LeaderboardButton />
         <ChangelogButton />
         <DocsButton />
       </div>
