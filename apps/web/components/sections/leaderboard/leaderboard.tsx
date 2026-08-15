@@ -88,7 +88,8 @@ export const Leaderboard = ({ entries }: LeaderboardProps) => (
     <div className="w-full max-w-2xl">
       <div className="bg-card/20 shadow-custom rounded-2xl p-1">
         <div className="preview-card relative overflow-hidden rounded-xl px-4 py-2">
-          <ol className="divide-border/50 divide-y divide-dashed">
+          {/* opt out of the global content-list styling in globals.css */}
+          <ol className="divide-border/50 list-none gap-0 divide-y divide-dashed pl-0">
             {entries.map((entry, index) => (
               <Row entry={entry} key={entry.slug} rank={index + 1} />
             ))}
