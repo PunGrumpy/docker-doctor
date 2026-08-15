@@ -6,11 +6,6 @@ import { Fragment } from "react";
 
 import { cn } from "@/lib/utils";
 
-// Each layout is a fixed coordinate canvas: the SVG uses it as its viewBox and
-// every node is placed as a percentage of it, so curves and nodes scale
-// together as long as the frame keeps the canvas' aspect ratio. Phones get the
-// portrait canvas, everything else the landscape one — same nodes, same
-// routes, re-laid out rather than reduced.
 interface Canvas {
   height: number;
   width: number;
@@ -55,7 +50,6 @@ const across = (canvas: Canvas, value: number) =>
 const down = (canvas: Canvas, value: number) =>
   `${(value / canvas.height) * 100}%`;
 
-// Chrome the diagram draws at a fixed size…
 const place = (
   canvas: Canvas,
   x: number,
@@ -69,7 +63,6 @@ const place = (
   width: across(canvas, width),
 });
 
-// …and nodes whose box has to grow when their text does.
 const placeGrowable = (
   canvas: Canvas,
   x: number,
@@ -108,8 +101,6 @@ const LANDSCAPE: Layout = {
   scanPath: "M130,160 C168,160 168,160 207,160",
 };
 
-// The clean branch lands on a card pinned left; the issues branch runs down the
-// free corridor to its right, so neither curve crosses a card.
 const PORTRAIT: Layout = {
   canvas: TALL,
   cleanPath: "M160,242 C160,270 115,272 115,300",
@@ -127,8 +118,6 @@ const PORTRAIT: Layout = {
   scanPath: "M160,170 C160,190 160,190 160,210",
 };
 
-// The second route draws after the first, in both the time-based and the
-// scroll-driven form of the entrance.
 const LATE_BEAM = {
   "--beam-delay": "0.35s",
   "--beam-end": "50%",
@@ -356,8 +345,6 @@ const DiagramCanvas = ({
     <ProjectCard style={layout.project} />
     <DecisionPill style={layout.decision} />
 
-    {/* Each route label precedes the card it labels, so the branches survive
-        linearized reading. */}
     {OUTCOMES.map((outcome, index) => (
       <Fragment key={outcome.label}>
         <RouteLabel active={outcome.active} style={layout.labels[index]}>
