@@ -6,46 +6,126 @@ import { Fragment } from "react";
 
 import { cn } from "@/lib/utils";
 
-// The diagram lives on a fixed coordinate canvas: the SVG uses it as its
-// viewBox and every node is placed as a percentage of it, so curves and nodes
-// scale together as long as the frame keeps the canvas' aspect ratio.
-const CANVAS_WIDTH = 600;
-const CANVAS_HEIGHT = 320;
+// Each layout is a fixed coordinate canvas: the SVG uses it as its viewBox and
+// every node is placed as a percentage of it, so curves and nodes scale
+// together as long as the frame keeps the canvas' aspect ratio. Phones get the
+// portrait canvas, everything else the landscape one — same nodes, same
+// routes, re-laid out rather than reduced.
+interface Canvas {
+  height: number;
+  width: number;
+}
 
-const across = (value: number) => `${(value / CANVAS_WIDTH) * 100}%`;
-const down = (value: number) => `${(value / CANVAS_HEIGHT) * 100}%`;
+interface Box {
+  height?: string;
+  left: string;
+  minHeight?: string;
+  top: string;
+  width: string;
+}
+
+interface Anchor {
+  left: string;
+  top: string;
+}
+
+interface Gradient {
+  x1: number;
+  x2: number;
+  y1: number;
+  y2: number;
+}
+
+interface Layout {
+  canvas: Canvas;
+  cleanPath: string;
+  decision: Box;
+  id: string;
+  issuesGradient: Gradient;
+  issuesPath: string;
+  labels: Anchor[];
+  outcomes: Box[];
+  project: Box;
+  scanGradient: Gradient;
+  scanPath: string;
+}
+
+const across = (canvas: Canvas, value: number) =>
+  `${(value / canvas.width) * 100}%`;
+const down = (canvas: Canvas, value: number) =>
+  `${(value / canvas.height) * 100}%`;
 
 // Chrome the diagram draws at a fixed size…
-const place = (x: number, y: number, width: number, height: number) => ({
-  height: down(height),
-  left: across(x),
-  top: down(y),
-  width: across(width),
+const place = (
+  canvas: Canvas,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): Box => ({
+  height: down(canvas, height),
+  left: across(canvas, x),
+  top: down(canvas, y),
+  width: across(canvas, width),
 });
 
 // …and nodes whose box has to grow when their text does.
 const placeGrowable = (
+  canvas: Canvas,
   x: number,
   y: number,
   width: number,
   minHeight: number
-) => ({
-  left: across(x),
-  minHeight: down(minHeight),
-  top: down(y),
-  width: across(width),
+): Box => ({
+  left: across(canvas, x),
+  minHeight: down(canvas, minHeight),
+  top: down(canvas, y),
+  width: across(canvas, width),
 });
 
-const anchor = (x: number, y: number) => ({ left: across(x), top: down(y) });
+const anchor = (canvas: Canvas, x: number, y: number): Anchor => ({
+  left: across(canvas, x),
+  top: down(canvas, y),
+});
 
-const PROJECT = place(0, 40, 130, 240);
-const DECISION = place(207, 143, 145, 34);
-const CLEAN = placeGrowable(400, 66, 200, 60);
-const ISSUES = placeGrowable(400, 194, 200, 60);
+const WIDE: Canvas = { height: 320, width: 600 };
+const TALL: Canvas = { height: 470, width: 320 };
 
-const SCAN_PATH = "M130,160 C168,160 168,160 207,160";
-const CLEAN_PATH = "M352,160 C376,160 376,96 400,96";
-const ISSUES_PATH = "M352,160 C376,160 376,224 400,224";
+const LANDSCAPE: Layout = {
+  canvas: WIDE,
+  cleanPath: "M352,160 C376,160 376,96 400,96",
+  decision: place(WIDE, 207, 143, 145, 34),
+  id: "wide",
+  issuesGradient: { x1: 352, x2: 400, y1: 160, y2: 224 },
+  issuesPath: "M352,160 C376,160 376,224 400,224",
+  labels: [anchor(WIDE, 376, 128), anchor(WIDE, 376, 192)],
+  outcomes: [
+    placeGrowable(WIDE, 400, 66, 200, 60),
+    placeGrowable(WIDE, 400, 194, 200, 60),
+  ],
+  project: place(WIDE, 0, 40, 130, 240),
+  scanGradient: { x1: 130, x2: 207, y1: 160, y2: 160 },
+  scanPath: "M130,160 C168,160 168,160 207,160",
+};
+
+// The clean branch lands on a card pinned left; the issues branch runs down the
+// free corridor to its right, so neither curve crosses a card.
+const PORTRAIT: Layout = {
+  canvas: TALL,
+  cleanPath: "M160,242 C160,270 115,272 115,300",
+  decision: place(TALL, 82, 210, 156, 32),
+  id: "tall",
+  issuesGradient: { x1: 160, x2: 290, y1: 242, y2: 390 },
+  issuesPath: "M160,242 C220,250 290,300 290,390",
+  labels: [anchor(TALL, 137, 271), anchor(TALL, 248, 285)],
+  outcomes: [
+    placeGrowable(TALL, 0, 300, 230, 60),
+    placeGrowable(TALL, 90, 390, 230, 60),
+  ],
+  project: place(TALL, 75, 0, 170, 170),
+  scanGradient: { x1: 160, x2: 160, y1: 170, y2: 210 },
+  scanPath: "M160,170 C160,190 160,190 160,210",
+};
 
 // The second route draws after the first, in both the time-based and the
 // scroll-driven form of the entrance.
@@ -58,20 +138,16 @@ const LATE_BEAM = {
 const OUTCOMES = [
   {
     active: false,
-    box: CLEAN,
     detail: "score 94 · exit 0",
     icon: Check,
     label: "No errors",
-    labelAt: anchor(376, 128),
     route: "no",
   },
   {
     active: true,
-    box: ISSUES,
     detail: "score 71 · exit 1",
     icon: AlertTriangle,
     label: "2 errors found",
-    labelAt: anchor(376, 192),
     route: "yes",
   },
 ];
@@ -84,18 +160,9 @@ const routeChip = (active: boolean) =>
       : "bg-background text-muted-foreground shadow-border"
   );
 
-const ProjectCard = ({
-  className,
-  style,
-}: {
-  readonly className?: string;
-  readonly style?: CSSProperties;
-}) => (
+const ProjectCard = ({ style }: { readonly style: Box }) => (
   <div
-    className={cn(
-      "border-border bg-card flex flex-col overflow-hidden rounded-2xl border",
-      className
-    )}
+    className="border-border bg-card absolute flex flex-col overflow-hidden rounded-2xl border [mask-image:linear-gradient(to_bottom,#000_56%,transparent_96%)]"
     style={style}
   >
     <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
@@ -120,18 +187,9 @@ const ProjectCard = ({
   </div>
 );
 
-const DecisionPill = ({
-  className,
-  style,
-}: {
-  readonly className?: string;
-  readonly style?: CSSProperties;
-}) => (
+const DecisionPill = ({ style }: { readonly style: Box }) => (
   <div
-    className={cn(
-      "bg-background flex items-center justify-center rounded-full px-3 shadow-[0_0_0_1px_var(--color-foreground)]",
-      className
-    )}
+    className="bg-background absolute flex items-center justify-center rounded-full px-3 shadow-[0_0_0_1px_var(--color-foreground)]"
     style={style}
   >
     <span className="text-foreground text-[11px] whitespace-nowrap">
@@ -142,26 +200,23 @@ const DecisionPill = ({
 
 const OutcomeCard = ({
   active,
-  className,
   detail,
   icon: Icon,
   label,
   style,
 }: {
   readonly active: boolean;
-  readonly className?: string;
   readonly detail: string;
   readonly icon: LucideIcon;
   readonly label: string;
-  readonly style?: CSSProperties;
+  readonly style: Box;
 }) => (
   <div
     className={cn(
-      "bg-card flex items-center gap-2 rounded-lg px-2.5 py-2.5",
+      "bg-card absolute flex items-center gap-2 rounded-lg px-2.5 py-2.5",
       active
         ? "shadow-[0_0_0_1px_var(--color-foreground)]"
-        : "shadow-custom text-muted-foreground",
-      className
+        : "shadow-custom text-muted-foreground"
     )}
     style={style}
   >
@@ -195,7 +250,7 @@ const RouteLabel = ({
 }: {
   readonly active: boolean;
   readonly children: string;
-  readonly style: { left: string; top: string };
+  readonly style: Anchor;
 }) => (
   <span
     className={cn(
@@ -208,52 +263,53 @@ const RouteLabel = ({
   </span>
 );
 
-const Routes = () => (
+const BeamGradient = ({
+  bounds,
+  id,
+}: {
+  readonly bounds: Gradient;
+  readonly id: string;
+}) => (
+  <linearGradient
+    gradientUnits="userSpaceOnUse"
+    id={id}
+    x1={bounds.x1}
+    x2={bounds.x2}
+    y1={bounds.y1}
+    y2={bounds.y2}
+  >
+    <stop offset="0" stopColor="currentColor" stopOpacity="0" />
+    <stop offset="0.2" stopColor="currentColor" stopOpacity="1" />
+    <stop offset="0.8" stopColor="currentColor" stopOpacity="1" />
+    <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+  </linearGradient>
+);
+
+const Routes = ({ layout }: { readonly layout: Layout }) => (
   <svg
     aria-hidden="true"
     className="text-foreground absolute inset-0 size-full"
     fill="none"
-    viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
+    viewBox={`0 0 ${layout.canvas.width} ${layout.canvas.height}`}
   >
     <defs>
-      <linearGradient
-        gradientUnits="userSpaceOnUse"
-        id="dd-beam-scan"
-        x1="130"
-        x2="207"
-        y1="160"
-        y2="160"
-      >
-        <stop offset="0" stopColor="currentColor" stopOpacity="0" />
-        <stop offset="0.2" stopColor="currentColor" stopOpacity="1" />
-        <stop offset="0.8" stopColor="currentColor" stopOpacity="1" />
-        <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-      </linearGradient>
-      <linearGradient
-        gradientUnits="userSpaceOnUse"
-        id="dd-beam-issues"
-        x1="352"
-        x2="400"
-        y1="160"
-        y2="224"
-      >
-        <stop offset="0" stopColor="currentColor" stopOpacity="0" />
-        <stop offset="0.2" stopColor="currentColor" stopOpacity="1" />
-        <stop offset="0.8" stopColor="currentColor" stopOpacity="1" />
-        <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-      </linearGradient>
+      <BeamGradient bounds={layout.scanGradient} id={`dd-scan-${layout.id}`} />
+      <BeamGradient
+        bounds={layout.issuesGradient}
+        id={`dd-issues-${layout.id}`}
+      />
     </defs>
 
     <path
       className="stroke-muted-foreground/35"
-      d={SCAN_PATH}
+      d={layout.scanPath}
       strokeWidth={1.5}
     />
     <path
       className="route-beam"
-      d={SCAN_PATH}
+      d={layout.scanPath}
       pathLength={1}
-      stroke="url(#dd-beam-scan)"
+      stroke={`url(#dd-scan-${layout.id})`}
       strokeDasharray={1}
       strokeLinecap="round"
       strokeWidth={1.5}
@@ -261,21 +317,21 @@ const Routes = () => (
 
     <path
       className="stroke-muted-foreground/30"
-      d={CLEAN_PATH}
+      d={layout.cleanPath}
       strokeDasharray="4 4"
       strokeWidth={1.5}
     />
 
     <path
       className="stroke-muted-foreground/35"
-      d={ISSUES_PATH}
+      d={layout.issuesPath}
       strokeWidth={1.5}
     />
     <path
       className="route-beam"
-      d={ISSUES_PATH}
+      d={layout.issuesPath}
       pathLength={1}
-      stroke="url(#dd-beam-issues)"
+      stroke={`url(#dd-issues-${layout.id})`}
       strokeDasharray={1}
       strokeLinecap="round"
       strokeWidth={1.5}
@@ -284,28 +340,38 @@ const Routes = () => (
   </svg>
 );
 
-// Phones get the same nodes stacked, each branch keeping its route label.
-const StackedFlow = () => (
-  <div className="flex flex-col items-center gap-3 sm:hidden">
-    <ProjectCard className="h-40 w-40 [mask-image:linear-gradient(to_bottom,#000_58%,transparent_96%)]" />
-    <span aria-hidden="true" className="h-5 border-l border-dashed" />
-    <DecisionPill className="h-9" />
-    <span aria-hidden="true" className="h-5 border-l border-dashed" />
-    <div className="flex w-full max-w-64 flex-col gap-3">
-      {OUTCOMES.map((outcome) => (
-        <div className="flex flex-col gap-1.5" key={outcome.label}>
-          <span className={cn("w-fit", routeChip(outcome.active))}>
-            {outcome.route}
-          </span>
-          <OutcomeCard
-            active={outcome.active}
-            detail={outcome.detail}
-            icon={outcome.icon}
-            label={outcome.label}
-          />
-        </div>
-      ))}
-    </div>
+const DiagramCanvas = ({
+  className,
+  layout,
+}: {
+  readonly className: string;
+  readonly layout: Layout;
+}) => (
+  <div
+    className={cn("relative w-full", className)}
+    style={{ aspectRatio: `${layout.canvas.width} / ${layout.canvas.height}` }}
+  >
+    <Routes layout={layout} />
+
+    <ProjectCard style={layout.project} />
+    <DecisionPill style={layout.decision} />
+
+    {/* Each route label precedes the card it labels, so the branches survive
+        linearized reading. */}
+    {OUTCOMES.map((outcome, index) => (
+      <Fragment key={outcome.label}>
+        <RouteLabel active={outcome.active} style={layout.labels[index]}>
+          {outcome.route}
+        </RouteLabel>
+        <OutcomeCard
+          active={outcome.active}
+          detail={outcome.detail}
+          icon={outcome.icon}
+          label={outcome.label}
+          style={layout.outcomes[index]}
+        />
+      </Fragment>
+    ))}
   </div>
 );
 
@@ -316,38 +382,8 @@ export const ArchitectureDiagram = () => (
       className="pointer-events-none absolute inset-0 [background-image:radial-gradient(oklch(from_var(--color-muted-foreground)_l_c_h/0.3)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,#000_45%,transparent_82%)] [background-size:20px_20px]"
     />
 
-    <StackedFlow />
-
-    <div
-      className="relative hidden w-full sm:block"
-      style={{ aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}` }}
-    >
-      <Routes />
-
-      <ProjectCard
-        className="absolute [mask-image:linear-gradient(to_bottom,#000_56%,transparent_96%)]"
-        style={PROJECT}
-      />
-      <DecisionPill className="absolute" style={DECISION} />
-
-      {/* Each route label precedes the card it labels, so the branches survive
-          linearized reading. */}
-      {OUTCOMES.map((outcome) => (
-        <Fragment key={outcome.label}>
-          <RouteLabel active={outcome.active} style={outcome.labelAt}>
-            {outcome.route}
-          </RouteLabel>
-          <OutcomeCard
-            active={outcome.active}
-            className="absolute"
-            detail={outcome.detail}
-            icon={outcome.icon}
-            label={outcome.label}
-            style={outcome.box}
-          />
-        </Fragment>
-      ))}
-    </div>
+    <DiagramCanvas className="sm:hidden" layout={PORTRAIT} />
+    <DiagramCanvas className="hidden sm:block" layout={LANDSCAPE} />
 
     <figcaption className="text-muted-foreground relative mt-6 text-center text-[11px] text-balance">
       25 rules across five categories. Errors fail the build;{" "}
