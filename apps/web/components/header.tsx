@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
-import { ChangelogButton, DocsButton } from "@/components/nav-buttons";
+import {
+  ChangelogButton,
+  DocsButton,
+  LeaderboardButton,
+} from "@/components/nav-buttons";
 
 export const Header = () => (
   <header className="absolute right-0 left-0 z-10 mx-auto flex w-full max-w-196 items-center justify-center bg-transparent px-4 lg:px-24">
@@ -12,6 +16,7 @@ export const Header = () => (
       </Link>
 
       <div className="flex gap-2">
+        <LeaderboardButton />
         <ChangelogButton />
         <DocsButton />
       </div>

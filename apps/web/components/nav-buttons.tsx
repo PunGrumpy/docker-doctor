@@ -18,6 +18,22 @@ export const ChangelogButton = () => (
   </Link>
 );
 
+export const LeaderboardButton = () => (
+  <Link
+    aria-label="Leaderboard"
+    className={cn(
+      "shadow-custom bg-background hover:bg-card/30 relative flex h-8 items-center justify-center rounded-full px-3 text-sm font-medium",
+      "before:absolute before:inset-x-0 before:-inset-y-1",
+      "transition-[scale,color,background-color,box-shadow] duration-200 ease-[var(--ease-out)] will-change-transform active:scale-[0.96]"
+    )}
+    data-destination="leaderboard"
+    data-track="nav_clicked"
+    href="/leaderboard"
+  >
+    <span className="contents select-none">Leaderboard</span>
+  </Link>
+);
+
 export const DocsButton = () => (
   <Link
     aria-label="Docs"
