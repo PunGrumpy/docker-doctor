@@ -68,7 +68,7 @@ const Row = ({ entry, rank }: RowProps) => {
         />
       </div>
 
-      <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums">
+      <span className="shrink-0 text-right font-mono text-sm tabular-nums">
         {entry.score}
         <span className="text-muted-foreground/50">
           <span className="sr-only"> out of </span>
