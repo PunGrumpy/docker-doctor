@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
+import { parseCompose } from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   combineAptUpdateInstall,
@@ -396,6 +397,20 @@ describe("Compose Rules", () => {
     expect(
       requireRestartPolicy.check(withDeployRestartPolicy, "compose.yml")
     ).toHaveLength(0);
+  });
+
+  test("require-restart-policy: no false positive when restart comes via merge key", () => {
+    const content = `
+x-base: &base
+  restart: always
+services:
+  web:
+    <<: *base
+    image: nginx
+    `;
+    const composeContent = parseCompose(content, "compose.yml");
+    const diags = requireRestartPolicy.check(composeContent, "compose.yml");
+    expect(diags).toHaveLength(0);
   });
 
   test("use-depends-on-condition", () => {

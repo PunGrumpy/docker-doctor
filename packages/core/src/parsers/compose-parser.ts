@@ -4,7 +4,9 @@ import { ParseError } from "../errors";
 
 export const parseCompose = (content: string, filepath: string): unknown => {
   try {
-    return parse(content);
+    // Compose files rely on YAML 1.1 merge keys (`<<: *anchor`); yaml's
+    // default 1.2 schema leaves `<<` as a literal key without this option.
+    return parse(content, { merge: true });
   } catch (error: unknown) {
     throw new ParseError({
       file: filepath,

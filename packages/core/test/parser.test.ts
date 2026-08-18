@@ -130,4 +130,39 @@ services:
     expect(compose.services.web).toBeDefined();
     expect(compose.services.web.image).toBe("node:22");
   });
+
+  test("resolves merge keys (<<: *anchor)", () => {
+    const content = `
+x-base: &base
+  restart: always
+  deploy:
+    resources:
+      limits:
+        memory: 256M
+services:
+  web:
+    <<: *base
+    image: nginx
+    `;
+    const compose = parseCompose(content, "docker-compose.yml") as {
+      services: Record<string, { restart?: string }>;
+    };
+    expect(compose.services.web.restart).toBe("always");
+    expect("<<" in compose.services.web).toBe(false);
+  });
+
+  test("resolves plain aliases (no merge key)", () => {
+    const content = `
+services:
+  a:
+    environment: &env
+      FOO: "1"
+  b:
+    environment: *env
+    `;
+    const compose = parseCompose(content, "docker-compose.yml") as {
+      services: Record<string, { environment?: { FOO?: string } }>;
+    };
+    expect(compose.services.b.environment?.FOO).toBe("1");
+  });
 });
