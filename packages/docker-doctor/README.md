@@ -14,11 +14,46 @@
 
 Your Dockerfiles are probably wrong. Docker Doctor finds out why.
 
-Docker Doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 21+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
+Docker Doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 25 rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
 
 Works with any project that uses Docker.
 
 [Website →](https://docker-doctor.vercel.app)
+
+## What it catches
+
+The most common finding: an install that sits below the source copy, so editing any file reruns it.
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+COPY . .
+RUN npm ci
+CMD ["node", "server.js"]
+```
+
+```text
+⚠ WARN [docker-doctor/order-layers]:4
+      3 │ COPY . .
+>     4 │ RUN npm ci
+      5 │ CMD ["node", "server.js"]
+
+  Running package installation command 'npm ci' after copying application files (at line 3). This invalidates the cache on any code changes.
+  Help: Copy dependency definition files (like package.json, lockfiles) and run install commands BEFORE copying the rest of the application source code.
+```
+
+Manifest first, install, then the source — plus a `.dockerignore`, so a stray log file or a local `node_modules` cannot invalidate that layer either:
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+CMD ["node", "server.js"]
+```
+
+Four lines reordered and one new file takes that Dockerfile from `77` to `87`, with the Performance category down to zero.
 
 ## Install
 
