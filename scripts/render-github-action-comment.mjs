@@ -21,6 +21,32 @@ const MAX_FINDING_LINES = 50;
 const MAX_MESSAGE_LENGTH = 180;
 const SHORT_SHA_LENGTH = 7;
 
+// Diagnostic messages and file paths embed content from the scanned repo
+// (rule messages quote Dockerfile lines verbatim). Everything interpolated
+// into the comment body or step outputs must pass through one of these.
+const sanitizeText = (value) =>
+  String(value)
+    // control chars (incl. newlines and ANSI escapes) -> single space
+    // Intentional: strips control chars from untrusted content.
+    // oxlint-disable-next-line no-control-regex
+    .replaceAll(/[\u0000-\u001F\u007F]+/gu, " ")
+    // neutralize markdown/HTML structure
+    .replaceAll("`", "'")
+    .replaceAll("|", "\\|")
+    .replaceAll("<", "&lt;")
+    .replaceAll("[", "\\[")
+    .replaceAll("]", "\\]");
+
+// encodeURIComponent leaves "(" and ")" unescaped (they're in its
+// unreserved set), which defeats the point here — an unmatched ")" in a
+// filename can still close a markdown link early. Map those two explicitly.
+const URL_ESCAPES = { "(": "%28", ")": "%29" };
+const sanitizeUrlPart = (value) =>
+  String(value).replaceAll(
+    /[\s()<>`]/gu,
+    (c) => URL_ESCAPES[c] ?? encodeURIComponent(c)
+  );
+
 const SEVERITY_RANK = { error: 3, info: 1, warning: 2 };
 
 // Status dots are tiny SVG circles served from the site (same approach as
@@ -115,7 +141,7 @@ const blobUrl = (file, line) => {
     )
     .replace(/^(?:\.\/)+/u, "");
   const fragment = line ? `#L${line}` : "";
-  return `${serverUrl}/${repository}/blob/${headSha}/${joined}${fragment}`;
+  return `${serverUrl}/${repository}/blob/${headSha}/${sanitizeUrlPart(joined)}${fragment}`;
 };
 
 const formatTimestamp = (iso) => {
@@ -163,7 +189,7 @@ const fileRow = (file, diagnostics, updated) => {
   }
   const status = worst ? STATUS_BY_SEVERITY[worst] : CLEAN_STATUS;
   return {
-    markdown: `| [\`${file}\`](${blobUrl(file)}) | ${status} | ${countSummary(diagnostics)} | ${updated} |`,
+    markdown: `| [\`${sanitizeText(file)}\`](${blobUrl(file)}) | ${status} | ${countSummary(diagnostics)} | ${updated} |`,
     worst: SEVERITY_RANK[worst] ?? 0,
   };
 };
@@ -208,7 +234,7 @@ const findingLine = (diagnostic) => {
     ? `${diagnostic.file}:${diagnostic.line}`
     : diagnostic.file;
   const rule = diagnostic.rule.replace(/^docker-doctor\//u, "");
-  return `- ${ICON_BY_SEVERITY[diagnostic.severity] ?? "•"} [\`${location}\`](${blobUrl(diagnostic.file, diagnostic.line)}) ${shortMessage(diagnostic.message)} \`${rule}\``;
+  return `- ${ICON_BY_SEVERITY[diagnostic.severity] ?? "•"} [\`${sanitizeText(location)}\`](${blobUrl(diagnostic.file, diagnostic.line)}) ${sanitizeText(shortMessage(diagnostic.message))} \`${sanitizeText(rule)}\``;
 };
 
 const findingsSection = (report, hasErrors) => {
@@ -221,7 +247,7 @@ const findingsSection = (report, hasErrors) => {
   const byFile = groupByFile(sorted.slice(0, MAX_FINDING_LINES));
   const groups = [...byFile.entries()].map(
     ([file, diagnostics]) =>
-      `**\`${file}\`**\n${diagnostics.map(findingLine).join("\n")}`
+      `**\`${sanitizeText(file)}\`**\n${diagnostics.map(findingLine).join("\n")}`
   );
   const overflow = sorted.length - MAX_FINDING_LINES;
   if (overflow > 0) {
@@ -243,15 +269,33 @@ const footer = () => {
   return `<sub>Scanned by <a href="${SITE_URL}">Docker Doctor</a> for commit <code>${shortSha}</code>.</sub>`;
 };
 
-const stepOutputs = ({ errors, gate, infos, label, score, warnings }) => ({
-  "error-count": String(errors),
-  "gate-status": gate,
-  "info-count": String(infos),
-  label,
-  score: String(score),
-  "total-issues": String(errors + warnings + infos),
-  "warning-count": String(warnings),
-});
+// The report JSON is untrusted (fork PR content), so `label` is allowlisted
+// rather than passed through — anything outside this set (including
+// injected newlines meant to smuggle extra GITHUB_OUTPUT keys) becomes "".
+const KNOWN_LABELS = new Set(["Excellent", "Good", "Needs Work", "Critical"]);
+
+const safeLabel = (label) => {
+  // CLI labels carry a trailing emoji ("Good ✅") — keep only the text.
+  const text = String(label)
+    .replaceAll(/[^ -~]/gu, "")
+    .trim();
+  return KNOWN_LABELS.has(text) ? text : "";
+};
+
+const stepOutputs = ({ errors, gate, infos, label, score, warnings }) => {
+  const errorCount = Number(errors) || 0;
+  const warningCount = Number(warnings) || 0;
+  const infoCount = Number(infos) || 0;
+  return {
+    "error-count": String(errorCount),
+    "gate-status": gate,
+    "info-count": String(infoCount),
+    label: safeLabel(label),
+    score: String(Number(score) || 0),
+    "total-issues": String(errorCount + warningCount + infoCount),
+    "warning-count": String(warningCount),
+  };
+};
 
 const renderFailure = () => ({
   body: [
@@ -293,7 +337,7 @@ const renderReport = (report) => {
 
   if (scannedFiles === 0) {
     lines.push(
-      `**Docker Doctor** found no Dockerfiles or Compose files in \`${scanDirectory}\`.`
+      `**Docker Doctor** found no Dockerfiles or Compose files in \`${sanitizeText(scanDirectory)}\`.`
     );
   } else {
     lines.push(
@@ -333,8 +377,11 @@ outputs["comment-file"] = commentFile;
 
 const githubOutput = env("GITHUB_OUTPUT");
 if (githubOutput) {
+  // Belt-and-suspenders on top of the allowlisting in stepOutputs: strip
+  // newlines from every value regardless of source so no field can smuggle
+  // in an extra GITHUB_OUTPUT key.
   const serialized = Object.entries(outputs)
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([key, value]) => `${key}=${String(value).replaceAll(/\r?\n/gu, " ")}`)
     .join("\n");
   appendFileSync(githubOutput, `${serialized}\n`);
 }
