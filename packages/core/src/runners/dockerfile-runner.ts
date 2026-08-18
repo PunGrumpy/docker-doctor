@@ -4,27 +4,29 @@ import type {
   Diagnostic,
   RuleSeverity,
 } from "../types/index";
+import { resolveSeverity } from "./resolve-severity";
 
 export const runDockerfileRules = (
   instructions: DockerfileInstruction[],
   file: string,
   projectFiles: string[],
-  rulesConfig?: Record<string, RuleSeverity>
+  rulesConfig?: Record<string, RuleSeverity>,
+  categoriesConfig?: Record<string, RuleSeverity>
 ): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
 
   for (const rule of allDockerfileRules) {
-    const configSeverity = rulesConfig?.[rule.key];
-    if (configSeverity === "off") {
+    const severity = resolveSeverity(rule, rulesConfig, categoriesConfig);
+    if (severity === "off") {
       continue;
     }
 
     const ruleDiagnostics = rule.check(instructions, file, { projectFiles });
 
-    // Override severity if config specifies it
-    if (configSeverity) {
+    // Override severity if config resolved to something other than default
+    if (severity !== rule.defaultSeverity) {
       for (const diag of ruleDiagnostics) {
-        diag.severity = configSeverity as "error" | "warning" | "info";
+        diag.severity = severity;
       }
     }
 

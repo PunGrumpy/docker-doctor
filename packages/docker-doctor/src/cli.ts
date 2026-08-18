@@ -476,6 +476,7 @@ const runRulesEngine = async (
   rootDir: string,
   project: { dockerfiles: string[]; composeFiles: string[] },
   rulesConfig: Record<string, RuleSeverity> | undefined,
+  categoriesConfig: Record<string, RuleSeverity> | undefined,
   projectFilesList: string[],
   fileContents: Record<string, string>,
   options: { score?: boolean; json?: boolean },
@@ -502,7 +503,8 @@ const runRulesEngine = async (
           instructions,
           df,
           projectFilesList,
-          rulesConfig
+          rulesConfig,
+          categoriesConfig
         );
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -528,7 +530,7 @@ const runRulesEngine = async (
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[cf] = content;
         const composeObj = parseCompose(content, cf);
-        return runComposeRules(composeObj, cf, rulesConfig);
+        return runComposeRules(composeObj, cf, rulesConfig, categoriesConfig);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
@@ -541,25 +543,6 @@ const runRulesEngine = async (
   }
 
   return diagnostics;
-};
-
-const filterDiagnostics = (
-  diagnostics: Diagnostic[],
-  categories?: Record<string, RuleSeverity>
-): Diagnostic[] => {
-  if (!categories) {
-    return diagnostics;
-  }
-  return diagnostics.filter((d) => {
-    const ruleDef = findRule(d.rule);
-    if (ruleDef) {
-      const catSeverity = categories[ruleDef.category];
-      if (catSeverity === "off") {
-        return false;
-      }
-    }
-    return true;
-  });
 };
 
 const program = new Command();
@@ -648,20 +631,15 @@ program
           rootDir,
           project,
           config.rules,
+          config.categories,
           projectFilesList,
           fileContents,
           options,
           setStatus
         );
 
-        // Filter by category config if needed
-        const filteredDiagnostics = filterDiagnostics(
-          diagnostics,
-          config.categories
-        );
-
         // Calculate score
-        const { score, label } = calculateScore(filteredDiagnostics);
+        const { score, label } = calculateScore(diagnostics);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
@@ -684,21 +662,14 @@ program
           process.exitCode = score < 50 ? 1 : 0;
           return;
         } else if (options.json) {
-          const report = toJsonReport(
-            filteredDiagnostics,
-            score,
-            label,
-            project
-          );
+          const report = toJsonReport(diagnostics, score, label, project);
           console.log(JSON.stringify(report, null, 2));
-          const hasErrors = filteredDiagnostics.some(
-            (d) => d.severity === "error"
-          );
+          const hasErrors = diagnostics.some((d) => d.severity === "error");
           process.exitCode = hasErrors ? 1 : 0;
           return;
         }
         await formatTerminal(
-          filteredDiagnostics,
+          diagnostics,
           score,
           label,
           project,
@@ -707,14 +678,12 @@ program
         );
 
         // Exit with non-zero code if there are any error severity diagnostics
-        const hasErrors = filteredDiagnostics.some(
-          (d) => d.severity === "error"
-        );
+        const hasErrors = diagnostics.some((d) => d.severity === "error");
 
         if (process.stdout.isTTY && process.stdin.isTTY) {
           await runInteractiveWizard({
-            diagnostics: filteredDiagnostics,
-            report: toJsonReport(filteredDiagnostics, score, label, project),
+            diagnostics,
+            report: toJsonReport(diagnostics, score, label, project),
             rootDir,
           });
         }
