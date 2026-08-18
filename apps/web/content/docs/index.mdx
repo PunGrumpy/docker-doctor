@@ -13,14 +13,14 @@ import {
 
 Your Dockerfiles are probably wrong. docker-doctor finds out why.
 
-docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 21+ rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
+docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 25 rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
 
 Works with any project that uses Docker.
 
 ## Key features
 
 <Cards>
-  <Card icon={<Layers />} title="21+ built-in rules">
+  <Card icon={<Layers />} title="25 built-in rules">
     Across five categories: Security, Performance, Best Practices, Compose, and
     Image Size.
   </Card>
@@ -44,18 +44,38 @@ Works with any project that uses Docker.
 
 ## Quick example
 
+A scan of a small project with a misordered install:
+
 ```bash
 npx @docker-doctor/cli@latest
 ```
 
 ```text
-✔ Scanned 4 files in 0.3s [~8 workers]
+  All 6 issues
 
-Dockerfile
-  10:1  warning  Container should not run as root user  docker-doctor/no-root-user
+  Security › 1 issue
+  Performance › 2 issues
+  Best Practices › 2 issues
+  Compose › 0 issues
+  Image Size › 1 issue
+
+  Run docker-doctor --verbose to list every error and warning
+
+    ":"     77 / 100 Good ✅
+   .---.    ███████████████████████████████████████░░░░░░░░░░░
+  ( ◠ ◠ )>  Docker Doctor (https://docker-doctor.vercel.app)
+   \___/
+```
+
+Pass `--verbose` to list every diagnostic with its source lines, message, and fix:
+
+```text
+⚠ WARN [docker-doctor/no-root-user]:1
+>     1 │ FROM node:22-slim
+      2 │ WORKDIR /app
+
+  The container runs as root. Running as root allows potential container breakout vulnerabilities.
   Help: Add a non-root user (e.g., 'USER node' or 'USER 1000') to improve security.
-
-Score: 94 Good ✅
 ```
 
 ## API
