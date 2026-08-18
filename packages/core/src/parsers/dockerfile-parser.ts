@@ -21,11 +21,26 @@ const DOCKERFILE_KEYWORDS = new Set([
   "WORKDIR",
 ]);
 
+// The only instructions BuildKit supports heredocs on.
+const HEREDOC_INSTRUCTIONS = new Set(["ADD", "COPY", "RUN"]);
+
 const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>.*)$/u;
 
-// Matches a heredoc opener like <<EOF, <<-EOF, <<'EOF', <<"EOF". Global so a
-// single line (e.g. `COPY <<FILE1 <<FILE2 /dest/`) can open more than one.
-const HEREDOC_OPENER_RE = /<<-?\s*(?<quote>['"]?)(?<delim>\w+)\k<quote>/gu;
+// Matches a BuildKit heredoc opener like <<EOF, <<-EOF, <<'EOF', <<"EOF".
+// Three constraints keep this from matching shell constructs that aren't
+// Dockerfile heredocs: (1) `<<` must be preceded by start-of-line or
+// whitespace, so `1<<3` (shell arithmetic) doesn't match and every
+// character-shifted alignment inside `<<<` (here-strings) fails too; (2) the
+// delimiter must be attached directly to `<<` with no whitespace, so
+// `$((1 << 3))` and shell `cat << EOF` (both redirection, not a Dockerfile
+// heredoc) don't match; (3) callers only invoke this for RUN/COPY/ADD, the
+// only instructions BuildKit supports heredocs on. Known accepted
+// limitation: `RUN echo "text <<EOF more"` still matches inside a quoted
+// string — correctly rejecting that needs a shell lexer, out of scope here.
+// Global so a single line (e.g. `COPY <<FILE1 <<FILE2 /dest/`) can open more
+// than one.
+const HEREDOC_OPENER_RE =
+  /(?<=^|\s)<<-?(?<quote>['"]?)(?<delim>\w+)\k<quote>/gu;
 
 interface ParserState {
   instructions: DockerfileInstruction[];
@@ -129,7 +144,7 @@ const processInstructionLine = (
     }
   }
 
-  if (state.currentInstruction) {
+  if (HEREDOC_INSTRUCTIONS.has(state.currentInstruction)) {
     state.heredocQueue.push(...findHeredocDelimiters(lineContent));
   }
 

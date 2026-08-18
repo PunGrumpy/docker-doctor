@@ -112,6 +112,65 @@ EOF
     expect(parsed).toHaveLength(2);
     expect(parsed[1].instruction).toBe("USER");
   });
+
+  test("does not treat shell arithmetic << as a heredoc opener", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN echo $((1<<3))
+USER node
+LABEL a=b
+CMD ["node"]
+    `);
+    expect(parsed).toHaveLength(5);
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("does not treat spaced shell arithmetic << as a heredoc opener", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN echo $((1 << 3))
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("does not treat a here-string <<< as a heredoc opener", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN grep foo <<< "bar"
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("handles multiple heredocs opened on one COPY line, closed in FIFO order", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+COPY <<F1 <<F2 /dest/
+body one
+F1
+body two
+F2
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed[1].instruction).toBe("COPY");
+    expect(parsed[1].args).toContain("body one");
+    expect(parsed[1].args).toContain("body two");
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("does not treat << on non-heredoc instructions as a heredoc opener", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+ENV DOC="a<<b"
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
 });
 
 describe("Compose Parser", () => {
