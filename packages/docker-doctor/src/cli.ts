@@ -36,6 +36,7 @@ import {
 import { buildHandoffPayload } from "./agents/handoff-payload";
 import { launchAgent } from "./agents/launch-agent";
 import {
+  AGENT_AUTO_FLAGS,
   AGENT_BINARIES,
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
@@ -410,6 +411,15 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   }
 
   const agentId = launchable[choice];
+
+  const confirmedLaunch = await askConfirm(
+    `Launch ${AGENT_BINARIES[agentId]} with ${AGENT_AUTO_FLAGS[agentId].join(" ")}? It will edit files without asking for approval.`
+  );
+  if (!confirmedLaunch) {
+    printAgentPrompt(payload);
+    return;
+  }
+
   const installResult = await installSkillForAgents([agentId], {
     projectRoot: context.rootDir,
   });

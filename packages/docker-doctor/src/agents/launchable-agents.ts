@@ -18,7 +18,9 @@ export const AGENT_BINARIES: Record<LaunchableAgentId, string> = {
 };
 
 // Each agent's skip-approvals flag. The handoff exists so the agent can fix
-// the issues end-to-end; the user opted in by picking it from the menu.
+// the issues end-to-end; the CLI confirms the literal flag with the user
+// before launch (see cli.ts's runAgentHandoff), so picking it from the menu
+// alone is not the consent — the confirmation is.
 export const AGENT_AUTO_FLAGS: Record<LaunchableAgentId, readonly string[]> = {
   "claude-code": ["--dangerously-skip-permissions"],
   codex: ["--yolo"],
