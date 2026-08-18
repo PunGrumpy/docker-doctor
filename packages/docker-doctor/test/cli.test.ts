@@ -132,6 +132,22 @@ describe("empty project", () => {
   });
 });
 
+describe("categories config", () => {
+  test("categories: { Security: error } overrides no-root-user severity and fails the run", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("with-category-config"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    const report = JSON.parse(stdout);
+    const rootUserDiag = report.diagnostics.find(
+      (d: { rule: string }) => d.rule === "docker-doctor/no-root-user"
+    );
+    expect(rootUserDiag).toBeDefined();
+    expect(rootUserDiag.severity).toBe("error");
+  });
+});
+
 describe("piped --json output is not truncated", () => {
   test("--json on a piped stdout exits (does not hang) and parses", async () => {
     const { exitCode, stdout } = await runCli([
