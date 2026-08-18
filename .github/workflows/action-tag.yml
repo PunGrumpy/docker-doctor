@@ -48,9 +48,12 @@ jobs:
           comment: "false"
 
       - name: Assert the smoke test produced results
+        env:
+          SMOKE_SCORE: ${{ steps.smoke.outputs.score }}
+          SMOKE_TOTAL: ${{ steps.smoke.outputs.total-issues }}
         run: |
-          if [ -z "${{ steps.smoke.outputs.score }}" ] || [ "${{ steps.smoke.outputs.total-issues }}" -lt 1 ]; then
-            echo "::error::Action smoke test returned no results (score='${{ steps.smoke.outputs.score }}', total-issues='${{ steps.smoke.outputs.total-issues }}') — not tagging"
+          if [ -z "$SMOKE_SCORE" ] || [ "$SMOKE_TOTAL" -lt 1 ]; then
+            echo "::error::Action smoke test returned no results (score='$SMOKE_SCORE', total-issues='$SMOKE_TOTAL') — not tagging"
             exit 1
           fi
 
