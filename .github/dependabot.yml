@@ -1,0 +1,15 @@
+# Keeps the SHA-pinned action references in .github/workflows/ current.
+# Pinning without this means the pins silently rot.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: chore
+      include: scope
