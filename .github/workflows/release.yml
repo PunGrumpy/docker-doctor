@@ -49,7 +49,11 @@ jobs:
         run: bun run build --filter @docker-doctor/cli
       - name: Create Release PR or Publish to NPM
         id: changesets
-        uses: changesets/action@198f833dd7d863100ea6e28967bc9a9fdefadb0a # v2.1.0
+        # Held at v1 deliberately: changesets/action v2 requires Changesets
+        # CLI v3 and renames these inputs to version-script/publish-script.
+        # This repo is on @changesets/cli ^2.31.1. Bump both together or
+        # neither — see the Dependabot ignore rule.
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           # changeset:version also resyncs bun.lock so the Version Packages
           # PR doesn't fail the Format CI job with a stale lockfile.
