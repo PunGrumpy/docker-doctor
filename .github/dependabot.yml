@@ -7,9 +7,22 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Minor and patch only. Majors are deliberately excluded so each one
+      # arrives as its own reviewable PR: grouping them produced #70, where a
+      # breaking changesets/action v1 -> v2 bump rode along with two routine
+      # updates and broke the release workflow.
       actions:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # changesets/action v2 requires Changesets CLI v3; this repo is on
+      # @changesets/cli ^2.31.1. Drop this rule when the CLI is upgraded.
+      - dependency-name: changesets/action
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: chore
       include: scope
