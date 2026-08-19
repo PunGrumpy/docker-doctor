@@ -88,7 +88,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@remotion/cli": "4.0.507",
-        "@remotion/google-fonts": "^4.0.507",
+        "@remotion/google-fonts": "4.0.507",
         "@remotion/tailwind-v4": "4.0.507",
         "class-variance-authority": "^0.7.1",
         "cnfast": "^0.1.0",
@@ -645,7 +645,7 @@
 
     "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.507", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-g7spby8NuJ5ha38Tv99pNiKnz1nErv4LvLpdkG9YMVFyioSHzZX1pF1l2B9do5Kin/t/QP0KFgCc2ksF+4r5CQ=="],
 
-    "@remotion/google-fonts": ["@remotion/google-fonts@4.0.508", "", { "dependencies": { "remotion": "4.0.508" } }, "sha512-j6fW/hQNcBsDz//aBh4igUKCYKYdr14Gwl0AEhagUJyf8NmD6wit/0XMY5/sN9AVSCwURirMymkqHNg+AiVbJQ=="],
+    "@remotion/google-fonts": ["@remotion/google-fonts@4.0.507", "", { "dependencies": { "remotion": "4.0.507" } }, "sha512-PuNm8skWh8haY8YLpD6WZm34O8ElQ9llt+lgAniF49tIaYWDUvdBPQYZEuAeVbGBtZaiRjcpwEDIb9rQgj2/TQ=="],
 
     "@remotion/licensing": ["@remotion/licensing@4.0.507", "", {}, "sha512-fdods4YD9c8Ww69wHdnmXpjx7W0rvct6B7gLb92cWsd+ITSUG3hKoh+NqSWXF0GK5bk8IFRmTtBAwJObxow9wA=="],
 
@@ -2324,8 +2324,6 @@
     "@remotion/bundler/esbuild": ["esbuild@0.28.1", "", { "optionalDependencies": { "@esbuild/aix-ppc64": "0.28.1", "@esbuild/android-arm": "0.28.1", "@esbuild/android-arm64": "0.28.1", "@esbuild/android-x64": "0.28.1", "@esbuild/darwin-arm64": "0.28.1", "@esbuild/darwin-x64": "0.28.1", "@esbuild/freebsd-arm64": "0.28.1", "@esbuild/freebsd-x64": "0.28.1", "@esbuild/linux-arm": "0.28.1", "@esbuild/linux-arm64": "0.28.1", "@esbuild/linux-ia32": "0.28.1", "@esbuild/linux-loong64": "0.28.1", "@esbuild/linux-mips64el": "0.28.1", "@esbuild/linux-ppc64": "0.28.1", "@esbuild/linux-riscv64": "0.28.1", "@esbuild/linux-s390x": "0.28.1", "@esbuild/linux-x64": "0.28.1", "@esbuild/netbsd-arm64": "0.28.1", "@esbuild/netbsd-x64": "0.28.1", "@esbuild/openbsd-arm64": "0.28.1", "@esbuild/openbsd-x64": "0.28.1", "@esbuild/openharmony-arm64": "0.28.1", "@esbuild/sunos-x64": "0.28.1", "@esbuild/win32-arm64": "0.28.1", "@esbuild/win32-ia32": "0.28.1", "@esbuild/win32-x64": "0.28.1" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw=="],
 
     "@remotion/cli/semver": ["semver@7.5.3", "", { "dependencies": { "lru-cache": "^6.0.0" }, "bin": { "semver": "bin/semver.js" } }, "sha512-QBlUtyVk/5EeHbi7X0fw6liDZc7BBmEaSYn01fMU1OUYbf6GPsbTtd8WmnqbI20SeycoHSeiybkE/q1Q+qlThQ=="],
-
-    "@remotion/google-fonts/remotion": ["remotion@4.0.508", "", { "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-HEL3zBa6XEoGtqTKs6PiMI8tsZ9c731xFpBtsd8fGa04FjdRdXAybDUEWNLp08UhvNY9YUM+LACLvKu+NWog2w=="],
 
     "@remotion/renderer/execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
