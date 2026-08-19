@@ -101,7 +101,7 @@ jobs:
         run: echo "::notice::$KIT_REPO:${{ steps.kit.outputs.version }} is already on Docker Hub; skipping."
       - name: Log in to Docker Hub
         if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
