@@ -68,6 +68,22 @@ describe("Security Rules", () => {
     ).toHaveLength(0);
   });
 
+  test("no-root-user detects user:group root spellings", () => {
+    for (const user of ["root:root", "0:0", "root:0", "0:1000"]) {
+      const instructions = parseDockerfile(`
+        FROM node:22-alpine
+        USER ${user}
+      `);
+      expect(noRootUser.check(instructions, "Dockerfile")).toHaveLength(1);
+    }
+
+    const nonRoot = parseDockerfile(`
+      FROM node:22-alpine
+      USER node:node
+    `);
+    expect(noRootUser.check(nonRoot, "Dockerfile")).toHaveLength(0);
+  });
+
   test("no-root-user: multi-stage runtime without USER", () => {
     const multiStageRootRuntime = parseDockerfile(`
       FROM node:22-alpine AS build
