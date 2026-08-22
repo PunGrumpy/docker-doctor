@@ -482,6 +482,16 @@ jobs:
   }
 };
 
+interface ScanFailure {
+  file: string;
+  message: string;
+}
+
+interface RulesEngineResult {
+  diagnostics: Diagnostic[];
+  failures: ScanFailure[];
+}
+
 const runRulesEngine = async (
   rootDir: string,
   project: { dockerfiles: string[]; composeFiles: string[] },
@@ -491,8 +501,11 @@ const runRulesEngine = async (
   fileContents: Record<string, string>,
   options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void
-): Promise<Diagnostic[]> => {
+): Promise<RulesEngineResult> => {
   const diagnostics: Diagnostic[] = [];
+  // A file we could not read or parse has not been checked. Collect those so
+  // the caller can refuse to report the run as clean.
+  const failures: ScanFailure[] = [];
 
   const isSilent = options.score || options.json;
 
@@ -519,6 +532,7 @@ const runRulesEngine = async (
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
+        failures.push({ file: df, message: msg });
         return [];
       }
     })
@@ -544,6 +558,7 @@ const runRulesEngine = async (
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+        failures.push({ file: cf, message: msg });
         return [];
       }
     })
@@ -552,7 +567,40 @@ const runRulesEngine = async (
     diagnostics.push(...diags);
   }
 
-  return diagnostics;
+  return { diagnostics, failures };
+};
+
+// Exit 2 ("scan incomplete") outranks exit 1 ("findings"): a file we could not
+// analyze must never read as a clean pass.
+const SCAN_FAILURE_EXIT_CODE = 2;
+
+// Parser errors are multi-line (they quote the offending source). Flatten them
+// so the summary stays a readable one-line-per-file list; the unflattened
+// message was already printed in full when the failure was caught.
+const WHITESPACE_RUN = /\s+/gu;
+
+const flattenMessage = (message: string): string =>
+  message.replaceAll(WHITESPACE_RUN, " ").trim();
+
+// Exit 2 wins over 1 whenever any file went unanalyzed, in every output mode.
+const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
+  if (scanIncomplete) {
+    return SCAN_FAILURE_EXIT_CODE;
+  }
+  return failing ? 1 : 0;
+};
+
+const reportScanFailures = (failures: ScanFailure[]): void => {
+  if (failures.length === 0) {
+    return;
+  }
+  const fileWord = failures.length === 1 ? "file" : "files";
+  console.error(
+    `Docker Doctor could not analyze ${failures.length} ${fileWord}; the score below covers only the files that were analyzed.`
+  );
+  for (const failure of failures) {
+    console.error(`  - ${failure.file}: ${flattenMessage(failure.message)}`);
+  }
 };
 
 const program = new Command();
@@ -637,7 +685,7 @@ program
           ...(project.dockerignores || []),
         ];
 
-        const diagnostics = await runRulesEngine(
+        const { diagnostics, failures } = await runRulesEngine(
           rootDir,
           project,
           config.rules,
@@ -667,15 +715,18 @@ program
           );
         }
 
+        reportScanFailures(failures);
+        const scanIncomplete = failures.length > 0;
+
         if (options.score) {
           console.log(score);
-          process.exitCode = score < 50 ? 1 : 0;
+          process.exitCode = scanExitCode(scanIncomplete, score < 50);
           return;
         } else if (options.json) {
           const report = toJsonReport(diagnostics, score, label, project);
           console.log(JSON.stringify(report, null, 2));
           const hasErrors = diagnostics.some((d) => d.severity === "error");
-          process.exitCode = hasErrors ? 1 : 0;
+          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
           return;
         }
         await formatTerminal(
@@ -697,7 +748,7 @@ program
             rootDir,
           });
         }
-        process.exitCode = hasErrors ? 1 : 0;
+        process.exitCode = scanExitCode(scanIncomplete, hasErrors);
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
