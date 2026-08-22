@@ -56,6 +56,35 @@ describe("exit codes", () => {
   });
 });
 
+describe("unanalyzable files", () => {
+  test("a Compose file that cannot be parsed exits 2, not 0", async () => {
+    const { exitCode } = await runCli([
+      fixture("unparseable-compose"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(2);
+  });
+
+  test("the failure is reported on stderr and stdout stays valid JSON", async () => {
+    const { stderr, stdout } = await runCli([
+      fixture("unparseable-compose"),
+      "--json",
+    ]);
+    expect(stderr).toContain("could not analyze");
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
+
+  test("--score still prints only an integer, but exits 2", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("unparseable-compose"),
+      "--score",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
+    expect(stdout.trim().split("\n").length).toBe(1);
+  });
+});
+
 describe("--json contract", () => {
   test("with-error fixture produces parseable JSON", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
