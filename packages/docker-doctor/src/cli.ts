@@ -45,6 +45,10 @@ import {
   installSkillForAgents,
 } from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
+import {
+  scaffoldActionWorkflow,
+  WORKFLOW_RELATIVE_PATH,
+} from "./workflow-scaffold";
 
 interface KeypressKey {
   name?: string;
@@ -444,33 +448,29 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
       "Add Docker Doctor to GitHub Actions?"
     );
     if (addGhActions) {
-      const workflowDir = path.resolve(".github/workflows");
-      await fs.mkdir(workflowDir, { recursive: true });
-      const workflowPath = path.join(workflowDir, "docker-doctor.yml");
-      const workflowYaml = `name: Docker Doctor
-on:
-  pull_request:
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-jobs:
-  docker-doctor:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ${ACTION_REF}
-`;
-      await fs.writeFile(workflowPath, workflowYaml, "utf-8");
-      console.log(
-        `\n  ${chalk.green("✨")} Created ${chalk.cyan(".github/workflows/docker-doctor.yml")}!`
-      );
-      console.log(
-        `    Every pull request gets a scan and a sticky summary comment — advisory by default.`
-      );
-      console.log(
-        `    Inputs and gating: ${chalk.cyan("https://docker-doctor.vercel.app/docs/guides/github-actions")}`
-      );
+      const status = await scaffoldActionWorkflow({
+        actionRef: ACTION_REF,
+        confirmOverwrite: () =>
+          askConfirm(
+            `A ${WORKFLOW_RELATIVE_PATH} already exists. Overwrite it?`
+          ),
+        rootDir: context.rootDir,
+      });
+      if (status === "kept") {
+        console.log(
+          `\n  ${chalk.yellow("⚠")} Kept your existing ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}.`
+        );
+      } else {
+        console.log(
+          `\n  ${chalk.green("✨")} ${status === "updated" ? "Updated" : "Created"} ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}!`
+        );
+        console.log(
+          `    Every pull request gets a scan and a sticky summary comment — advisory by default.`
+        );
+        console.log(
+          `    Inputs and gating: ${chalk.cyan("https://docker-doctor.vercel.app/docs/guides/github-actions")}`
+        );
+      }
     }
 
     if (context.diagnostics.length === 0) {
