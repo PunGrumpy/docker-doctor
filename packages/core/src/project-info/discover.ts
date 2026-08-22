@@ -67,9 +67,14 @@ export const discoverProject = async (
     }
   }
 
+  // The traversal is concurrent, so results arrive in I/O-completion order.
+  // Sort at the boundary so identical scans produce byte-identical JSON
+  // reports and stable PR-comment row ordering. The default comparator is
+  // deliberate: localeCompare would make the order machine-dependent, which
+  // is the class of bug this sorting exists to fix.
   return {
-    composeFiles,
-    dockerfiles,
-    dockerignores,
+    composeFiles: composeFiles.toSorted(),
+    dockerfiles: dockerfiles.toSorted(),
+    dockerignores: dockerignores.toSorted(),
   };
 };
