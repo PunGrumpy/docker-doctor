@@ -40,11 +40,15 @@ export const preferSlimBase: DockerfileRule = {
           continue;
         }
 
-        const tag = ref.tag.toLowerCase();
+        // Minimal bases identify themselves either in the name (alpine,
+        // busybox, gcr.io/distroless/*) or in the tag (node:22-slim,
+        // python:3.13-alpine). Judging by tag alone flagged `alpine:3.19`.
+        const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
         const isSlim =
-          tag.includes("alpine") ||
-          tag.includes("slim") ||
-          tag.includes("distroless");
+          haystack.includes("alpine") ||
+          haystack.includes("slim") ||
+          haystack.includes("distroless") ||
+          haystack.includes("busybox");
 
         if (!isSlim) {
           diagnostics.push(

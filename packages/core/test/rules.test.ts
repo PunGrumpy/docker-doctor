@@ -483,6 +483,20 @@ describe("Image Size Rules", () => {
     expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
   });
 
+  test("prefer-slim-base recognizes minimal images by name", () => {
+    const minimal = parseDockerfile(`
+      FROM alpine:3.19
+      FROM busybox:1.36
+      FROM gcr.io/distroless/static:nonroot
+    `);
+    expect(preferSlimBase.check(minimal, "Dockerfile")).toHaveLength(0);
+
+    const fullOs = parseDockerfile(`
+      FROM ubuntu:24.04
+    `);
+    expect(preferSlimBase.check(fullOs, "Dockerfile")).toHaveLength(1);
+  });
+
   test("clean-package-cache", () => {
     const noCleanup = parseDockerfile(`
       RUN apt-get update && apt-get install -y git
