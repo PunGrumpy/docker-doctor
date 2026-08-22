@@ -30,15 +30,6 @@ const walk = async (
   return fileList;
 };
 
-// Locale-independent on purpose: localeCompare would make the order depend on
-// the machine's locale, which is the class of bug this sorting exists to fix.
-const byPath = (a: string, b: string): number => {
-  if (a < b) {
-    return -1;
-  }
-  return a > b ? 1 : 0;
-};
-
 export const discoverProject = async (
   rootDir: string
 ): Promise<ProjectInfo> => {
@@ -78,10 +69,12 @@ export const discoverProject = async (
 
   // The traversal is concurrent, so results arrive in I/O-completion order.
   // Sort at the boundary so identical scans produce byte-identical JSON
-  // reports and stable PR-comment row ordering.
+  // reports and stable PR-comment row ordering. The default comparator is
+  // deliberate: localeCompare would make the order machine-dependent, which
+  // is the class of bug this sorting exists to fix.
   return {
-    composeFiles: composeFiles.toSorted(byPath),
-    dockerfiles: dockerfiles.toSorted(byPath),
-    dockerignores: dockerignores.toSorted(byPath),
+    composeFiles: composeFiles.toSorted(),
+    dockerfiles: dockerfiles.toSorted(),
+    dockerignores: dockerignores.toSorted(),
   };
 };
