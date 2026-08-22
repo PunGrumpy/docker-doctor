@@ -448,7 +448,7 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
       "Add Docker Doctor to GitHub Actions?"
     );
     if (addGhActions) {
-      const result = await scaffoldActionWorkflow({
+      const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
         confirmOverwrite: () =>
           askConfirm(
@@ -456,13 +456,13 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
           ),
         rootDir: context.rootDir,
       });
-      if (result.status === "kept") {
+      if (status === "kept") {
         console.log(
           `\n  ${chalk.yellow("⚠")} Kept your existing ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}.`
         );
       } else {
         console.log(
-          `\n  ${chalk.green("✨")} ${result.status === "updated" ? "Updated" : "Created"} ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}!`
+          `\n  ${chalk.green("✨")} ${status === "updated" ? "Updated" : "Created"} ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}!`
         );
         console.log(
           `    Every pull request gets a scan and a sticky summary comment — advisory by default.`

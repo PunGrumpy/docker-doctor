@@ -30,14 +30,13 @@ describe("scaffoldActionWorkflow", () => {
   test("creates the workflow under the scanned root, not the cwd", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: false });
     try {
-      const result = await scaffoldActionWorkflow({
+      const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
         confirmOverwrite: neverCalled,
         rootDir: root,
       });
 
-      expect(result.status).toBe("created");
-      expect(result.path).toBe(path.join(root, WORKFLOW_PATH));
+      expect(status).toBe("created");
       expect(read()).toContain("name: Docker Doctor");
       expect(read()).toContain(`uses: ${ACTION_REF}`);
       // process.cwd() is the package directory under test -- it must be untouched.
@@ -52,13 +51,13 @@ describe("scaffoldActionWorkflow", () => {
   test("keeps an existing workflow when the overwrite is declined", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: true });
     try {
-      const result = await scaffoldActionWorkflow({
+      const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
         confirmOverwrite: () => Promise.resolve(false),
         rootDir: root,
       });
 
-      expect(result.status).toBe("kept");
+      expect(status).toBe("kept");
       expect(read()).toBe(EXISTING_CONTENT);
     } finally {
       cleanup();
@@ -68,13 +67,13 @@ describe("scaffoldActionWorkflow", () => {
   test("replaces an existing workflow only when the overwrite is confirmed", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: true });
     try {
-      const result = await scaffoldActionWorkflow({
+      const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
         confirmOverwrite: () => Promise.resolve(true),
         rootDir: root,
       });
 
-      expect(result.status).toBe("updated");
+      expect(status).toBe("updated");
       expect(read()).toContain("name: Docker Doctor");
       expect(read()).not.toContain("my customized workflow");
     } finally {
