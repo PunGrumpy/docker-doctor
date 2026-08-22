@@ -163,6 +163,20 @@ export const minimizeLayers: DockerfileRule = {
   message: "Minimize the number of image layers",
 };
 
+// Docker reads .dockerignore from the build-context root, which we cannot know
+// statically. Accept the two locations that cover real usage: next to the
+// Dockerfile, or at the scan root (the common monorepo-root build context).
+// Paths here are scan-root-relative and always "/"-separated.
+const hasDockerignoreFor = (
+  dockerfilePath: string,
+  projectFiles: string[]
+): boolean => {
+  const lastSlash = dockerfilePath.lastIndexOf("/");
+  const dir = lastSlash === -1 ? "" : dockerfilePath.slice(0, lastSlash);
+  const adjacent = dir === "" ? ".dockerignore" : `${dir}/.dockerignore`;
+  return projectFiles.some((f) => f === adjacent || f === ".dockerignore");
+};
+
 export const useDockerignore: DockerfileRule = {
   category: "Performance",
   check(instructions, file, context) {
@@ -186,22 +200,21 @@ export const useDockerignore: DockerfileRule = {
       return false;
     });
 
-    if (hasCopyAll && context?.projectFiles) {
-      const hasDockerignore = context.projectFiles.some((f) =>
-        f.endsWith(".dockerignore")
-      );
-      if (!hasDockerignore) {
-        return [
-          createDiagnostic(
-            file,
-            this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
-            "Using COPY/ADD with wildcard/directory, but no .dockerignore file was found in the workspace. This can copy local build folders and secrets.",
-            this.help,
-            1
-          ),
-        ];
-      }
+    if (
+      hasCopyAll &&
+      context?.projectFiles &&
+      !hasDockerignoreFor(file, context.projectFiles)
+    ) {
+      return [
+        createDiagnostic(
+          file,
+          this.key,
+          this.defaultSeverity as "error" | "warning" | "info",
+          "Using COPY/ADD with a wildcard or directory, but no .dockerignore file was found next to the Dockerfile or at the project root. This can copy local build folders and secrets.",
+          this.help,
+          1
+        ),
+      ];
     }
     return [];
   },

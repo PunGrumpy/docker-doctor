@@ -337,6 +337,33 @@ describe("Performance Rules", () => {
       useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
     ).toHaveLength(0);
   });
+  test("use-dockerignore only accepts an adjacent or root .dockerignore", () => {
+    const instructions = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+
+    // An unrelated .dockerignore elsewhere in the monorepo must not satisfy it.
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", "services/web/.dockerignore"],
+      })
+    ).toHaveLength(1);
+
+    // Adjacent to the Dockerfile is fine.
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", "services/api/.dockerignore"],
+      })
+    ).toHaveLength(0);
+
+    // Scan root is fine (monorepo-root build context).
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", ".dockerignore"],
+      })
+    ).toHaveLength(0);
+  });
 });
 
 describe("Compose Rules", () => {
