@@ -1,5 +1,20 @@
 # @docker-doctor/cli
 
+## 0.4.2
+
+### Patch Changes
+
+- a458b4c: Sanitize scanned-file content before it enters agent handoff prompts, label it as untrusted data, and ask for explicit confirmation before launching an agent with its skip-approvals flag.
+- d235f97: `categories` severity values other than "off" now actually override rule severities (previously they were silently ignored), and category handling moved into the core runners so programmatic API consumers get the same results as the CLI.
+- f2a983a: Resolve YAML merge keys (`<<: *anchor`) when parsing Compose files, eliminating false `require-restart-policy` / `require-resource-limits` warnings on services that inherit those settings from an extension field.
+- 37cca50: Discovered Dockerfiles, Compose files and `.dockerignore` files are now returned in sorted order, so repeated scans of an unchanged project produce byte-identical JSON reports (apart from the timestamp) and stable PR-comment row ordering. Previously the concurrent workspace walk emitted files in I/O-completion order.
+- 34dc094: Fix the Dockerfile parser treating shell `<<` (arithmetic, here-strings) as a heredoc opener, which silently swallowed the rest of the file and produced false diagnostics.
+- bfde65a: Declare `engines.node >= 20.11.0`. The CLI already required Node 20.11+ at runtime (`Array.prototype.toSorted`, `import.meta.dirname`); npm now warns at install time instead of crashing at first run on older Node.
+- 3a41a43: Add a "What it catches" section with a before/after layer-ordering example, and correct the rule count to 25.
+- bba2a18: Three rule-accuracy fixes: `no-root-user` now detects `USER root:root`, `USER root:0` and other `user:group` root spellings; `prefer-slim-base` recognizes minimal images by name (`alpine`, `busybox`, distroless) instead of only by tag, removing false positives on `alpine:3.19`; `use-dockerignore` now requires a `.dockerignore` next to the Dockerfile or at the scan root, instead of accepting any `.dockerignore` anywhere in the workspace.
+- fc5569d: Exit with status 2 when a Dockerfile or Compose file cannot be read or parsed, and list the affected files on stderr. Previously an unparseable file contributed no diagnostics and the run could report a perfect score with exit 0 — a green CI gate over a file that was never analyzed.
+- a581f49: The interactive wizard now scaffolds `.github/workflows/docker-doctor.yml` into the scanned directory instead of the current working directory, and asks before overwriting an existing workflow file (declining, or a non-interactive run, keeps the existing file).
+
 ## 0.4.1
 
 ### Patch Changes
