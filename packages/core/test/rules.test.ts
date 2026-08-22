@@ -68,6 +68,22 @@ describe("Security Rules", () => {
     ).toHaveLength(0);
   });
 
+  test("no-root-user detects user:group root spellings", () => {
+    for (const user of ["root:root", "0:0", "root:0", "0:1000"]) {
+      const instructions = parseDockerfile(`
+        FROM node:22-alpine
+        USER ${user}
+      `);
+      expect(noRootUser.check(instructions, "Dockerfile")).toHaveLength(1);
+    }
+
+    const nonRoot = parseDockerfile(`
+      FROM node:22-alpine
+      USER node:node
+    `);
+    expect(noRootUser.check(nonRoot, "Dockerfile")).toHaveLength(0);
+  });
+
   test("no-root-user: multi-stage runtime without USER", () => {
     const multiStageRootRuntime = parseDockerfile(`
       FROM node:22-alpine AS build
@@ -321,6 +337,33 @@ describe("Performance Rules", () => {
       useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
     ).toHaveLength(0);
   });
+  test("use-dockerignore only accepts an adjacent or root .dockerignore", () => {
+    const instructions = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+
+    // An unrelated .dockerignore elsewhere in the monorepo must not satisfy it.
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", "services/web/.dockerignore"],
+      })
+    ).toHaveLength(1);
+
+    // Adjacent to the Dockerfile is fine.
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", "services/api/.dockerignore"],
+      })
+    ).toHaveLength(0);
+
+    // Scan root is fine (monorepo-root build context).
+    expect(
+      useDockerignore.check(instructions, "services/api/Dockerfile", {
+        projectFiles: ["services/api/Dockerfile", ".dockerignore"],
+      })
+    ).toHaveLength(0);
+  });
 });
 
 describe("Compose Rules", () => {
@@ -465,6 +508,20 @@ describe("Image Size Rules", () => {
       FROM build
     `);
     expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("prefer-slim-base recognizes minimal images by name", () => {
+    const minimal = parseDockerfile(`
+      FROM alpine:3.19
+      FROM busybox:1.36
+      FROM gcr.io/distroless/static:nonroot
+    `);
+    expect(preferSlimBase.check(minimal, "Dockerfile")).toHaveLength(0);
+
+    const fullOs = parseDockerfile(`
+      FROM ubuntu:24.04
+    `);
+    expect(preferSlimBase.check(fullOs, "Dockerfile")).toHaveLength(1);
   });
 
   test("clean-package-cache", () => {

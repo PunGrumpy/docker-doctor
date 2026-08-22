@@ -10,6 +10,13 @@ const createDiagnostic = (
   line?: number
 ): Diagnostic => ({ file, help, line, message, rule: ruleKey, severity });
 
+// USER accepts "user", "uid", "user:group" and "uid:gid". Only the user half
+// decides whether the container runs as root; the group half is irrelevant.
+const isRootUser = (value: string): boolean => {
+  const [user] = value.split(":");
+  return user === "root" || user === "0";
+};
+
 export const noRootUser: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
@@ -26,7 +33,7 @@ export const noRootUser: DockerfileRule = {
       }
     }
 
-    if (lastUser === "root" || lastUser === "0" || lastUser === "0:0") {
+    if (isRootUser(lastUser)) {
       return [
         createDiagnostic(
           file,
