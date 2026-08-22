@@ -577,8 +577,10 @@ const SCAN_FAILURE_EXIT_CODE = 2;
 // Parser errors are multi-line (they quote the offending source). Flatten them
 // so the summary stays a readable one-line-per-file list; the unflattened
 // message was already printed in full when the failure was caught.
+const WHITESPACE_RUN = /\s+/gu;
+
 const flattenMessage = (message: string): string =>
-  message.replaceAll(/\s+/gu, " ").trim();
+  message.replaceAll(WHITESPACE_RUN, " ").trim();
 
 // Exit 2 wins over 1 whenever any file went unanalyzed, in every output mode.
 const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
