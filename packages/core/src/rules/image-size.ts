@@ -1,5 +1,13 @@
-import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
-import type { Diagnostic, DockerfileRule } from "../types/index";
+import {
+  collectStageAliases,
+  parseFromArgs,
+  parseImageRef,
+} from "../parsers/image-ref";
+import type {
+  Diagnostic,
+  DockerfileInstruction,
+  DockerfileRule,
+} from "../types/index";
 
 const createDiagnostic = (
   file: string,
@@ -18,8 +26,7 @@ export const preferSlimBase: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        const parts = inst.args.split(/\s+/u);
-        const imagePart = parts.find((p) => !p.startsWith("--"));
+        const imagePart = parseFromArgs(inst.args).base;
         if (!imagePart || imagePart === "scratch") {
           continue;
         }
@@ -127,47 +134,74 @@ export const cleanPackageCache: DockerfileRule = {
   message: "Clean up package manager cache in the same RUN layer",
 };
 
+const installsDevDependencies = (args: string): boolean =>
+  (args.includes("npm install") ||
+    args.includes("npm ci") ||
+    args.includes("yarn install")) &&
+  !args.includes("--production") &&
+  !args.includes("--omit=dev") &&
+  !args.includes("prune");
+
 export const avoidDevDependencies: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
-    let isLastStage = false;
-    let fromCount = 0;
 
+    const stages: {
+      name: string | null;
+      base: string;
+      runs: DockerfileInstruction[];
+    }[] = [];
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        fromCount += 1;
+        const { base, stage } = parseFromArgs(inst.args);
+        stages.push({
+          base: base?.toLowerCase() ?? "",
+          name: stage?.toLowerCase() ?? null,
+          runs: [],
+        });
+      } else if (inst.instruction === "RUN" && stages.length > 0) {
+        stages.at(-1)?.runs.push(inst);
       }
     }
+    if (stages.length === 0) {
+      return diagnostics;
+    }
 
-    let currentStage = 0;
-    for (const inst of instructions) {
-      if (inst.instruction === "FROM") {
-        currentStage += 1;
-        isLastStage = currentStage === fromCount;
-      }
+    // The default build target is the last stage, and its image contains
+    // every layer of the local stages it builds FROM — so a dev install in
+    // an inherited stage ships just like one in the final stage itself.
+    const auditedIndices: number[] = [];
+    let index = stages.length - 1;
+    while (index >= 0) {
+      auditedIndices.push(index);
+      const { base } = stages[index];
+      index = stages
+        .slice(0, index)
+        .findIndex((s) => s.name !== null && s.name === base);
+    }
 
-      if (isLastStage && inst.instruction === "RUN") {
-        const { args } = inst;
-        if (
-          (args.includes("npm install") ||
-            args.includes("npm ci") ||
-            args.includes("yarn install")) &&
-          !args.includes("--production") &&
-          !args.includes("--omit=dev") &&
-          !args.includes("prune")
-        ) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
-              `Running package install '${inst.args}' in the final stage without omitting devDependencies.`,
-              this.help,
-              inst.line
-            )
-          );
+    const finalIndex = stages.length - 1;
+    for (const stageIndex of auditedIndices.toReversed()) {
+      const stage = stages[stageIndex];
+      for (const inst of stage.runs) {
+        if (!installsDevDependencies(inst.args)) {
+          continue;
         }
+        const where =
+          stageIndex === finalIndex
+            ? "in the final stage"
+            : `in stage '${stage.name}', whose layers the final stage inherits,`;
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            `Running package install '${inst.args}' ${where} without omitting devDependencies.`,
+            this.help,
+            inst.line
+          )
+        );
       }
     }
 

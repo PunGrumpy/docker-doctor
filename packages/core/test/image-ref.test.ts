@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
-import { collectStageAliases, parseImageRef } from "../src/parsers/image-ref";
+import {
+  collectStageAliases,
+  parseFromArgs,
+  parseImageRef,
+} from "../src/parsers/image-ref";
 
 describe("parseImageRef", () => {
   test("bare image name", () => {
@@ -80,5 +84,23 @@ describe("collectStageAliases", () => {
       FROM build
     `);
     expect(collectStageAliases(instructions)).toEqual(new Set(["build"]));
+  });
+});
+
+describe("parseFromArgs", () => {
+  test("splits base and stage from FROM args", () => {
+    expect(parseFromArgs("debian:12-slim")).toEqual({
+      base: "debian:12-slim",
+      stage: null,
+    });
+    expect(parseFromArgs("--platform=linux/amd64 node:20 AS build")).toEqual({
+      base: "node:20",
+      stage: "build",
+    });
+    expect(parseFromArgs("base as final")).toEqual({
+      base: "base",
+      stage: "final",
+    });
+    expect(parseFromArgs("")).toEqual({ base: null, stage: null });
   });
 });

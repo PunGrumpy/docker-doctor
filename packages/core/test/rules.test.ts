@@ -84,6 +84,45 @@ describe("Security Rules", () => {
     expect(noRootUser.check(nonRoot, "Dockerfile")).toHaveLength(0);
   });
 
+  test("no-root-user inherits USER from a parent stage", () => {
+    // Issue #88: FROM <previous stage> inherits that stage's image config,
+    // USER included, so this must not report.
+    const inherited = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      USER app
+      FROM base AS final
+      CMD ["node", "x.js"]
+    `);
+    expect(noRootUser.check(inherited, "Dockerfile")).toHaveLength(0);
+
+    const twoHop = parseDockerfile(`
+      FROM debian:bookworm-slim AS a
+      USER app
+      FROM a AS b
+      FROM b AS c
+      CMD ["node", "x.js"]
+    `);
+    expect(noRootUser.check(twoHop, "Dockerfile")).toHaveLength(0);
+
+    // A fresh base image resets to root even if an earlier stage set USER.
+    const freshBase = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      USER app
+      FROM debian:bookworm-slim AS final
+      CMD ["node", "x.js"]
+    `);
+    expect(noRootUser.check(freshBase, "Dockerfile")).toHaveLength(1);
+
+    // Inheriting a non-root USER and then switching back to root reports.
+    const resetToRoot = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      USER app
+      FROM base AS final
+      USER root
+    `);
+    expect(noRootUser.check(resetToRoot, "Dockerfile")).toHaveLength(1);
+  });
+
   test("no-root-user: multi-stage runtime without USER", () => {
     const multiStageRootRuntime = parseDockerfile(`
       FROM node:22-alpine AS build
@@ -559,6 +598,60 @@ describe("Image Size Rules", () => {
       `);
     const diags2 = avoidDevDependencies.check(withoutDev, "Dockerfile");
     expect(diags2).toHaveLength(0);
+  });
+
+  test("avoid-dev-dependencies audits stages the final image inherits", () => {
+    // Issue #90: FROM <previous stage> carries that stage's layers into the
+    // final image, so a dev install there ships too.
+    const inheritedDev = parseDockerfile(`
+      FROM node:22 AS deps
+      RUN npm install
+      FROM deps AS final
+      CMD ["node", "x.js"]
+    `);
+    const diags = avoidDevDependencies.check(inheritedDev, "Dockerfile");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBe(3);
+
+    const inheritedClean = parseDockerfile(`
+      FROM node:22 AS deps
+      RUN npm ci --omit=dev
+      FROM deps AS final
+      CMD ["node", "x.js"]
+    `);
+    expect(
+      avoidDevDependencies.check(inheritedClean, "Dockerfile")
+    ).toHaveLength(0);
+
+    // A discarded builder stage (not in the final stage's FROM chain) still
+    // does not report.
+    const discardedBuilder = parseDockerfile(`
+      FROM node:22 AS builder
+      RUN npm install
+      FROM node:22 AS runner
+      COPY --from=builder /app/dist ./dist
+      RUN npm ci --omit=dev
+    `);
+    expect(
+      avoidDevDependencies.check(discardedBuilder, "Dockerfile")
+    ).toHaveLength(0);
+
+    // The default build target is the LAST stage, so a trailing helper stage
+    // is what actually ships and its dev install still reports.
+    const trailingTestStage = parseDockerfile(`
+      FROM node:22 AS build
+      RUN npm install
+      FROM node:22 AS final
+      RUN npm ci --omit=dev
+      FROM final AS test
+      RUN npm install
+    `);
+    const trailing = avoidDevDependencies.check(
+      trailingTestStage,
+      "Dockerfile"
+    );
+    expect(trailing).toHaveLength(1);
+    expect(trailing[0].line).toBe(7);
   });
 });
 
