@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/no-add-remote]
-  Avoid using ADD with remote URLs
+  ADD instruction uses a remote URL 'https://example.com/tool.tar.gz'. Remote files added via ADD cannot be cleaned up in later layers, increasing image size.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ Three separate problems stack up. **Integrity:** `ADD` gives you no place to ver
 
 ## How to fix it
 
-Use 'RUN curl' or 'RUN wget' instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.
+Use `RUN curl` or `RUN wget` instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.
 
 ```dockerfile title="Dockerfile — download, verify, extract, and clean in one layer"
 FROM debian:12-slim

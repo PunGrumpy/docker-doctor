@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/useradd-no-log-init]
-  Use --no-log-init with useradd
+  RUN instruction runs 'useradd' without '--no-log-init'. This can cause excessive disk space usage / exhaustion under Go's sparse tar archive bug when large UIDs are used.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ This is a genuine footgun (docker/docker#5419): the Dockerfile looks completely 
 
 ## How to fix it
 
-Pass '--no-log-init' flag to useradd (e.g., 'RUN useradd --no-log-init -r -g mygroup myuser').
+Pass `--no-log-init` flag to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).
 
 ```dockerfile title="Dockerfile — accounting files never created"
 FROM debian:12-slim

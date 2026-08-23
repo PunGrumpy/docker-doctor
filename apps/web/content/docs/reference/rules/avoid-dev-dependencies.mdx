@@ -24,7 +24,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/avoid-dev-dependencies]
-  Avoid installing development dependencies in final production stage
+  Running package install 'npm install' in the final stage without omitting devDependencies.
 ```
 
 ## Why it matters
@@ -33,7 +33,7 @@ Dev dependencies in production are dead weight with a blast radius: hundreds of 
 
 ## How to fix it
 
-For Node.js, run 'npm prune --production' or install only production dependencies ('npm ci --omit=dev') in the runtime stage.
+For Node.js, run `npm prune --production` or install only production dependencies (`npm ci --omit=dev`) in the runtime stage.
 
 ```dockerfile title="Dockerfile — dev deps live and die in the build stage"
 FROM node:22-slim AS build

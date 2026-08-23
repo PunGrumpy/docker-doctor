@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/combine-apt-update-install]
-  Combine apt-get update and apt-get install
+  RUN apt-get update used without apt-get install in the same instruction. This can cause caching issues and build failures.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ The two commands are only correct as a unit: the update fetches the index, the i
 
 ## How to fix it
 
-Combine 'apt-get update' and 'apt-get install' in the same RUN instruction (e.g. 'RUN apt-get update && apt-get install -y --no-install-recommends \<package> && rm -rf /var/lib/apt/lists/\*').
+Combine `apt-get update` and `apt-get install` in the same RUN instruction (e.g. `RUN apt-get update && apt-get install -y --no-install-recommends <package> && rm -rf /var/lib/apt/lists/*`).
 
 ```dockerfile title="Dockerfile — index fetched, used, and removed in one layer"
 FROM debian:12-slim

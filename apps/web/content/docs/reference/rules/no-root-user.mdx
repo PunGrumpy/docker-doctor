@@ -22,7 +22,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/no-root-user]
-  Container should not run as root user
+  The container runs as root. Running as root allows potential container breakout vulnerabilities.
 ```
 
 ## Why it matters
@@ -31,7 +31,7 @@ A container is not a security boundary on its own. If an attacker gets code exec
 
 ## How to fix it
 
-Add a non-root user (e.g., 'USER node' or 'USER 1000') to improve security.
+Add a non-root user (e.g., `USER node` or `USER 1000`) to improve security.
 
 ```dockerfile title="Dockerfile — drops to a non-root user"
 FROM node:22-slim

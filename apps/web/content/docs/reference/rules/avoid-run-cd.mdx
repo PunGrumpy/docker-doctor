@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/avoid-run-cd]
-  Avoid changing directories with cd in RUN
+  Avoid using 'cd' in RUN instructions. Use WORKDIR instead to change the working directory stably across layers.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ Scanning this file reports:
 
 ## How to fix it
 
-Use the WORKDIR instruction instead of 'cd' inside RUN to establish directory context.
+Use the WORKDIR instruction instead of `cd` inside RUN to establish directory context.
 
 ```dockerfile title="Dockerfile — WORKDIR persists for every instruction after it"
 FROM node:22-slim

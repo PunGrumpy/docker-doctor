@@ -21,7 +21,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/require-labels]
-  Add LABEL metadata to images
+  No LABEL metadata was found in this Dockerfile. Adding labels helps identify build information, maintainers, and descriptions.
 ```
 
 ## Why it matters
@@ -30,7 +30,7 @@ Labels are machine-readable provenance. Registries (GitHub Container Registry am
 
 ## How to fix it
 
-Use LABEL instructions (e.g. LABEL org.opencontainers.image.authors="...") to document ownership, license, version, and build info.
+Use LABEL instructions (e.g. `LABEL org.opencontainers.image.authors="..."`) to document ownership, license, version, and build info.
 
 ```dockerfile title="Dockerfile — image carries its provenance"
 FROM node:22-slim

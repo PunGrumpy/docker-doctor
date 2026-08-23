@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/require-restart-policy]
-  Set restart policy for services
+  Service 'api' has no restart policy configured. It will not restart if it crashes or if the host reboots.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ Crashes are normal operation: OOM kills, unhandled exceptions, dropped database 
 
 ## How to fix it
 
-Define 'restart: always' or 'restart: unless-stopped' (or deploy.restart_policy) so services restart on crashes or host reboot.
+Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot.
 
 ```yaml title="compose.yaml — restarts on crash and after reboot"
 services:

@@ -25,7 +25,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/use-depends-on-condition]
-  Use long-form depends_on with healthcheck conditions
+  Service 'web' uses shorthand depends_on list. This only checks if containers are started, not if they are ready/healthy.
 ```
 
 ## Why it matters
@@ -34,7 +34,7 @@ Scanning this file reports:
 
 ## How to fix it
 
-Instead of a simple service list, use 'depends_on: \{ dependency: \{ condition: service_healthy } }' to ensure dependencies are fully ready before starting.
+Instead of a simple service list, use `depends_on: { dependency: { condition: service_healthy } }` to ensure dependencies are fully ready before starting.
 
 ```yaml title="compose.yaml — app waits until postgres is actually ready"
 services:

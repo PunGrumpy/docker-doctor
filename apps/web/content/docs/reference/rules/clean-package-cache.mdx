@@ -19,7 +19,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/clean-package-cache]
-  Clean up package manager cache in the same RUN layer
+  Running 'apt-get install' without removing package lists afterwards. This keeps metadata caches inside the image layer.
 ```
 
 ## Why it matters
@@ -28,7 +28,7 @@ This is the most common avoidable image bloat, and the layer mechanics make the 
 
 ## How to fix it
 
-For apt-get, append '&& rm -rf /var/lib/apt/lists/\*'. For apk, use 'apk add --no-cache'. For dnf/yum, run 'yum clean all'.
+For apt-get, append `&& rm -rf /var/lib/apt/lists/*`. For apk, use `apk add --no-cache`. For dnf/yum, run `yum clean all`.
 
 ```dockerfile title="Dockerfile — layer committed already clean"
 FROM debian:12-slim
