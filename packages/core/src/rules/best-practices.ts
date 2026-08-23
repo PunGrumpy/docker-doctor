@@ -188,32 +188,85 @@ export const combineAptUpdateInstall: DockerfileRule = {
   message: "Combine apt-get update and apt-get install",
 };
 
+// An actual pipefail configuration, not a bare substring: `set -o pipefail`,
+// the combined short form (`set -euo pipefail`), repeated flags (`set -e -o
+// errexit -o pipefail`), or a shell invoked with the option (`bash -o
+// pipefail -c ...`). The word must follow an option-setting flag, so a
+// pipeline merely mentioning "pipefail" (echo "pipefail" | tee log) does not
+// count as configuring it.
+const PIPEFAIL_SETTING_RE =
+  /\b(?:set|\w*sh)\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*o(?:\s+\S+)*?\s+\bpipefail\b/u;
+
+// SHELL takes an exec-form array; joined, its elements are the prefix every
+// shell-form RUN is wrapped in (e.g. /bin/bash -o pipefail -c), so the
+// option must appear there for the directive to enable pipefail.
+const shellArgsEnablePipefail = (args: string): boolean => {
+  try {
+    const shell: unknown = JSON.parse(args);
+    if (!Array.isArray(shell) || shell.length === 0) {
+      return false;
+    }
+    return PIPEFAIL_SETTING_RE.test(shell.map(String).join(" "));
+  } catch {
+    return false;
+  }
+};
+
+// FROM <image> [--flags] [AS <stage>]
+const FROM_BASE_RE = /^(?:--\S+\s+)*(?<base>\S+)(?:\s+AS\s+(?<stage>\S+))?/iu;
+
 export const usePipefail: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    // FROM <previous stage> inherits that stage's image config — SHELL
+    // included (verified against BuildKit); FROM a fresh base image, or the
+    // reserved empty stage `scratch`, resets it to the Docker default. A
+    // SHELL instruction replaces it for the rest of the current stage.
+    const stagePipefail = new Map<string, boolean>();
+    let shellHasPipefail = false;
+    let currentStage: string | null = null;
     for (const inst of instructions) {
-      if (inst.instruction === "RUN") {
-        const { raw } = inst;
-        const hasPipe = /(?<!\|)\|(?!\|)/u.test(raw);
-        if (hasPipe && !raw.includes("pipefail")) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
-              "RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.",
-              this.help,
-              inst.line
-            )
-          );
+      if (inst.instruction === "FROM") {
+        const match = inst.args.match(FROM_BASE_RE);
+        const base = (match?.groups?.base ?? "").toLowerCase();
+        shellHasPipefail =
+          base !== "scratch" && (stagePipefail.get(base) ?? false);
+        currentStage = (match?.groups?.stage ?? "").toLowerCase() || null;
+        if (currentStage) {
+          stagePipefail.set(currentStage, shellHasPipefail);
         }
+        continue;
+      }
+      if (inst.instruction === "SHELL") {
+        shellHasPipefail = shellArgsEnablePipefail(inst.args);
+        if (currentStage) {
+          stagePipefail.set(currentStage, shellHasPipefail);
+        }
+        continue;
+      }
+      if (inst.instruction !== "RUN") {
+        continue;
+      }
+      const { raw } = inst;
+      const hasPipe = /(?<!\|)\|(?!\|)/u.test(raw);
+      if (hasPipe && !shellHasPipefail && !PIPEFAIL_SETTING_RE.test(raw)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            "RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.",
+            this.help,
+            inst.line
+          )
+        );
       }
     }
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Prepend 'set -o pipefail &&' to pipe commands, or use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']).",
+  help: "Prepend 'set -o pipefail &&' to pipe commands, use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']), or set SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] at the top of the stage.",
   key: "docker-doctor/use-pipefail",
   message: "Use pipefail to catch pipeline command failures",
 };

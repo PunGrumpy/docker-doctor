@@ -609,6 +609,56 @@ describe("Best Practices Rules", () => {
     `);
     const diags3 = usePipefail.check(noPipe, "Dockerfile");
     expect(diags3).toHaveLength(0);
+
+    // Issue #84: the SHELL directive the docs prescribe must clear the
+    // warning, but only while it actually enables pipefail.
+    const shellDirective = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(shellDirective, "Dockerfile")).toHaveLength(0);
+
+    const shellDirectiveWithoutPipefail = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-c"]
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(
+      usePipefail.check(shellDirectiveWithoutPipefail, "Dockerfile")
+    ).toHaveLength(1);
+
+    // A stage-level SHELL with pipefail carries into a stage that builds FROM
+    // the previous one (the image config inherits), but not into a stage that
+    // starts from a fresh base image.
+    const inheritedStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM base AS app
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(inheritedStage, "Dockerfile")).toHaveLength(0);
+
+    const freshStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM debian:bookworm-slim AS app
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(freshStage, "Dockerfile")).toHaveLength(1);
+
+    // The opposite direction of the substring bug: merely mentioning the word
+    // must not exempt a pipeline that never sets the option.
+    const mentionsPipefail = parseDockerfile(`
+      RUN echo "pipefail" | tee log
+    `);
+    expect(usePipefail.check(mentionsPipefail, "Dockerfile")).toHaveLength(1);
+
+    // The combined short form still counts.
+    const combinedShort = parseDockerfile(`
+      RUN set -euo pipefail && curl -fsSL https://x.sh | sh
+    `);
+    expect(usePipefail.check(combinedShort, "Dockerfile")).toHaveLength(0);
   });
 
   // Known false positive: the pipefail check tests inst.raw with no quote
