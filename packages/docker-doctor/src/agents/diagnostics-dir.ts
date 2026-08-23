@@ -3,6 +3,8 @@ import path from "node:path";
 
 import type { Diagnostic, JsonReport } from "@docker-doctor/core";
 
+import { sanitizeMessage, sanitizePath } from "./sanitize";
+
 export const DIAGNOSTICS_DIR_NAME = ".docker-doctor";
 
 // Diagnostic messages and the report they're drawn from quote content from
@@ -58,11 +60,12 @@ export const writeDiagnosticsDirectory = async (
     const lines = [
       TRUST_BOUNDARY_NOTE,
       `${rule} (${first.severity})`,
-      first.message,
+      sanitizeMessage(first.message),
       `Fix: ${first.help}`,
       "",
       ...ruleDiagnostics.map(
-        (d) => `${d.file}${d.line === undefined ? "" : `:${d.line}`}`
+        (d) =>
+          `${sanitizePath(d.file)}${d.line === undefined ? "" : `:${d.line}`}`
       ),
       "",
     ];
