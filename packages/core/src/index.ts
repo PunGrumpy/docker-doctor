@@ -11,6 +11,10 @@ export {
 } from "./rules/index";
 export { defineConfig } from "./config/define-config";
 export { loadConfig } from "./config/loader";
+export {
+  collectUnknownConfigKeys,
+  type UnknownConfigKeys,
+} from "./config/unknown-keys";
 export { calculateScore, getScoreBucket, SCORE_BUCKETS } from "./scoring";
 export * from "./errors";
 export * from "./types/index";
