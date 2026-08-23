@@ -1,11 +1,10 @@
 "use client";
 
 import { trackError } from "@databuddy/sdk/react";
+import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 
-import { Check } from "@/components/icons/check";
-import { Copy } from "@/components/icons/copy";
 import { cn } from "@/lib/utils";
 
 interface CopyButtonProps extends Omit<ComponentProps<"button">, "onClick"> {
@@ -42,8 +41,8 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
       type="button"
       onClick={handleCopy}
       className={cn(
-        "shadow-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:ring-primary focus-visible:ring-offset-background relative flex size-9 cursor-pointer items-center justify-center rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-offset-2",
-        "transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]",
+        "shadow-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:ring-primary focus-visible:ring-offset-background relative flex size-9 cursor-pointer items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        "transition-[opacity,transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]",
         // Hit area extended to 40x40px
         "after:absolute after:-inset-0.5 after:content-['']",
         className
@@ -52,21 +51,26 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
       {...props}
     >
       <Copy
+        aria-hidden="true"
         className={cn(
           "size-4 transition-all duration-200 ease-[var(--ease-out)]",
           copied
-            ? "scale-[0.6] opacity-0 blur-xs"
+            ? "scale-[0.25] opacity-0 blur-xs"
             : "blur-0 scale-100 opacity-100"
         )}
       />
       <Check
+        aria-hidden="true"
         className={cn(
           "absolute inset-0 m-auto size-4 transition-all duration-200 ease-[var(--ease-out)]",
           copied
             ? "blur-0 scale-100 opacity-100"
-            : "scale-[0.6] opacity-0 blur-xs"
+            : "scale-[0.25] opacity-0 blur-xs"
         )}
       />
+      {/* Stable live region: always rendered, text toggled, so screen
+          readers announce the copy result the icon swap only shows. */}
+      <output className="sr-only">{copied ? "Copied" : ""}</output>
     </button>
   );
 };

@@ -11,6 +11,7 @@ import {
   OrderedList,
   Paragraph,
   Pre,
+  SeverityPill,
   Table,
   TableCell,
   TableHeaderCell,
@@ -22,6 +23,7 @@ export const getMDXComponents = (
 ): MDXComponents => ({
   Card,
   Cards,
+  SeverityPill,
   a: Anchor,
   code: Code,
   h2: Heading2,

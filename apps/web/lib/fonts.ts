@@ -27,5 +27,8 @@ export const fonts = cn(
   sans.variable,
   mono.variable,
   serif.variable,
-  "touch-manipulation font-sans antialiased [font-synthesis:none]"
+  // `style` (not `none`): no italic faces are loaded, so with synthesis
+  // fully off every <em> would render upright and emphasis would vanish.
+  // Weight/small-caps synthesis stays off — all used weights are real.
+  "touch-manipulation font-sans antialiased [font-synthesis:style]"
 );

@@ -3,6 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { isValidElement } from "react";
 
 import { CopyButton } from "@/components/copy-button";
+import { Pill } from "@/components/pill";
 import { cn } from "@/lib/utils";
 
 const getNodeText = (node: ReactNode): string => {
@@ -39,7 +40,9 @@ export const Heading2 = ({
 }: ComponentProps<"h2">) => (
   <h2
     className={cn(
-      "mt-12 mb-4 scroll-mt-24 font-serif text-2xl font-normal tracking-tight",
+      // Sticky header (56px) + the mobile TOC bar (~50px) stack below `xl`,
+      // so anchor jumps need the larger offset there.
+      "mt-12 mb-4 scroll-mt-28 font-serif text-2xl font-normal tracking-tight xl:scroll-mt-24",
       className
     )}
     {...props}
@@ -55,7 +58,7 @@ export const Heading3 = ({
 }: ComponentProps<"h3">) => (
   <h3
     className={cn(
-      "mt-8 mb-3 scroll-mt-24 font-serif text-xl font-normal tracking-tight",
+      "mt-8 mb-3 scroll-mt-28 font-serif text-xl font-normal tracking-tight xl:scroll-mt-24",
       className
     )}
     {...props}
@@ -71,15 +74,21 @@ export const Paragraph = ({ className, ...props }: ComponentProps<"p">) => (
   />
 );
 
+// The global `ul, ol` base style (globals.css) is written for marketing
+// surfaces: muted 14px flex lists. Docs lists are primary reading content,
+// so reset it back to body prose — utilities beat the base layer.
+const listReset =
+  "text-foreground/90 my-4 block ps-6 text-base leading-7 [&_&]:my-1";
+
 export const UnorderedList = ({
   className,
   ...props
 }: ComponentProps<"ul">) => (
-  <ul className={cn("my-4 ml-6 list-disc", className)} {...props} />
+  <ul className={cn(listReset, "list-disc", className)} {...props} />
 );
 
 export const OrderedList = ({ className, ...props }: ComponentProps<"ol">) => (
-  <ol className={cn("my-4 ml-6 list-decimal", className)} {...props} />
+  <ol className={cn(listReset, "list-decimal", className)} {...props} />
 );
 
 export const ListItem = ({ className, ...props }: ComponentProps<"li">) => (
@@ -124,7 +133,9 @@ export const Anchor = ({
 export const Code = ({ className, ...props }: ComponentProps<"code">) => (
   <code
     className={cn(
-      "bg-muted text-foreground rounded-md border px-1.5 py-0.5 font-mono text-[13px]",
+      // em-based so the chip scales with its context (16px body → 13px,
+      // 14px table cells → ~11.4px) instead of pinning to one pixel size.
+      "bg-muted text-foreground rounded-md border px-1.5 py-0.5 font-mono text-[0.8125em]",
       // Reset the inline-code chip when this `code` is the child of a `pre`
       // (a fenced/highlighted block) so shiki's own token colors show
       // through untouched.
@@ -138,12 +149,23 @@ export const Code = ({ className, ...props }: ComponentProps<"code">) => (
 export const Pre = ({
   children,
   className,
+  title,
+  // fumadocs' rehype-code forwards fence meta (`title`, `icon`) as props.
+  // `icon` is raw SVG markup we don't render — strip it so it never lands
+  // on the DOM element; `title` becomes a visible header instead of a
+  // hover-only tooltip.
+  icon: _icon,
   ...props
-}: ComponentProps<"pre">) => {
+}: ComponentProps<"pre"> & { readonly icon?: string }) => {
   const code = getNodeText(children);
 
   return (
     <div className="group bg-background shadow-border relative my-6 overflow-hidden rounded-xl">
+      {title ? (
+        <div className="text-muted-foreground border-b border-dashed px-4 py-2 font-mono text-xs">
+          {title}
+        </div>
+      ) : null}
       <pre
         className={cn("overflow-x-auto p-4 font-mono text-sm", className)}
         {...props}
@@ -152,7 +174,7 @@ export const Pre = ({
       </pre>
       <CopyButton
         aria-label="Copy code"
-        className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        className="absolute top-2 right-2 rounded-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
         data-snippet={getSnippetLabel(code)}
         data-track="docs_code_copied"
         value={code}
@@ -173,7 +195,7 @@ export const TableHeaderCell = ({
 }: ComponentProps<"th">) => (
   <th
     className={cn(
-      "bg-muted/50 border-b px-4 py-2 text-left font-medium",
+      "bg-muted/50 border-b px-4 py-2 text-start font-medium",
       className
     )}
     {...props}
@@ -182,7 +204,12 @@ export const TableHeaderCell = ({
 
 export const TableCell = ({ className, ...props }: ComponentProps<"td">) => (
   <td
-    className={cn("border-border/60 border-b px-4 py-2", className)}
+    className={cn(
+      // No border on the last row — the wrapper's shadow-border already
+      // draws that edge, and two hairlines read as a rendering glitch.
+      "border-border/60 border-b px-4 py-2 in-[tr:last-child]:border-b-0",
+      className
+    )}
     {...props}
   />
 );
@@ -233,4 +260,22 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
 
 export const Cards = ({ children }: { readonly children: ReactNode }) => (
   <div className="my-6 grid gap-3 sm:grid-cols-2">{children}</div>
+);
+
+const SEVERITY_HUE = {
+  error: "red",
+  info: "blue",
+  warning: "amber",
+} as const;
+
+// Rule severity as a labeled pill on the badge ramp — the word carries the
+// meaning, the hue only reinforces it. Used by the generated rules index.
+export const SeverityPill = ({ severity }: { readonly severity: string }) => (
+  <Pill
+    contrast="low"
+    size="sm"
+    variant={SEVERITY_HUE[severity as keyof typeof SEVERITY_HUE] ?? "gray"}
+  >
+    {severity}
+  </Pill>
 );
