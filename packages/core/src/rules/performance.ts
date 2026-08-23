@@ -45,7 +45,7 @@ export const useMultiStage: DockerfileRule = {
   defaultSeverity: "info",
   help: "Use multi-stage builds (multiple FROM statements) to separate build dependencies from the runtime image and reduce size.",
   key: "docker-doctor/use-multi-stage",
-  message: "Consider using multi-stage builds",
+  message: "Use multi-stage builds",
 };
 
 export const orderLayers: DockerfileRule = {
@@ -158,7 +158,7 @@ export const minimizeLayers: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "info",
-  help: "Combine consecutive RUN instructions using '&&' and '\\' to reduce the total layer count and image size.",
+  help: "Combine consecutive RUN instructions using `&&` and `\\` to reduce the total layer count and image size.",
   key: "docker-doctor/minimize-layers",
   message: "Minimize the number of image layers",
 };
@@ -221,7 +221,7 @@ export const useDockerignore: DockerfileRule = {
   defaultSeverity: "warning",
   help: "Create a .dockerignore file in the same directory as the Dockerfile to prevent copying unnecessary files (like node_modules, logs, build artifacts).",
   key: "docker-doctor/use-dockerignore",
-  message: "Ensure .dockerignore is used",
+  message: "Add a .dockerignore file",
 };
 
 export const performanceRules = [
