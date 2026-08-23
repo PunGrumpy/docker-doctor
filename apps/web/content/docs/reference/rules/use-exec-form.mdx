@@ -21,7 +21,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/use-exec-form]
-  Use exec form for CMD and ENTRYPOINT
+  CMD instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.
 ```
 
 ## Why it matters
@@ -30,7 +30,7 @@ The visible symptom is every `docker stop` and every rolling deploy hanging for 
 
 ## How to fix it
 
-Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. ENTRYPOINT ["node", "index.js"]) so OS signals (like SIGTERM) are forwarded correctly.
+Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.
 
 ```dockerfile title="Dockerfile — the app is PID 1 and receives signals"
 FROM node:22-slim

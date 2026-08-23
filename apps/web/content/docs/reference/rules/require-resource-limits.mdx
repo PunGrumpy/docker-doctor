@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/require-resource-limits]
-  Define resource limits for services
+  Service 'api' does not have CPU or memory limits defined. A resource leak in this service could crash the host.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ Limits are the isolation part of running containers. With a memory limit, a leak
 
 ## How to fix it
 
-Add resource limits (e.g. deploy.resources.limits) to prevent a single service from starving host resources in production.
+Add resource limits (e.g. `deploy.resources.limits`) to prevent a single service from starving host resources in production.
 
 ```yaml title="compose.yaml — the leak is contained at 512 MB"
 services:

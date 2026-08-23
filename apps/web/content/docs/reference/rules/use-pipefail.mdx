@@ -19,7 +19,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/use-pipefail]
-  Use pipefail to catch pipeline command failures
+  RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.
 ```
 
 ## Why it matters
@@ -28,7 +28,7 @@ Silent partial failure is the worst kind in a build: the image ships and the pro
 
 ## How to fix it
 
-Prepend 'set -o pipefail &&' to pipe commands, or use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']).
+Prepend `set -o pipefail &&` to pipe commands, or use exec form with a shell that supports it (e.g., `RUN ["/bin/bash", "-c", "set -o pipefail && ..."]`).
 
 ```dockerfile title="Dockerfile — any failure in the pipe fails the build"
 FROM debian:12-slim

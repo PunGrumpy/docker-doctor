@@ -1,6 +1,5 @@
 {
   "pages": [
-    "index",
     "no-root-user",
     "no-secrets-in-env",
     "pin-image-version",

@@ -22,7 +22,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/require-healthcheck]
-  Add a HEALTHCHECK instruction
+  No HEALTHCHECK instruction found. Containers running services should expose healthchecks to enable auto-healing.
 ```
 
 ## Why it matters
@@ -31,7 +31,7 @@ Health status is what turns Docker from "process supervisor" into something oper
 
 ## How to fix it
 
-Use HEALTHCHECK (e.g., 'HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1') so Docker can monitor the container's live status.
+Use HEALTHCHECK (e.g., `HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1`) so Docker can monitor the container's live status.
 
 ```dockerfile title="Dockerfile — Docker probes the app itself"
 FROM node:22-slim

@@ -28,6 +28,12 @@ interface RulePageContent {
   bad: RuleExample;
   /** Example that passes the rule. */
   good: RuleExample;
+  /**
+   * Input the generator scans to produce the page's sample diagnostic.
+   * Only needed when `bad` is not itself scannable input (e.g. it shows
+   * terminal output instead of a Dockerfile or Compose file).
+   */
+  diagnosticSource?: RuleExample;
   /** Optional extra markdown appended after "How to fix it". */
   notes?: string;
 }
@@ -439,6 +445,10 @@ export const rulePageContent: Record<string, RulePageContent> = {
     },
     description:
       "Missing .dockerignore? Why node_modules, .git and .env end up in your Docker image, slow down builds, and how to write one.",
+    diagnosticSource: {
+      code: 'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "index.js"]',
+      lang: "dockerfile",
+    },
     good: {
       code: "node_modules\n.git\ndist\n*.log\n.env*\nDockerfile\ncompose.yaml",
       lang: "text",
