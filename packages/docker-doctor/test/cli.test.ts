@@ -177,6 +177,20 @@ describe("categories config", () => {
   });
 });
 
+describe("unknown config keys", () => {
+  test("warns on stderr without breaking the --json stdout contract", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("with-unknown-config-keys"),
+      "--json",
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain('Unknown rule "docker-doctor/no-root-users"');
+    expect(stderr).toContain('Unknown category "security"');
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
+});
+
 describe("piped --json output is not truncated", () => {
   test("--json on a piped stdout exits (does not hang) and parses", async () => {
     const { exitCode, stdout } = await runCli([

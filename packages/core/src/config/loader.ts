@@ -6,6 +6,7 @@ import { parse as parseYaml } from "yaml";
 import { ConfigError } from "../errors";
 import type { DockerDoctorConfig } from "../schemas/config";
 import { validateConfig } from "../schemas/config";
+import { collectUnknownConfigKeys } from "./unknown-keys";
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
@@ -52,9 +53,29 @@ const importConfig = async (filePath: string): Promise<unknown> => {
   }
 };
 
+const warnUnknownKeys = (
+  raw: unknown,
+  onWarning: (message: string) => void
+): void => {
+  const unknown = collectUnknownConfigKeys(raw);
+  for (const key of unknown.rules) {
+    onWarning(
+      `Unknown rule "${key}" in config — it matches no rule and has no effect.`
+    );
+  }
+  for (const key of unknown.categories) {
+    onWarning(
+      `Unknown category "${key}" in config — categories are case-sensitive (e.g. "Best Practices", "Security").`
+    );
+  }
+};
+
 export const loadConfig = async (
   rootDir: string,
-  customPath?: string
+  customPath?: string,
+  // Called once per unrecognized config key. Optional so existing callers are
+  // unaffected; without it, unknown keys stay silent as before.
+  onWarning?: (message: string) => void
 ): Promise<DockerDoctorConfig> => {
   let configObject: unknown = null;
 
@@ -108,7 +129,11 @@ export const loadConfig = async (
   }
 
   try {
-    return validateConfig(configObject);
+    const config = validateConfig(configObject);
+    if (onWarning) {
+      warnUnknownKeys(configObject, onWarning);
+    }
+    return config;
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     throw new ConfigError({

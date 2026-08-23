@@ -22,6 +22,47 @@ describe("loadConfig", () => {
     expect(config).toEqual({});
   });
 
+  test("warns about unknown rule and category keys", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({
+        categories: { Security: "error", security: "error" },
+        rules: {
+          "docker-doctor/no-root-user": "error",
+          "docker-doctor/no-root-users": "error",
+        },
+      })
+    );
+
+    const warnings: string[] = [];
+    await loadConfig(dir, undefined, (message) => warnings.push(message));
+
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("docker-doctor/no-root-users");
+    expect(warnings[1]).toContain('"security"');
+    // The correctly-spelled keys are never reported as unknown. (The hint
+    // text quotes "Security" as an example, so match the full phrase.)
+    expect(warnings.join(" ")).not.toContain('Unknown category "Security"');
+    expect(warnings.join(" ")).not.toContain(
+      'Unknown rule "docker-doctor/no-root-user"'
+    );
+  });
+
+  test("stays silent for a fully valid config", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({
+        categories: { "Best Practices": "info" },
+        rules: { "docker-doctor/no-root-user": "off" },
+      })
+    );
+
+    const warnings: string[] = [];
+    await loadConfig(dir, undefined, (message) => warnings.push(message));
+
+    expect(warnings).toEqual([]);
+  });
+
   test("returns valid rules as-is", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),

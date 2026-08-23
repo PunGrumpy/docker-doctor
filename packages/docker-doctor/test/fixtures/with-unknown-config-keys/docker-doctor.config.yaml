@@ -1,0 +1,4 @@
+rules:
+  docker-doctor/no-root-users: error
+categories:
+  security: error
