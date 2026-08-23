@@ -1,0 +1,31 @@
+{
+  "pages": [
+    "index",
+    "no-root-user",
+    "no-secrets-in-env",
+    "pin-image-version",
+    "no-add-remote",
+    "use-multi-stage",
+    "order-layers",
+    "minimize-layers",
+    "use-dockerignore",
+    "require-healthcheck",
+    "prefer-copy-over-add",
+    "use-exec-form",
+    "require-labels",
+    "combine-apt-update-install",
+    "use-pipefail",
+    "absolute-workdir",
+    "avoid-run-cd",
+    "sort-multiline-args",
+    "useradd-no-log-init",
+    "no-version-key",
+    "require-resource-limits",
+    "require-restart-policy",
+    "use-depends-on-condition",
+    "prefer-slim-base",
+    "clean-package-cache",
+    "avoid-dev-dependencies"
+  ],
+  "title": "Rules"
+}

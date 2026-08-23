@@ -1,0 +1,15 @@
+{
+  "name": "docker-doctor",
+  "description": "Docker Doctor plugins — static analysis and agent workflows for Dockerfile and Docker Compose files.",
+  "owner": {
+    "name": "Noppakorn Kaewsalabnil",
+    "url": "https://www.pungrumpy.com"
+  },
+  "plugins": [
+    {
+      "name": "docker-doctor",
+      "source": "./",
+      "description": "Scan, triage, and fix Dockerfile and Docker Compose issues with Docker Doctor. Adds the /docker-doctor triage workflow plus docker-author and improve-docker skills."
+    }
+  ]
+}
