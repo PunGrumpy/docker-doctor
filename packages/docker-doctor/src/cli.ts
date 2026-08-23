@@ -670,7 +670,11 @@ program
 
         setStatus("Loading configuration...");
         // Load config first
-        const config = await loadConfig(rootDir, options.config);
+        // Warnings go to stderr so the --json and --score stdout contracts
+        // stay machine-readable.
+        const config = await loadConfig(rootDir, options.config, (message) => {
+          console.error(`Warning: ${message}`);
+        });
 
         setStatus("Scanning workspace files...");
         // Project discovery
