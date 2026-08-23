@@ -29,6 +29,13 @@ const neverCalled = () => {
 describe("scaffoldActionWorkflow", () => {
   test("creates the workflow under the scanned root, not the cwd", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: false });
+    // The cwd must come out exactly as it went in. Snapshotting beforehand
+    // keeps the assertion honest wherever the runner starts from — the repo
+    // root legitimately has its own .github/workflows/docker-doctor.yml.
+    const cwdWorkflow = path.join(process.cwd(), WORKFLOW_PATH);
+    const cwdWorkflowBefore = fs.existsSync(cwdWorkflow)
+      ? fs.readFileSync(cwdWorkflow, "utf-8")
+      : null;
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
@@ -39,10 +46,10 @@ describe("scaffoldActionWorkflow", () => {
       expect(status).toBe("created");
       expect(read()).toContain("name: Docker Doctor");
       expect(read()).toContain(`uses: ${ACTION_REF}`);
-      // process.cwd() is the package directory under test -- it must be untouched.
-      expect(fs.existsSync(path.join(process.cwd(), WORKFLOW_PATH))).toBe(
-        false
-      );
+      const cwdWorkflowAfter = fs.existsSync(cwdWorkflow)
+        ? fs.readFileSync(cwdWorkflow, "utf-8")
+        : null;
+      expect(cwdWorkflowAfter).toBe(cwdWorkflowBefore);
     } finally {
       cleanup();
     }
