@@ -72,3 +72,19 @@ export const collectStageAliases = (
 
   return aliases;
 };
+
+export interface FromArgs {
+  base: string | null;
+  stage: string | null;
+}
+
+// FROM [--flags] <image|stage> [AS <stage>], flags in any position.
+export const parseFromArgs = (args: string): FromArgs => {
+  const parts = args.split(/\s+/u).filter(Boolean);
+  const asIndex = parts.findIndex((p) => p.toLowerCase() === "as");
+  const imageParts = asIndex === -1 ? parts : parts.slice(0, asIndex);
+  return {
+    base: imageParts.find((p) => !p.startsWith("--")) ?? null,
+    stage: asIndex === -1 ? null : (parts[asIndex + 1] ?? null),
+  };
+};

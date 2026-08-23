@@ -1,4 +1,8 @@
-import { collectStageAliases, parseImageRef } from "../parsers/image-ref";
+import {
+  collectStageAliases,
+  parseFromArgs,
+  parseImageRef,
+} from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -20,16 +24,28 @@ const isRootUser = (value: string): boolean => {
 export const noRootUser: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
+    // A stage built FROM a previous stage inherits that stage's image
+    // config, USER included; a fresh base image resets it to root.
+    const stageUser = new Map<string, string>();
+    let currentStage: string | null = null;
     let lastUser = "root";
     let lastUserLine = 1;
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        lastUser = "root";
+        const { base, stage } = parseFromArgs(inst.args);
+        lastUser = stageUser.get(base?.toLowerCase() ?? "") ?? "root";
         lastUserLine = inst.line;
+        currentStage = stage?.toLowerCase() ?? null;
+        if (currentStage) {
+          stageUser.set(currentStage, lastUser);
+        }
       } else if (inst.instruction === "USER") {
         lastUser = inst.args.trim().toLowerCase();
         lastUserLine = inst.line;
+        if (currentStage) {
+          stageUser.set(currentStage, lastUser);
+        }
       }
     }
 
@@ -150,8 +166,7 @@ export const pinImageVersion: DockerfileRule = {
       if (inst.instruction === "FROM") {
         // FROM image or FROM image:tag or FROM image@sha256:hash
         // Also respect multi-stage builds (AS stageName)
-        const parts = inst.args.split(/\s+/u);
-        const imagePart = parts.find((p) => !p.startsWith("--"));
+        const imagePart = parseFromArgs(inst.args).base;
 
         if (!imagePart || imagePart === "scratch") {
           continue;
