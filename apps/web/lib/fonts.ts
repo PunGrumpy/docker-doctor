@@ -27,5 +27,6 @@ export const fonts = cn(
   sans.variable,
   mono.variable,
   serif.variable,
-  "touch-manipulation font-sans antialiased [font-synthesis:none]"
+  // No italic faces are loaded — `none` would render every <em> upright.
+  "touch-manipulation font-sans antialiased [font-synthesis:style]"
 );
