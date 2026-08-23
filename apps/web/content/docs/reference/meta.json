@@ -1,4 +1,4 @@
 {
   "title": "Reference",
-  "pages": ["cli", "rules", "configuration", "scoring"]
+  "pages": ["cli", "configuration", "scoring", "rules"]
 }
