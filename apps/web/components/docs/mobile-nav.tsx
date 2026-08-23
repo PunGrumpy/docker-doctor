@@ -57,7 +57,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
         aria-controls="docs-mobile-menu"
         aria-haspopup="dialog"
         aria-label="Open documentation menu"
-        className="text-muted-foreground hover:bg-muted/50 hover:text-foreground -me-1 flex size-9 items-center justify-center rounded-lg transition-transform duration-150 active:scale-[0.97] lg:hidden"
+        className="text-muted-foreground hover:bg-muted/50 hover:text-foreground relative -me-1 flex size-9 items-center justify-center rounded-lg transition-transform duration-150 after:absolute after:-inset-1 after:content-[''] active:scale-[0.96] lg:hidden"
         onClick={openMenu}
         type="button"
       >
@@ -66,7 +66,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
 
       <dialog
         aria-label="Documentation"
-        className="bg-background text-foreground fixed inset-y-0 right-0 left-auto z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none translate-x-full border-s border-dashed transition-[transform,overlay,display] transition-discrete duration-350 ease-[var(--ease-drawer)] backdrop:bg-black/40 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-350 backdrop:ease-[var(--ease-drawer)] open:translate-x-0 open:backdrop:opacity-100 motion-reduce:transition-none motion-reduce:backdrop:transition-none starting:open:translate-x-full starting:open:backdrop:opacity-0"
+        className="bg-background text-foreground fixed inset-y-0 start-auto end-0 z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none border-s border-dashed transition-[transform,overlay,display] transition-discrete duration-350 ease-[var(--ease-drawer)] backdrop:bg-black/40 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-350 backdrop:ease-[var(--ease-drawer)] open:translate-x-0 open:backdrop:opacity-100 motion-reduce:transition-none motion-reduce:backdrop:transition-none ltr:translate-x-full rtl:-translate-x-full starting:open:backdrop:opacity-0 starting:open:ltr:translate-x-full starting:open:rtl:-translate-x-full"
         id="docs-mobile-menu"
         onClose={() => {
           document.body.style.overflow = "";
@@ -84,7 +84,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
             </Link>
             <button
               aria-label="Close menu"
-              className="text-muted-foreground hover:bg-muted/50 hover:text-foreground -me-1 flex size-9 items-center justify-center rounded-lg transition-transform duration-150 active:scale-[0.97]"
+              className="text-muted-foreground hover:bg-muted/50 hover:text-foreground relative -me-1 flex size-9 items-center justify-center rounded-lg transition-transform duration-150 after:absolute after:-inset-1 after:content-[''] active:scale-[0.96]"
               onClick={closeMenu}
               type="button"
             >
@@ -94,7 +94,9 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
           <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-6">
             <DocsSidebar tree={tree} />
           </div>
-          <div className="flex gap-2 border-t border-dashed p-4">
+          {/* Edge-attached full-height drawer: keep the footer controls
+              clear of the iOS home indicator and notch-side inset. */}
+          <div className="flex gap-2 border-t border-dashed p-4 pe-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]">
             <LeaderboardButton />
             <ChangelogButton />
           </div>
