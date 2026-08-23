@@ -68,9 +68,9 @@ export const preferSlimBase: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "info",
-  help: "Prefer tags with '-slim', '-alpine', or use distroless base images to minimize the default operating system footprint.",
+  help: "Prefer tags with `-slim`, `-alpine`, or use distroless base images to minimize the default operating system footprint.",
   key: "docker-doctor/prefer-slim-base",
-  message: "Use slim, alpine, or distroless base images",
+  message: "Prefer slim, alpine, or distroless base images",
 };
 
 export const cleanPackageCache: DockerfileRule = {
@@ -122,7 +122,7 @@ export const cleanPackageCache: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "For apt-get, append '&& rm -rf /var/lib/apt/lists/*'. For apk, use 'apk add --no-cache'. For dnf/yum, run 'yum clean all'.",
+  help: "For apt-get, append `&& rm -rf /var/lib/apt/lists/*`. For apk, use `apk add --no-cache`. For dnf/yum, run `yum clean all`.",
   key: "docker-doctor/clean-package-cache",
   message: "Clean up package manager cache in the same RUN layer",
 };
@@ -174,10 +174,9 @@ export const avoidDevDependencies: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "For Node.js, run 'npm prune --production' or install only production dependencies ('npm ci --omit=dev') in the runtime stage.",
+  help: "For Node.js, run `npm prune --production` or install only production dependencies (`npm ci --omit=dev`) in the runtime stage.",
   key: "docker-doctor/avoid-dev-dependencies",
-  message:
-    "Avoid installing development dependencies in final production stage",
+  message: "Avoid installing dev dependencies in the final stage",
 };
 
 export const imageSizeRules = [

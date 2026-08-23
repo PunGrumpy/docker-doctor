@@ -29,9 +29,9 @@ export const noVersionKey: ComposeRule = {
     return [];
   },
   defaultSeverity: "warning",
-  help: "The 'version' key is deprecated by the Compose specification. Omitting it defaults to the latest specification.",
+  help: "The `version` key is obsolete in the Compose specification. Omitting it defaults to the latest specification.",
   key: "docker-doctor/no-version-key",
-  message: "Remove the 'version' key from Compose file",
+  message: "Remove the `version` key from the Compose file",
 };
 
 export const requireResourceLimits: ComposeRule = {
@@ -77,7 +77,7 @@ export const requireResourceLimits: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Add resource limits (e.g. deploy.resources.limits) to prevent a single service from starving host resources in production.",
+  help: "Add resource limits (e.g. `deploy.resources.limits`) to prevent a single service from starving host resources in production.",
   key: "docker-doctor/require-resource-limits",
   message: "Define resource limits for services",
 };
@@ -121,7 +121,7 @@ export const requireRestartPolicy: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Define 'restart: always' or 'restart: unless-stopped' (or deploy.restart_policy) so services restart on crashes or host reboot.",
+  help: "Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot.",
   key: "docker-doctor/require-restart-policy",
   message: "Set restart policy for services",
 };
@@ -160,7 +160,7 @@ export const useDependsOnCondition: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "info",
-  help: "Instead of a simple service list, use 'depends_on: { dependency: { condition: service_healthy } }' to ensure dependencies are fully ready before starting.",
+  help: "Instead of a simple service list, use `depends_on: { dependency: { condition: service_healthy } }` to ensure dependencies are fully ready before starting.",
   key: "docker-doctor/use-depends-on-condition",
   message: "Use long-form depends_on with healthcheck conditions",
 };
