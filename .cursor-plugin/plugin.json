@@ -1,0 +1,23 @@
+{
+  "name": "docker-doctor",
+  "displayName": "Docker Doctor",
+  "version": "1.0.0",
+  "description": "Scan, triage, and fix Dockerfile and Docker Compose diagnostics with Docker Doctor.",
+  "author": {
+    "name": "Noppakorn Kaewsalabnil",
+    "email": "noppakorn.pun@gmail.com"
+  },
+  "homepage": "https://docker-doctor.vercel.app",
+  "repository": "https://github.com/PunGrumpy/docker-doctor",
+  "logo": "apps/web/public/docker-doctor-readme-logo-light.svg",
+  "keywords": [
+    "docker",
+    "dockerfile",
+    "docker-compose",
+    "static-analysis",
+    "security",
+    "performance"
+  ],
+  "category": "developer-tools",
+  "tags": ["docker", "linting", "code-review"]
+}

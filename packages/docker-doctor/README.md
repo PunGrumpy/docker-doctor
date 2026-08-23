@@ -73,6 +73,13 @@ npx @docker-doctor/cli@latest install
 
 Works with Claude Code, Cursor, Codex, OpenCode, and many more. After an interactive scan finds issues, Docker Doctor also offers to hand them straight to an agent detected on your machine. Add `--global` to install the skill once for your whole machine instead of the current project.
 
+Prefer plugins? This repository is also a Claude Code plugin marketplace and ships a Cursor plugin — both bundle all three skills (`docker-doctor`, `docker-author`, `improve-docker`) and update with the repo:
+
+```text
+/plugin marketplace add PunGrumpy/docker-doctor
+/plugin install docker-doctor@docker-doctor
+```
+
 [Rules reference →](https://docker-doctor.vercel.app/docs/reference/rules)
 
 ### 3. Run in Docker Sandboxes

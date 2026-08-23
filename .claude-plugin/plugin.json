@@ -1,0 +1,21 @@
+{
+  "name": "docker-doctor",
+  "description": "Scan, triage, and fix Dockerfile and Docker Compose issues with Docker Doctor. Adds the /docker-doctor triage workflow plus docker-author and improve-docker skills.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Noppakorn Kaewsalabnil",
+    "url": "https://www.pungrumpy.com"
+  },
+  "homepage": "https://docker-doctor.vercel.app",
+  "repository": "https://github.com/PunGrumpy/docker-doctor",
+  "license": "MIT",
+  "keywords": [
+    "docker",
+    "dockerfile",
+    "docker-compose",
+    "linter",
+    "static-analysis",
+    "security",
+    "performance"
+  ]
+}
