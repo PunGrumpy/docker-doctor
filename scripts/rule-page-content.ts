@@ -17,7 +17,7 @@ export interface RuleExample {
   title?: string;
 }
 
-export interface RulePageContent {
+interface RulePageContent {
   /** Meta description — one sentence, phrased the way people search. */
   description: string;
   /** Opening markdown: the problem in the reader's words. */

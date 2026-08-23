@@ -112,7 +112,6 @@ const escapeProse = (text: string): string =>
 
 const buildRulePage = (rule: RuleDefinition): string => {
   const content = rulePageContent[rule.key];
-  const slug = ruleSlug(rule);
   const appliesTo =
     rule.category === "Compose" ? "Docker Compose files" : "Dockerfiles";
   const prefix = SEVERITY_PREFIX[rule.defaultSeverity] ?? rule.defaultSeverity;
@@ -120,7 +119,7 @@ const buildRulePage = (rule: RuleDefinition): string => {
 
   return `---
 ${AUTOGEN_HEADER}
-title: ${slug}
+title: ${ruleSlug(rule)}
 description: >-
   ${content.description}
 ---
