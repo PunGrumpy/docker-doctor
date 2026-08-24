@@ -1,3 +1,4 @@
+import { parseExecForm } from "../parsers/exec-form";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -96,21 +97,21 @@ export const useExecForm: DockerfileRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const inst of instructions) {
-      if (inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT") {
-        const args = inst.args.trim();
-        // If it does not start with [ and end with ]
-        if (!args.startsWith("[") || !args.endsWith("]")) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
-              `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
-              this.help,
-              inst.line
-            )
-          );
-        }
+      const takesExecForm =
+        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
+      // Bracket-wrapped args that are not a JSON string array still run under
+      // /bin/sh -c, so they count as shell form.
+      if (takesExecForm && parseExecForm(inst.args) === null) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
+            this.help,
+            inst.line
+          )
+        );
       }
     }
 

@@ -985,6 +985,23 @@ describe("Best Practices Rules", () => {
       ENTRYPOINT ["docker-entrypoint.sh"]
     `);
     expect(useExecForm.check(entrypointExecForm, "Dockerfile")).toHaveLength(0);
+
+    // Bracket-wrapped but not a JSON array: Docker runs these through
+    // /bin/sh -c, so they are shell form and must be reported.
+    const unquotedTokens = parseDockerfile(`
+      CMD [node, index.js]
+    `);
+    expect(useExecForm.check(unquotedTokens, "Dockerfile")).toHaveLength(1);
+
+    const singleQuoted = parseDockerfile(`
+      ENTRYPOINT ['docker-entrypoint.sh']
+    `);
+    expect(useExecForm.check(singleQuoted, "Dockerfile")).toHaveLength(1);
+
+    const trailingComma = parseDockerfile(`
+      CMD ["node", "index.js",]
+    `);
+    expect(useExecForm.check(trailingComma, "Dockerfile")).toHaveLength(1);
   });
 
   test("require-labels", () => {
