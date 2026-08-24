@@ -730,7 +730,7 @@ describe("Best Practices Rules", () => {
     ).toBe(false);
   });
 
-  // Known false positive: the pipefail check tests inst.raw with no quote
+  // Known false positive: the pipefail check reads inst.args with no quote
   // awareness, so a regex alternation inside a quoted argument reads as a
   // shell pipeline. Not fixed here - see plans/README.md deferred list.
   test.todo("use-pipefail ignores pipes inside quoted arguments", () => {
