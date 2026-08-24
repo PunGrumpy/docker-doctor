@@ -5,6 +5,7 @@ import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   combineAptUpdateInstall,
   usePipefail,
+  PIPEFAIL_SETTING_RE,
   absoluteWorkdir,
   avoidRunCd,
   sortMultilineArgs,
@@ -647,10 +648,10 @@ describe("Best Practices Rules", () => {
     `);
     expect(usePipefail.check(freshStage, "Dockerfile")).toHaveLength(1);
 
-    // The opposite direction of the substring bug: merely mentioning the word
-    // must not exempt a pipeline that never sets the option.
+    // The opposite direction of the substring bug: a RUN that sets another
+    // shell option must not exempt a pipeline that merely mentions the word.
     const mentionsPipefail = parseDockerfile(`
-      RUN echo "pipefail" | tee log
+      RUN set -o errexit && echo pipefail | tee log
     `);
     expect(usePipefail.check(mentionsPipefail, "Dockerfile")).toHaveLength(1);
 
@@ -659,6 +660,74 @@ describe("Best Practices Rules", () => {
       RUN set -euo pipefail && curl -fsSL https://x.sh | sh
     `);
     expect(usePipefail.check(combinedShort, "Dockerfile")).toHaveLength(0);
+
+    // Exec-form RUN runs its own argv: SHELL does not apply, the argv itself
+    // must configure pipefail.
+    const execFormWithPipefail = parseDockerfile(`
+      RUN ["/bin/bash", "-o", "pipefail", "-c", "curl -fsSL https://x.sh | sh"]
+    `);
+    expect(usePipefail.check(execFormWithPipefail, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const execFormIgnoresShellDirective = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      RUN ["/bin/sh", "-c", "curl -fsSL https://x.sh | sh"]
+    `);
+    expect(
+      usePipefail.check(execFormIgnoresShellDirective, "Dockerfile")
+    ).toHaveLength(1);
+
+    // Stage inheritance chains across two hops.
+    const twoHopStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS a
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM a AS b
+      FROM b AS c
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(twoHopStage, "Dockerfile")).toHaveLength(0);
+
+    // Interior comment lines (stripped from args) must not flip the verdict.
+    const commentMentioningPipefail = parseDockerfile(`
+      RUN apt-get update \\
+        # TODO: use set -o pipefail here
+        && curl -s https://x.sh | sh
+    `);
+    expect(
+      usePipefail.check(commentMentioningPipefail, "Dockerfile")
+    ).toHaveLength(1);
+
+    const commentMentioningPipe = parseDockerfile(`
+      RUN apt-get update \\
+        # TODO: avoid curl | sh
+        && apt-get install -y curl
+    `);
+    expect(usePipefail.check(commentMentioningPipe, "Dockerfile")).toHaveLength(
+      0
+    );
+  });
+
+  test("use-pipefail flag regex", () => {
+    // Direct guard on PIPEFAIL_SETTING_RE: accepts the spellings that set the
+    // option, rejects commands that merely mention the word or pass it to a
+    // non-shell flag.
+    expect(PIPEFAIL_SETTING_RE.test("set -o pipefail && curl | sh")).toBe(true);
+    expect(PIPEFAIL_SETTING_RE.test("set -euo pipefail && curl | sh")).toBe(
+      true
+    );
+    expect(PIPEFAIL_SETTING_RE.test("bash -o pipefail -c curl | sh")).toBe(
+      true
+    );
+    expect(
+      PIPEFAIL_SETTING_RE.test(
+        "ssh -o StrictHostKeyChecking=no h | grep pipefail"
+      )
+    ).toBe(false);
+    expect(
+      PIPEFAIL_SETTING_RE.test("set -o errexit && echo pipefail | tee log")
+    ).toBe(false);
   });
 
   // Known false positive: the pipefail check tests inst.raw with no quote
