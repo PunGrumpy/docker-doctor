@@ -188,32 +188,112 @@ export const combineAptUpdateInstall: DockerfileRule = {
   message: "Combine apt-get update and apt-get install",
 };
 
+// An actual pipefail setting: the option must appear adjacent to its flag
+// (`-o pipefail`, `-euo pipefail`, repeated `-o errexit -o pipefail`, or a
+// shell invoked with `-o pipefail`). Matching the flag directly (rather than
+// a shell name) also works inside joined exec-form argv, and cannot backtrack
+// pathologically. Known limitation: the word inside quotes (e.g.
+// `echo "set -o pipefail" >> .bashrc`) still matches — same class as the
+// existing test.todo for quoted pipes.
+export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
+
+// A RUN line uses a pipe: a single `|` not part of `||`.
+const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
+
+// SHELL and exec-form RUN both take a JSON array; joined, the elements form
+// the command prefix (SHELL) or the full argv (exec RUN). The option must
+// appear in that joined string for pipefail to be active.
+const jsonArrayEnablesPipefail = (args: string): boolean => {
+  try {
+    const parsed: unknown = JSON.parse(args.trimStart());
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return false;
+    }
+    return PIPEFAIL_SETTING_RE.test(parsed.join(" "));
+  } catch {
+    return false;
+  }
+};
+
+// Exec-form RUN: args is a JSON array (e.g. RUN ["/bin/bash", "-c", "..."]).
+const isExecForm = (args: string): boolean => {
+  const trimmed = args.trimStart();
+  if (!trimmed.startsWith("[")) {
+    return false;
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+};
+
+// FROM [--flags] <image> [AS <stage>]
+const FROM_BASE_RE = /^(?:--\S+\s+)*(?<base>\S+)(?:\s+AS\s+(?<stage>\S+))?/iu;
+
 export const usePipefail: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    // FROM <previous stage> inherits that stage's image config — SHELL
+    // included (verified against BuildKit); FROM a fresh base image, or the
+    // reserved empty stage `scratch`, resets it to the Docker default. A
+    // SHELL instruction replaces it for the rest of the current stage.
+    // NOTE: FROM ${VAR} (variable base) misses the map lookup and silently
+    // resets — fails safe (extra warning, never a missed one).
+    const stagePipefail = new Map<string, boolean>();
+    let shellHasPipefail = false;
+    let currentStage: string | null = null;
     for (const inst of instructions) {
-      if (inst.instruction === "RUN") {
-        const { raw } = inst;
-        const hasPipe = /(?<!\|)\|(?!\|)/u.test(raw);
-        if (hasPipe && !raw.includes("pipefail")) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
-              "RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.",
-              this.help,
-              inst.line
-            )
-          );
+      if (inst.instruction === "FROM") {
+        const match = inst.args.match(FROM_BASE_RE);
+        const base = (match?.groups?.base ?? "").toLowerCase();
+        shellHasPipefail =
+          base !== "scratch" && (stagePipefail.get(base) ?? false);
+        currentStage = (match?.groups?.stage ?? "").toLowerCase() || null;
+        if (currentStage) {
+          stagePipefail.set(currentStage, shellHasPipefail);
         }
+        continue;
+      }
+      if (inst.instruction === "SHELL") {
+        shellHasPipefail = jsonArrayEnablesPipefail(inst.args);
+        if (currentStage) {
+          stagePipefail.set(currentStage, shellHasPipefail);
+        }
+        continue;
+      }
+      if (inst.instruction !== "RUN") {
+        continue;
+      }
+      // args strips interior comment lines; raw keeps them.
+      const { args } = inst;
+      if (!HAS_PIPE_RE.test(args)) {
+        continue;
+      }
+      // SHELL only applies to shell-form RUN; exec-form RUN runs its own
+      // argv directly, so check the argv for pipefail instead.
+      const pipefailConfigured = isExecForm(args)
+        ? jsonArrayEnablesPipefail(args)
+        : shellHasPipefail || PIPEFAIL_SETTING_RE.test(args);
+      if (!pipefailConfigured) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            "RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.",
+            this.help,
+            inst.line
+          )
+        );
       }
     }
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Prepend 'set -o pipefail &&' to pipe commands, or use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']).",
+  help: "Prepend 'set -o pipefail &&' to pipe commands, use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']), or set SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] at the top of the stage.",
   key: "docker-doctor/use-pipefail",
   message: "Use pipefail to catch pipeline command failures",
 };

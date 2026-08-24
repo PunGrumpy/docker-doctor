@@ -5,6 +5,7 @@ import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   combineAptUpdateInstall,
   usePipefail,
+  PIPEFAIL_SETTING_RE,
   absoluteWorkdir,
   avoidRunCd,
   sortMultilineArgs,
@@ -702,9 +703,127 @@ describe("Best Practices Rules", () => {
     `);
     const diags3 = usePipefail.check(noPipe, "Dockerfile");
     expect(diags3).toHaveLength(0);
+
+    // Issue #84: the SHELL directive the docs prescribe must clear the
+    // warning, but only while it actually enables pipefail.
+    const shellDirective = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(shellDirective, "Dockerfile")).toHaveLength(0);
+
+    const shellDirectiveWithoutPipefail = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-c"]
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(
+      usePipefail.check(shellDirectiveWithoutPipefail, "Dockerfile")
+    ).toHaveLength(1);
+
+    // A stage-level SHELL with pipefail carries into a stage that builds FROM
+    // the previous one (the image config inherits), but not into a stage that
+    // starts from a fresh base image.
+    const inheritedStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM base AS app
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(inheritedStage, "Dockerfile")).toHaveLength(0);
+
+    const freshStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS base
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM debian:bookworm-slim AS app
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(freshStage, "Dockerfile")).toHaveLength(1);
+
+    // The opposite direction of the substring bug: a RUN that sets another
+    // shell option must not exempt a pipeline that merely mentions the word.
+    const mentionsPipefail = parseDockerfile(`
+      RUN set -o errexit && echo pipefail | tee log
+    `);
+    expect(usePipefail.check(mentionsPipefail, "Dockerfile")).toHaveLength(1);
+
+    // The combined short form still counts.
+    const combinedShort = parseDockerfile(`
+      RUN set -euo pipefail && curl -fsSL https://x.sh | sh
+    `);
+    expect(usePipefail.check(combinedShort, "Dockerfile")).toHaveLength(0);
+
+    // Exec-form RUN runs its own argv: SHELL does not apply, the argv itself
+    // must configure pipefail.
+    const execFormWithPipefail = parseDockerfile(`
+      RUN ["/bin/bash", "-o", "pipefail", "-c", "curl -fsSL https://x.sh | sh"]
+    `);
+    expect(usePipefail.check(execFormWithPipefail, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const execFormIgnoresShellDirective = parseDockerfile(`
+      FROM debian:bookworm-slim
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      RUN ["/bin/sh", "-c", "curl -fsSL https://x.sh | sh"]
+    `);
+    expect(
+      usePipefail.check(execFormIgnoresShellDirective, "Dockerfile")
+    ).toHaveLength(1);
+
+    // Stage inheritance chains across two hops.
+    const twoHopStage = parseDockerfile(`
+      FROM debian:bookworm-slim AS a
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM a AS b
+      FROM b AS c
+      RUN curl -fsSL https://bun.sh/install | bash
+    `);
+    expect(usePipefail.check(twoHopStage, "Dockerfile")).toHaveLength(0);
+
+    // Interior comment lines (stripped from args) must not flip the verdict.
+    const commentMentioningPipefail = parseDockerfile(`
+      RUN apt-get update \\
+        # TODO: use set -o pipefail here
+        && curl -s https://x.sh | sh
+    `);
+    expect(
+      usePipefail.check(commentMentioningPipefail, "Dockerfile")
+    ).toHaveLength(1);
+
+    const commentMentioningPipe = parseDockerfile(`
+      RUN apt-get update \\
+        # TODO: avoid curl | sh
+        && apt-get install -y curl
+    `);
+    expect(usePipefail.check(commentMentioningPipe, "Dockerfile")).toHaveLength(
+      0
+    );
   });
 
-  // Known false positive: the pipefail check tests inst.raw with no quote
+  test("use-pipefail flag regex", () => {
+    // Direct guard on PIPEFAIL_SETTING_RE: accepts the spellings that set the
+    // option, rejects commands that merely mention the word or pass it to a
+    // non-shell flag.
+    expect(PIPEFAIL_SETTING_RE.test("set -o pipefail && curl | sh")).toBe(true);
+    expect(PIPEFAIL_SETTING_RE.test("set -euo pipefail && curl | sh")).toBe(
+      true
+    );
+    expect(PIPEFAIL_SETTING_RE.test("bash -o pipefail -c curl | sh")).toBe(
+      true
+    );
+    expect(
+      PIPEFAIL_SETTING_RE.test(
+        "ssh -o StrictHostKeyChecking=no h | grep pipefail"
+      )
+    ).toBe(false);
+    expect(
+      PIPEFAIL_SETTING_RE.test("set -o errexit && echo pipefail | tee log")
+    ).toBe(false);
+  });
+
+  // Known false positive: the pipefail check reads inst.args with no quote
   // awareness, so a regex alternation inside a quoted argument reads as a
   // shell pipeline. Not fixed here - see plans/README.md deferred list.
   test.todo("use-pipefail ignores pipes inside quoted arguments", () => {

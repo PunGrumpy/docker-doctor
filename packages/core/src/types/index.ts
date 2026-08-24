@@ -45,6 +45,10 @@ export interface RuleDefinition {
 }
 
 export interface DockerfileRule extends RuleDefinition {
+  /**
+   * `instructions` is the complete instruction list of one Dockerfile, in
+   * file order — rules may rely on ordering (e.g. stage-level state).
+   */
   check: (
     instructions: DockerfileInstruction[],
     file: string,
