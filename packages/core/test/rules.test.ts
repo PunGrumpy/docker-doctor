@@ -684,26 +684,33 @@ describe("Best Practices Rules", () => {
     expect(diags3).toHaveLength(0);
   });
 
-  test("use-pipefail", () => {
-    const withoutPipefail = parseDockerfile(`
-      RUN wget -O - https://some.site | wc -l > /number
-    `);
-    const diags1 = usePipefail.check(withoutPipefail, "Dockerfile");
-    expect(diags1).toHaveLength(1);
-    expect(diags1[0].rule).toBe("docker-doctor/use-pipefail");
+  test.each([
+    {
+      dockerfile: `RUN wget -O - https://some.site | wc -l > /number`,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "reports pipelines without pipefail",
+    },
+    {
+      dockerfile: `RUN set -o pipefail && wget -O - https://some.site | wc -l > /number`,
+      expectedRules: [],
+      name: "accepts pipelines with pipefail",
+    },
+    {
+      dockerfile: `RUN echo "hello" > /msg`,
+      expectedRules: [],
+      name: "ignores commands without a pipeline",
+    },
+  ])("use-pipefail: $name", ({ dockerfile, expectedRules }) => {
+    const diagnostics = usePipefail.check(
+      parseDockerfile(dockerfile),
+      "Dockerfile"
+    );
+    expect(diagnostics.map((diagnostic) => diagnostic.rule)).toEqual(
+      expectedRules
+    );
+  });
 
-    const withPipefail = parseDockerfile(`
-      RUN set -o pipefail && wget -O - https://some.site | wc -l > /number
-    `);
-    const diags2 = usePipefail.check(withPipefail, "Dockerfile");
-    expect(diags2).toHaveLength(0);
-
-    const noPipe = parseDockerfile(`
-      RUN echo "hello" > /msg
-    `);
-    const diags3 = usePipefail.check(noPipe, "Dockerfile");
-    expect(diags3).toHaveLength(0);
-
+  test("use-pipefail regression coverage", () => {
     // Issue #84: the SHELL directive the docs prescribe must clear the
     // warning, but only while it actually enables pipefail.
     const shellDirective = parseDockerfile(`
