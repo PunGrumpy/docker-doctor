@@ -209,7 +209,7 @@ const jsonArrayEnablesPipefail = (args: string): boolean => {
     if (!Array.isArray(parsed) || parsed.length === 0) {
       return false;
     }
-    return PIPEFAIL_SETTING_RE.test(parsed.map(String).join(" "));
+    return PIPEFAIL_SETTING_RE.test(parsed.join(" "));
   } catch {
     return false;
   }
