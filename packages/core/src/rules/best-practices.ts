@@ -1,3 +1,4 @@
+import { parseExecForm } from "../parsers/exec-form";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -96,21 +97,21 @@ export const useExecForm: DockerfileRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const inst of instructions) {
-      if (inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT") {
-        const args = inst.args.trim();
-        // If it does not start with [ and end with ]
-        if (!args.startsWith("[") || !args.endsWith("]")) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
-              `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
-              this.help,
-              inst.line
-            )
-          );
-        }
+      const takesExecForm =
+        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
+      // Bracket-wrapped args that are not a JSON string array still run under
+      // /bin/sh -c, so they count as shell form.
+      if (takesExecForm && parseExecForm(inst.args) === null) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity as "error" | "warning" | "info",
+            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
+            this.help,
+            inst.line
+          )
+        );
       }
     }
 
@@ -200,33 +201,12 @@ export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 // A RUN line uses a pipe: a single `|` not part of `||`.
 const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
 
-// SHELL and exec-form RUN both take a JSON array; joined, the elements form
-// the command prefix (SHELL) or the full argv (exec RUN). The option must
-// appear in that joined string for pipefail to be active.
-const jsonArrayEnablesPipefail = (args: string): boolean => {
-  try {
-    const parsed: unknown = JSON.parse(args.trimStart());
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return false;
-    }
-    return PIPEFAIL_SETTING_RE.test(parsed.join(" "));
-  } catch {
-    return false;
-  }
-};
-
-// Exec-form RUN: args is a JSON array (e.g. RUN ["/bin/bash", "-c", "..."]).
-const isExecForm = (args: string): boolean => {
-  const trimmed = args.trimStart();
-  if (!trimmed.startsWith("[")) {
-    return false;
-  }
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    return Array.isArray(parsed);
-  } catch {
-    return false;
-  }
+// SHELL takes exec form; joined, its argv is the prefix every shell-form RUN
+// is wrapped in (e.g. /bin/bash -o pipefail -c). Any other spelling is
+// rejected by Docker, so it cannot be enabling pipefail.
+const shellDirectiveEnablesPipefail = (args: string): boolean => {
+  const argv = parseExecForm(args);
+  return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
 // FROM [--flags] <image> [AS <stage>]
@@ -258,7 +238,7 @@ export const usePipefail: DockerfileRule = {
         continue;
       }
       if (inst.instruction === "SHELL") {
-        shellHasPipefail = jsonArrayEnablesPipefail(inst.args);
+        shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
         if (currentStage) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
@@ -274,9 +254,11 @@ export const usePipefail: DockerfileRule = {
       }
       // SHELL only applies to shell-form RUN; exec-form RUN runs its own
       // argv directly, so check the argv for pipefail instead.
-      const pipefailConfigured = isExecForm(args)
-        ? jsonArrayEnablesPipefail(args)
-        : shellHasPipefail || PIPEFAIL_SETTING_RE.test(args);
+      const execArgv = parseExecForm(args);
+      const pipefailConfigured =
+        execArgv === null
+          ? shellHasPipefail || PIPEFAIL_SETTING_RE.test(args)
+          : PIPEFAIL_SETTING_RE.test(execArgv.join(" "));
       if (!pipefailConfigured) {
         diagnostics.push(
           createDiagnostic(
