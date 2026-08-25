@@ -121,3 +121,18 @@ jobs:
           sbx kit validate ./kits/docker-doctor
           sbx kit push ./kits/docker-doctor "docker.io/pungrumpy/docker-doctor-kit:${{ steps.kit.outputs.version }}"
           sbx kit push ./kits/docker-doctor docker.io/pungrumpy/docker-doctor-kit:latest
+      # The web changelog page renders packages/docker-doctor/CHANGELOG.md at
+      # build time. Vercel's own deploy for this push races the publish steps
+      # above and may not even fire (the Version Packages commit touches no
+      # file under apps/web), which is why the page used to need a manual
+      # redeploy. Kick a fresh deploy of main once the release has fully landed.
+      - name: Trigger web deploy
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL is not set; skipping the web deploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK" -o /dev/null
