@@ -1,5 +1,31 @@
 # @docker-doctor/cli
 
+## 0.4.3
+
+### Patch Changes
+
+- 485a1ee: Sanitize scanned file paths before they reach a coding agent. Rule messages were already flattened, but the paths beside them were interpolated raw into both the handoff prompt and the `.docker-doctor/*.txt` reports, so a filename containing newlines could introduce its own line into an agent's instructions. Those per-rule reports now also flatten the message, matching the prompt.
+- 37b3f7d: Warn when a config names a rule or category that does not exist. Keys are matched exactly, so a typo'd rule key — or a category written as `security` instead of `Security` — used to be accepted and then silently match nothing, leaving a suppression the user believed was active doing nothing. Unknown keys are reported on stderr rather than failing the scan, so a config naming a rule removed in a later release still runs.
+- 1cda220: Fix `use-exec-form` missing bracket-wrapped `CMD`/`ENTRYPOINT` args that are not valid JSON. `CMD [node, index.js]` was accepted as exec form because the rule only checked for a leading `[` and a trailing `]`, but Docker treats anything that is not a JSON string array as shell form and runs it under `/bin/sh -c` — exactly what the rule exists to flag. Single-quoted elements and trailing commas were missed the same way.
+
+  Exec-form detection now lives in one place, `parseExecForm` in `parsers/`, which `use-exec-form` and `use-pipefail` both use, so the two rules can no longer disagree about what exec form is. This surfaces new warnings on Dockerfiles that previously passed; the fix is to quote the elements (`CMD ["node", "index.js"]`).
+
+- 8105153: Fix `use-pipefail` so its verdict reflects how Docker actually runs a `RUN`.
+
+  - **`SHELL` is honoured.** The rule's own docs prescribe `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` as the fix, but applying it never cleared the warning, because only the single `RUN` line was inspected. The active shell is now tracked per stage: a stage reached `FROM <previous stage>` inherits it, while a fresh base image or `scratch` resets it, matching BuildKit.
+  - **Exec-form `RUN` is judged on its own argv.** `RUN ["/bin/bash", "-o", "pipefail", "-c", "…"]` no longer warns. Conversely, a `SHELL` directive no longer suppresses the warning for an exec-form `RUN` that execs a different shell — Docker runs that argv directly, so the `SHELL` prefix never applies. **This surfaces new warnings on Dockerfiles that previously passed.**
+  - **Interior comments no longer flip the verdict.** The check reads the instruction's args, which have comment lines stripped, rather than the raw text. A `# TODO: use set -o pipefail` comment no longer silences a real finding, and a `# avoid curl | sh` comment no longer invents one.
+  - **Pipefail detection requires the option adjacent to its flag.** The previous bare-substring match exempted any line merely containing the word. Lines such as `set -o errexit && echo pipefail | tee log` and `ssh -o StrictHostKeyChecking=no h | grep pipefail` now warn. The new pattern is also linear, replacing one that backtracked pathologically on long `RUN` lines.
+
+  Known limitation: quoting is invisible to the check, so `RUN echo "set -o pipefail" >> .bashrc && cat x | grep y` still reads as configuring the option. Tracked as a `test.todo` alongside the existing quoted-pipes case.
+
+- 77f056a: Reword all 25 rule summaries into one imperative voice ("Run the container as a non-root user", "Use multi-stage builds", "Add a .dockerignore file") and format code tokens in help text as backticks (`USER node`, `apk add --no-cache`). `rules list`, `rules explain`, and the docs show the new wording; rule keys, severities, and diagnostic messages are unchanged.
+- 4a600a4: Route every rule through one `FROM` parser. `use-pipefail` carried its own regex, which required each `--flag` to precede the base image and lost the stage name when one followed it, so `FROM base --platform=linux/amd64 AS app` never registered `app` as a stage and later stages built on it stopped inheriting its `SHELL`. It now uses the shared `parseFromArgs`, as `pin-image-version` and `prefer-slim-base` already did, and `collectStageAliases` is built on it too.
+
+  The reserved empty base is now recognised the same way everywhere via `isScratch`. `pin-image-version` compared case-sensitively while `use-pipefail` lowercased first, so `FROM SCRATCH` was reported as an image that "does not specify a tag" by one rule and treated as the empty stage by the other. It is treated as the empty stage everywhere now, so that diagnostic no longer appears.
+
+- d78d960: Teach `no-root-user` and `avoid-dev-dependencies` about multi-stage inheritance. A stage built `FROM <previous stage>` inherits that stage's image config and layers, but `no-root-user` reset `USER` to root on every `FROM`, reporting a false positive when the parent stage had already dropped privileges, and `avoid-dev-dependencies` audited only the instructions after the last `FROM`, missing dev installs whose layers the final image inherits from a parent stage. Both rules now resolve the stage chain through a shared `parseFromArgs` helper in the image-ref parser.
+
 ## 0.4.2
 
 ### Patch Changes

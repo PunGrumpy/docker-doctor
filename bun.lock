@@ -66,7 +66,7 @@
     },
     "packages/docker-doctor": {
       "name": "@docker-doctor/cli",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "bin": {
         "docker-doctor": "dist/cli.mjs",
       },

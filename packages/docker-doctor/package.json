@@ -1,6 +1,6 @@
 {
   "name": "@docker-doctor/cli",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Static analysis for Dockerfile and Docker Compose files",
   "keywords": [
     "best-practices",
