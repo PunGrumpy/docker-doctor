@@ -103,4 +103,11 @@ describe("parseFromArgs", () => {
     });
     expect(parseFromArgs("")).toEqual({ base: null, stage: null });
   });
+
+  test("finds the stage when a flag follows the base", () => {
+    expect(parseFromArgs("base --platform=linux/amd64 AS app")).toEqual({
+      base: "base",
+      stage: "app",
+    });
+  });
 });
