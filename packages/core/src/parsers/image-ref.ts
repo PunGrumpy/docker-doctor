@@ -54,25 +54,6 @@ export const parseImageRef = (ref: string): ImageRef => {
   };
 };
 
-export const collectStageAliases = (
-  instructions: DockerfileInstruction[]
-): Set<string> => {
-  const aliases = new Set<string>();
-
-  for (const inst of instructions) {
-    if (inst.instruction !== "FROM") {
-      continue;
-    }
-
-    const match = /\sas\s+(?<alias>\S+)/iu.exec(inst.args);
-    if (match?.groups?.alias) {
-      aliases.add(match.groups.alias.toLowerCase());
-    }
-  }
-
-  return aliases;
-};
-
 export interface FromArgs {
   base: string | null;
   stage: string | null;
@@ -87,4 +68,29 @@ export const parseFromArgs = (args: string): FromArgs => {
     base: imageParts.find((p) => !p.startsWith("--")) ?? null,
     stage: asIndex === -1 ? null : (parts[asIndex + 1] ?? null),
   };
+};
+
+// The reserved empty base, not a real image: nothing to pin a tag on, no
+// distribution to slim down, and no image config to inherit. One definition
+// so the rules cannot disagree about a given FROM line.
+export const isScratch = (base: string | null): boolean =>
+  base?.toLowerCase() === "scratch";
+
+export const collectStageAliases = (
+  instructions: DockerfileInstruction[]
+): Set<string> => {
+  const aliases = new Set<string>();
+
+  for (const inst of instructions) {
+    if (inst.instruction !== "FROM") {
+      continue;
+    }
+
+    const { stage } = parseFromArgs(inst.args);
+    if (stage) {
+      aliases.add(stage.toLowerCase());
+    }
+  }
+
+  return aliases;
 };

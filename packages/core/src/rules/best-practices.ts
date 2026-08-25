@@ -1,4 +1,5 @@
 import { parseExecForm } from "../parsers/exec-form";
+import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -209,9 +210,6 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
   return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
-// FROM [--flags] <image> [AS <stage>]
-const FROM_BASE_RE = /^(?:--\S+\s+)*(?<base>\S+)(?:\s+AS\s+(?<stage>\S+))?/iu;
-
 export const usePipefail: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
@@ -227,11 +225,15 @@ export const usePipefail: DockerfileRule = {
     let currentStage: string | null = null;
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        const match = inst.args.match(FROM_BASE_RE);
-        const base = (match?.groups?.base ?? "").toLowerCase();
+        const { base, stage } = parseFromArgs(inst.args);
+        // Only a reference to an earlier stage carries state forward; a real
+        // base image, scratch, or a variable we cannot resolve resets it.
+        const parentStage = isScratch(base)
+          ? null
+          : (base?.toLowerCase() ?? null);
         shellHasPipefail =
-          base !== "scratch" && (stagePipefail.get(base) ?? false);
-        currentStage = (match?.groups?.stage ?? "").toLowerCase() || null;
+          parentStage !== null && stagePipefail.get(parentStage) === true;
+        currentStage = stage?.toLowerCase() ?? null;
         if (currentStage) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }

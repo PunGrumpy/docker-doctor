@@ -1,5 +1,6 @@
 import {
   collectStageAliases,
+  isScratch,
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
@@ -27,7 +28,7 @@ export const preferSlimBase: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         const imagePart = parseFromArgs(inst.args).base;
-        if (!imagePart || imagePart === "scratch") {
+        if (!imagePart || isScratch(imagePart)) {
           continue;
         }
 
