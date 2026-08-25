@@ -16,8 +16,15 @@
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { allRules } from "../packages/core/src/rules/index";
+import { parseCompose } from "../packages/core/src/parsers/compose-parser";
+import { parseDockerfile } from "../packages/core/src/parsers/dockerfile-parser";
+import {
+  allComposeRules,
+  allDockerfileRules,
+  allRules,
+} from "../packages/core/src/rules/index";
 import type {
+  Diagnostic,
   RuleCategory,
   RuleDefinition,
 } from "../packages/core/src/types/index";
@@ -42,8 +49,9 @@ const CATEGORY_ORDER: readonly RuleCategory[] = [
 ];
 
 const CATEGORY_BLURB: Record<RuleCategory, string> = {
-  "Best Practices": "General Dockerfile and Compose hygiene.",
-  Compose: "Docker Compose-specific checks.",
+  "Best Practices":
+    "Keeps Dockerfiles and Compose files clean and predictable.",
+  Compose: "Catches Docker Compose-specific misconfigurations.",
   "Image Size": "Keeps final images small.",
   Performance: "Reduces build time and layer bloat.",
   Security: "Catches Dockerfile patterns that widen your attack surface.",
@@ -104,17 +112,57 @@ const renderExample = (example: RuleExample): string => {
 };
 
 // Core's help strings are written for the terminal, not MDX prose — a lone
-// `*` (e.g. in '/var/lib/apt/lists/*') reads as an unmatched emphasis
+// `*` (e.g. in `/var/lib/apt/lists/*`) reads as an unmatched emphasis
 // marker, and `<package>` / `{ condition: … }` parse as JSX/expressions.
 // Escape them up front so generated output compiles and is formatter-clean.
+// Skip code spans — an escape inside backticks renders as a literal slash.
 const escapeProse = (text: string): string =>
-  text.replaceAll("*", "\\*").replaceAll("<", "\\<").replaceAll("{", "\\{");
+  text
+    .split(/(?<codeSpan>`[^`]*`)/u)
+    .map((part) =>
+      part.startsWith("`")
+        ? part
+        : part
+            .replaceAll("*", "\\*")
+            .replaceAll("<", "\\<")
+            .replaceAll("{", "\\{")
+    )
+    .join("");
+
+// The sample output on each page is a real diagnostic from scanning the
+// failing example — generation fails if the example stops triggering.
+const exampleDiagnostic = (
+  rule: RuleDefinition,
+  example: RuleExample
+): Diagnostic => {
+  const composeRule = allComposeRules.find((r) => r.key === rule.key);
+  const dockerfileRule = allDockerfileRules.find((r) => r.key === rule.key);
+  const diagnostics = composeRule
+    ? composeRule.check(
+        parseCompose(example.code, "compose.yaml"),
+        "compose.yaml"
+      )
+    : (dockerfileRule?.check(parseDockerfile(example.code), "Dockerfile", {
+        projectFiles: ["Dockerfile"],
+      }) ?? []);
+  const [diagnostic] = diagnostics;
+  if (!diagnostic) {
+    throw new Error(
+      `The failing example for ${rule.key} in scripts/rule-page-content.ts no longer triggers the rule — its docs page would show scan output that never happens. Update the example.`
+    );
+  }
+  return diagnostic;
+};
 
 const buildRulePage = (rule: RuleDefinition): string => {
   const content = rulePageContent[rule.key];
   const appliesTo =
     rule.category === "Compose" ? "Docker Compose files" : "Dockerfiles";
-  const prefix = SEVERITY_PREFIX[rule.defaultSeverity] ?? rule.defaultSeverity;
+  const diagnostic = exampleDiagnostic(
+    rule,
+    content.diagnosticSource ?? content.bad
+  );
+  const prefix = SEVERITY_PREFIX[diagnostic.severity] ?? diagnostic.severity;
   const notes = content.notes ? `\n${content.notes}\n` : "";
 
   return `---
@@ -134,7 +182,7 @@ Scanning this file reports:
 
 \`\`\`text
 ${prefix} [${rule.key}]
-  ${rule.message}
+  ${diagnostic.message}
 \`\`\`
 
 ## Why it matters
@@ -176,7 +224,7 @@ Severity affects the [health score](/docs/reference/scoring): \`error\` findings
 };
 
 const renderIndexRule = (rule: RuleDefinition): string =>
-  `- [\`${ruleSlug(rule)}\`](/docs/reference/rules/${ruleSlug(rule)}) — ${rule.message} (\`${rule.defaultSeverity}\`)`;
+  `| [\`${ruleSlug(rule)}\`](/docs/reference/rules/${ruleSlug(rule)}) | ${rule.message} | <SeverityPill severity="${rule.defaultSeverity}" /> |`;
 
 const renderIndexSection = (category: RuleCategory): string => {
   const rules = rulesByCategory(category);
@@ -185,6 +233,8 @@ const renderIndexSection = (category: RuleCategory): string => {
     "",
     CATEGORY_BLURB[category],
     "",
+    "| Rule | What it checks | Severity |",
+    "| --- | --- | --- |",
     ...rules.map(renderIndexRule),
   ].join("\n");
 };
@@ -223,7 +273,9 @@ const buildMeta = (): string => {
   const orderedSlugs = CATEGORY_ORDER.flatMap((category) =>
     rulesByCategory(category).map(ruleSlug)
   );
-  return `${JSON.stringify({ pages: ["index", ...orderedSlugs], title: "Rules" }, null, 2)}\n`;
+  // "index" is deliberately not listed: fumadocs then keeps it as the
+  // folder's `index` node, which the sidebar renders as an Overview link.
+  return `${JSON.stringify({ pages: orderedSlugs, title: "Rules" }, null, 2)}\n`;
 };
 
 assertCoverage();

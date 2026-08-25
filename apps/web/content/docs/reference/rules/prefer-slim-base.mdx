@@ -19,7 +19,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/prefer-slim-base]
-  Use slim, alpine, or distroless base images
+  Base image 'node:22' may be a full-OS distribution. Consider using a slim or alpine alternative.
 ```
 
 ## Why it matters
@@ -28,7 +28,7 @@ Every megabyte in the base is pulled on every deploy, stored in every registry c
 
 ## How to fix it
 
-Prefer tags with '-slim', '-alpine', or use distroless base images to minimize the default operating system footprint.
+Prefer tags with `-slim`, `-alpine`, or use distroless base images to minimize the default operating system footprint.
 
 ```dockerfile title="Dockerfile — same runtime, ~75% smaller"
 FROM node:22-slim

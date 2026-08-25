@@ -43,7 +43,7 @@ const Page = async ({ params }: DocPageProps) => {
 
   return (
     <div className="flex gap-12">
-      <article className="max-w-3xl min-w-0 flex-1">
+      <article className="max-w-[70ch] min-w-0 flex-1">
         <h1 className="font-serif text-4xl font-normal tracking-tight">
           {page.data.title}
         </h1>

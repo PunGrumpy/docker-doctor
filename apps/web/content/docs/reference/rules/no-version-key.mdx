@@ -22,7 +22,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/no-version-key]
-  Remove the 'version' key from Compose file
+  The 'version' property is deprecated. Remove it to use standard Compose spec behavior.
 ```
 
 ## Why it matters
@@ -31,7 +31,7 @@ Beyond the warning noise, the key actively misleads: it suggests you're opting i
 
 ## How to fix it
 
-The 'version' key is deprecated by the Compose specification. Omitting it defaults to the latest specification.
+The `version` key is obsolete in the Compose specification. Omitting it defaults to the latest specification.
 
 ```yaml title="compose.yaml — services at the top level"
 services:

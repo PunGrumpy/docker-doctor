@@ -21,7 +21,7 @@ Scanning this file reports:
 
 ```text
 ℹ INFO [docker-doctor/minimize-layers]
-  Minimize the number of image layers
+  Found 3 consecutive RUN instructions starting at line 2. Consider combining them into a single RUN layer.
 ```
 
 ## Why it matters
@@ -30,7 +30,7 @@ The classic trap is cleanup in a separate step: `RUN apt-get install …` follow
 
 ## How to fix it
 
-Combine consecutive RUN instructions using '&&' and '\' to reduce the total layer count and image size.
+Combine consecutive RUN instructions using `&&` and `\` to reduce the total layer count and image size.
 
 ```dockerfile title="Dockerfile — install and cleanup share one layer"
 FROM debian:12-slim

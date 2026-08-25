@@ -1,13 +1,33 @@
 "use client";
 
 import { AnchorProvider, TOCItem, useActiveAnchor } from "fumadocs-core/toc";
-import type { TableOfContents } from "fumadocs-core/toc";
-import type { RefObject } from "react";
+import type { TableOfContents, TOCItemType } from "fumadocs-core/toc";
+import type { ComponentProps, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 interface DocsTocProps {
   readonly toc: TableOfContents;
 }
+
+// Mirrors TOCItem's `data-active` (invisible to assistive tech) as
+// `aria-current`. Must render inside an `AnchorProvider`.
+export const TocLink = ({
+  item,
+  ...props
+}: Omit<ComponentProps<typeof TOCItem>, "href"> & {
+  readonly item: TOCItemType;
+}) => {
+  const active = useActiveAnchor();
+  return (
+    <TOCItem
+      aria-current={item.url.slice(1) === active ? "location" : undefined}
+      href={item.url}
+      {...props}
+    >
+      {item.title}
+    </TOCItem>
+  );
+};
 
 interface ThumbPosition {
   readonly top: number;
@@ -73,7 +93,7 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
     <aside className="hidden w-56 shrink-0 xl:block">
       <div className="sticky top-24">
         <p
-          className="text-muted-foreground mb-3 text-[0.6875rem] font-medium tracking-wider uppercase"
+          className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase"
           id="toc-heading"
         >
           On this page
@@ -81,21 +101,19 @@ export const DocsToc = ({ toc }: DocsTocProps) => {
         <AnchorProvider toc={toc}>
           <nav
             aria-labelledby="toc-heading"
-            className="relative flex flex-col gap-0.5 border-s border-dashed ps-4"
+            className="dark:border-input relative flex flex-col gap-0.5 border-s border-dashed ps-4"
             ref={navRef}
           >
             <TocThumb containerRef={navRef} />
             {toc.map((item) => (
-              <TOCItem
+              <TocLink
                 className="text-muted-foreground hover:text-foreground data-[active=true]:text-foreground py-1 text-sm"
-                href={item.url}
+                item={item}
                 key={item.url}
                 style={{
                   paddingInlineStart: `${Math.max(0, item.depth - 2) * 0.75}rem`,
                 }}
-              >
-                {item.title}
-              </TOCItem>
+              />
             ))}
           </nav>
         </AnchorProvider>

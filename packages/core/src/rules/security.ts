@@ -66,9 +66,9 @@ export const noRootUser: DockerfileRule = {
     return [];
   },
   defaultSeverity: "warning",
-  help: "Add a non-root user (e.g., 'USER node' or 'USER 1000') to improve security.",
+  help: "Add a non-root user (e.g., `USER node` or `USER 1000`) to improve security.",
   key: "docker-doctor/no-root-user",
-  message: "Container should not run as root user",
+  message: "Run the container as a non-root user",
 };
 
 export const noSecretsInEnv: DockerfileRule = {
@@ -154,7 +154,7 @@ export const noSecretsInEnv: DockerfileRule = {
   defaultSeverity: "error",
   help: "Use Docker Secrets, build arguments passed at runtime, or environment variables at runtime instead of baking them into the image.",
   key: "docker-doctor/no-secrets-in-env",
-  message: "Do not store secrets in ENV or ARG instructions",
+  message: "Avoid storing secrets in ENV or ARG instructions",
 };
 
 export const pinImageVersion: DockerfileRule = {
@@ -208,9 +208,9 @@ export const pinImageVersion: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Specify a concrete tag instead of 'latest' or no tag (e.g., 'node:22.2.0-alpine' instead of 'node').",
+  help: "Specify a concrete tag instead of `latest` or no tag (e.g., `node:22.2.0-alpine` instead of `node`).",
   key: "docker-doctor/pin-image-version",
-  message: "Always pin base image versions to specific tags",
+  message: "Pin base images to a specific tag or digest",
 };
 
 export const noAddRemote: DockerfileRule = {
@@ -245,7 +245,7 @@ export const noAddRemote: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Use 'RUN curl' or 'RUN wget' instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.",
+  help: "Use `RUN curl` or `RUN wget` instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.",
   key: "docker-doctor/no-add-remote",
   message: "Avoid using ADD with remote URLs",
 };

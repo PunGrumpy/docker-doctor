@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/absolute-workdir]
-  Use absolute paths for WORKDIR
+  WORKDIR specifies a relative path 'app'. For clarity and reliability, always use absolute paths.
 ```
 
 ## Why it matters
@@ -29,7 +29,7 @@ Relative `WORKDIR`s compound: `WORKDIR app` after an inherited `WORKDIR /usr/src
 
 ## How to fix it
 
-Always specify absolute paths for WORKDIR instructions (e.g. WORKDIR /app).
+Always specify absolute paths for WORKDIR instructions (e.g. `WORKDIR /app`).
 
 ```dockerfile title="Dockerfile — destination is unambiguous"
 FROM node:22-slim

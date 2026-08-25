@@ -41,7 +41,7 @@ export const requireHealthcheck: DockerfileRule = {
     return [];
   },
   defaultSeverity: "info",
-  help: "Use HEALTHCHECK (e.g., 'HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1') so Docker can monitor the container's live status.",
+  help: "Use HEALTHCHECK (e.g., `HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1`) so Docker can monitor the container's live status.",
   key: "docker-doctor/require-healthcheck",
   message: "Add a HEALTHCHECK instruction",
 };
@@ -119,7 +119,7 @@ export const useExecForm: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. ENTRYPOINT ["node", "index.js"]) so OS signals (like SIGTERM) are forwarded correctly.',
+  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.',
   key: "docker-doctor/use-exec-form",
   message: "Use exec form for CMD and ENTRYPOINT",
 };
@@ -143,7 +143,7 @@ export const requireLabels: DockerfileRule = {
     return [];
   },
   defaultSeverity: "info",
-  help: 'Use LABEL instructions (e.g. LABEL org.opencontainers.image.authors="...") to document ownership, license, version, and build info.',
+  help: 'Use LABEL instructions (e.g. `LABEL org.opencontainers.image.authors="..."`) to document ownership, license, version, and build info.',
   key: "docker-doctor/require-labels",
   message: "Add LABEL metadata to images",
 };
@@ -185,7 +185,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Combine 'apt-get update' and 'apt-get install' in the same RUN instruction (e.g. 'RUN apt-get update && apt-get install -y --no-install-recommends <package> && rm -rf /var/lib/apt/lists/*').",
+  help: "Combine `apt-get update` and `apt-get install` in the same RUN instruction (e.g. `RUN apt-get update && apt-get install -y --no-install-recommends <package> && rm -rf /var/lib/apt/lists/*`).",
   key: "docker-doctor/combine-apt-update-install",
   message: "Combine apt-get update and apt-get install",
 };
@@ -277,7 +277,7 @@ export const usePipefail: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Prepend 'set -o pipefail &&' to pipe commands, use exec form with a shell that supports it (e.g., RUN ['/bin/bash', '-c', 'set -o pipefail && ...']), or set SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] at the top of the stage.",
+  help: 'Prepend `set -o pipefail &&` to pipe commands, use exec form with a shell that supports it (e.g., `RUN ["/bin/bash", "-c", "set -o pipefail && ..."]`), or set `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` at the top of the stage.',
   key: "docker-doctor/use-pipefail",
   message: "Use pipefail to catch pipeline command failures",
 };
@@ -308,7 +308,7 @@ export const absoluteWorkdir: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Always specify absolute paths for WORKDIR instructions (e.g. WORKDIR /app).",
+  help: "Always specify absolute paths for WORKDIR instructions (e.g. `WORKDIR /app`).",
   key: "docker-doctor/absolute-workdir",
   message: "Use absolute paths for WORKDIR",
 };
@@ -334,7 +334,7 @@ export const avoidRunCd: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "info",
-  help: "Use the WORKDIR instruction instead of 'cd' inside RUN to establish directory context.",
+  help: "Use the WORKDIR instruction instead of `cd` inside RUN to establish directory context.",
   key: "docker-doctor/avoid-run-cd",
   message: "Avoid changing directories with cd in RUN",
 };
@@ -423,7 +423,7 @@ export const useraddNoLogInit: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Pass '--no-log-init' flag to useradd (e.g., 'RUN useradd --no-log-init -r -g mygroup myuser').",
+  help: "Pass `--no-log-init` flag to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).",
   key: "docker-doctor/useradd-no-log-init",
   message: "Use --no-log-init with useradd",
 };

@@ -32,7 +32,8 @@ const DocsRootLayout = ({ children }: DocsRootLayoutProps) => (
     <div className="relative mx-auto flex w-full max-w-[1200px] flex-1 px-4 pt-14 lg:px-8">
       <div className="grid w-full grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
         <aside className="hidden lg:block">
-          <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto py-8 ps-4 pe-4">
+          {/* lg:py-12 matches main's, keeping the three column tops level. */}
+          <div className="sticky top-14 h-[calc(100dvh-3.5rem)] overflow-y-auto py-8 ps-4 pe-4 lg:py-12">
             <DocsSidebar tree={source.getPageTree()} />
           </div>
         </aside>
