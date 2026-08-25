@@ -1,6 +1,10 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  // apps/web renders packages/docker-doctor/CHANGELOG.md at build time, but
+  // that file sits outside web's package dir and outside its dependency
+  // graph, so nothing else would invalidate the cached build for it.
+  "globalDependencies": ["packages/docker-doctor/CHANGELOG.md"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
