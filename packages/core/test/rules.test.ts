@@ -137,6 +137,15 @@ describe("Security Rules", () => {
     expect(diags3).toHaveLength(1);
   });
 
+  test("pin-image-version: scratch is not an unpinned image", () => {
+    const counts = ["scratch", "SCRATCH", "Scratch"].map(
+      (base) =>
+        pinImageVersion.check(parseDockerfile(`FROM ${base}`), "Dockerfile")
+          .length
+    );
+    expect(counts).toEqual([0, 0, 0]);
+  });
+
   test("pin-image-version", () => {
     const unpinned = parseDockerfile(`
       FROM node

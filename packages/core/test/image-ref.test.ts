@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   collectStageAliases,
+  isScratch,
   parseFromArgs,
   parseImageRef,
 } from "../src/parsers/image-ref";
@@ -109,5 +110,19 @@ describe("parseFromArgs", () => {
       base: "base",
       stage: "app",
     });
+  });
+});
+
+describe("isScratch", () => {
+  test("matches the reserved empty base in any case", () => {
+    expect(isScratch("scratch")).toBe(true);
+    expect(isScratch("SCRATCH")).toBe(true);
+    expect(isScratch("Scratch")).toBe(true);
+  });
+
+  test("does not match real images or a missing base", () => {
+    expect(isScratch("node:22-alpine")).toBe(false);
+    expect(isScratch("scratchpad")).toBe(false);
+    expect(isScratch(null)).toBe(false);
   });
 });

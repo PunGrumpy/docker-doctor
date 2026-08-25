@@ -1,5 +1,6 @@
 import {
   collectStageAliases,
+  isScratch,
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
@@ -168,7 +169,7 @@ export const pinImageVersion: DockerfileRule = {
         // Also respect multi-stage builds (AS stageName)
         const imagePart = parseFromArgs(inst.args).base;
 
-        if (!imagePart || imagePart === "scratch") {
+        if (!imagePart || isScratch(imagePart)) {
           continue;
         }
 

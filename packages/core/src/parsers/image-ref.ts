@@ -70,6 +70,12 @@ export const parseFromArgs = (args: string): FromArgs => {
   };
 };
 
+// The reserved empty base, not a real image: nothing to pin a tag on, no
+// distribution to slim down, and no image config to inherit. One definition
+// so the rules cannot disagree about a given FROM line.
+export const isScratch = (base: string | null): boolean =>
+  base?.toLowerCase() === "scratch";
+
 export const collectStageAliases = (
   instructions: DockerfileInstruction[]
 ): Set<string> => {

@@ -1,5 +1,5 @@
 import { parseExecForm } from "../parsers/exec-form";
-import { parseFromArgs } from "../parsers/image-ref";
+import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 
 const createDiagnostic = (
@@ -228,10 +228,9 @@ export const usePipefail: DockerfileRule = {
         const { base, stage } = parseFromArgs(inst.args);
         // Only a reference to an earlier stage carries state forward; a real
         // base image, scratch, or a variable we cannot resolve resets it.
-        const parentStage =
-          base?.toLowerCase() === "scratch"
-            ? null
-            : (base?.toLowerCase() ?? null);
+        const parentStage = isScratch(base)
+          ? null
+          : (base?.toLowerCase() ?? null);
         shellHasPipefail =
           parentStage !== null && stagePipefail.get(parentStage) === true;
         currentStage = stage?.toLowerCase() ?? null;
