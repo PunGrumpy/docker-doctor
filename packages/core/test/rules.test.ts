@@ -760,6 +760,17 @@ describe("Best Practices Rules", () => {
       expectedRules: [],
       name: "stage inheritance chains across two hops",
     },
+    {
+      dockerfile: `
+      FROM debian:bookworm-slim AS base
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+      FROM base --platform=linux/amd64 AS app
+      FROM app AS final
+      RUN curl -fsSL https://bun.sh/install | bash
+    `,
+      expectedRules: [],
+      name: "stage inheritance survives a flag written after the base",
+    },
     // The opposite direction of the substring bug: a RUN that sets another
     // shell option must not exempt a pipeline that merely mentions the word.
     {
