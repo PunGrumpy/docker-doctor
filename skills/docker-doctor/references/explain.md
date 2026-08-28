@@ -54,7 +54,7 @@ export default {
 };
 ```
 
-The config schema also accepts an `ignore.files` array, but it is NOT currently implemented — nothing in the codebase reads it, so listing files there has no effect. Do not tell users it will exempt a file from scanning.
+The config also accepts an `ignore.files` array of glob patterns. docker-doctor drops matching files from discovery before any rule runs — see the decision guide below for when to reach for it.
 
 ## Decision guide
 
