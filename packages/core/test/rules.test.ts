@@ -25,6 +25,11 @@ import {
   useDependsOnCondition,
 } from "../src/rules/compose";
 import {
+  noDockerSocketMount,
+  noPlaintextSecrets,
+  noPrivilegedService,
+} from "../src/rules/compose-security";
+import {
   preferSlimBase,
   cleanPackageCache,
   avoidDevDependencies,
@@ -605,6 +610,112 @@ services:
     expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
       0
     );
+  });
+});
+
+describe("Compose Security Rules", () => {
+  test("no-privileged-service", () => {
+    const source = `services:
+  agent:
+    image: myagent:1.0
+    privileged: true
+  web:
+    image: nginx:1.27-alpine
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = noPrivilegedService.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("'agent'");
+    expect(diags[0].line).toBe(4);
+  });
+
+  test("no-privileged-service: privileged false or absent is clean", () => {
+    const composeContent = {
+      services: {
+        web: { image: "nginx:1.27-alpine", privileged: false },
+      },
+    };
+    expect(
+      noPrivilegedService.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
+  });
+
+  test("no-docker-socket-mount: short and long volume syntax", () => {
+    const source = `services:
+  gateway:
+    image: docker/mcp-gateway:1.0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  agent:
+    image: myagent:1.0
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./html:/usr/share/nginx/html
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = noDockerSocketMount.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(2);
+    expect(diags[0].message).toContain("'gateway'");
+    expect(diags[0].line).toBe(5);
+    expect(diags[1].message).toContain("'agent'");
+    expect(diags[1].line).toBe(9);
+  });
+
+  test("no-plaintext-secrets: map and list syntax, interpolation is clean", () => {
+    const source = `services:
+  agent:
+    image: myagent:1.0
+    environment:
+      OPENAI_API_KEY: sk-abc123
+      LOG_LEVEL: debug
+      GITHUB_TOKEN: \${GITHUB_TOKEN}
+  worker:
+    image: myworker:1.0
+    environment:
+      - DB_PASSWORD=hunter2
+      - REDIS_URL=redis://cache:6379
+      - ANTHROPIC_API_KEY
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = noPlaintextSecrets.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(2);
+    expect(diags[0].message).toContain("'OPENAI_API_KEY'");
+    expect(diags[0].line).toBe(5);
+    expect(diags[1].message).toContain("'DB_PASSWORD'");
+    expect(diags[1].line).toBe(11);
+  });
+
+  test("compose security rules work without a locator", () => {
+    const composeContent = {
+      services: {
+        agent: {
+          environment: { API_KEY: "sk-live" },
+          privileged: true,
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+        },
+      },
+    };
+    const rules = [
+      noPrivilegedService,
+      noDockerSocketMount,
+      noPlaintextSecrets,
+    ];
+    for (const rule of rules) {
+      const diags = rule.check(composeContent, "compose.yml");
+      expect(diags).toHaveLength(1);
+      expect(diags[0].line).toBeUndefined();
+    }
   });
 });
 

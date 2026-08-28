@@ -22,6 +22,9 @@
     "require-resource-limits",
     "require-restart-policy",
     "use-depends-on-condition",
+    "no-privileged-service",
+    "no-docker-socket-mount",
+    "no-plaintext-secrets",
     "prefer-slim-base",
     "clean-package-cache",
     "avoid-dev-dependencies"
