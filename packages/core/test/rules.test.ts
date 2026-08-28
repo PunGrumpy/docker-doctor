@@ -150,6 +150,37 @@ describe("Security Rules", () => {
     expect(diags3).toHaveLength(1);
   });
 
+  test("no-root-user: DHI runtime bases default to nonroot", () => {
+    const dhiRuntime = parseDockerfile(`
+      FROM dhi.io/python:3.13
+      COPY . .
+    `);
+    expect(noRootUser.check(dhiRuntime, "Dockerfile")).toHaveLength(0);
+
+    // -dev variants keep a shell and are not assumed nonroot.
+    const dhiDev = parseDockerfile(`
+      FROM dhi.io/python:3.13-dev
+      COPY . .
+    `);
+    expect(noRootUser.check(dhiDev, "Dockerfile")).toHaveLength(1);
+
+    // An explicit USER root on a DHI base still reports.
+    const dhiRoot = parseDockerfile(`
+      FROM dhi.io/python:3.13
+      USER root
+    `);
+    expect(noRootUser.check(dhiRoot, "Dockerfile")).toHaveLength(1);
+
+    // Build in a -dev stage, run in the runtime variant.
+    const multiStage = parseDockerfile(`
+      FROM dhi.io/python:3.13-dev AS build
+      RUN pip install -r requirements.txt
+      FROM dhi.io/python:3.13
+      COPY --from=build /app /app
+    `);
+    expect(noRootUser.check(multiStage, "Dockerfile")).toHaveLength(0);
+  });
+
   test("pin-image-version: scratch is not an unpinned image", () => {
     const counts = ["scratch", "SCRATCH", "Scratch"].map(
       (base) =>
@@ -879,6 +910,14 @@ describe("Image Size Rules", () => {
       FROM ubuntu:24.04
     `);
     expect(preferSlimBase.check(fullOs, "Dockerfile")).toHaveLength(1);
+  });
+
+  test("prefer-slim-base: Docker Hardened Images are minimal by construction", () => {
+    for (const base of ["dhi.io/python:3.13", "dhi.io/node:22-dev"]) {
+      expect(
+        preferSlimBase.check(parseDockerfile(`FROM ${base}`), "Dockerfile")
+      ).toHaveLength(0);
+    }
   });
 
   test("clean-package-cache", () => {
