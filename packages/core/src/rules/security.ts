@@ -6,6 +6,7 @@ import {
 } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+import { isSecretKey } from "./secret-keywords";
 
 // USER accepts "user", "uid", "user:group" and "uid:gid". Only the user half
 // decides whether the container runs as root; the group half is irrelevant.
@@ -67,14 +68,6 @@ export const noSecretsInEnv: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
-    const secretKeywords = [
-      /(?:^|[_-])password(?:[_-]|$)/iu,
-      /(?:^|[_-])secret(?:[_-]|$)/iu,
-      /(?:^|[_-])token(?:[_-]|$)/iu,
-      /(?:^|[_-])api_key(?:[_-]|$)/iu,
-      /(?:^|[_-])private_key(?:[_-]|$)/iu,
-      /(?:^|[_-])auth(?:[_-]|$)/iu,
-    ];
 
     for (const inst of instructions) {
       if (inst.instruction === "ENV" || inst.instruction === "ARG") {
@@ -84,9 +77,9 @@ export const noSecretsInEnv: DockerfileRule = {
           const match = args.match(/^(?<key>[^\s]+)\s+(?<value>.*)$/u);
           if (match?.groups) {
             const { key, value } = match.groups;
-            const isSecretKey = secretKeywords.some((regex) => regex.test(key));
+            const keyIsSecret = isSecretKey(key);
             if (
-              isSecretKey &&
+              keyIsSecret &&
               value &&
               !value.startsWith("$") &&
               !value.startsWith("{")
@@ -118,9 +111,9 @@ export const noSecretsInEnv: DockerfileRule = {
               key = part;
             }
 
-            const isSecretKey = secretKeywords.some((regex) => regex.test(key));
+            const keyIsSecret = isSecretKey(key);
             if (
-              isSecretKey &&
+              keyIsSecret &&
               value &&
               !value.startsWith("$") &&
               !value.startsWith("{")

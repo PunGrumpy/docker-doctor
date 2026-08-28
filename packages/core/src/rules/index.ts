@@ -5,6 +5,7 @@ import type {
 } from "../types/index";
 import { bestPracticesRules } from "./best-practices";
 import { composeRules } from "./compose";
+import { composeSecurityRules } from "./compose-security";
 import { imageSizeRules } from "./image-size";
 import { performanceRules } from "./performance";
 import { securityRules } from "./security";
@@ -16,7 +17,10 @@ export const allDockerfileRules: DockerfileRule[] = [
   ...imageSizeRules,
 ];
 
-export const allComposeRules: ComposeRule[] = [...composeRules];
+export const allComposeRules: ComposeRule[] = [
+  ...composeRules,
+  ...composeSecurityRules,
+];
 
 export const allRules: RuleDefinition[] = [
   ...allDockerfileRules,

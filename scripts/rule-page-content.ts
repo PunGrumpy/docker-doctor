@@ -175,6 +175,69 @@ export const rulePageContent: Record<string, RulePageContent> = {
     why: "Three separate problems stack up. **Integrity:** `ADD` gives you no place to verify a checksum, so you're trusting the remote server and the network path at every build. **Size:** the downloaded file is committed to its own layer; even if a later instruction deletes it, the bytes stay in the image history. **Caching:** Docker cannot tell whether the remote content changed, leading to stale-or-rebuilt-forever cache behavior. A `RUN curl` line fixes all three in one move.",
   },
 
+  "docker-doctor/no-docker-socket-mount": {
+    bad: {
+      code: "services:\n  mcp-gateway:\n    image: docker/mcp-gateway:0.9.0\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock",
+      lang: "yaml",
+      title: "compose.yaml — raw Docker socket bind mount",
+    },
+    description:
+      "Bind-mounting /var/run/docker.sock into a Compose service hands the container root on the host. Safer alternatives for tools that need the Docker API.",
+    good: {
+      code: "services:\n  mcp-gateway:\n    image: docker/mcp-gateway:0.9.0\n    # Compose provisions scoped Docker API credentials for this service\n    use_api_socket: true",
+      lang: "yaml",
+      title: "compose.yaml — scoped API access via use_api_socket",
+    },
+    intro:
+      "Mounting `/var/run/docker.sock` into a container is the standard trick for anything that needs to talk to Docker: CI runners, reverse proxies that watch containers, and increasingly AI-agent tooling like MCP gateways that launch tool containers on demand. It is also equivalent to giving that container root on the host, because the Docker API can start privileged containers, mount any host path, and read every volume. This rule flags any service whose `volumes` bind-mount the Docker socket, in either the short or long syntax.",
+    notes:
+      "If the service genuinely needs the Docker API, use a mechanism that limits what a compromised container can do:\n\n- **`use_api_socket: true`** (Compose ≥ 2.36): Compose mounts the API socket together with scoped credentials. Docker's own `compose-for-agents` examples use this for MCP gateways.\n- **A filtering socket proxy**: exposes only the API endpoints the client needs, such as read-only container listing.\n\nMounting the socket `:ro` does _not_ help. Writes go through the connected socket, not the file, so a read-only mount still allows every API call.",
+    why: "The Docker daemon runs as root and its API has no notion of partial trust. Any client can do anything, including `docker run --privileged -v /:/host`, so a compromised process in a socket-mounted container escapes to the host in one API call. Agent stacks raise the stakes: an MCP gateway or agent runtime executes model-directed actions, so prompt injection anywhere in the toolchain becomes a path to that socket.",
+  },
+
+  "docker-doctor/no-plaintext-secrets": {
+    bad: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    environment:\n      OPENAI_API_KEY: sk-proj-abc123\n      DB_PASSWORD: hunter2",
+      lang: "yaml",
+      title: "compose.yaml — credentials committed in plain text",
+    },
+    description:
+      "API keys and passwords written literally in a Compose file end up in version control. Where to put Compose secrets instead: interpolation, env_file, or secrets.",
+    good: {
+      // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    environment:\n      # resolved from the host environment / .env at compose up time\n      OPENAI_API_KEY: ${OPENAI_API_KEY}\n    env_file:\n      - .env.local # gitignored",
+      lang: "yaml",
+      title: "compose.yaml — values resolved outside the file",
+    },
+    intro:
+      // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+      "A Compose file is code: it gets committed, reviewed, forked, and pushed to template registries. A literal `OPENAI_API_KEY: sk-…` in `environment:` therefore publishes the credential to everyone with repo access, and to every clone, mirror, and backup, forever. This rule flags environment entries (map or list syntax) whose key looks like a credential (`PASSWORD`, `SECRET`, `TOKEN`, `API_KEY`, …) and whose value is a literal rather than a `${VAR}` interpolation.",
+    notes:
+      // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+      "Pick the mechanism by how sensitive the value is:\n\n- **`${VAR}` interpolation**: Compose resolves it from the host environment or a `.env` file at `compose up` time; the compose file carries only the reference.\n- **`env_file`**: point it at a gitignored file to keep whole blocks of configuration out of version control.\n- **Compose `secrets`**: mounts the value as a file rather than an environment variable, which also keeps it out of `docker inspect` output and crash dumps.\n\nIf a real credential has already been committed, rotate it. Removing the line only hides it from the working tree, not from git history.",
+    why: "Committed credentials are one of the most common real-world breach vectors, and compose files travel further than people expect: they get pasted into issues, copied into starter templates, and pushed to public forks. Agent stacks concentrate the risk, since one file often holds keys for a model provider, a search API, and a database at once. The rule only inspects the key name, so it cannot tell a real key from a placeholder; treat a hit on a placeholder as a prompt to switch to interpolation before the placeholder becomes real.",
+  },
+
+  "docker-doctor/no-privileged-service": {
+    bad: {
+      code: "services:\n  runner:\n    image: my-runner:2.1.0\n    privileged: true",
+      lang: "yaml",
+      title: "compose.yaml — full host access via privileged",
+    },
+    description:
+      "privileged: true in Docker Compose disables nearly every container isolation mechanism. What it actually grants and the narrower alternatives.",
+    good: {
+      code: "services:\n  runner:\n    image: my-runner:2.1.0\n    # grant only what the service actually needs\n    cap_add:\n      - NET_ADMIN\n    devices:\n      - /dev/net/tun",
+      lang: "yaml",
+      title: "compose.yaml — specific capabilities and devices only",
+    },
+    intro:
+      "`privileged: true` is the biggest hammer in the Compose vocabulary: it gives the container every Linux capability, access to every host device, and turns off the seccomp, AppArmor, and cgroup device protections that make a container a container. It usually enters a file as a workaround, because some device wouldn't open or some syscall was blocked, and then never leaves. This rule flags every service that sets it.",
+    notes:
+      "Almost every legitimate use has a narrower replacement:\n\n- **Network syscalls** (VPN, routing): `cap_add: [NET_ADMIN]`.\n- **One device**: `devices: [/dev/net/tun]` (or `/dev/dri`, `/dev/kvm`, …).\n- **GPU access for model inference**: `deploy.resources.reservations.devices` with the `gpu` capability, not `privileged`.\n- **Docker-in-Docker for CI**: prefer the host's socket via a scoped mechanism (see `no-docker-socket-mount`) or a rootless DinD setup.\n\nStart from nothing and add single capabilities until the service works; the final list is rarely more than two entries.",
+    why: "A privileged container is not meaningfully contained: it can load kernel modules, talk to raw disks, and remount host filesystems. Root inside is root on the host, so compromise of the service becomes compromise of the machine and every other workload on it. The setting also hides the service's real requirements, so nobody can later reconstruct which capability it actually needed; an explicit `cap_add`/`devices` list is both safer and better documentation.",
+  },
+
   "docker-doctor/no-root-user": {
     bad: {
       code: 'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]',
