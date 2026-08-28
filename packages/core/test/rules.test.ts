@@ -26,6 +26,10 @@ import {
   useDependsOnCondition,
 } from "../src/rules/compose";
 import {
+  pinModelVersion,
+  undefinedModelReference,
+} from "../src/rules/compose-models";
+import {
   noDockerSocketMount,
   noPlaintextSecrets,
   noPrivilegedService,
@@ -757,6 +761,78 @@ describe("Compose Security Rules", () => {
       expect(diags).toHaveLength(1);
       expect(diags[0].line).toBeUndefined();
     }
+  });
+});
+
+describe("Compose Model Rules", () => {
+  test("undefined-model-reference: flags unknown names in list and map syntax", () => {
+    const source = `services:
+  agent:
+    image: my-agent:1.0.0
+    models:
+      gemma3:
+        endpoint_var: MODEL_RUNNER_URL
+  worker:
+    image: my-worker:1.0.0
+    models:
+      - llama
+      - phi4
+models:
+  llama:
+    model: ai/llama3.2:1B-Q8_0
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = undefinedModelReference.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(2);
+    expect(diags[0].message).toContain("'gemma3'");
+    expect(diags[0].line).toBe(5);
+    expect(diags[1].message).toContain("'phi4'");
+    expect(diags[1].line).toBe(11);
+  });
+
+  test("undefined-model-reference: every reference is undefined without a top-level models section", () => {
+    const composeContent = {
+      services: {
+        agent: { image: "my-agent:1.0.0", models: ["gemma3"] },
+      },
+    };
+    const diags = undefinedModelReference.check(composeContent, "compose.yml");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBeUndefined();
+  });
+
+  test("pin-model-version: flags untagged and latest model artifacts", () => {
+    const source = `services:
+  agent:
+    image: my-agent:1.0.0
+    models: [gemma3, phi4, qwen]
+models:
+  gemma3:
+    model: ai/gemma3
+  phi4:
+    model: ai/phi4:latest
+  qwen:
+    model: ai/qwen3:8B-Q4_0
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = pinModelVersion.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(2);
+    expect(diags[0].message).toContain("'gemma3'");
+    expect(diags[0].message).toContain("does not specify a tag");
+    expect(diags[0].line).toBe(7);
+    expect(diags[1].message).toContain("'phi4'");
+    expect(diags[1].message).toContain("'latest'");
+    expect(diags[1].line).toBe(9);
+
+    const references = undefinedModelReference.check(
+      composeContent,
+      "compose.yml"
+    );
+    expect(references).toHaveLength(0);
   });
 });
 

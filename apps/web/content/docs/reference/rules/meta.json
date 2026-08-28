@@ -26,6 +26,8 @@
     "no-privileged-service",
     "no-docker-socket-mount",
     "no-plaintext-secrets",
+    "undefined-model-reference",
+    "pin-model-version",
     "prefer-slim-base",
     "clean-package-cache",
     "avoid-dev-dependencies"
