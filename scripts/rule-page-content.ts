@@ -338,6 +338,26 @@ export const rulePageContent: Record<string, RulePageContent> = {
     why: 'Unpinned bases break the core promise of a Dockerfile: reproducibility. Debugging becomes guesswork ("it works on my rebuild"), rollbacks stop being rollbacks because rebuilding an old commit pulls a new base, and you silently absorb every change the upstream image publishes — including breaking ones and, in a registry-compromise scenario, malicious ones. Pinning turns base-image updates into a reviewable diff instead of a background surprise.',
   },
 
+  "docker-doctor/pin-model-version": {
+    bad: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    models: [gemma3]\nmodels:\n  gemma3:\n    model: ai/gemma3",
+      lang: "yaml",
+      title: "compose.yaml — whichever weights the registry serves today",
+    },
+    description:
+      "Docker Compose models without a tag pull different weights over time. How to pin Docker Model Runner models to a specific version.",
+    good: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    models: [gemma3]\nmodels:\n  gemma3:\n    model: ai/gemma3:4B-Q4_0\n    context_size: 10000",
+      lang: "yaml",
+      title: "compose.yaml — exact quantization, reproducible behavior",
+    },
+    intro:
+      "The top-level `models:` element (Docker Model Runner, Compose ≥ 2.35) declares AI models as OCI artifacts, and OCI rules apply: `model: ai/gemma3` with no tag resolves to whatever the registry currently serves. For a model, drift means _different weights_: often a different parameter count or quantization, with different memory needs and different behavior on the same prompts. This rule flags top-level models whose `model:` reference has no tag or uses `latest`.",
+    notes:
+      "Model tags encode size and quantization (`ai/gemma3:4B-Q4_0`), so the pin also documents the VRAM footprint you tested against. That pairs well with `context_size`, which trades context length against memory on the same weights. Pinning matters double for agents: tool-calling reliability varies sharply between model versions, so an unpinned model can turn a working agent into a flaky one without any code change.",
+    why: "An unpinned model is an unversioned dependency at the most behavior-sensitive layer of the stack. When outputs change, nothing in git explains why: the compose file is identical, the app is identical, only the silently updated weights differ. Debugging that means re-benchmarking prompts instead of reading a diff. A pinned tag turns 'the model changed' from a hypothesis into a visible line in version control, exactly like `pin-service-image` does for service images.",
+  },
+
   "docker-doctor/pin-service-image": {
     bad: {
       code: "services:\n  web:\n    image: nginx\n  cache:\n    image: redis:latest",
@@ -495,6 +515,26 @@ export const rulePageContent: Record<string, RulePageContent> = {
     intro:
       "A long unsorted package list in a `RUN apt-get install` or `apk add` turns every change into a hunt: is `libpq-dev` already in here? Did two branches both append `git` at the end? This rule suggests keeping multi-line package lists sorted alphabetically.",
     why: "Sorted lists make duplicates impossible to miss, merge conflicts rarer (two branches appending to the same last line is the classic conflict), and reviews instant — a one-line diff in a sorted list is exactly the package that changed. It's the same reason import statements get sorted. Zero runtime effect, purely a maintainability win, and `docker-doctor` only asks for it once the list spans multiple lines.",
+  },
+
+  "docker-doctor/undefined-model-reference": {
+    bad: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    models:\n      gemma:\n        endpoint_var: MODEL_RUNNER_URL\nmodels:\n  gemma3:\n    model: ai/gemma3:4B-Q4_0",
+      lang: "yaml",
+      title: "compose.yaml — service binds a model name that doesn't exist",
+    },
+    description:
+      "A Compose service references a model that isn't declared under the top-level models element. Why the names must match and how the binding works.",
+    good: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    models:\n      gemma3:\n        endpoint_var: MODEL_RUNNER_URL\nmodels:\n  gemma3:\n    model: ai/gemma3:4B-Q4_0",
+      lang: "yaml",
+      title: "compose.yaml — reference and declaration agree",
+    },
+    intro:
+      "With Docker Model Runner, a service consumes a model in two steps: the top-level `models:` element declares it under a name and maps it to an OCI artifact, and the service's own `models:` section references that name, either as a plain list or as a map with `endpoint_var`/`model_var` bindings. The names must match exactly. A typo, or a model renamed in one place but not the other, leaves a reference with nothing to resolve to. This rule flags every service-level model reference that no top-level declaration satisfies.",
+    notes:
+      "The binding is how connection details reach your app: Compose starts the declared model via Model Runner and injects its URL and identifier into the service's environment, using either the default variables or the names you chose with `endpoint_var`/`model_var`. That's also why this error can surface confusingly late: the symptom is an agent failing to reach its endpoint at startup, several layers away from the one-word mismatch in the compose file. The rule intentionally has no opinion in the other direction; a declared model that no service references yet is fine.",
+    why: "This is a hard error caught cheap. The mismatch is invisible to a YAML syntax check, because both sections are individually valid. At runtime it appears as environment variables that were never injected, which reads like an app bug, not a compose bug. A linter comparing the two name sets finds it before anything is pulled or started, which is exactly the class of cross-reference mistake static analysis exists for.",
   },
 
   "docker-doctor/use-depends-on-condition": {

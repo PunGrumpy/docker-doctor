@@ -5,7 +5,7 @@ title: Rules
 description: Every rule docker-doctor ships, grouped by category.
 ---
 
-docker-doctor ships 29 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
+docker-doctor ships 31 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
 
 List everything docker-doctor knows about:
 
@@ -72,6 +72,8 @@ Catches Docker Compose-specific misconfigurations.
 | [`no-privileged-service`](/docs/reference/rules/no-privileged-service) | Do not run services in privileged mode | <SeverityPill severity="error" /> |
 | [`no-docker-socket-mount`](/docs/reference/rules/no-docker-socket-mount) | Do not bind-mount the Docker socket into services | <SeverityPill severity="error" /> |
 | [`no-plaintext-secrets`](/docs/reference/rules/no-plaintext-secrets) | Avoid literal secret values in Compose environment | <SeverityPill severity="warning" /> |
+| [`undefined-model-reference`](/docs/reference/rules/undefined-model-reference) | Service model references must be declared in top-level models | <SeverityPill severity="error" /> |
+| [`pin-model-version`](/docs/reference/rules/pin-model-version) | Pin models to a specific tag or digest | <SeverityPill severity="warning" /> |
 
 ## Image Size
 
