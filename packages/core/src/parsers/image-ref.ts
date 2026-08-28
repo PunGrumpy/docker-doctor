@@ -54,6 +54,24 @@ export const parseImageRef = (ref: string): ImageRef => {
   };
 };
 
+/**
+ * Why a reference would resolve differently over time: no tag at all, or
+ * the mutable `latest` tag without a digest. `undefined` means the ref is
+ * pinned. Shared by every pinning rule (base images, service images,
+ * models) so they agree on what counts as pinned.
+ */
+export const mutableRefIssue = (
+  ref: ImageRef
+): "untagged" | "latest" | undefined => {
+  if (!(ref.tag || ref.digest)) {
+    return "untagged";
+  }
+  if (ref.tag === "latest" && !ref.digest) {
+    return "latest";
+  }
+  return undefined;
+};
+
 export interface FromArgs {
   base: string | null;
   stage: string | null;
