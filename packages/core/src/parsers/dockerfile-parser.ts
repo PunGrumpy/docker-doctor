@@ -122,11 +122,6 @@ const processInstructionLine = (
 ): void => {
   let lineContent = trimmed;
 
-  // Inside a multi-line run, comment lines are ignored by docker parser
-  if (lineContent.startsWith("#")) {
-    return;
-  }
-
   const hasContinuation = lineContent.endsWith("\\");
   if (hasContinuation) {
     lineContent = lineContent.slice(0, -1).trim();
@@ -168,12 +163,15 @@ export const parseDockerfile = (content: string): DockerfileInstruction[] => {
     const lineNum = i + 1;
     const insideHeredoc = state.heredocQueue.length > 0;
 
-    // Skip empty lines or comment lines if not in multi-line block
-    if (
-      !state.currentInstruction &&
-      !insideHeredoc &&
-      (trimmed === "" || trimmed.startsWith("#"))
-    ) {
+    // Comment lines are dropped by Docker's parser even mid-continuation, so
+    // keep them out of args AND `raw` — raw-based rules must not see them.
+    // Heredoc bodies are exempt: a leading `#` there is shell content.
+    if (!insideHeredoc && trimmed.startsWith("#")) {
+      continue;
+    }
+
+    // Skip empty lines if not in a multi-line block
+    if (!state.currentInstruction && !insideHeredoc && trimmed === "") {
       continue;
     }
 

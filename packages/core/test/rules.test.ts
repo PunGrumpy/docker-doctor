@@ -986,6 +986,19 @@ describe("Best Practices Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  test("sort-multiline-args ignores comment lines inside the list", () => {
+    const sortedWithComment = parseDockerfile(`
+      RUN apt-get update && apt-get install -y --no-install-recommends \\
+        curl \\
+        # version control
+        git \\
+        tmux
+    `);
+    expect(
+      sortMultilineArgs.check(sortedWithComment, "Dockerfile")
+    ).toHaveLength(0);
+  });
+
   test("useradd-no-log-init", () => {
     const withoutFlag = parseDockerfile(`
       RUN useradd -r -g mygroup myuser
