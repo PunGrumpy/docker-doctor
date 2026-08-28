@@ -1,0 +1,2 @@
+FROM node
+ENV DB_PASSWORD=hunter2

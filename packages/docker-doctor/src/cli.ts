@@ -684,8 +684,10 @@ program
         });
 
         setStatus("Scanning workspace files...");
-        // Project discovery
-        const project = await discoverProject(rootDir);
+        // Project discovery, minus anything the config ignores
+        const project = await discoverProject(rootDir, {
+          ignoreFiles: config.ignore?.files,
+        });
 
         // Collect all diagnostics
         const fileContents: Record<string, string> = {};

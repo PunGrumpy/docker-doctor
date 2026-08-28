@@ -47,6 +47,8 @@ export default {
 
 The five valid `categories` keys are `Security`, `Performance`, `Best Practices`, `Compose`, and `Image Size`.
 
+`ignore.files` patterns match paths relative to the scan root: `**` crosses directories, while `*` and `?` stay within one path segment. Brace expansion and character classes are not supported. docker-doctor drops ignored files from discovery, so they produce no diagnostics and don't appear in the report's `project` lists.
+
 ## YAML and JSON configs
 
 If you'd rather stay in YAML (you're writing Compose files anyway), the same shape works as `docker-doctor.config.yaml` — no `package.json` or `"type": "module"` required:
