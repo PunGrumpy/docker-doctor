@@ -338,6 +338,27 @@ export const rulePageContent: Record<string, RulePageContent> = {
     why: 'Unpinned bases break the core promise of a Dockerfile: reproducibility. Debugging becomes guesswork ("it works on my rebuild"), rollbacks stop being rollbacks because rebuilding an old commit pulls a new base, and you silently absorb every change the upstream image publishes — including breaking ones and, in a registry-compromise scenario, malicious ones. Pinning turns base-image updates into a reviewable diff instead of a background surprise.',
   },
 
+  "docker-doctor/pin-service-image": {
+    bad: {
+      code: "services:\n  web:\n    image: nginx\n  cache:\n    image: redis:latest",
+      lang: "yaml",
+      title: "compose.yaml — images that mean something different every pull",
+    },
+    description:
+      "Compose services with an untagged or :latest image deploy a different container every pull. How to pin service images to a tag or digest.",
+    good: {
+      code: "services:\n  web:\n    image: nginx:1.27-alpine\n  cache:\n    image: redis:7.4-alpine",
+      lang: "yaml",
+      title: "compose.yaml — every host resolves the same image",
+    },
+    intro:
+      // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+      '`image: nginx` and `image: redis:latest` both mean "whatever the registry serves today". In a Compose file that\'s worse than in a Dockerfile, because the file _is_ the deployment: two hosts running the same file can silently run different software, and so can one host after a reboot pulls fresh. This rule flags service images with no tag or with the mutable `latest` tag. Services built from a local `build:` context are skipped, as are `${VAR}`-templated references.',
+    notes:
+      "A version tag (`nginx:1.27-alpine`) is the practical default: readable, and mutated rarely enough for most services. For supply-chain-sensitive deployments, pin the digest (`nginx:1.27-alpine@sha256:…`). A digest is immutable by construction, and the tag next to it stays as documentation. Renovate and Dependabot both understand Compose files, so pinned versions don't have to mean stale versions. The same reasoning for Dockerfile base images lives in `pin-image-version`.",
+    why: "Unpinned images break the two properties a deployment file exists to provide. Reproducibility: \"works on staging\" means nothing if production pulled a different `latest` an hour later. Rollback: re-deploying yesterday's compose file after a bad release still pulls today's image, so the rollback undoes nothing. Pinning makes the file's git history an accurate record of what actually ran, which is also what an incident review needs.",
+  },
+
   "docker-doctor/prefer-copy-over-add": {
     bad: {
       code: "FROM node:22-slim\nWORKDIR /app\nADD package.json ./\nADD src/ ./src/",

@@ -20,6 +20,7 @@ import {
 } from "../src/rules/best-practices";
 import {
   noVersionKey,
+  pinServiceImage,
   requireResourceLimits,
   requireRestartPolicy,
   useDependsOnCondition,
@@ -610,6 +611,46 @@ services:
     expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
       0
     );
+  });
+});
+
+describe("Compose Rules — pin-service-image", () => {
+  test("flags untagged and latest images, skips pinned/built/variable ones", () => {
+    const source = `services:
+  web:
+    image: nginx
+  cache:
+    image: redis:latest
+  db:
+    image: postgres:16-alpine
+  pinned:
+    image: nginx@sha256:abc123
+  built:
+    build: .
+    image: myapp
+  templated:
+    image: \${REGISTRY}/app:\${TAG}
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = pinServiceImage.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(2);
+    expect(diags[0].message).toContain("'web'");
+    expect(diags[0].message).toContain("does not specify a tag");
+    expect(diags[0].line).toBe(3);
+    expect(diags[1].message).toContain("'cache'");
+    expect(diags[1].message).toContain("'latest'");
+    expect(diags[1].line).toBe(5);
+  });
+
+  test("works without a locator", () => {
+    const diags = pinServiceImage.check(
+      { services: { web: { image: "nginx" } } },
+      "compose.yml"
+    );
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBeUndefined();
   });
 });
 

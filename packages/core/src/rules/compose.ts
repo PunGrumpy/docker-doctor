@@ -1,4 +1,6 @@
+import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
 import type { ComposeRule, Diagnostic } from "../types/index";
+import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
 export const noVersionKey: ComposeRule = {
@@ -163,9 +165,56 @@ export const useDependsOnCondition: ComposeRule = {
   message: "Use long-form depends_on with healthcheck conditions",
 };
 
+export const pinServiceImage: ComposeRule = {
+  category: "Compose",
+  check(composeContent, file, context) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const [name, config] of composeServices(composeContent)) {
+      const { image } = config;
+      // With `build:` present, `image` only names the locally built
+      // artifact — there is nothing to pin.
+      if (typeof image !== "string" || "build" in config) {
+        continue;
+      }
+
+      const ref = parseImageRef(image);
+      if (ref.isVariable) {
+        continue;
+      }
+
+      const issue = mutableRefIssue(ref);
+      if (!issue) {
+        continue;
+      }
+      const detail =
+        issue === "untagged"
+          ? `Service '${name}' image '${image}' does not specify a tag.`
+          : `Service '${name}' image '${image}' uses the mutable 'latest' tag.`;
+      diagnostics.push(
+        createDiagnostic(
+          file,
+          this.key,
+          this.defaultSeverity,
+          `${detail} Every pull may fetch a different image.`,
+          this.help,
+          context?.locate?.(["services", name, "image"])
+        )
+      );
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: "Pin the image to a specific tag or digest (e.g. `nginx:1.27-alpine`) so deploys are reproducible and a rollback actually rolls back.",
+  key: "docker-doctor/pin-service-image",
+  message: "Pin service images to a specific tag or digest",
+};
+
 export const composeRules = [
   noVersionKey,
   requireResourceLimits,
   requireRestartPolicy,
   useDependsOnCondition,
+  pinServiceImage,
 ];

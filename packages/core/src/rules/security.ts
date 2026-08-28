@@ -1,6 +1,7 @@
 import {
   collectStageAliases,
   isScratch,
+  mutableRefIssue,
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
@@ -164,24 +165,18 @@ export const pinImageVersion: DockerfileRule = {
           continue;
         }
 
-        if (!(ref.tag || ref.digest)) {
+        const issue = mutableRefIssue(ref);
+        if (issue) {
+          const detail =
+            issue === "untagged"
+              ? `Base image '${imagePart}' does not specify a tag.`
+              : `Base image '${imagePart}' uses the mutable 'latest' tag.`;
           diagnostics.push(
             createDiagnostic(
               file,
               this.key,
               this.defaultSeverity,
-              `Base image '${imagePart}' does not specify a tag. This makes builds non-deterministic.`,
-              this.help,
-              inst.line
-            )
-          );
-        } else if (ref.tag === "latest" && !ref.digest) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity,
-              `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
+              `${detail} This makes builds non-deterministic.`,
               this.help,
               inst.line
             )

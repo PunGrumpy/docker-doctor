@@ -22,6 +22,7 @@
     "require-resource-limits",
     "require-restart-policy",
     "use-depends-on-condition",
+    "pin-service-image",
     "no-privileged-service",
     "no-docker-socket-mount",
     "no-plaintext-secrets",
