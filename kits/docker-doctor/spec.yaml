@@ -4,7 +4,7 @@ name: docker-doctor
 # The kit versions independently of the CLI it installs (see README
 # "Publishing"). CLI releases auto-bump the patch; bump this by hand for
 # kit-only changes.
-version: "0.1.3"
+version: "0.1.4"
 displayName: Docker Doctor
 description: Static analysis for Dockerfiles and Compose files — installs the docker-doctor CLI and its agent skill, and tells the agent to lint before committing Docker changes.
 sourceURL: https://github.com/PunGrumpy/docker-doctor
@@ -30,7 +30,7 @@ setup:
           npm config set proxy "$HTTP_PROXY"
           npm config set https-proxy "$HTTP_PROXY"
         fi
-        npm install -g @docker-doctor/cli@0.4.3
+        npm install -g @docker-doctor/cli@0.4.4
         docker-doctor --version
       user: "0"
       description: "Install pinned @docker-doctor/cli from registry.npmjs.org"
