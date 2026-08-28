@@ -73,6 +73,32 @@ export const preferSlimBase: DockerfileRule = {
   message: "Prefer slim, alpine, or distroless base images",
 };
 
+const BUILDKIT_MOUNT_FLAG_RE = /--mount=(?<spec>\S+)/gu;
+
+// BuildKit accepts `target`, `dst` and `destination` as synonyms.
+const CACHE_TARGET_KEY_RE = /^(?:target|dst|destination)=/u;
+
+// A `RUN --mount=type=cache,target=<dir>` keeps <dir> in the cache mount, not
+// in the image layer — cleanup commands for that dir are unnecessary (and the
+// Docker-documented apt pattern deliberately omits them).
+const cacheMountTargets = (args: string): string[] =>
+  [...args.matchAll(BUILDKIT_MOUNT_FLAG_RE)]
+    .map((match) => (match.groups?.spec ?? "").split(","))
+    .filter((options) => options.includes("type=cache"))
+    .flatMap((options) =>
+      options
+        .filter((option) => CACHE_TARGET_KEY_RE.test(option))
+        .map((option) => option.slice(option.indexOf("=") + 1))
+    );
+
+const APT_CACHE_DIRS = ["/var/lib/apt", "/var/cache/apt"];
+const APK_CACHE_DIRS = ["/var/cache/apk", "/etc/apk/cache"];
+
+const hasCacheMountFor = (args: string, cacheDirs: string[]): boolean =>
+  cacheMountTargets(args).some((target) =>
+    cacheDirs.some((dir) => target === dir || target.startsWith(`${dir}/`))
+  );
+
 export const cleanPackageCache: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
@@ -85,7 +111,8 @@ export const cleanPackageCache: DockerfileRule = {
         // check apt-get install without cleanup
         if (
           args.includes("apt-get install") &&
-          !args.includes("rm -rf /var/lib/apt/lists")
+          !args.includes("rm -rf /var/lib/apt/lists") &&
+          !hasCacheMountFor(args, APT_CACHE_DIRS)
         ) {
           diagnostics.push(
             createDiagnostic(
@@ -103,7 +130,8 @@ export const cleanPackageCache: DockerfileRule = {
         if (
           args.includes("apk add") &&
           !args.includes("--no-cache") &&
-          !args.includes("rm -rf /var/cache/apk")
+          !args.includes("rm -rf /var/cache/apk") &&
+          !hasCacheMountFor(args, APK_CACHE_DIRS)
         ) {
           diagnostics.push(
             createDiagnostic(

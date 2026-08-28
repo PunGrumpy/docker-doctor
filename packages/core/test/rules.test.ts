@@ -592,6 +592,43 @@ describe("Image Size Rules", () => {
     expect(cleanPackageCache.check(apkNoCache, "Dockerfile")).toHaveLength(0);
   });
 
+  test("clean-package-cache accepts BuildKit cache mounts as cleanup", () => {
+    // The Docker-documented apt pattern: caches live in the mount, not the
+    // layer, so no `rm -rf` is needed.
+    const aptCacheMount = parseDockerfile(`
+      RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \\
+          --mount=type=cache,target=/var/lib/apt,sharing=locked \\
+          apt-get update && apt-get install -y git
+    `);
+    expect(cleanPackageCache.check(aptCacheMount, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const apkCacheMount = parseDockerfile(`
+      RUN --mount=type=cache,target=/var/cache/apk \\
+          apk add curl
+    `);
+    expect(cleanPackageCache.check(apkCacheMount, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    // A cache mount elsewhere does not excuse the missing cleanup.
+    const unrelatedMount = parseDockerfile(`
+      RUN --mount=type=cache,target=/root/.npm \\
+          apt-get update && apt-get install -y git
+    `);
+    expect(cleanPackageCache.check(unrelatedMount, "Dockerfile")).toHaveLength(
+      1
+    );
+
+    // A bind mount to an apt dir is not a cache mount.
+    const bindMount = parseDockerfile(`
+      RUN --mount=type=bind,target=/var/lib/apt \\
+          apt-get update && apt-get install -y git
+    `);
+    expect(cleanPackageCache.check(bindMount, "Dockerfile")).toHaveLength(1);
+  });
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder
