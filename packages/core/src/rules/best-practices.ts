@@ -241,7 +241,6 @@ export const usePipefail: DockerfileRule = {
       if (inst.instruction !== "RUN") {
         continue;
       }
-      // args strips interior comment lines; raw keeps them.
       const { args } = inst;
       if (!HAS_PIPE_RE.test(args)) {
         continue;

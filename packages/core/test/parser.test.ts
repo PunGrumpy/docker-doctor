@@ -107,6 +107,33 @@ EOF
     expect(parsed[1].raw).toContain("echo hello");
   });
 
+  test("keeps comment lines inside a continuation out of raw and args", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN apt-get update && apt-get install -y \\
+  curl \\
+  # tools below are build-only
+  git \\
+  tmux
+    `);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[1].args).toBe(
+      "apt-get update && apt-get install -y curl git tmux"
+    );
+    expect(parsed[1].raw).not.toContain("build-only");
+  });
+
+  test("keeps comment-looking lines inside a heredoc body in raw", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN <<EOF
+# this is shell content, not a Dockerfile comment
+echo hello
+EOF
+    `);
+    expect(parsed[1].raw).toContain("# this is shell content");
+  });
+
   test("handles CRLF line endings", () => {
     const parsed = parseDockerfile("FROM node:22\r\nUSER node\r\n");
     expect(parsed).toHaveLength(2);
