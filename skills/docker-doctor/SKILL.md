@@ -51,7 +51,7 @@ npx @docker-doctor/cli@latest . --verbose
 | --- | --- |
 | `.` | Directory to scan (default `.`) |
 | `--verbose`, `-v` | Show affected file, line, explanation, and fix hint per diagnostic |
-| `--score`, `-s` | Output only the numeric score (exits 1 if score < 50) |
+| `--score`, `-s` | Output only the numeric score (exits 1 if any error-severity diagnostic) |
 | `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic) |
 | `--config <path>`, `-c` | Use a custom config file |
 | `rules list` | List every rule with its category, default severity, and description |
