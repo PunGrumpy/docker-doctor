@@ -1,5 +1,6 @@
 import {
   collectStageAliases,
+  isHardenedImage,
   isScratch,
   parseFromArgs,
   parseImageRef,
@@ -27,6 +28,12 @@ export const preferSlimBase: DockerfileRule = {
         const ref = parseImageRef(imagePart);
 
         if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+          continue;
+        }
+
+        // Docker Hardened Images are minimal by construction (dev variants
+        // included), whatever their name and tag say.
+        if (isHardenedImage(imagePart)) {
           continue;
         }
 

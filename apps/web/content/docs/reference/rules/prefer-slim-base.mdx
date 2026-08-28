@@ -43,6 +43,8 @@ Choosing between the variants:
 
 If a build tool is missing in a slim base, install it in the build stage — not by retreating to the full image for production.
 
+Images pulled from the `dhi.io` registry ([Docker Hardened Images](https://docs.docker.com/dhi/)) are minimal by construction, `-dev` variants included, so this rule skips them.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/prefer-slim-base`

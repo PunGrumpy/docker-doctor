@@ -55,6 +55,28 @@ export const parseImageRef = (ref: string): ImageRef => {
 };
 
 /**
+ * Docker Hardened Images (free catalog since Dec 2025) are pulled from the
+ * dhi.io registry. Enterprise mirrors live under a plain Docker Hub org
+ * namespace and cannot be recognized from the ref alone, so they keep the
+ * default rule behavior.
+ */
+export const isHardenedImage = (imagePart: string): boolean =>
+  imagePart.toLowerCase().startsWith("dhi.io/");
+
+/**
+ * DHI runtime variants ship no shell or package manager and run as a
+ * nonroot user by default. The `-dev` variants keep a shell for build
+ * stages and are not assumed to be nonroot.
+ */
+export const isHardenedRuntimeImage = (imagePart: string): boolean => {
+  if (!isHardenedImage(imagePart)) {
+    return false;
+  }
+  const { tag } = parseImageRef(imagePart);
+  return !(tag === "dev" || tag?.endsWith("-dev"));
+};
+
+/**
  * Why a reference would resolve differently over time: no tag at all, or
  * the mutable `latest` tag without a digest. `undefined` means the ref is
  * pinned. Shared by every pinning rule (base images, service images,

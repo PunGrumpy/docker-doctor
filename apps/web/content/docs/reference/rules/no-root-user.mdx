@@ -51,6 +51,8 @@ USER appuser
 
 Switch users **after** the instructions that need root (package installs, `chown`), and remember that `USER` resets to root at every new `FROM` — the final stage needs its own `USER` line. If the app must bind a port below 1024, listen on a high port instead and map it (`-p 80:8080`).
 
+Runtime variants of [Docker Hardened Images](https://docs.docker.com/dhi/) (the `dhi.io` registry) default to a nonroot user, so this rule does not report them. A `-dev` variant in the final stage still reports.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/no-root-user`
