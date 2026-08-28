@@ -47,7 +47,7 @@ export default {
 
 The five valid `categories` keys are `Security`, `Performance`, `Best Practices`, `Compose`, and `Image Size`.
 
-`ignore.files` patterns match paths relative to the scan root: `**` crosses directories, while `*` and `?` stay within one path segment. Brace expansion and character classes are not supported. Ignored files are dropped from discovery entirely, so they produce no diagnostics and don't appear in the report's `project` lists.
+`ignore.files` patterns match paths relative to the scan root: `**` crosses directories, while `*` and `?` stay within one path segment. Brace expansion and character classes are not supported. docker-doctor drops ignored files from discovery, so they produce no diagnostics and don't appear in the report's `project` lists.
 
 ## YAML and JSON configs
 
