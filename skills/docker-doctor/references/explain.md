@@ -63,7 +63,7 @@ Match the change to the intent — prefer the narrowest one:
 - **User disagrees with one rule / it's a false positive** → set it off in `rules`: `"docker-doctor/<key>": "off"`. The rule stops running everywhere. This is the default for "I don't want this rule".
 - **Rule is fine but wrong severity** → set `"docker-doctor/<key>": "warning"` (or `"error"` / `"info"`) in `rules`. This works today via the per-rule override.
 - **A whole area is unwanted** (e.g. all image-size rules) → set the category off: `categories: { "Image Size": "off" }`. This is the only working `categories` value.
-- **A specific file should be exempt from everything** → there is currently no way to do this; `ignore.files` is unimplemented. Say so rather than suggesting it.
+- **A specific file should be exempt from everything** → add a glob to `ignore.files` (e.g. `ignore: { files: ["vendored/**"] }`). Matching files are dropped from discovery entirely, so no rule sees them and they leave the report. `**` crosses directories; `*` and `?` stay within one path segment.
 
 How this actually combines: each rule's default severity can be overridden per-rule via `rules`. Separately, a whole category can be turned `"off"` via `categories`, which drops every diagnostic in that category regardless of per-rule settings. There is no severity cascade between `categories` and `rules` beyond that "off" check — a non-"off" `categories` value does nothing.
 

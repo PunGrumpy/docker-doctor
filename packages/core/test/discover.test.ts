@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { discoverProject } from "../src/project-info/discover";
+import { createIgnoreMatcher } from "../src/project-info/ignore";
 
 // Enough breadth and depth that a concurrent walk interleaves subtrees.
 const DIRS = [
@@ -64,5 +65,49 @@ describe("discoverProject", () => {
     } finally {
       cleanup();
     }
+  });
+
+  test("ignoreFiles excludes matches from every file list", async () => {
+    const { root, cleanup } = makeProject();
+    try {
+      const project = await discoverProject(root, {
+        ignoreFiles: ["alpha/**", "**/compose.yaml"],
+      });
+
+      expect(project.dockerfiles.some((f) => f.startsWith("alpha/"))).toBe(
+        false
+      );
+      expect(project.dockerfiles).toHaveLength(DIRS.length - 1);
+      expect(project.composeFiles).toEqual([]);
+      expect(
+        (project.dockerignores ?? []).some((f) => f.startsWith("alpha/"))
+      ).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("createIgnoreMatcher", () => {
+  test("supports the documented glob subset", () => {
+    const matches = createIgnoreMatcher([
+      "examples/**/Dockerfile",
+      "*.dockerfile",
+      "services/?/compose.yml",
+    ]);
+
+    expect(matches("examples/Dockerfile")).toBe(true);
+    expect(matches("examples/a/b/Dockerfile")).toBe(true);
+    expect(matches("other/Dockerfile")).toBe(false);
+    expect(matches("api.dockerfile")).toBe(true);
+    // `*` stays within one path segment.
+    expect(matches("nested/api.dockerfile")).toBe(false);
+    expect(matches("services/a/compose.yml")).toBe(true);
+    expect(matches("services/ab/compose.yml")).toBe(false);
+  });
+
+  test("no patterns matches nothing", () => {
+    expect(createIgnoreMatcher()("Dockerfile")).toBe(false);
+    expect(createIgnoreMatcher([])("Dockerfile")).toBe(false);
   });
 });

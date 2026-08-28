@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { ProjectInfo } from "../types/index";
+import { createIgnoreMatcher } from "./ignore";
 
 const walk = async (
   dir: string,
@@ -31,18 +32,24 @@ const walk = async (
 };
 
 export const discoverProject = async (
-  rootDir: string
+  rootDir: string,
+  options?: { ignoreFiles?: readonly string[] }
 ): Promise<ProjectInfo> => {
   const allFiles = await walk(rootDir);
   const dockerfiles: string[] = [];
   const composeFiles: string[] = [];
   const dockerignores: string[] = [];
+  const isIgnored = createIgnoreMatcher(options?.ignoreFiles);
 
   for (const file of allFiles) {
+    const relative = path.relative(rootDir, file);
+    if (isIgnored(relative)) {
+      continue;
+    }
     const base = path.basename(file).toLowerCase();
 
     if (base === ".dockerignore") {
-      dockerignores.push(path.relative(rootDir, file));
+      dockerignores.push(relative);
     }
 
     // Match Dockerfile, Dockerfile.*, *.dockerfile
@@ -51,7 +58,7 @@ export const discoverProject = async (
       base.startsWith("dockerfile.") ||
       base.endsWith(".dockerfile")
     ) {
-      dockerfiles.push(path.relative(rootDir, file));
+      dockerfiles.push(relative);
     }
 
     // Match docker-compose.yml, docker-compose.*.yml, compose.yml, compose.*.yml, and yaml extensions
@@ -63,7 +70,7 @@ export const discoverProject = async (
       ((base.startsWith("docker-compose.") || base.startsWith("compose.")) &&
         (base.endsWith(".yml") || base.endsWith(".yaml")))
     ) {
-      composeFiles.push(path.relative(rootDir, file));
+      composeFiles.push(relative);
     }
   }
 

@@ -177,6 +177,25 @@ describe("categories config", () => {
   });
 });
 
+describe("ignore.files config", () => {
+  test("ignored files are excluded from the scan and the report", async () => {
+    // The vendored/ Dockerfile holds an error-severity finding; ignoring it
+    // must remove both the diagnostics and the file from the report.
+    const { exitCode, stdout } = await runCli([
+      fixture("with-ignore-config"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(0);
+    const report = JSON.parse(stdout);
+    expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
+    expect(
+      report.diagnostics.some((d: { file: string }) =>
+        d.file.startsWith("vendored/")
+      )
+    ).toBe(false);
+  });
+});
+
 describe("unknown config keys", () => {
   test("warns on stderr without breaking the --json stdout contract", async () => {
     const { exitCode, stderr, stdout } = await runCli([
