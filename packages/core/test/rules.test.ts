@@ -626,6 +626,22 @@ services:
     expect(diags).toHaveLength(0);
   });
 
+  test("a service with a null body is still checked", () => {
+    const source =
+      "services:\n  web:\n  db:\n    image: postgres:16-alpine\n    restart: unless-stopped\n";
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = requireRestartPolicy.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("'web'");
+    expect(diags[0].line).toBe(2);
+
+    expect(
+      requireResourceLimits.check(composeContent, "compose.yml")
+    ).toHaveLength(2);
+  });
+
   test("use-depends-on-condition", () => {
     const shortForm = {
       services: {

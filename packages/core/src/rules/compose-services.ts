@@ -1,6 +1,9 @@
 /**
- * Narrows an unknown compose document to its service entries. Services with
- * a null/scalar body are skipped, matching the other compose rules.
+ * Narrows an unknown compose document to its service entries. A service
+ * with a null body (`web:` with nothing under it) is returned as an empty
+ * config so rules still check it: it is the least-configured service in
+ * the file, not a service to skip. Scalar and array bodies are invalid
+ * compose and are dropped.
  */
 export const composeServices = (
   composeContent: unknown
@@ -16,8 +19,14 @@ export const composeServices = (
   if (!services || typeof services !== "object") {
     return [];
   }
-  return Object.entries(services).filter(
-    (entry): entry is [string, Record<string, unknown>] =>
-      Boolean(entry[1]) && typeof entry[1] === "object"
-  );
+
+  const entries: [string, Record<string, unknown>][] = [];
+  for (const [name, config] of Object.entries(services)) {
+    if (config === null || config === undefined) {
+      entries.push([name, {}]);
+    } else if (typeof config === "object" && !Array.isArray(config)) {
+      entries.push([name, config as Record<string, unknown>]);
+    }
+  }
+  return entries;
 };

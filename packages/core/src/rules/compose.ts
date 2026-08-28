@@ -35,39 +35,24 @@ export const requireResourceLimits: ComposeRule = {
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
-    if (
-      composeContent &&
-      typeof composeContent === "object" &&
-      "services" in composeContent
-    ) {
-      const { services } = composeContent;
-      if (services && typeof services === "object") {
-        for (const [name, config] of Object.entries(services)) {
-          if (config && typeof config === "object") {
-            const deploy = (config as Record<string, unknown>).deploy as
-              | Record<string, unknown>
-              | undefined;
-            const resources = deploy?.resources as
-              | Record<string, unknown>
-              | undefined;
-            const limits = resources?.limits as
-              | Record<string, unknown>
-              | undefined;
+    for (const [name, config] of composeServices(composeContent)) {
+      const deploy = config.deploy as Record<string, unknown> | undefined;
+      const resources = deploy?.resources as
+        | Record<string, unknown>
+        | undefined;
+      const limits = resources?.limits as Record<string, unknown> | undefined;
 
-            if (!limits || (!limits.cpus && !limits.memory)) {
-              diagnostics.push(
-                createDiagnostic(
-                  file,
-                  this.key,
-                  this.defaultSeverity,
-                  `Service '${name}' does not have CPU or memory limits defined. A resource leak in this service could crash the host.`,
-                  this.help,
-                  context?.locate?.(["services", name])
-                )
-              );
-            }
-          }
-        }
+      if (!limits || (!limits.cpus && !limits.memory)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Service '${name}' does not have CPU or memory limits defined. A resource leak in this service could crash the host.`,
+            this.help,
+            context?.locate?.(["services", name])
+          )
+        );
       }
     }
 
@@ -84,35 +69,22 @@ export const requireRestartPolicy: ComposeRule = {
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
-    if (
-      composeContent &&
-      typeof composeContent === "object" &&
-      "services" in composeContent
-    ) {
-      const { services } = composeContent;
-      if (services && typeof services === "object") {
-        for (const [name, config] of Object.entries(services)) {
-          if (config && typeof config === "object") {
-            const hasRestart = "restart" in config;
-            const deploy = (config as Record<string, unknown>).deploy as
-              | Record<string, unknown>
-              | undefined;
-            const hasDeployRestart = deploy?.restart_policy !== undefined;
+    for (const [name, config] of composeServices(composeContent)) {
+      const hasRestart = "restart" in config;
+      const deploy = config.deploy as Record<string, unknown> | undefined;
+      const hasDeployRestart = deploy?.restart_policy !== undefined;
 
-            if (!hasRestart && !hasDeployRestart) {
-              diagnostics.push(
-                createDiagnostic(
-                  file,
-                  this.key,
-                  this.defaultSeverity,
-                  `Service '${name}' has no restart policy configured. It will not restart if it crashes or if the host reboots.`,
-                  this.help,
-                  context?.locate?.(["services", name])
-                )
-              );
-            }
-          }
-        }
+      if (!hasRestart && !hasDeployRestart) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Service '${name}' has no restart policy configured. It will not restart if it crashes or if the host reboots.`,
+            this.help,
+            context?.locate?.(["services", name])
+          )
+        );
       }
     }
 
@@ -129,31 +101,20 @@ export const useDependsOnCondition: ComposeRule = {
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
-    if (
-      composeContent &&
-      typeof composeContent === "object" &&
-      "services" in composeContent
-    ) {
-      const { services } = composeContent;
-      if (services && typeof services === "object") {
-        for (const [name, config] of Object.entries(services)) {
-          if (config && typeof config === "object") {
-            const dependsOn = (config as Record<string, unknown>).depends_on;
-            if (dependsOn && Array.isArray(dependsOn)) {
-              diagnostics.push(
-                createDiagnostic(
-                  file,
-                  this.key,
-                  this.defaultSeverity,
-                  `Service '${name}' uses shorthand depends_on list. This only checks if containers are started, not if they are ready/healthy.`,
-                  this.help,
-                  context?.locate?.(["services", name, "depends_on"]) ??
-                    context?.locate?.(["services", name])
-                )
-              );
-            }
-          }
-        }
+    for (const [name, config] of composeServices(composeContent)) {
+      const dependsOn = config.depends_on;
+      if (dependsOn && Array.isArray(dependsOn)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Service '${name}' uses shorthand depends_on list. This only checks if containers are started, not if they are ready/healthy.`,
+            this.help,
+            context?.locate?.(["services", name, "depends_on"]) ??
+              context?.locate?.(["services", name])
+          )
+        );
       }
     }
 
