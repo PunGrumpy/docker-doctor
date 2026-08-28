@@ -1,5 +1,9 @@
 import { describe, test, expect } from "bun:test";
 
+import {
+  createComposeLocator,
+  parseCompose,
+} from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import { runComposeRules } from "../src/runners/compose-runner";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
@@ -114,6 +118,24 @@ describe("runComposeRules", () => {
     );
     expect(restartDiag).toBeDefined();
     expect(restartDiag?.severity).toBe("warning");
+  });
+
+  test("forwards a locator so diagnostics carry line numbers", () => {
+    const source = 'version: "3.8"\nservices:\n  web:\n    image: node:22\n';
+    const diagnostics = runComposeRules(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      undefined,
+      undefined,
+      createComposeLocator(source)
+    );
+    const versionDiag = findByRule(diagnostics, "docker-doctor/no-version-key");
+    const restartDiag = findByRule(
+      diagnostics,
+      "docker-doctor/require-restart-policy"
+    );
+    expect(versionDiag?.line).toBe(1);
+    expect(restartDiag?.line).toBe(3);
   });
 
   test('rules: { "docker-doctor/require-restart-policy": "off" } skips that rule, leaves others', () => {

@@ -3,7 +3,7 @@ import { createDiagnostic } from "./create-diagnostic";
 
 export const noVersionKey: ComposeRule = {
   category: "Compose",
-  check(composeContent, file) {
+  check(composeContent, file, context) {
     if (
       composeContent &&
       typeof composeContent === "object" &&
@@ -15,7 +15,8 @@ export const noVersionKey: ComposeRule = {
           this.key,
           this.defaultSeverity,
           "The 'version' property is deprecated. Remove it to use standard Compose spec behavior.",
-          this.help
+          this.help,
+          context?.locate?.(["version"])
         ),
       ];
     }
@@ -29,7 +30,7 @@ export const noVersionKey: ComposeRule = {
 
 export const requireResourceLimits: ComposeRule = {
   category: "Compose",
-  check(composeContent, file) {
+  check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
     if (
@@ -58,7 +59,8 @@ export const requireResourceLimits: ComposeRule = {
                   this.key,
                   this.defaultSeverity,
                   `Service '${name}' does not have CPU or memory limits defined. A resource leak in this service could crash the host.`,
-                  this.help
+                  this.help,
+                  context?.locate?.(["services", name])
                 )
               );
             }
@@ -77,7 +79,7 @@ export const requireResourceLimits: ComposeRule = {
 
 export const requireRestartPolicy: ComposeRule = {
   category: "Compose",
-  check(composeContent, file) {
+  check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
     if (
@@ -102,7 +104,8 @@ export const requireRestartPolicy: ComposeRule = {
                   this.key,
                   this.defaultSeverity,
                   `Service '${name}' has no restart policy configured. It will not restart if it crashes or if the host reboots.`,
-                  this.help
+                  this.help,
+                  context?.locate?.(["services", name])
                 )
               );
             }
@@ -121,7 +124,7 @@ export const requireRestartPolicy: ComposeRule = {
 
 export const useDependsOnCondition: ComposeRule = {
   category: "Compose",
-  check(composeContent, file) {
+  check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
     if (
@@ -141,7 +144,9 @@ export const useDependsOnCondition: ComposeRule = {
                   this.key,
                   this.defaultSeverity,
                   `Service '${name}' uses shorthand depends_on list. This only checks if containers are started, not if they are ready/healthy.`,
-                  this.help
+                  this.help,
+                  context?.locate?.(["services", name, "depends_on"]) ??
+                    context?.locate?.(["services", name])
                 )
               );
             }

@@ -1,12 +1,13 @@
 import { allComposeRules } from "../rules/index";
-import type { Diagnostic, RuleSeverity } from "../types/index";
+import type { ComposeLocator, Diagnostic, RuleSeverity } from "../types/index";
 import { resolveSeverity } from "./resolve-severity";
 
 export const runComposeRules = (
   composeContent: unknown,
   file: string,
   rulesConfig?: Record<string, RuleSeverity>,
-  categoriesConfig?: Record<string, RuleSeverity>
+  categoriesConfig?: Record<string, RuleSeverity>,
+  locate?: ComposeLocator
 ): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
 
@@ -16,7 +17,7 @@ export const runComposeRules = (
       continue;
     }
 
-    const ruleDiagnostics = rule.check(composeContent, file);
+    const ruleDiagnostics = rule.check(composeContent, file, { locate });
 
     // Override severity if config resolved to something other than default
     if (severity !== rule.defaultSeverity) {
