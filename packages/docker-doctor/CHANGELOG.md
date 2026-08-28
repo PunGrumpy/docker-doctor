@@ -1,5 +1,13 @@
 # @docker-doctor/cli
 
+## 0.4.4
+
+### Patch Changes
+
+- 035da22: `clean-package-cache` no longer flags `RUN` instructions that keep apt/apk caches in BuildKit cache mounts (`--mount=type=cache,target=/var/cache/apt`, the pattern Docker documents). A cache mount elsewhere, or a bind mount, still warns.
+- 186801a: Compose diagnostics now include the line number of the offending service or key, so terminal output and the GitHub Action's file links point to the correct line instead of the top of the file. Keys that only exist through YAML merge keys (`<<: *anchor`) fall back to the service line.
+- 74eba7b: Comment lines inside a line continuation no longer appear in an instruction's `raw` text. They made `sort-multiline-args` misread commented package lists as unsorted. Heredoc bodies keep their `#` lines, since those are shell content.
+
 ## 0.4.3
 
 ### Patch Changes
