@@ -150,6 +150,26 @@ describe("--score contract", () => {
     const { stdout } = await runCli([fixture("clean"), "--score"]);
     expect(Number(stdout.trim())).toBeGreaterThanOrEqual(50);
   });
+
+  test("--score exits 1 when an error-severity diagnostic is present", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("with-error"),
+      "--score",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
+  });
+
+  test("--score exits 0 for a low score with no error-severity diagnostics", async () => {
+    // The same project must pass or fail identically in every output mode;
+    // score alone never drives the exit code.
+    const { exitCode, stdout } = await runCli([
+      fixture("low-score-no-errors"),
+      "--score",
+    ]);
+    expect(Number(stdout.trim())).toBeLessThan(50);
+    expect(exitCode).toBe(0);
+  });
 });
 
 describe("empty project", () => {

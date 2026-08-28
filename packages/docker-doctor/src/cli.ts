@@ -729,14 +729,17 @@ program
         reportScanFailures(failures);
         const scanIncomplete = failures.length > 0;
 
+        // Every output mode gates on the same condition, so the same
+        // project cannot pass in one mode and fail in another.
+        const hasErrors = diagnostics.some((d) => d.severity === "error");
+
         if (options.score) {
           console.log(score);
-          process.exitCode = scanExitCode(scanIncomplete, score < 50);
+          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
           return;
         } else if (options.json) {
           const report = toJsonReport(diagnostics, score, label, project);
           console.log(JSON.stringify(report, null, 2));
-          const hasErrors = diagnostics.some((d) => d.severity === "error");
           process.exitCode = scanExitCode(scanIncomplete, hasErrors);
           return;
         }
@@ -748,9 +751,6 @@ program
           options.verbose,
           fileContents
         );
-
-        // Exit with non-zero code if there are any error severity diagnostics
-        const hasErrors = diagnostics.some((d) => d.severity === "error");
 
         if (process.stdout.isTTY && process.stdin.isTTY) {
           await runInteractiveWizard({

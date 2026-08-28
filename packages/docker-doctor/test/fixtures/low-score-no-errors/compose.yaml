@@ -1,0 +1,31 @@
+services:
+  svc01:
+    image: nginx
+  svc02:
+    image: nginx
+  svc03:
+    image: nginx
+  svc04:
+    image: nginx
+  svc05:
+    image: nginx
+  svc06:
+    image: nginx
+  svc07:
+    image: nginx
+  svc08:
+    image: nginx
+  svc09:
+    image: nginx
+  svc10:
+    image: nginx
+  svc11:
+    image: nginx
+  svc12:
+    image: nginx
+  svc13:
+    image: nginx
+  svc14:
+    image: nginx
+  svc15:
+    image: nginx

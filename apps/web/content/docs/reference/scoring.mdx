@@ -42,4 +42,4 @@ The old `max(0, 100 - penalty)` formula saturated at 0 once penalty reached 100 
 npx @docker-doctor/cli@latest . --score
 ```
 
-Prints only the numeric score and exits non-zero if it's below 50 — useful as a lightweight CI gate alongside the default scan's error-based exit code.
+Prints only the numeric score. The exit code follows the same rule as every other mode: non-zero when any `error`-severity diagnostic is present, so a CI gate behaves identically whichever output you pick.
