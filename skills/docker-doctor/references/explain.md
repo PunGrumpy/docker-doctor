@@ -54,7 +54,7 @@ export default {
 };
 ```
 
-The config also accepts an `ignore.files` array of glob patterns. docker-doctor drops matching files from discovery before any rule runs — see the decision guide below for when to reach for it.
+The config also accepts an `ignore.files` array of glob patterns. docker-doctor drops matching files from discovery before any rule runs. The decision guide below covers when to use it.
 
 ## Decision guide
 
