@@ -82,7 +82,13 @@ jobs:
       - name: Install Docker Sandboxes CLI
         run: |
           curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
-          sudo apt-get install -y docker-sbx
+          # docker-sbx is pinned: 0.39.0 changed `sbx kit push` to read only
+          # the sbx credential store, which `docker login` does not populate
+          # on a headless runner, so every push since 2026-08-19 failed with
+          # "no default account profile set: secret not found". 0.42.0
+          # advertises reading `docker login` credentials again — re-test and
+          # unpin once it reaches the stable apt channel.
+          sudo apt-get install -y "docker-sbx=0.38.0-1~ubuntu.24.04~noble"
       - name: Check whether the tag already exists
         id: exists
         run: |
