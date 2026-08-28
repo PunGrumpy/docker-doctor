@@ -5,10 +5,12 @@ export interface DockerfileInstruction {
   raw: string;
 }
 
+export type DiagnosticSeverity = "error" | "warning" | "info";
+
 export interface Diagnostic {
   file: string;
   rule: string;
-  severity: "error" | "warning" | "info";
+  severity: DiagnosticSeverity;
   message: string;
   help: string;
   line?: number;
@@ -34,12 +36,13 @@ export type RuleCategory =
   | "Best Practices"
   | "Compose"
   | "Image Size";
-export type RuleSeverity = "error" | "warning" | "info" | "off";
+export type RuleSeverity = DiagnosticSeverity | "off";
 
 export interface RuleDefinition {
   key: string;
   category: RuleCategory;
-  defaultSeverity: RuleSeverity;
+  // "off" is a config-only severity: a rule's own default is always emitting.
+  defaultSeverity: DiagnosticSeverity;
   message: string;
   help: string;
 }

@@ -1,13 +1,5 @@
 import type { Diagnostic, DockerfileRule } from "../types/index";
-
-const createDiagnostic = (
-  file: string,
-  ruleKey: string,
-  severity: "error" | "warning" | "info",
-  message: string,
-  help: string,
-  line?: number
-): Diagnostic => ({ file, help, line, message, rule: ruleKey, severity });
+import { createDiagnostic } from "./create-diagnostic";
 
 export const useMultiStage: DockerfileRule = {
   category: "Performance",
@@ -32,7 +24,7 @@ export const useMultiStage: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             "Only one build stage (FROM) was detected, but build instructions were found. Multi-stage builds can significantly reduce final image size.",
             this.help,
             instructions.find((inst) => inst.instruction === "FROM")?.line || 1
@@ -94,7 +86,7 @@ export const orderLayers: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Running package installation command '${inst.args}' after copying application files (at line ${copyAllLine}). This invalidates the cache on any code changes.`,
               this.help,
               inst.line
@@ -131,7 +123,7 @@ export const minimizeLayers: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Found ${consecutiveRunCount} consecutive RUN instructions starting at line ${firstRunLine}. Consider combining them into a single RUN layer.`,
               this.help,
               firstRunLine
@@ -147,7 +139,7 @@ export const minimizeLayers: DockerfileRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           `Found ${consecutiveRunCount} consecutive RUN instructions starting at line ${firstRunLine}. Consider combining them into a single RUN layer.`,
           this.help,
           firstRunLine
@@ -209,7 +201,7 @@ export const useDockerignore: DockerfileRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           "Using COPY/ADD with a wildcard or directory, but no .dockerignore file was found next to the Dockerfile or at the project root. This can copy local build folders and secrets.",
           this.help,
           1

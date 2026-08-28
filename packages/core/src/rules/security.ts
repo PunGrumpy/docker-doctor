@@ -5,15 +5,7 @@ import {
   parseImageRef,
 } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
-
-const createDiagnostic = (
-  file: string,
-  ruleKey: string,
-  severity: "error" | "warning" | "info",
-  message: string,
-  help: string,
-  line?: number
-): Diagnostic => ({ file, help, line, message, rule: ruleKey, severity });
+import { createDiagnostic } from "./create-diagnostic";
 
 // USER accepts "user", "uid", "user:group" and "uid:gid". Only the user half
 // decides whether the container runs as root; the group half is irrelevant.
@@ -55,7 +47,7 @@ export const noRootUser: DockerfileRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           "The container runs as root. Running as root allows potential container breakout vulnerabilities.",
           this.help,
           lastUserLine
@@ -103,7 +95,7 @@ export const noSecretsInEnv: DockerfileRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
                   this.help,
                   inst.line
@@ -137,7 +129,7 @@ export const noSecretsInEnv: DockerfileRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
                   this.help,
                   inst.line
@@ -184,7 +176,7 @@ export const pinImageVersion: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Base image '${imagePart}' does not specify a tag. This makes builds non-deterministic.`,
               this.help,
               inst.line
@@ -195,7 +187,7 @@ export const pinImageVersion: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Base image '${imagePart}' uses the mutable 'latest' tag. This makes builds non-deterministic.`,
               this.help,
               inst.line
@@ -232,7 +224,7 @@ export const noAddRemote: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `ADD instruction uses a remote URL '${src}'. Remote files added via ADD cannot be cleaned up in later layers, increasing image size.`,
               this.help,
               inst.line

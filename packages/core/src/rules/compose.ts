@@ -1,12 +1,5 @@
-import type { Diagnostic, ComposeRule } from "../types/index";
-
-const createDiagnostic = (
-  file: string,
-  ruleKey: string,
-  severity: "error" | "warning" | "info",
-  message: string,
-  help: string
-): Diagnostic => ({ file, help, message, rule: ruleKey, severity });
+import type { ComposeRule, Diagnostic } from "../types/index";
+import { createDiagnostic } from "./create-diagnostic";
 
 export const noVersionKey: ComposeRule = {
   category: "Compose",
@@ -20,7 +13,7 @@ export const noVersionKey: ComposeRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           "The 'version' property is deprecated. Remove it to use standard Compose spec behavior.",
           this.help
         ),
@@ -63,7 +56,7 @@ export const requireResourceLimits: ComposeRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   `Service '${name}' does not have CPU or memory limits defined. A resource leak in this service could crash the host.`,
                   this.help
                 )
@@ -107,7 +100,7 @@ export const requireRestartPolicy: ComposeRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   `Service '${name}' has no restart policy configured. It will not restart if it crashes or if the host reboots.`,
                   this.help
                 )
@@ -146,7 +139,7 @@ export const useDependsOnCondition: ComposeRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   `Service '${name}' uses shorthand depends_on list. This only checks if containers are started, not if they are ready/healthy.`,
                   this.help
                 )

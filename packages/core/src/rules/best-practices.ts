@@ -1,15 +1,7 @@
 import { parseExecForm } from "../parsers/exec-form";
 import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
-
-const createDiagnostic = (
-  file: string,
-  ruleKey: string,
-  severity: "error" | "warning" | "info",
-  message: string,
-  help: string,
-  line?: number
-): Diagnostic => ({ file, help, line, message, rule: ruleKey, severity });
+import { createDiagnostic } from "./create-diagnostic";
 
 export const requireHealthcheck: DockerfileRule = {
   category: "Best Practices",
@@ -31,7 +23,7 @@ export const requireHealthcheck: DockerfileRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           "No HEALTHCHECK instruction found. Containers running services should expose healthchecks to enable auto-healing.",
           this.help,
           1
@@ -74,7 +66,7 @@ export const preferCopyOverAdd: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `ADD instruction used for regular files: '${inst.args}'. COPY is simpler and less prone to magic side effects.`,
               this.help,
               inst.line
@@ -107,7 +99,7 @@ export const useExecForm: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
             this.help,
             inst.line
@@ -133,7 +125,7 @@ export const requireLabels: DockerfileRule = {
         createDiagnostic(
           file,
           this.key,
-          this.defaultSeverity as "error" | "warning" | "info",
+          this.defaultSeverity,
           "No LABEL metadata was found in this Dockerfile. Adding labels helps identify build information, maintainers, and descriptions.",
           this.help,
           1
@@ -162,7 +154,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               "RUN apt-get update used without apt-get install in the same instruction. This can cause caching issues and build failures.",
               this.help,
               inst.line
@@ -173,7 +165,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               "RUN apt-get install used without apt-get update in the same instruction. Always combine them to ensure up-to-date package installation.",
               this.help,
               inst.line
@@ -266,7 +258,7 @@ export const usePipefail: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             "RUN instruction uses a pipe (|) but does not configure 'pipefail'. If a command in the pipe fails, the step may still succeed silently.",
             this.help,
             inst.line
@@ -296,7 +288,7 @@ export const absoluteWorkdir: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `WORKDIR specifies a relative path '${path}'. For clarity and reliability, always use absolute paths.`,
               this.help,
               inst.line
@@ -323,7 +315,7 @@ export const avoidRunCd: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             "Avoid using 'cd' in RUN instructions. Use WORKDIR instead to change the working directory stably across layers.",
             this.help,
             inst.line
@@ -379,7 +371,7 @@ export const sortMultilineArgs: DockerfileRule = {
                 createDiagnostic(
                   file,
                   this.key,
-                  this.defaultSeverity as "error" | "warning" | "info",
+                  this.defaultSeverity,
                   "Multi-line package arguments are not sorted alphanumerically. Keeping them sorted makes maintenance easier and prevents duplicates.",
                   this.help,
                   inst.line
@@ -412,7 +404,7 @@ export const useraddNoLogInit: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             "RUN instruction runs 'useradd' without '--no-log-init'. This can cause excessive disk space usage / exhaustion under Go's sparse tar archive bug when large UIDs are used.",
             this.help,
             inst.line

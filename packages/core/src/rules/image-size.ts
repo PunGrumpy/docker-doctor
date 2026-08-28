@@ -9,15 +9,7 @@ import type {
   DockerfileInstruction,
   DockerfileRule,
 } from "../types/index";
-
-const createDiagnostic = (
-  file: string,
-  ruleKey: string,
-  severity: "error" | "warning" | "info",
-  message: string,
-  help: string,
-  line?: number
-): Diagnostic => ({ file, help, line, message, rule: ruleKey, severity });
+import { createDiagnostic } from "./create-diagnostic";
 
 export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
@@ -63,7 +55,7 @@ export const preferSlimBase: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
               this.help,
               inst.line
@@ -99,7 +91,7 @@ export const cleanPackageCache: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Running 'apt-get install' without removing package lists afterwards. This keeps metadata caches inside the image layer.`,
               this.help,
               inst.line
@@ -117,7 +109,7 @@ export const cleanPackageCache: DockerfileRule = {
             createDiagnostic(
               file,
               this.key,
-              this.defaultSeverity as "error" | "warning" | "info",
+              this.defaultSeverity,
               `Running 'apk add' without '--no-cache' or cleaning the apk cache. This increases layer size.`,
               this.help,
               inst.line
@@ -197,7 +189,7 @@ export const avoidDevDependencies: DockerfileRule = {
           createDiagnostic(
             file,
             this.key,
-            this.defaultSeverity as "error" | "warning" | "info",
+            this.defaultSeverity,
             `Running package install '${inst.args}' ${where} without omitting devDependencies.`,
             this.help,
             inst.line
