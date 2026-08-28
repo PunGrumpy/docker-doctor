@@ -8,6 +8,7 @@ import type { Diagnostic, JsonReport, RuleSeverity } from "@docker-doctor/core";
 import {
   discoverProject,
   parseDockerfile,
+  createComposeLocator,
   parseCompose,
   runDockerfileRules,
   runComposeRules,
@@ -554,7 +555,13 @@ const runRulesEngine = async (
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[cf] = content;
         const composeObj = parseCompose(content, cf);
-        return runComposeRules(composeObj, cf, rulesConfig, categoriesConfig);
+        return runComposeRules(
+          composeObj,
+          cf,
+          rulesConfig,
+          categoriesConfig,
+          createComposeLocator(content)
+        );
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);

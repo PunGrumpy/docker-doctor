@@ -1,6 +1,9 @@
 import { describe, test, expect } from "bun:test";
 
-import { parseCompose } from "../src/parsers/compose-parser";
+import {
+  createComposeLocator,
+  parseCompose,
+} from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
   combineAptUpdateInstall,
@@ -435,6 +438,83 @@ describe("Compose Rules", () => {
     expect(noVersionKey.check(realisticCompliant, "compose.yml")).toHaveLength(
       0
     );
+  });
+
+  test("compose diagnostics carry the line of the offending key", () => {
+    const source = `version: "3.8"
+services:
+  web:
+    image: node:22-alpine
+    depends_on:
+      - db
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const locate = createComposeLocator(source);
+    const context = { locate };
+
+    const versionDiags = noVersionKey.check(
+      composeContent,
+      "compose.yml",
+      context
+    );
+    expect(versionDiags).toHaveLength(1);
+    expect(versionDiags[0].line).toBe(1);
+
+    const restartDiags = requireRestartPolicy.check(
+      composeContent,
+      "compose.yml",
+      context
+    );
+    expect(restartDiags).toHaveLength(1);
+    expect(restartDiags[0].line).toBe(3);
+
+    const dependsDiags = useDependsOnCondition.check(
+      composeContent,
+      "compose.yml",
+      context
+    );
+    expect(dependsDiags).toHaveLength(1);
+    expect(dependsDiags[0].line).toBe(5);
+  });
+
+  test("compose line lookup degrades gracefully through YAML merge keys", () => {
+    // `depends_on` on `web` only exists via the merge key, so there is no
+    // concrete node to point at — the diagnostic falls back to the service.
+    const source = `x-base: &base
+  depends_on:
+    - db
+services:
+  web:
+    <<: *base
+    image: node:22-alpine
+    restart: unless-stopped
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const locate = createComposeLocator(source);
+
+    const dependsDiags = useDependsOnCondition.check(
+      composeContent,
+      "compose.yml",
+      { locate }
+    );
+    expect(dependsDiags).toHaveLength(1);
+    expect(dependsDiags[0].line).toBe(5);
+  });
+
+  test("compose rules still work without a locator", () => {
+    const composeContent = parseCompose(
+      "services:\n  web:\n    image: node:22-alpine\n",
+      "compose.yml"
+    );
+    const diags = requireRestartPolicy.check(composeContent, "compose.yml");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBeUndefined();
   });
 
   test("require-resource-limits", () => {

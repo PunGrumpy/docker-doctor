@@ -59,8 +59,21 @@ export interface DockerfileRule extends RuleDefinition {
   ) => Diagnostic[];
 }
 
+/**
+ * Maps a path of YAML keys/indices (e.g. `["services", "web"]`) to the
+ * 1-based line where that key is defined, or `undefined` when the path does
+ * not resolve to a concrete node in the source document.
+ */
+export type ComposeLocator = (
+  path: readonly (string | number)[]
+) => number | undefined;
+
 export interface ComposeRule extends RuleDefinition {
-  check: (composeContent: unknown, file: string) => Diagnostic[];
+  check: (
+    composeContent: unknown,
+    file: string,
+    context?: { locate?: ComposeLocator }
+  ) => Diagnostic[];
 }
 
 export interface DockerDoctorConfig {
