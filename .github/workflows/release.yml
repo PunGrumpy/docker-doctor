@@ -108,7 +108,13 @@ jobs:
         if: steps.kit.outputs.version != ''
         run: |
           curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
-          sudo apt-get install -y docker-sbx
+          # docker-sbx is pinned: 0.39.0 changed `sbx kit push` to read only
+          # the sbx credential store, which `docker login` does not populate
+          # on a headless runner, so every push since 2026-08-19 failed with
+          # "no default account profile set: secret not found". 0.42.0
+          # advertises reading `docker login` credentials again — re-test and
+          # unpin once it reaches the stable apt channel.
+          sudo apt-get install -y "docker-sbx=0.38.0-1~ubuntu.24.04~noble"
       - name: Log in to Docker Hub
         if: steps.kit.outputs.version != ''
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -127,7 +133,10 @@ jobs:
       # file under apps/web), which is why the page used to need a manual
       # redeploy. Kick a fresh deploy of main once the release has fully landed.
       - name: Trigger web deploy
-        if: steps.changesets.outputs.published == 'true'
+        # !cancelled(): the changelog page only needs the npm publish, so a
+        # failed kit push earlier in the job must not skip this step (it did
+        # for 0.4.4, leaving the page stale — the exact problem #98 fixed).
+        if: ${{ !cancelled() && steps.changesets.outputs.published == 'true' }}
         env:
           DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
