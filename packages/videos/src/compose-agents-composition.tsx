@@ -365,15 +365,15 @@ const SceneOut = () => (
 
 // ─── Composition ────────────────────────────────────────────────────────────
 
-export const V050_FPS = 30;
-export const V050_WIDTH = 1920;
-export const V050_HEIGHT = 1080;
+export const FPS = 30;
+export const WIDTH = 1920;
+export const HEIGHT = 1080;
 
 const THEME_END = TITLE_DURATION + THEME_DURATION;
 const COUNT_END = THEME_END + COUNT_DURATION;
 const FEATURES_END = COUNT_END + FEATURES_DURATION;
 const CTA_END = FEATURES_END + CTA_DURATION;
-export const V050_DURATION = CTA_END + OUT_DURATION;
+export const DURATION = CTA_END + OUT_DURATION;
 
 const MARQUEE = "docker doctor v0.5.0 ✦ compose + ai agents ✦ ";
 
@@ -382,7 +382,7 @@ const MARQUEE = "docker doctor v0.5.0 ✦ compose + ai agents ✦ ";
 const REF_W = 1280;
 const REF_H = 720;
 
-export const V050 = () => {
+export const ComposeAgents = () => {
   const { width } = useVideoConfig();
   const stageScale = width / REF_W;
 

@@ -1,5 +1,12 @@
 import { Composition } from "remotion";
 
+import {
+  ComposeAgents,
+  DURATION as COMPOSE_AGENTS_DURATION,
+  FPS as COMPOSE_AGENTS_FPS,
+  HEIGHT as COMPOSE_AGENTS_HEIGHT,
+  WIDTH as COMPOSE_AGENTS_WIDTH,
+} from "./compose-agents-composition";
 import { DockerDoctor, DURATION, FPS, HEIGHT, WIDTH } from "./composition";
 import {
   DURATION as SANDBOX_DURATION,
@@ -7,13 +14,6 @@ import {
   SandboxKit,
   SIZE as SANDBOX_SIZE,
 } from "./sandbox-composition";
-import {
-  V050,
-  V050_DURATION,
-  V050_FPS,
-  V050_HEIGHT,
-  V050_WIDTH,
-} from "./v050-composition";
 
 import "./index.css";
 
@@ -36,12 +36,12 @@ export const RemotionRoot = () => (
       width={SANDBOX_SIZE}
     />
     <Composition
-      component={V050}
-      durationInFrames={V050_DURATION}
-      fps={V050_FPS}
-      height={V050_HEIGHT}
-      id="V050"
-      width={V050_WIDTH}
+      component={ComposeAgents}
+      durationInFrames={COMPOSE_AGENTS_DURATION}
+      fps={COMPOSE_AGENTS_FPS}
+      height={COMPOSE_AGENTS_HEIGHT}
+      id="ComposeAgents"
+      width={COMPOSE_AGENTS_WIDTH}
     />
   </>
 );
