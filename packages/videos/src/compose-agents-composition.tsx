@@ -382,11 +382,12 @@ export const DURATION = CTA_END + OUT_DURATION;
 
 // ─── Sound ──────────────────────────────────────────────────────────────────
 
-// Two synthesized sounds (scripts/make-sfx.py), after the warm bass-forward
-// language of elevenlabs.io: a soft sub thump on each scene cut, and one
-// dark drone bed under the whole video, faded in and out here. No clicks,
-// no per-character ticks. Social feeds autoplay muted, so the video must
-// read silent; sound is texture.
+// A composed music bed plus two accents (scripts/make-sfx.py), in the
+// product-launch style of ElevenLabs' videos: 22.5 s of minimal electronic
+// in D minor at 96 BPM under the whole video, a soft sub thump on each
+// scene cut, and a rising pluck per counter increment. All sine-based, no
+// noise sources. Social feeds autoplay muted, so the video must read
+// silent; sound is texture.
 const THUMP_FRAMES = [
   0,
   TITLE_DURATION,
@@ -397,12 +398,12 @@ const THUMP_FRAMES = [
 ];
 
 // The rule counter gets its own voice: one clean bass pluck per increment,
-// rising through a just-intonation pentatonic and landing the octave on 31.
+// rising through D minor pentatonic and landing the octave on 31.
 // The frames replicate SceneCount's interpolate so blips sit exactly on the
 // displayed value changes.
 const COUNT_EASE = (t: number): number => 1 - (1 - t) ** 2;
 const COUNT_BLIPS: { frame: number; rate: number }[] = [];
-const BLIP_RATES = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2];
+const BLIP_RATES = [1, 6 / 5, 4 / 3, 3 / 2, 16 / 9, 2];
 {
   let shown = 25;
   for (let f = 10; f <= 48 && COUNT_BLIPS.length < BLIP_RATES.length; f += 1) {
@@ -420,20 +421,20 @@ const BLIP_RATES = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2];
 // Slight deterministic pitch walk so repeated thumps stay organic.
 const PITCH_STEPS = [1, 0.96, 1.04, 0.98];
 
-const BED_FADE_IN = 30;
-const BED_FADE_OUT = 75;
+const MUSIC_FADE_IN = 20;
+const MUSIC_FADE_OUT = 60;
 
-const bedVolume = (frame: number): number =>
+const musicVolume = (frame: number): number =>
   interpolate(
     frame,
-    [0, BED_FADE_IN, DURATION - BED_FADE_OUT, DURATION - 5],
-    [0, 0.45, 0.45, 0],
+    [0, MUSIC_FADE_IN, DURATION - MUSIC_FADE_OUT, DURATION - 5],
+    [0, 0.6, 0.6, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
 const Soundtrack = () => (
   <>
-    <Audio src={staticFile("sfx/bed.wav")} volume={bedVolume} />
+    <Audio src={staticFile("sfx/music.wav")} volume={musicVolume} />
     {COUNT_BLIPS.map(({ frame, rate }) => (
       <Sequence
         durationInFrames={10}
@@ -458,7 +459,7 @@ const Soundtrack = () => (
         <Audio
           playbackRate={PITCH_STEPS[i % PITCH_STEPS.length]}
           src={staticFile("sfx/thump.wav")}
-          volume={0.8}
+          volume={0.6}
         />
       </Sequence>
     ))}

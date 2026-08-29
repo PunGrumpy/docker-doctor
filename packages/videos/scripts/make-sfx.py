@@ -1,28 +1,50 @@
 #!/usr/bin/env python3
-"""Generate the ComposeAgents sound design into public/sfx/.
+"""Generate the ComposeAgents soundtrack into public/sfx/.
 
-Two sounds only, modeled on the warm, bass-forward ambient language of
-elevenlabs.io (measured from their site bed: energy centered 90-600 Hz,
-rolling off hard above 2 kHz). Everything is synthesized from scratch,
-stdlib only (wave + math):
+A real music bed in the product-launch style of ElevenLabs' videos —
+minimal electronic, warm chords, soft deep kick, sub bass — composed and
+synthesized from scratch, stdlib only (wave + math). Everything is
+sine-based: no noise sources anywhere in the signal path.
 
-  thump.wav - a soft sub impact (120 -> 45 Hz pitch drop, ~10 ms attack,
-              ~300 ms decay) with a quiet 200 Hz knock so it still reads
-              on phone speakers; one per scene cut
-  bed.wav   - a 24 s dark drone on D2: a detuned pair, a low fifth,
-              octave and a faint ninth, two slow swell LFOs, no noise;
-              sits under the whole video, faded in and out by Remotion
-  blip.wav  - a clean bass pluck; the rule counter plays it once per
-              increment at rising pentatonic playback rates
+  music.wav - 22.5 s in D minor at 96 BPM. Nine 2.5 s bars:
+              Dm9 x2, Bbmaj7 x2, Fmaj7 x2, Cadd9 x2, Dm9 held.
+              Per bar: a soft pad chord, a sub bass root, a quiet
+              plucked eighth-note arpeggio, a deep kick on beats 1 and
+              3, and a sidechain dip after each kick for groove.
+  thump.wav - a soft sub impact for scene cuts (120 -> 45 Hz drop)
+  blip.wav  - a clean D3 pluck; the rule counter plays it per increment
+              at rising D-minor-pentatonic playback rates
 """
 
 import math
 import os
-import random
 import struct
 import wave
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "sfx")
+
+# Note frequencies (Hz).
+D2, F2, A2, C2 = 73.42, 87.31, 110.0, 65.41
+BB1 = 58.27
+D3, F3, G3, A3, BB2, C3, E3 = 146.83, 174.61, 196.0, 220.0, 116.54, 130.81, 164.81
+C4, D4, E4, A4 = 261.63, 293.66, 329.63, 440.0
+
+BPM = 96.0
+BEAT = 60.0 / BPM  # 0.625 s
+BAR = 4.0 * BEAT  # 2.5 s
+
+# (pad chord, bass root, arp notes) per bar; the last bar holds home.
+BARS = [
+    ([D3, F3, A3, C4, E4], D2, [D4, A3, C4, E4]),
+    ([D3, F3, A3, C4, E4], D2, [D4, A3, C4, E4]),
+    ([BB2, D3, F3, A3], BB1, [BB2 * 2, F3, A3, D4]),
+    ([BB2, D3, F3, A3], BB1, [BB2 * 2, F3, A3, D4]),
+    ([F3, A3, C4, E4], F2, [F3 * 2, C4, E4, A4]),
+    ([F3, A3, C4, E4], F2, [F3 * 2, C4, E4, A4]),
+    ([C3, E3, G3, D4], C2, [C4, G3, D4, E4]),
+    ([C3, E3, G3, D4], C2, [C4, G3, D4, E4]),
+    ([D3, F3, A3, C4, E4], D2, []),
+]
 
 
 def write_wav(name: str, samples: list[float], rate: int, peak_target: float) -> None:
@@ -37,6 +59,66 @@ def write_wav(name: str, samples: list[float], rate: int, peak_target: float) ->
     print(f"{name}: {len(samples) / rate:.1f} s")
 
 
+def warm_voice(freq: float, t: float) -> float:
+    """One pad voice: detuned pair plus soft low harmonics."""
+    s = math.sin(2.0 * math.pi * freq * t)
+    s += math.sin(2.0 * math.pi * freq * 1.0018 * t)
+    s += 0.25 * math.sin(2.0 * math.pi * freq * 2.0 * t)
+    return s
+
+
+def music(rate: int = 22050) -> list[float]:
+    n = int(rate * BAR * len(BARS))
+    out = [0.0] * n
+    eighth = BEAT / 2.0
+
+    for bar_index, (chord, bass, arp) in enumerate(BARS):
+        bar_start = bar_index * BAR
+        i0 = int(bar_start * rate)
+        i1 = min(n, int((bar_start + BAR) * rate))
+        last_bar = bar_index == len(BARS) - 1
+        for i in range(i0, i1):
+            t = i / rate - bar_start
+
+            # Sidechain: duck after the kicks on beats 1 and 3.
+            since_kick = t if t < 2.0 * BEAT else t - 2.0 * BEAT
+            duck = 1.0 - 0.4 * math.exp(-since_kick / 0.16)
+
+            # Pad: soft attack, held across the bar, released at its end.
+            edge = min(1.0, t / 0.09, (BAR - t) / 0.12) if not last_bar else min(1.0, t / 0.09)
+            pad = sum(warm_voice(f, i / rate) for f in chord)
+            out[i] += pad * 0.055 * edge * duck
+
+            # Sub bass: root with a soft octave touch on beat 4.
+            sub = math.sin(2.0 * math.pi * bass * (i / rate))
+            if 3.0 * BEAT < t < 3.5 * BEAT:
+                sub += 0.4 * math.sin(2.0 * math.pi * bass * 2.0 * (i / rate))
+            out[i] += sub * 0.3 * edge * duck
+
+            # Kick: beats 1 and 3, a small sine drop, quiet and round.
+            for kick_t in (0.0, 2.0 * BEAT):
+                dt = t - kick_t
+                if 0.0 <= dt < 0.22:
+                    freq = 100.0 * math.exp(-dt * 22.0) + 42.0
+                    out[i] += math.sin(2.0 * math.pi * freq * dt) * math.exp(-dt * 17.0) * 0.5
+
+            # Arpeggio: quiet eighth-note plucks over the chord tones.
+            if arp:
+                step = int(t / eighth)
+                dt = t - step * eighth
+                if dt < 0.24:
+                    note = arp[step % len(arp)]
+                    pluck = math.sin(2.0 * math.pi * note * dt)
+                    pluck += 0.2 * math.sin(2.0 * math.pi * note * 2.0 * dt)
+                    out[i] += pluck * math.exp(-dt * 16.0) * 0.075 * duck
+
+    # Gentle tail fade baked in; the composition fades the rest.
+    fade_n = int(rate * 1.5)
+    for i in range(fade_n):
+        out[n - 1 - i] *= i / fade_n
+    return [math.tanh(s * 1.1) for s in out]
+
+
 def thump(rate: int = 44100) -> list[float]:
     duration = 0.4
     n = int(rate * duration)
@@ -48,7 +130,6 @@ def thump(rate: int = 44100) -> list[float]:
         freq = 120.0 * math.exp(-t * 14.0) + 45.0
         phase += 2.0 * math.pi * freq / rate
         body = math.sin(phase) * math.exp(-t * 11.0)
-        # A quiet upper knock so the hit registers on speakers with no sub.
         knock_phase += 2.0 * math.pi * 205.0 / rate
         knock = math.sin(knock_phase) * math.exp(-t * 55.0) * 0.22
         attack = min(1.0, i / (rate * 0.01))
@@ -56,28 +137,10 @@ def thump(rate: int = 44100) -> list[float]:
     return samples
 
 
-def bed(rate: int = 22050) -> list[float]:
-    duration = 24.0
-    n = int(rate * duration)
-    root = 73.42  # D2
-    samples = []
-    for i in range(n):
-        t = i / rate
-        swell = 0.8 + 0.2 * math.sin(2.0 * math.pi * 0.06 * t)
-        drift = 0.92 + 0.08 * math.sin(2.0 * math.pi * 0.021 * t + 1.7)
-        s = math.sin(2.0 * math.pi * root * t)
-        s += math.sin(2.0 * math.pi * root * 1.0025 * t)
-        s += 0.35 * math.sin(2.0 * math.pi * root * 1.5 * t)
-        s += 0.18 * math.sin(2.0 * math.pi * root * 2.0 * t)
-        s += 0.08 * math.sin(2.0 * math.pi * root * 2.25 * t)
-        samples.append(s * swell * drift)
-    return samples
-
-
 def blip(rate: int = 44100) -> list[float]:
     duration = 0.22
     n = int(rate * duration)
-    base = 110.0
+    base = D3
     samples = []
     for i in range(n):
         t = i / rate
@@ -89,8 +152,7 @@ def blip(rate: int = 44100) -> list[float]:
 
 
 if __name__ == "__main__":
-    random.seed(50)
     os.makedirs(OUT_DIR, exist_ok=True)
+    write_wav("music.wav", music(), rate=22050, peak_target=0.55)
     write_wav("thump.wav", thump(), rate=44100, peak_target=0.6)
-    write_wav("bed.wav", bed(), rate=22050, peak_target=0.3)
     write_wav("blip.wav", blip(), rate=44100, peak_target=0.45)
