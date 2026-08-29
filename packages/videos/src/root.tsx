@@ -7,6 +7,13 @@ import {
   SandboxKit,
   SIZE as SANDBOX_SIZE,
 } from "./sandbox-composition";
+import {
+  V050,
+  V050_DURATION,
+  V050_FPS,
+  V050_HEIGHT,
+  V050_WIDTH,
+} from "./v050-composition";
 
 import "./index.css";
 
@@ -27,6 +34,14 @@ export const RemotionRoot = () => (
       height={SANDBOX_SIZE}
       id="SandboxKit"
       width={SANDBOX_SIZE}
+    />
+    <Composition
+      component={V050}
+      durationInFrames={V050_DURATION}
+      fps={V050_FPS}
+      height={V050_HEIGHT}
+      id="V050"
+      width={V050_WIDTH}
     />
   </>
 );

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@remotion/cli": "4.0.507",
+    "@remotion/fonts": "4.0.507",
     "@remotion/google-fonts": "4.0.507",
     "@remotion/tailwind-v4": "4.0.507",
     "class-variance-authority": "^0.7.1",
