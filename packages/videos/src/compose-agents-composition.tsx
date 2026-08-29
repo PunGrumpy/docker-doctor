@@ -382,61 +382,51 @@ export const DURATION = CTA_END + OUT_DURATION;
 
 // ─── Sound ──────────────────────────────────────────────────────────────────
 
-// Three synthesized effects (scripts/make-sfx.py), modeled on the arcade
-// button foley basement.studio uses: a mechanical clack on every slam and
-// scene cut, a lighter tick per typed character, one warm tone under the
-// outro. Each clack plays at a slightly different rate so thirteen presses
-// read as a hand on a keyboard, not a sampler. Social feeds autoplay muted,
-// so the video must read silent; sound is texture.
-// Semitone-ish spread around unity, walked deterministically.
-const PITCH_STEPS = [1, 0.95, 1.05, 0.97, 1.02];
-
-const SLAM_FRAMES = [
+// Two synthesized sounds (scripts/make-sfx.py), after the warm bass-forward
+// language of elevenlabs.io: a soft sub thump on each scene cut, and one
+// dark drone bed under the whole video, faded in and out here. No clicks,
+// no per-character ticks. Social feeds autoplay muted, so the video must
+// read silent; sound is texture.
+const THUMP_FRAMES = [
   0,
-  5,
-  14,
   TITLE_DURATION,
-  TITLE_DURATION + 5,
   THEME_END,
-  ...FEATURES.map((_, i) => COUNT_END + i * SLAM_DURATION + 2),
+  ...FEATURES.map((_, i) => COUNT_END + i * SLAM_DURATION),
+  FEATURES_END,
   CTA_END,
-  CTA_END + 6,
 ];
 
-const TICK_FRAMES = Array.from(
-  CTA_TEXT,
-  (_, i) => FEATURES_END + Math.round((i * FPS) / CTA_CHARS_PER_SECOND)
-);
+// Slight deterministic pitch walk so repeated thumps stay organic.
+const PITCH_STEPS = [1, 0.96, 1.04, 0.98];
+
+const BED_FADE_IN = 30;
+const BED_FADE_OUT = 75;
+
+const bedVolume = (frame: number): number =>
+  interpolate(
+    frame,
+    [0, BED_FADE_IN, DURATION - BED_FADE_OUT, DURATION - 5],
+    [0, 0.45, 0.45, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
 
 const Soundtrack = () => (
   <>
-    {SLAM_FRAMES.map((from, i) => (
+    <Audio src={staticFile("sfx/bed.wav")} volume={bedVolume} />
+    {THUMP_FRAMES.map((from, i) => (
       <Sequence
-        durationInFrames={8}
+        durationInFrames={14}
         from={from}
-        key={`clack-${from}`}
+        key={`thump-${from}`}
         layout="none"
       >
         <Audio
           playbackRate={PITCH_STEPS[i % PITCH_STEPS.length]}
-          src={staticFile("sfx/clack.wav")}
+          src={staticFile("sfx/thump.wav")}
           volume={0.8}
         />
       </Sequence>
     ))}
-    {TICK_FRAMES.map((from, i) => (
-      <Sequence
-        durationInFrames={3}
-        from={from}
-        key={`tick-${from}-${String(i)}`}
-        layout="none"
-      >
-        <Audio src={staticFile("sfx/tick.wav")} volume={0.35} />
-      </Sequence>
-    ))}
-    <Sequence durationInFrames={40} from={CTA_END} layout="none">
-      <Audio src={staticFile("sfx/tone.wav")} volume={0.5} />
-    </Sequence>
   </>
 );
 
