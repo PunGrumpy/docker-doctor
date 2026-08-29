@@ -13,14 +13,15 @@ import { FONT_VARS, SANS } from "./fonts";
 
 // The v0.5.0 release video, styled after basement.studio: near-black stage,
 // heavy Geist stacked caps slamming in on hard cuts, marquee
-// strips top and bottom, film grain, one orange accent. No fades anywhere —
+// strips top and bottom, film grain, one brand-blue accent. No fades anywhere —
 // every scene change is a cut, every reveal is a clip-mask slam.
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
 
 const BLACK = "#0d0d0d";
 const PAPER = "#fbfbf9";
-const ORANGE = "#ff4d00";
+// The brand blue from the site mark (apps/web/components/logo.tsx).
+const BRAND = "#2b7fff";
 const FAINT = "rgba(251,251,249,0.34)";
 const HAIRLINE = "rgba(251,251,249,0.16)";
 
@@ -48,23 +49,6 @@ const Grain = () => {
     </AbsoluteFill>
   );
 };
-
-// Corner crosshairs — the registration marks basement frames everything with.
-const Crosshair = ({ x, y }: { readonly x: number; readonly y: number }) => (
-  <div
-    style={{
-      color: FAINT,
-      fontFamily: MONO,
-      fontSize: 22,
-      left: x,
-      position: "absolute",
-      top: y,
-      transform: "translate(-50%, -50%)",
-    }}
-  >
-    +
-  </div>
-);
 
 // ─── Marquee ────────────────────────────────────────────────────────────────
 
@@ -217,7 +201,7 @@ const SceneTitle = () => (
   <Centered>
     <SlamLine fontSize={190} text="Docker" />
     <SlamLine delay={5} fontSize={190} text="Doctor" />
-    <SlamLine color={ORANGE} delay={14} fontSize={90} text="v0.5.0" />
+    <SlamLine color={BRAND} delay={14} fontSize={90} text="v0.5.0" />
   </Centered>
 );
 
@@ -262,7 +246,7 @@ const SceneCount = () => {
         }}
       >
         {value}
-        <span style={{ color: ORANGE }}>.</span>
+        <span style={{ color: BRAND }}>.</span>
       </div>
       <MonoCaption delay={26} text="rules. zero setup. six new for Compose." />
     </Centered>
@@ -309,7 +293,7 @@ const FeatureSlam = ({
   <Centered>
     <div
       style={{
-        color: ORANGE,
+        color: BRAND,
         fontFamily: MONO,
         fontSize: 26,
         letterSpacing: "0.08em",
@@ -364,7 +348,7 @@ const SceneCta = () => (
         background="transparent"
         charsPerSecond={18}
         color={PAPER}
-        cursorColor={ORANGE}
+        cursorColor={BRAND}
         fontSize={54}
         text="bunx @docker-doctor/cli"
       />
@@ -375,7 +359,7 @@ const SceneCta = () => (
 const SceneOut = () => (
   <Centered>
     <SlamLine fontSize={210} text="Out now" />
-    <SlamLine color={ORANGE} delay={6} fontSize={92} text="v0.5.0" />
+    <SlamLine color={BRAND} delay={6} fontSize={92} text="v0.5.0" />
   </Centered>
 );
 
@@ -462,10 +446,6 @@ export const V050 = () => {
           <div style={{ bottom: 0, left: 0, position: "absolute", right: 0 }}>
             <Marquee flip phrase={MARQUEE} />
           </div>
-          <Crosshair x={64} y={86} />
-          <Crosshair x={REF_W - 64} y={86} />
-          <Crosshair x={64} y={REF_H - 86} />
-          <Crosshair x={REF_W - 64} y={REF_H - 86} />
         </div>
       </AbsoluteFill>
       <Grain />
