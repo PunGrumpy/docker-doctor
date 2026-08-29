@@ -9,9 +9,11 @@ stdlib only (wave + math):
   thump.wav - a soft sub impact (120 -> 45 Hz pitch drop, ~10 ms attack,
               ~300 ms decay) with a quiet 200 Hz knock so it still reads
               on phone speakers; one per scene cut
-  bed.wav   - a 24 s dark drone on D2: a detuned pair, a low fifth and
-              octave, low-passed air, two slow swell LFOs; sits under the
-              whole video at low volume, faded in and out by Remotion
+  bed.wav   - a 24 s dark drone on D2: a detuned pair, a low fifth,
+              octave and a faint ninth, two slow swell LFOs, no noise;
+              sits under the whole video, faded in and out by Remotion
+  blip.wav  - a clean bass pluck; the rule counter plays it once per
+              increment at rising pentatonic playback rates
 """
 
 import math
@@ -59,19 +61,30 @@ def bed(rate: int = 22050) -> list[float]:
     n = int(rate * duration)
     root = 73.42  # D2
     samples = []
-    noise_lp = 0.0
-    noise_a = 1.0 - math.exp(-2.0 * math.pi * 400.0 / rate)
     for i in range(n):
         t = i / rate
-        swell = 0.75 + 0.25 * math.sin(2.0 * math.pi * 0.07 * t)
-        drift = 0.9 + 0.1 * math.sin(2.0 * math.pi * 0.023 * t + 1.7)
+        swell = 0.8 + 0.2 * math.sin(2.0 * math.pi * 0.06 * t)
+        drift = 0.92 + 0.08 * math.sin(2.0 * math.pi * 0.021 * t + 1.7)
         s = math.sin(2.0 * math.pi * root * t)
-        s += math.sin(2.0 * math.pi * root * 1.003 * t)
-        s += 0.4 * math.sin(2.0 * math.pi * root * 1.5 * t)
-        s += 0.2 * math.sin(2.0 * math.pi * root * 2.0 * t)
-        noise_lp += noise_a * ((random.random() * 2.0 - 1.0) - noise_lp)
-        s += noise_lp * 0.5
-        samples.append(math.tanh(s * swell * drift * 0.7))
+        s += math.sin(2.0 * math.pi * root * 1.0025 * t)
+        s += 0.35 * math.sin(2.0 * math.pi * root * 1.5 * t)
+        s += 0.18 * math.sin(2.0 * math.pi * root * 2.0 * t)
+        s += 0.08 * math.sin(2.0 * math.pi * root * 2.25 * t)
+        samples.append(s * swell * drift)
+    return samples
+
+
+def blip(rate: int = 44100) -> list[float]:
+    duration = 0.22
+    n = int(rate * duration)
+    base = 110.0
+    samples = []
+    for i in range(n):
+        t = i / rate
+        s = math.sin(2.0 * math.pi * base * t)
+        s += 0.3 * math.sin(2.0 * math.pi * base * 2.0 * t)
+        env = min(1.0, i / (rate * 0.004)) * math.exp(-t * 22.0)
+        samples.append(s * env)
     return samples
 
 
@@ -80,3 +93,4 @@ if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     write_wav("thump.wav", thump(), rate=44100, peak_target=0.6)
     write_wav("bed.wav", bed(), rate=22050, peak_target=0.3)
+    write_wav("blip.wav", blip(), rate=44100, peak_target=0.45)

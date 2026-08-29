@@ -396,6 +396,27 @@ const THUMP_FRAMES = [
   CTA_END,
 ];
 
+// The rule counter gets its own voice: one clean bass pluck per increment,
+// rising through a just-intonation pentatonic and landing the octave on 31.
+// The frames replicate SceneCount's interpolate so blips sit exactly on the
+// displayed value changes.
+const COUNT_EASE = (t: number): number => 1 - (1 - t) ** 2;
+const COUNT_BLIPS: { frame: number; rate: number }[] = [];
+const BLIP_RATES = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2];
+{
+  let shown = 25;
+  for (let f = 10; f <= 48 && COUNT_BLIPS.length < BLIP_RATES.length; f += 1) {
+    const value = Math.round(25 + 6 * COUNT_EASE((f - 10) / 38));
+    if (value > shown) {
+      shown = value;
+      COUNT_BLIPS.push({
+        frame: THEME_END + f,
+        rate: BLIP_RATES[COUNT_BLIPS.length],
+      });
+    }
+  }
+}
+
 // Slight deterministic pitch walk so repeated thumps stay organic.
 const PITCH_STEPS = [1, 0.96, 1.04, 0.98];
 
@@ -413,6 +434,20 @@ const bedVolume = (frame: number): number =>
 const Soundtrack = () => (
   <>
     <Audio src={staticFile("sfx/bed.wav")} volume={bedVolume} />
+    {COUNT_BLIPS.map(({ frame, rate }) => (
+      <Sequence
+        durationInFrames={10}
+        from={frame}
+        key={`blip-${frame}`}
+        layout="none"
+      >
+        <Audio
+          playbackRate={rate}
+          src={staticFile("sfx/blip.wav")}
+          volume={0.55}
+        />
+      </Sequence>
+    ))}
     {THUMP_FRAMES.map((from, i) => (
       <Sequence
         durationInFrames={14}
