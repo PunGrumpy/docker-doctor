@@ -88,7 +88,6 @@
       "version": "1.0.0",
       "dependencies": {
         "@remotion/cli": "4.0.507",
-        "@remotion/fonts": "4.0.507",
         "@remotion/google-fonts": "4.0.507",
         "@remotion/tailwind-v4": "4.0.507",
         "class-variance-authority": "^0.7.1",
@@ -645,8 +644,6 @@
     "@remotion/compositor-win32-x64-msvc": ["@remotion/compositor-win32-x64-msvc@4.0.507", "", { "os": "win32", "cpu": "x64" }, "sha512-FCkZDLcPBCO2WO/MyrtMB5tpsIuqqkc7E1nY2lfY6WmRX2quGfykcsz4S9inYx/G+XybKVTgplqnyLtt9wyFnw=="],
 
     "@remotion/eslint-config-flat": ["@remotion/eslint-config-flat@4.0.507", "", { "dependencies": { "typescript-eslint": "8.21.0" }, "peerDependencies": { "eslint": ">=9" } }, "sha512-g7spby8NuJ5ha38Tv99pNiKnz1nErv4LvLpdkG9YMVFyioSHzZX1pF1l2B9do5Kin/t/QP0KFgCc2ksF+4r5CQ=="],
-
-    "@remotion/fonts": ["@remotion/fonts@4.0.507", "", { "dependencies": { "remotion": "4.0.507" } }, "sha512-n0FV8lkTzNQ8bU5vK5Ga83ru23DWfJss2DuepabRwdnmnYZnNXXd9lr1EVjhmGHd8pk+IFTaLfKBeNjshe89GA=="],
 
     "@remotion/google-fonts": ["@remotion/google-fonts@4.0.507", "", { "dependencies": { "remotion": "4.0.507" } }, "sha512-PuNm8skWh8haY8YLpD6WZm34O8ElQ9llt+lgAniF49tIaYWDUvdBPQYZEuAeVbGBtZaiRjcpwEDIb9rQgj2/TQ=="],
 
