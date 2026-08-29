@@ -1,9 +1,11 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Easing,
   interpolate,
   Sequence,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -331,6 +333,9 @@ const SceneFeatures = () => (
 const CTA_DURATION = 100;
 const OUT_DURATION = 80;
 
+const CTA_TEXT = "bunx @docker-doctor/cli";
+const CTA_CHARS_PER_SECOND = 18;
+
 // Typewriter hardcodes the sans variable, so point that variable at the mono
 // face for this subtree — the command should read as a terminal line.
 const SceneCta = () => (
@@ -346,11 +351,11 @@ const SceneCta = () => (
     >
       <Typewriter
         background="transparent"
-        charsPerSecond={18}
+        charsPerSecond={CTA_CHARS_PER_SECOND}
         color={PAPER}
         cursorColor={BRAND}
         fontSize={54}
-        text="bunx @docker-doctor/cli"
+        text={CTA_TEXT}
       />
     </div>
   </Sequence>
@@ -374,6 +379,56 @@ const COUNT_END = THEME_END + COUNT_DURATION;
 const FEATURES_END = COUNT_END + FEATURES_DURATION;
 const CTA_END = FEATURES_END + CTA_DURATION;
 export const DURATION = CTA_END + OUT_DURATION;
+
+// ─── Sound ──────────────────────────────────────────────────────────────────
+
+// Three synthesized effects (scripts/make-sfx.py): a thud on every slam and
+// scene cut, a tick per typed character, one low tone under the outro. Social
+// feeds autoplay muted, so the video must read silent; sound is texture.
+const SLAM_FRAMES = [
+  0,
+  5,
+  14,
+  TITLE_DURATION,
+  TITLE_DURATION + 5,
+  THEME_END,
+  ...FEATURES.map((_, i) => COUNT_END + i * SLAM_DURATION + 2),
+  CTA_END,
+  CTA_END + 6,
+];
+
+const TICK_FRAMES = Array.from(
+  CTA_TEXT,
+  (_, i) => FEATURES_END + Math.round((i * FPS) / CTA_CHARS_PER_SECOND)
+);
+
+const Soundtrack = () => (
+  <>
+    {SLAM_FRAMES.map((from) => (
+      <Sequence
+        durationInFrames={8}
+        from={from}
+        key={`thud-${from}`}
+        layout="none"
+      >
+        <Audio src={staticFile("sfx/thud.wav")} volume={0.85} />
+      </Sequence>
+    ))}
+    {TICK_FRAMES.map((from, i) => (
+      <Sequence
+        durationInFrames={3}
+        from={from}
+        key={`tick-${from}-${String(i)}`}
+        layout="none"
+      >
+        <Audio src={staticFile("sfx/tick.wav")} volume={0.3} />
+      </Sequence>
+    ))}
+    <Sequence durationInFrames={40} from={CTA_END} layout="none">
+      <Audio src={staticFile("sfx/tone.wav")} volume={0.55} />
+    </Sequence>
+  </>
+);
 
 const MARQUEE = "docker doctor v0.5.0 ✦ compose + ai agents ✦ ";
 
@@ -449,6 +504,7 @@ export const ComposeAgents = () => {
         </div>
       </AbsoluteFill>
       <Grain />
+      <Soundtrack />
     </AbsoluteFill>
   );
 };
