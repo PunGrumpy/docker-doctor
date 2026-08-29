@@ -382,9 +382,15 @@ export const DURATION = CTA_END + OUT_DURATION;
 
 // ─── Sound ──────────────────────────────────────────────────────────────────
 
-// Three synthesized effects (scripts/make-sfx.py): a thud on every slam and
-// scene cut, a tick per typed character, one low tone under the outro. Social
-// feeds autoplay muted, so the video must read silent; sound is texture.
+// Three synthesized effects (scripts/make-sfx.py), modeled on the arcade
+// button foley basement.studio uses: a mechanical clack on every slam and
+// scene cut, a lighter tick per typed character, one warm tone under the
+// outro. Each clack plays at a slightly different rate so thirteen presses
+// read as a hand on a keyboard, not a sampler. Social feeds autoplay muted,
+// so the video must read silent; sound is texture.
+// Semitone-ish spread around unity, walked deterministically.
+const PITCH_STEPS = [1, 0.95, 1.05, 0.97, 1.02];
+
 const SLAM_FRAMES = [
   0,
   5,
@@ -404,14 +410,18 @@ const TICK_FRAMES = Array.from(
 
 const Soundtrack = () => (
   <>
-    {SLAM_FRAMES.map((from) => (
+    {SLAM_FRAMES.map((from, i) => (
       <Sequence
         durationInFrames={8}
         from={from}
-        key={`thud-${from}`}
+        key={`clack-${from}`}
         layout="none"
       >
-        <Audio src={staticFile("sfx/thud.wav")} volume={0.85} />
+        <Audio
+          playbackRate={PITCH_STEPS[i % PITCH_STEPS.length]}
+          src={staticFile("sfx/clack.wav")}
+          volume={0.8}
+        />
       </Sequence>
     ))}
     {TICK_FRAMES.map((from, i) => (
@@ -421,11 +431,11 @@ const Soundtrack = () => (
         key={`tick-${from}-${String(i)}`}
         layout="none"
       >
-        <Audio src={staticFile("sfx/tick.wav")} volume={0.3} />
+        <Audio src={staticFile("sfx/tick.wav")} volume={0.35} />
       </Sequence>
     ))}
     <Sequence durationInFrames={40} from={CTA_END} layout="none">
-      <Audio src={staticFile("sfx/tone.wav")} volume={0.55} />
+      <Audio src={staticFile("sfx/tone.wav")} volume={0.5} />
     </Sequence>
   </>
 );
