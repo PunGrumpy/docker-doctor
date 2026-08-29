@@ -434,7 +434,7 @@ const musicVolume = (frame: number): number =>
   interpolate(
     frame,
     [0, MUSIC_FADE_IN, DURATION - MUSIC_FADE_OUT, DURATION - 5],
-    [0, 0.6, 0.6, 0],
+    [0, 0.35, 0.35, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
