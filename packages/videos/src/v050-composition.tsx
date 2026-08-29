@@ -11,19 +11,19 @@ import {
 import { Typewriter } from "./components/remocn/typewriter";
 import { FONT_VARS, SANS } from "./fonts";
 
-// The v0.5.0 release video, styled after basement.studio: near-black stage,
+// The v0.5.0 release video, styled after basement.studio: paper-white stage,
 // heavy Geist stacked caps slamming in on hard cuts, marquee
 // strips top and bottom, film grain, one brand-blue accent. No fades anywhere —
 // every scene change is a cut, every reveal is a clip-mask slam.
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
 
-const BLACK = "#0d0d0d";
-const PAPER = "#fbfbf9";
+const BLACK = "#fbfbf9";
+const PAPER = "#111110";
 // The brand blue from the site mark (apps/web/components/logo.tsx).
 const BRAND = "#2b7fff";
-const FAINT = "rgba(251,251,249,0.34)";
-const HAIRLINE = "rgba(251,251,249,0.16)";
+const FAINT = "rgba(17,17,16,0.38)";
+const HAIRLINE = "rgba(17,17,16,0.14)";
 
 // ─── Texture ────────────────────────────────────────────────────────────────
 
