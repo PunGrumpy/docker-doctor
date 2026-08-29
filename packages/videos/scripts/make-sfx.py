@@ -14,6 +14,7 @@ sine-based: no noise sources anywhere in the signal path.
   thump.wav - a soft sub impact for scene cuts (120 -> 45 Hz drop)
   blip.wav  - a clean D3 pluck; the rule counter plays it per increment
               at rising D-minor-pentatonic playback rates
+  tick.wav  - a tiny soft key tick, one per typed CTA character
 """
 
 import math
@@ -151,8 +152,22 @@ def blip(rate: int = 44100) -> list[float]:
     return samples
 
 
+def tick(rate: int = 44100) -> list[float]:
+    duration = 0.035
+    n = int(rate * duration)
+    samples = []
+    for i in range(n):
+        t = i / rate
+        s = math.sin(2.0 * math.pi * 950.0 * t)
+        s += 0.3 * math.sin(2.0 * math.pi * 1900.0 * t)
+        env = min(1.0, i / (rate * 0.0015)) * math.exp(-t * 220.0)
+        samples.append(s * env)
+    return samples
+
+
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     write_wav("music.wav", music(), rate=22050, peak_target=0.55)
     write_wav("thump.wav", thump(), rate=44100, peak_target=0.6)
     write_wav("blip.wav", blip(), rate=44100, peak_target=0.45)
+    write_wav("tick.wav", tick(), rate=44100, peak_target=0.25)

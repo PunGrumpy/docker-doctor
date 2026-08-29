@@ -385,9 +385,9 @@ export const DURATION = CTA_END + OUT_DURATION;
 // A composed music bed plus two accents (scripts/make-sfx.py), in the
 // product-launch style of ElevenLabs' videos: 22.5 s of minimal electronic
 // in D minor at 96 BPM under the whole video, a soft sub thump on each
-// scene cut, and a rising pluck per counter increment. All sine-based, no
-// noise sources. Social feeds autoplay muted, so the video must read
-// silent; sound is texture.
+// scene cut, a rising pluck per counter increment, and a tiny key tick per
+// typed CTA character. All sine-based, no noise sources. Social feeds
+// autoplay muted, so the video must read silent; sound is texture.
 const THUMP_FRAMES = [
   0,
   TITLE_DURATION,
@@ -418,6 +418,12 @@ const BLIP_RATES = [1, 6 / 5, 4 / 3, 3 / 2, 16 / 9, 2];
   }
 }
 
+// One tick per typed character, mirroring the Typewriter's pacing exactly.
+const TICK_FRAMES = Array.from(
+  CTA_TEXT,
+  (_, i) => FEATURES_END + Math.round((i * FPS) / CTA_CHARS_PER_SECOND)
+);
+
 // Slight deterministic pitch walk so repeated thumps stay organic.
 const PITCH_STEPS = [1, 0.96, 1.04, 0.98];
 
@@ -446,6 +452,20 @@ const Soundtrack = () => (
           playbackRate={rate}
           src={staticFile("sfx/blip.wav")}
           volume={0.55}
+        />
+      </Sequence>
+    ))}
+    {TICK_FRAMES.map((from, i) => (
+      <Sequence
+        durationInFrames={3}
+        from={from}
+        key={`tick-${from}-${String(i)}`}
+        layout="none"
+      >
+        <Audio
+          playbackRate={i % 2 === 0 ? 1 : 0.93}
+          src={staticFile("sfx/tick.wav")}
+          volume={0.3}
         />
       </Sequence>
     ))}
