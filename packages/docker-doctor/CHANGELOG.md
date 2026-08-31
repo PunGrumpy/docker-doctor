@@ -1,5 +1,20 @@
 # @docker-doctor/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- c1218ff: Understand the Compose `models:` element (Docker Model Runner) with two new rules: `undefined-model-reference` (error) flags service-level model references with no matching top-level declaration, and `pin-model-version` (warning) flags model artifacts with no tag or a `latest` tag. Unpinned weights change behavior with nothing visible in version control.
+- 9ee6eec: Add three Compose security rules aimed at agent-era compose files: `no-privileged-service` (error) flags `privileged: true`, `no-docker-socket-mount` (error) flags bind mounts of `/var/run/docker.sock` in short or long volume syntax, and `no-plaintext-secrets` (warning) flags literal credential values in `environment`. Because new rules add findings, existing projects can score lower than on 0.4.x.
+- 536d47c: Implement `ignore.files`. The config key was documented, typed, and validated but consumed by nothing. Glob patterns (`vendored/**`, `**/Dockerfile.test`) now exclude matching files from discovery: they produce no diagnostics, don't affect the score, and don't appear in the report's `project` lists. `**` crosses directories; `*` and `?` stay within one path segment.
+- 12c7279: Add the `pin-service-image` Compose rule (warning): flags service `image:` references with no tag or with the mutable `latest` tag, mirroring `pin-image-version` for Dockerfiles. Services with a `build:` context and `${VAR}`-templated references are skipped.
+- 8aedfe8: `--score` now exits non-zero on the same condition as every other mode: an `error`-severity diagnostic is present. It previously exited 1 when the score was below 50, so the same project could pass with `--json` and fail with `--score`. If you relied on the old threshold as a CI gate, compare the printed score yourself (e.g. `[ "$(docker-doctor . --score)" -ge 50 ]`).
+
+### Patch Changes
+
+- d444521: Check services with an empty body. `services: { web: }` was skipped by every Compose rule, so the least-configured service in the file produced zero findings. An empty service now reports missing restart policy, resource limits, and the rest like any other service.
+- 3e1e0f9: Recognize Docker Hardened Images (`dhi.io/…`): `prefer-slim-base` no longer flags them as heavy bases, and `no-root-user` treats their runtime variants as nonroot by default (`-dev` variants still report). Moving to a hardened base no longer costs score points.
+
 ## 0.4.4
 
 ### Patch Changes
