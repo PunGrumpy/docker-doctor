@@ -16,6 +16,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write
 jobs:
   docker-doctor:
     runs-on: ubuntu-latest
@@ -38,6 +39,10 @@ See a live comment on [this pull request](https://github.com/PunGrumpy/docker-do
 
 The same summary is mirrored to the workflow's job summary. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there — pushes never fail the check either way.
 
+## Commit status
+
+Every run also publishes a commit status on the scanned commit: `Docker Doctor · Score: 82/100 · 1 error · 3 warnings`, with a Details link to the run. It appears in the checks line on pull requests and on the commit itself, so a push to your default branch still gets a score even though it gets no PR comment. On pull requests the status mirrors the `blocking` gate. On pushes it is always green. Publishing needs `statuses: write`; without it the action logs a warning and moves on. Set `commit-status: false` to turn it off.
+
 ## Inputs
 
 | Input | Default | Description |
@@ -46,6 +51,7 @@ The same summary is mirrored to the workflow's job summary. Add a `push` trigger
 | `version` | `latest` | `@docker-doctor/cli` version to run — pin it to keep scans reproducible. |
 | `blocking` | `none` | Which severities fail the check on pull requests: `none` (advisory), `warning`, or `error`. |
 | `comment` | `true` | Post/update the sticky summary comment on pull requests. |
+| `commit-status` | `true` | Publish a commit status with the score and issue counts, linking to the run. Requires `statuses: write`. |
 | `config` | — | Path to a [config file](/docs/reference/configuration), passed to the CLI as `--config`. |
 
 ## Outputs
