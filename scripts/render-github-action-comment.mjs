@@ -1,7 +1,8 @@
 /**
  * Renders a Docker Doctor JSON report into the sticky PR comment body,
  * mirrors it to the job summary, and writes step outputs (including the
- * gate status the final action step exits with).
+ * gate status the final action step exits with and the state/description
+ * the commit-status step posts).
  *
  * Inputs (env): DOCTOR_REPORT_FILE, DOCTOR_DIRECTORY, DOCTOR_BLOCKING,
  * DOCTOR_HEAD_SHA, plus the standard GITHUB_* / RUNNER_TEMP runner vars.
@@ -285,16 +286,29 @@ const safeLabel = (label) => {
   return KNOWN_LABELS.has(text) ? text : "";
 };
 
-const stepOutputs = ({ errors, gate, infos, label, score, warnings }) => {
+const stepOutputs = ({
+  description,
+  errors,
+  gate,
+  infos,
+  label,
+  score,
+  warnings,
+}) => {
   const errorCount = Number(errors) || 0;
   const warningCount = Number(warnings) || 0;
   const infoCount = Number(infos) || 0;
+  // Advisory on pushes: findings never mark a default-branch commit red. On
+  // a pull request the status mirrors the gate step so the two never disagree.
+  const isPullRequest = env("GITHUB_EVENT_NAME") === "pull_request";
   return {
     "error-count": String(errorCount),
     "gate-status": gate,
     "info-count": String(infoCount),
     label: safeLabel(label),
     score: String(Number(score) || 0),
+    "status-description": description,
+    "status-state": isPullRequest && gate !== "0" ? "failure" : "success",
     "total-issues": String(errorCount + warningCount + infoCount),
     "warning-count": String(warningCount),
   };
@@ -308,6 +322,7 @@ const renderFailure = () => ({
     `<sub>If this looks like a bug, please <a href="https://github.com/PunGrumpy/docker-doctor/issues/new">open an issue</a>.</sub>`,
   ].join("\n"),
   outputs: stepOutputs({
+    description: "Scan could not complete",
     errors: 0,
     gate: "1",
     infos: 0,
@@ -358,6 +373,10 @@ const renderReport = (report) => {
   return {
     body: lines.join("\n"),
     outputs: stepOutputs({
+      description:
+        scannedFiles === 0
+          ? "No Dockerfiles or Compose files found"
+          : `Score: ${report.score}/100 · ${plural(errors, "error")} · ${plural(warnings, "warning")}`,
       errors,
       gate: gateStatus(errors, warnings),
       infos: total - errors - warnings,

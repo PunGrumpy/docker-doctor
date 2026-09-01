@@ -1,5 +1,5 @@
 name: "Docker Doctor"
-description: "Scan Dockerfiles and Compose files for security, performance, and best-practice issues, with a sticky PR summary comment"
+description: "Scan Dockerfiles and Compose files for security, performance, and best-practice issues, with a sticky PR summary comment and a commit status"
 author: "PunGrumpy"
 
 branding:
@@ -21,6 +21,10 @@ inputs:
     default: "none"
   comment:
     description: "Post/update a sticky summary comment on pull requests"
+    required: false
+    default: "true"
+  commit-status:
+    description: "Publish a commit status with the score and error/warning counts, linking to the run. Shows the result on pushes, where there is no PR comment. Requires 'statuses: write' (skipped with a warning otherwise)."
     required: false
     default: "true"
   config:
@@ -128,6 +132,41 @@ runs:
           } catch (error) {
             core.warning(
               `Docker Doctor could not post the PR comment (grant 'pull-requests: write' and 'issues: write'): ${error.message}`
+            );
+          }
+
+    # The render step computes the state and description; this step only posts
+    # them so the logic stays in one testable script.
+    - name: Publish commit status
+      if: always() && inputs.commit-status == 'true'
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        DOCTOR_STATUS_STATE: ${{ steps.render.outputs.status-state }}
+        DOCTOR_STATUS_DESCRIPTION: ${{ steps.render.outputs.status-description }}
+        # On a PR, `github.sha` is the synthetic merge commit; the status must
+        # land on the head commit. `github.sha` covers pushes.
+        DOCTOR_STATUS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        DOCTOR_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      with:
+        script: |
+          // Empty outputs mean the render step itself crashed: fail the PR
+          // status rather than show green, stay green on pushes (advisory).
+          const isPullRequest = context.eventName === "pull_request";
+          const fallbackState = isPullRequest ? "failure" : "success";
+          const description =
+            process.env.DOCTOR_STATUS_DESCRIPTION || "Scan could not complete";
+          try {
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: process.env.DOCTOR_STATUS_SHA,
+              state: process.env.DOCTOR_STATUS_STATE || fallbackState,
+              context: "Docker Doctor",
+              description: description.slice(0, 140),
+              target_url: process.env.DOCTOR_RUN_URL,
+            });
+          } catch (error) {
+            core.warning(
+              `Docker Doctor could not publish the commit status (grant 'statuses: write'): ${error.message}`
             );
           }
 
