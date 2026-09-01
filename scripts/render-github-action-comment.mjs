@@ -144,6 +144,9 @@ const blobUrl = (file, line) => {
   return `${serverUrl}/${repository}/blob/${headSha}/${sanitizeUrlPart(joined)}${fragment}`;
 };
 
+// GitHub-flavored markdown renders <relative-time> natively ("3 hours ago",
+// tooltip with the full date). The absolute UTC text inside is the fallback
+// for renderers without the element (email notifications, other viewers).
 const formatTimestamp = (iso) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -164,7 +167,7 @@ const formatTimestamp = (iso) => {
     .format(date)
     .replace(" AM", "am")
     .replace(" PM", "pm");
-  return `${day} ${time}`;
+  return `<relative-time datetime="${date.toISOString()}">${day} ${time} UTC</relative-time>`;
 };
 
 const countSummary = (diagnostics) => {
@@ -195,8 +198,8 @@ const fileRow = (file, diagnostics, updated) => {
 };
 
 const TABLE_HEADER = [
-  "| File | Status | Issues | Updated (UTC) |",
-  "| :--- | :----- | :----- | :------------ |",
+  "| File | Status | Issues | Updated |",
+  "| :--- | :----- | :----- | :------ |",
 ];
 
 const buildTable = (report) => {
