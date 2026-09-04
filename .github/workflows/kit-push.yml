@@ -91,7 +91,26 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "cli=$cli" >> "$GITHUB_OUTPUT"
+      # Ask Docker Hub directly. `sbx kit inspect` needs credentials this
+      # step does not have, so it failed for existing tags too and the
+      # workflow re-pushed 0.1.5 over itself on 2026-09-04.
+      - name: Check whether the tag already exists
+        id: exists
+        env:
+          TAG: ${{ steps.kit.outputs.version }}
+        run: |
+          repo_path="${KIT_REPO#docker.io/}"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' "https://hub.docker.com/v2/repositories/${repo_path}/tags/${TAG}")"
+          case "$code" in
+            200) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::error::Docker Hub returned HTTP $code for ${repo_path}:${TAG}; refusing to guess whether the tag exists."
+              exit 1
+              ;;
+          esac
       - name: Install Docker Sandboxes CLI
+        if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
         run: |
           curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
           # docker-sbx is pinned: 0.39.0 changed `sbx kit push` to read only
@@ -101,14 +120,6 @@ jobs:
           # advertises reading `docker login` credentials again — re-test and
           # unpin once it reaches the stable apt channel.
           sudo apt-get install -y "docker-sbx=0.38.0-1~ubuntu.24.04~noble"
-      - name: Check whether the tag already exists
-        id: exists
-        run: |
-          if sbx kit inspect "$KIT_REPO:${{ steps.kit.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Refuse to overwrite an existing tag
         if: ${{ github.event_name == 'workflow_dispatch' && steps.exists.outputs.exists == 'true' && !inputs.force }}
         run: |
