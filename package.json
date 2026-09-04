@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": [
     "apps/*",
+    "kits/*",
     "packages/*"
   ],
   "type": "module",
@@ -15,8 +16,9 @@
     "fix": "ultracite fix",
     "clean": "turbo run clean && git clean -xdf node_modules",
     "changeset": "changeset",
-    "changeset:version": "changeset version && bun install",
+    "changeset:version": "changeset version && bun run kit:sync && bun install",
     "changeset:publish": "turbo run build --filter @docker-doctor/cli && changeset publish",
+    "kit:sync": "bun scripts/sync-kit-spec.ts",
     "doctor": "react-doctor",
     "docs:rules": "bun scripts/generate-rules-doc.ts",
     "prepare": "husky"

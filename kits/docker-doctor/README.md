@@ -48,9 +48,9 @@ None — the kit writes only inside the sandbox (global npm install + home-direc
 
 ## Publishing (maintainers)
 
-The kit versions independently of the CLI it installs — its own semver lives in `spec.yaml` (`version:`), the same way the GitHub Action's `v1` tag is independent of the npm package. Docker Hub tags are immutable by policy: every push gets a fresh version, `:latest` floats.
+The kit versions independently of the CLI it installs — its semver is `version` in `package.json`, managed by Changesets like the npm package, and `bun run kit:sync` mirrors it (plus the `@docker-doctor/cli` pin) into `spec.yaml`, which is what `sbx kit push` publishes. Docker Hub tags are immutable by policy: every push gets a fresh version, `:latest` floats.
 
-- **CLI release (automatic)** — when the Release workflow publishes `@docker-doctor/cli` to npm, it re-pins `spec.yaml`, bumps the kit's **patch** version, commits both back to `main`, and pushes `:<kit-version>` + `:latest`.
-- **Kit-only change (automatic)** — bump `version:` in the same PR (minor for new behavior, patch for fixes; CI fails the PR if you forget) and merging publishes it. The manual **Kit Push** workflow (`Actions → Kit Push → Run workflow`) remains for backfills and deliberate overwrites (`force`).
+- **CLI release (automatic)** — `package.json` pins `@docker-doctor/cli` to an exact version, so `changeset version` bumps the kit's **patch** version and the pin whenever the CLI is released, inside the same Version Packages PR. Merging it publishes the CLI to npm (Release workflow) and, once that version resolves on npm, pushes `:<kit-version>` + `:latest` (Kit Push workflow).
+- **Kit-only change** — add a changeset for `docker-doctor-kit` in the same PR (`bunx changeset`; minor for new behavior, patch for fixes — CI fails the PR if you forget). The bump lands through the Version Packages PR and merging that publishes it. The manual **Kit Push** workflow (`Actions → Kit Push → Run workflow`) remains for backfills and deliberate overwrites (`force`).
 
 Both paths authenticate with the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repository secrets.

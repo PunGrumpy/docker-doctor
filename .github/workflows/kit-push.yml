@@ -1,12 +1,16 @@
 name: Kit Push
 
-# The kit's version lives in spec.yaml (version:) — the changeset-equivalent
-# for this artifact:
+# The kit is a private workspace package (kits/docker-doctor/package.json)
+# versioned by Changesets. It pins @docker-doctor/cli exactly, so every CLI
+# release bumps the kit's patch version in the same Version Packages PR;
+# kit-only changes ship with their own changeset. `bun run kit:sync` mirrors
+# the version and the CLI pin into spec.yaml, the file that gets published.
 #
-#   - pull_request: fail if the kit changed without a version bump
-#   - push to main: publish the version automatically if its tag is new
-#     (the release workflow's pin commits carry [skip ci], so they never
-#     double-trigger this — release.yml pushes those itself)
+#   - pull_request: fail if the kit changed without a changeset (the Version
+#     Packages PR is exempt — it carries the bump itself) or spec.yaml drifted
+#   - push to main: publish spec.yaml's version if its Docker Hub tag is new,
+#     waiting for the pinned CLI to reach npm first (the Release workflow
+#     publishes it from the same merge)
 #   - workflow_dispatch: backfill or deliberately overwrite (force)
 
 on:
@@ -37,32 +41,34 @@ env:
   KIT_REPO: docker.io/pungrumpy/docker-doctor-kit
 
 jobs:
-  require-version-bump:
+  require-changeset:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Require a version bump when the kit changes
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Require spec.yaml to match package.json
+        run: bun scripts/sync-kit-spec.ts --check
+      - name: Require a changeset when the kit changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --depth=1 origin "$BASE_SHA"
-          base="$(git show "$BASE_SHA:kits/docker-doctor/spec.yaml" 2>/dev/null | awk -F'"' '/^version:/ { print $2; exit }')"
-          head="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DIR/spec.yaml")"
-          if [ -z "$head" ]; then
-            echo "::error::No version field in $KIT_DIR/spec.yaml"
-            exit 1
+          base="$(git show "$BASE_SHA:kits/docker-doctor/package.json" 2>/dev/null | jq -r '.version // empty')"
+          head="$(jq -r .version "$KIT_DIR/package.json")"
+          if [ "$head" != "$base" ]; then
+            echo "Kit version: ${base:-<none>} -> $head (bumped in this PR)"
+            exit 0
           fi
-          if [ "$head" = "$base" ]; then
-            echo "::error::This PR changes the kit but leaves version: at $head — bump it in spec.yaml (minor for new behavior, patch for fixes)."
-            exit 1
+          if git diff --name-only --diff-filter=A "$BASE_SHA" HEAD -- '.changeset/*.md' \
+            | xargs -r grep -lE '^"?docker-doctor-kit"?:' >/dev/null; then
+            echo "Found a changeset for docker-doctor-kit."
+            exit 0
           fi
-          if [ -n "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$head" | sort -V | tail -n1)" != "$head" ]; then
-            echo "::error::version: went backwards ($base -> $head)."
-            exit 1
-          fi
-          echo "Kit version: ${base:-<none>} -> $head"
+          echo "::error::This PR changes the kit without a changeset — run \`bunx changeset\` and pick docker-doctor-kit (minor for new behavior, patch for fixes)."
+          exit 1
 
   push:
     if: ${{ github.event_name != 'pull_request' }}
@@ -70,15 +76,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Read kit version from spec.yaml
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Require spec.yaml to match package.json
+        run: bun scripts/sync-kit-spec.ts --check
+      - name: Read kit version and CLI pin from spec.yaml
         id: kit
         run: |
           version="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DIR/spec.yaml")"
-          if [ -z "$version" ]; then
-            echo "::error::No version field found in $KIT_DIR/spec.yaml"
+          cli="$(/usr/bin/grep -oE '@docker-doctor/cli@[[:alnum:]._-]+' "$KIT_DIR/spec.yaml" | head -n1 | cut -d@ -f3)"
+          if [ -z "$version" ] || [ -z "$cli" ]; then
+            echo "::error::Could not read version ($version) or CLI pin ($cli) from $KIT_DIR/spec.yaml"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "cli=$cli" >> "$GITHUB_OUTPUT"
       - name: Install Docker Sandboxes CLI
         run: |
           curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
@@ -100,11 +112,29 @@ jobs:
       - name: Refuse to overwrite an existing tag
         if: ${{ github.event_name == 'workflow_dispatch' && steps.exists.outputs.exists == 'true' && !inputs.force }}
         run: |
-          echo "::error::$KIT_REPO:${{ steps.kit.outputs.version }} already exists. Bump version in spec.yaml, or re-run with force to overwrite."
+          echo "::error::$KIT_REPO:${{ steps.kit.outputs.version }} already exists. Add a changeset for docker-doctor-kit, or re-run with force to overwrite."
           exit 1
       - name: Already published — nothing to do
         if: ${{ github.event_name == 'push' && steps.exists.outputs.exists == 'true' }}
         run: echo "::notice::$KIT_REPO:${{ steps.kit.outputs.version }} is already on Docker Hub; skipping."
+      # A CLI release merges the kit bump and the CLI bump in one commit, so
+      # this run races the Release workflow's npm publish. Never ship a kit
+      # whose `npm install -g @docker-doctor/cli@X` cannot resolve.
+      - name: Wait for the pinned CLI to reach npm
+        if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
+        env:
+          CLI_VERSION: ${{ steps.kit.outputs.cli }}
+        run: |
+          for attempt in $(seq 1 40); do
+            if npm view "@docker-doctor/cli@${CLI_VERSION}" version >/dev/null 2>&1; then
+              echo "@docker-doctor/cli@${CLI_VERSION} is on npm."
+              exit 0
+            fi
+            echo "Attempt $attempt/40: @docker-doctor/cli@${CLI_VERSION} not on npm yet; retrying in 30s."
+            sleep 30
+          done
+          echo "::error::@docker-doctor/cli@${CLI_VERSION} never appeared on npm — did the Release workflow fail? Re-run this workflow once it has published."
+          exit 1
       - name: Log in to Docker Hub
         if: ${{ steps.exists.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.force) }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

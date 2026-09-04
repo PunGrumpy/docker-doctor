@@ -23,7 +23,7 @@ jobs:
           - name: Check
             command: bun run check
           - name: Format
-            command: bun run fix && bun run docs:rules && git diff --exit-code
+            command: bun run fix && bun run docs:rules && bun run kit:sync && git diff --exit-code
           - name: Typecheck
             command: bun run typecheck
           - name: Test
