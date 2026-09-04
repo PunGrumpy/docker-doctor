@@ -7,5 +7,9 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["web", "@docker-doctor/core"]
+  "ignore": ["web", "videos", "@docker-doctor/core"],
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  }
 }
