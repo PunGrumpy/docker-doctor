@@ -1,15 +1,20 @@
 name: Release
 
+# Changesets v3 flow (https://changesets.dev/guide/automating):
+#
+#   select-mode  →  version   (changesets present: open/update the Version Packages PR)
+#                →  pack      (none left, unpublished versions: build + tarball)
+#                     →  publish  (npm via OIDC trusted publishing, then the kit + web deploy)
+#
+# Splitting the jobs keeps `id-token: write` on the publish job alone.
+
 on:
   push:
     branches:
       - main
 
-permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
-  issues: write
+# Each job declares exactly what it needs.
+permissions: {}
 
 # One release at a time; never cancel a run that may already have published.
 concurrency:
@@ -20,18 +25,25 @@ env:
   SKIP_ENV_VALIDATION: "1"
 
 jobs:
-  release:
+  select-mode:
+    name: Select mode
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci') }}
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.select-mode.outputs.mode }}
+      publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Prepare repository
-        run: git fetch --unshallow --tags
+        with:
+          persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@v7
-      - name: Update NPM
-        run: npm install -g npm@latest
+        with:
+          node-version: 24
+          package-manager-cache: false
       - name: Install Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: Setup Bun cache
@@ -42,26 +54,124 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
+      - name: Select Changesets mode
+        id: select-mode
+        uses: changesets/action/select-mode@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
+
+  version:
+    name: Version
+    needs: select-mode
+    if: ${{ needs.select-mode.outputs.mode == 'version' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Setup Bun cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Create or update the Version Packages PR
+        uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
+        with:
+          # changeset:version also resyncs bun.lock so the Version Packages
+          # PR doesn't fail the Format CI job with a stale lockfile.
+          script: bun run changeset:version
+        env:
+          HUSKY: "0"
+
+  pack:
+    name: Pack
+    needs: select-mode
+    if: ${{ needs.select-mode.outputs.mode == 'publish' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Setup Bun cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Run tests
         run: bun run test
       - name: Build
         run: bun run build --filter @docker-doctor/cli
-      - name: Create Release PR or Publish to NPM
-        id: changesets
-        # Held at v1 deliberately: changesets/action v2 requires Changesets
-        # CLI v3 and renames these inputs to version-script/publish-script.
-        # This repo is on @changesets/cli ^2.31.1. Bump both together or
-        # neither — see the Dependabot ignore rule.
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+      - name: Pack publishable packages
+        id: pack
+        uses: changesets/action/pack@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
-          # changeset:version also resyncs bun.lock so the Version Packages
-          # PR doesn't fail the Format CI job with a stale lockfile.
-          version: bun run changeset:version
-          publish: bun run changeset:publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: "" # Workaround for https://github.com/changesets/action/pull/545
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+
+  publish:
+    name: Publish
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub release + git tag, and the kit re-pin commit below
+      id-token: write # npm trusted publishing (also yields the provenance attestation)
+    steps:
+      # Credentials stay on disk here on purpose: the kit re-pin step pushes
+      # a commit back to main.
+      - name: Checkout
+        uses: actions/checkout@v7
+      # Node 24 bundles npm >= 11.5.1, the floor for trusted publishing.
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Setup Bun cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Publish to npm
+        id: publish
+        uses: changesets/action/publish@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
       # Kit release: when a new CLI version reaches npm, re-pin the Docker
       # Sandboxes kit to it, bump the kit's own patch version, and push the
       # kit to Docker Hub in the same run. The kit versions independently of
@@ -69,15 +179,15 @@ jobs:
       # through the Kit Push workflow (kit-push.yml).
       - name: Detect published CLI version
         id: cli
-        if: steps.changesets.outputs.published == 'true'
+        if: ${{ steps.publish.outputs.published == 'true' }}
         env:
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.publish.outputs.published-packages }}
         run: |
           version="$(jq -r '.[] | select(.name == "@docker-doctor/cli") | .version' <<<"$PUBLISHED")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Re-pin kit and bump its patch version
         id: kit
-        if: steps.cli.outputs.version != ''
+        if: ${{ steps.cli.outputs.version != '' }}
         env:
           # The husky pre-commit hook (format + build) is pointless in CI and
           # leaves regenerated files unstaged, which then breaks the rebase.
@@ -105,7 +215,7 @@ jobs:
           fi
           echo "version=$kit_version" >> "$GITHUB_OUTPUT"
       - name: Install Docker Sandboxes CLI
-        if: steps.kit.outputs.version != ''
+        if: ${{ steps.kit.outputs.version != '' }}
         run: |
           curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
           # docker-sbx is pinned: 0.39.0 changed `sbx kit push` to read only
@@ -116,13 +226,13 @@ jobs:
           # unpin once it reaches the stable apt channel.
           sudo apt-get install -y "docker-sbx=0.38.0-1~ubuntu.24.04~noble"
       - name: Log in to Docker Hub
-        if: steps.kit.outputs.version != ''
+        if: ${{ steps.kit.outputs.version != '' }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Push kit to Docker Hub
-        if: steps.kit.outputs.version != ''
+        if: ${{ steps.kit.outputs.version != '' }}
         run: |
           sbx kit validate ./kits/docker-doctor
           sbx kit push ./kits/docker-doctor "docker.io/pungrumpy/docker-doctor-kit:${{ steps.kit.outputs.version }}"
@@ -136,7 +246,7 @@ jobs:
         # !cancelled(): the changelog page only needs the npm publish, so a
         # failed kit push earlier in the job must not skip this step (it did
         # for 0.4.4, leaving the page stale — the exact problem #98 fixed).
-        if: ${{ !cancelled() && steps.changesets.outputs.published == 'true' }}
+        if: ${{ !cancelled() && steps.publish.outputs.published == 'true' }}
         env:
           DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
