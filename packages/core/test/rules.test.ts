@@ -762,6 +762,54 @@ describe("Compose Security Rules", () => {
     expect(diags[1].line).toBe(9);
   });
 
+  test("no-docker-socket-mount: every host spelling of the socket", () => {
+    const source = `services:
+  gateway:
+    image: docker/mcp-gateway:1.0
+    volumes:
+      - \${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      - /run/docker.sock:/var/run/docker.sock
+      - ~/.docker/run/docker.sock:/var/run/docker.sock:ro
+      - //var/run/docker.sock:/var/run/docker.sock
+      - \\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine
+      - \${DOCKER_SOCK}:/var/run/docker.sock
+      - type: bind
+        source: \${XDG_RUNTIME_DIR:-/run/user/1000}/docker.sock
+        target: /var/run/docker.sock
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = noDockerSocketMount.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags.map((d) => d.line)).toEqual([5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  test("no-docker-socket-mount: named volumes, unrelated binds, and unknown sources are clean", () => {
+    const composeContent = {
+      services: {
+        web: {
+          volumes: [
+            "docker.sock:/data",
+            "./docker.sock.bak:/backup",
+            "/var/run/docker.sock",
+            // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+            "${SOCK}:/tmp/sock",
+            // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+            "${SOCK:-/tmp/app.sock}:/var/run/docker.sock",
+            {
+              source: "sockets",
+              target: "/var/run/docker.sock",
+              type: "volume",
+            },
+          ],
+        },
+      },
+    };
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
+  });
+
   test("no-plaintext-secrets: map and list syntax, interpolation is clean", () => {
     const source = `services:
   agent:
@@ -880,6 +928,34 @@ models:
       "compose.yml"
     );
     expect(references).toHaveLength(0);
+  });
+
+  test("pin-model-version: service-level provider syntax", () => {
+    const source = `services:
+  llm:
+    provider:
+      type: model
+      options:
+        model: ai/gemma3
+  embeddings:
+    provider:
+      type: model
+      options:
+        model: ai/mxbai-embed-large:335M-F16
+  cache:
+    provider:
+      type: awscloud
+      options:
+        model: whatever
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = pinModelVersion.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("Service 'llm' model provider");
+    expect(diags[0].message).toContain("does not specify a tag");
+    expect(diags[0].line).toBe(6);
   });
 });
 

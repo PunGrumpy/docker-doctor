@@ -3,8 +3,6 @@ import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 import { isSecretKey } from "./secret-keywords";
 
-const DOCKER_SOCKET = "/var/run/docker.sock";
-
 export const noPrivilegedService: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -33,15 +31,87 @@ export const noPrivilegedService: ComposeRule = {
   message: "Do not run services in privileged mode",
 };
 
-const mountsDockerSocket = (volume: unknown): boolean => {
+const DOCKER_SOCKET_TARGET = "/var/run/docker.sock";
+
+// `${VAR:-default}` resolves to its default; `${VAR}`, `$VAR` and the
+// `?error` forms resolve to nothing.
+const INTERPOLATION_WITH_DEFAULT = /\$\{[^}:?-]+:?-(?<fallback>[^}]*)\}/gu;
+const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*/gu;
+
+const resolveInterpolationDefaults = (value: string): string =>
+  value
+    .replace(INTERPOLATION_WITH_DEFAULT, (_match, fallback: string) => fallback)
+    .replace(INTERPOLATION_WITHOUT_DEFAULT, "");
+
+// Named volumes cannot start with a path prefix, so only path-shaped
+// sources are bind mounts.
+const PATH_SHAPED = /^(?:[/.~]|[A-Za-z]:)/u;
+
+const isDockerSocketPath = (rawPath: string): boolean => {
+  const normalized = rawPath.replaceAll("\\", "/");
+  return (
+    PATH_SHAPED.test(normalized) &&
+    (normalized.endsWith("/docker.sock") ||
+      normalized.endsWith("/pipe/docker_engine"))
+  );
+};
+
+// `[SOURCE:]TARGET[:MODE]`, where a `${VAR:-default}` source has its own colon.
+const splitShortSyntax = (spec: string): string[] => {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of spec) {
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth = Math.max(0, depth - 1);
+    }
+    if (char === ":" && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+  return parts;
+};
+
+interface VolumeMount {
+  source: string | undefined;
+  target: string | undefined;
+}
+
+const volumeMount = (volume: unknown): VolumeMount | undefined => {
   if (typeof volume === "string") {
-    // Short syntax: SOURCE:TARGET[:MODE] (or a bare volume name).
-    return volume.split(":")[0] === DOCKER_SOCKET;
+    const [source, target] = splitShortSyntax(volume);
+    // A lone path is an anonymous volume at that target, not a bind mount.
+    return target === undefined ? undefined : { source, target };
   }
   if (volume && typeof volume === "object") {
-    return (volume as Record<string, unknown>).source === DOCKER_SOCKET;
+    const { source, target } = volume as Record<string, unknown>;
+    return {
+      source: typeof source === "string" ? source : undefined,
+      target: typeof target === "string" ? target : undefined,
+    };
   }
-  return false;
+  return undefined;
+};
+
+const mountsDockerSocket = (volume: unknown): boolean => {
+  const mount = volumeMount(volume);
+  if (!mount?.source) {
+    return false;
+  }
+  const resolvedSource = resolveInterpolationDefaults(mount.source);
+  if (resolvedSource !== "") {
+    return isDockerSocketPath(resolvedSource);
+  }
+  // A bare `${VAR}` source names no host path; the target still can.
+  return (
+    resolveInterpolationDefaults(mount.target ?? "") === DOCKER_SOCKET_TARGET
+  );
 };
 
 export const noDockerSocketMount: ComposeRule = {

@@ -72,22 +72,61 @@ export const undefinedModelReference: ComposeRule = {
   message: "Service model references must be declared in top-level models",
 };
 
+interface ModelBinding {
+  subject: string;
+  model: string;
+  path: (string | number)[];
+}
+
+// Top-level `models:` (Compose ≥ 2.38) plus the older service-level
+// `provider: { type: model }` form (Compose ≥ 2.35).
+const collectModelBindings = (composeContent: unknown): ModelBinding[] => {
+  const bindings: ModelBinding[] = [];
+
+  for (const [name, config] of Object.entries(topLevelModels(composeContent))) {
+    if (!config || typeof config !== "object") {
+      continue;
+    }
+    const { model } = config as Record<string, unknown>;
+    if (typeof model === "string") {
+      bindings.push({
+        model,
+        path: ["models", name, "model"],
+        subject: `Model '${name}' artifact`,
+      });
+    }
+  }
+
+  for (const [name, config] of composeServices(composeContent)) {
+    const { provider } = config;
+    if (!provider || typeof provider !== "object") {
+      continue;
+    }
+    const { type, options } = provider as Record<string, unknown>;
+    if (type !== "model" || !options || typeof options !== "object") {
+      continue;
+    }
+    const { model } = options as Record<string, unknown>;
+    if (typeof model === "string") {
+      bindings.push({
+        model,
+        path: ["services", name, "provider", "options", "model"],
+        subject: `Service '${name}' model provider`,
+      });
+    }
+  }
+
+  return bindings;
+};
+
 export const pinModelVersion: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
-    for (const [name, config] of Object.entries(
-      topLevelModels(composeContent)
+    for (const { subject, model, path } of collectModelBindings(
+      composeContent
     )) {
-      if (!config || typeof config !== "object") {
-        continue;
-      }
-      const { model } = config as Record<string, unknown>;
-      if (typeof model !== "string") {
-        continue;
-      }
-
       const ref = parseImageRef(model);
       if (ref.isVariable) {
         continue;
@@ -99,8 +138,8 @@ export const pinModelVersion: ComposeRule = {
       }
       const detail =
         issue === "untagged"
-          ? `Model '${name}' artifact '${model}' does not specify a tag.`
-          : `Model '${name}' artifact '${model}' uses the mutable 'latest' tag.`;
+          ? `${subject} '${model}' does not specify a tag.`
+          : `${subject} '${model}' uses the mutable 'latest' tag.`;
       diagnostics.push(
         createDiagnostic(
           file,
@@ -108,7 +147,7 @@ export const pinModelVersion: ComposeRule = {
           this.defaultSeverity,
           `${detail} Every pull may fetch different weights.`,
           this.help,
-          context?.locate?.(["models", name, "model"])
+          context?.locate?.(path)
         )
       );
     }

@@ -6,7 +6,7 @@ description: >-
   Docker Compose models without a tag pull different weights over time. How to pin Docker Model Runner models to a specific version.
 ---
 
-The top-level `models:` element (Docker Model Runner, Compose ≥ 2.35) declares AI models as OCI artifacts, and OCI rules apply: `model: ai/gemma3` with no tag resolves to whatever the registry currently serves. For a model, drift means _different weights_: often a different parameter count or quantization, with different memory needs and different behavior on the same prompts. This rule flags top-level models whose `model:` reference has no tag or uses `latest`.
+The top-level `models:` element (Docker Model Runner, Compose ≥ 2.35) declares AI models as OCI artifacts, and OCI rules apply: `model: ai/gemma3` with no tag resolves to whatever the registry currently serves. For a model, drift means _different weights_: often a different parameter count or quantization, with different memory needs and different behavior on the same prompts. This rule flags top-level models whose `model:` reference has no tag or uses `latest`, and applies the same check to the earlier service-level `provider: { type: model }` syntax.
 
 ## What the rule catches
 

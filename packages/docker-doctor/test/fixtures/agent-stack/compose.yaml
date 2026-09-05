@@ -1,0 +1,35 @@
+# Shapes from docker/compose-for-agents that the 0.5.0 rules missed.
+services:
+  mcp-gateway:
+    image: docker/mcp-gateway:0.9.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    volumes:
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+  agent:
+    image: my-agent:1.2.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    models: [gemma3]
+    depends_on:
+      mcp-gateway:
+        condition: service_started
+  llm:
+    provider:
+      type: model
+      options:
+        model: ai/gemma3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+models:
+  gemma3:
+    model: ai/gemma3:4B-Q4_0

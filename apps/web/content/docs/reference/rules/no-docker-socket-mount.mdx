@@ -6,7 +6,7 @@ description: >-
   Bind-mounting /var/run/docker.sock into a Compose service hands the container root on the host. Safer alternatives for tools that need the Docker API.
 ---
 
-Mounting `/var/run/docker.sock` into a container is the standard trick for anything that needs to talk to Docker: CI runners, reverse proxies that watch containers, and increasingly AI-agent tooling like MCP gateways that launch tool containers on demand. It is also equivalent to giving that container root on the host, because the Docker API can start privileged containers, mount any host path, and read every volume. This rule flags any service whose `volumes` bind-mount the Docker socket, in either the short or long syntax.
+Mounting `/var/run/docker.sock` into a container is the standard trick for anything that needs to talk to Docker: CI runners, reverse proxies that watch containers, and increasingly AI-agent tooling like MCP gateways that launch tool containers on demand. It is also equivalent to giving that container root on the host, because the Docker API can start privileged containers, mount any host path, and read every volume. This rule flags any service whose `volumes` bind-mount the Docker socket, in either the short or long syntax. It resolves `${VAR:-default}` interpolation to its default and recognizes the socket under its other host spellings: `/run/docker.sock`, rootless and Docker Desktop sockets under a home directory, and the Windows named pipe.
 
 ## What the rule catches
 
