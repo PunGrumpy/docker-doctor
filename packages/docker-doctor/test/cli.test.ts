@@ -85,6 +85,24 @@ describe("unanalyzable files", () => {
   });
 });
 
+describe("agent-stack fixture", () => {
+  test("reports the interpolated socket mount and the provider-syntax model", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("agent-stack"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    const report = JSON.parse(stdout);
+    const findings = report.diagnostics.map(
+      (d: { rule: string; line?: number }) => [d.rule, d.line]
+    );
+    expect(findings).toEqual([
+      ["docker-doctor/no-docker-socket-mount", 11],
+      ["docker-doctor/pin-model-version", 27],
+    ]);
+  });
+});
+
 describe("--json contract", () => {
   test("with-error fixture produces parseable JSON", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
