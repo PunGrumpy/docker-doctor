@@ -8,7 +8,7 @@ import {
 } from "../parsers/image-ref";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
-import { isSecretKey } from "./secret-keywords";
+import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 
 // USER accepts "user", "uid", "user:group" and "uid:gid". Only the user half
 // decides whether the container runs as root; the group half is irrelevant.
@@ -86,8 +86,7 @@ export const noSecretsInEnv: DockerfileRule = {
             const keyIsSecret = isSecretKey(key);
             if (
               keyIsSecret &&
-              value &&
-              !value.startsWith("$") &&
+              isLiteralSecretValue(value) &&
               !value.startsWith("{")
             ) {
               diagnostics.push(
@@ -120,8 +119,7 @@ export const noSecretsInEnv: DockerfileRule = {
             const keyIsSecret = isSecretKey(key);
             if (
               keyIsSecret &&
-              value &&
-              !value.startsWith("$") &&
+              isLiteralSecretValue(value) &&
               !value.startsWith("{")
             ) {
               diagnostics.push(

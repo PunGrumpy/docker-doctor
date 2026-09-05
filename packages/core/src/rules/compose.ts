@@ -41,8 +41,13 @@ export const requireResourceLimits: ComposeRule = {
         | Record<string, unknown>
         | undefined;
       const limits = resources?.limits as Record<string, unknown> | undefined;
+      const hasDeployLimits = Boolean(limits?.cpus || limits?.memory);
+      // Pre-`deploy` spelling of the same limits, still in the spec.
+      const hasServiceLevelLimits = Boolean(
+        config.mem_limit || config.cpus || config.cpu_quota
+      );
 
-      if (!limits || (!limits.cpus && !limits.memory)) {
+      if (!(hasDeployLimits || hasServiceLevelLimits)) {
         diagnostics.push(
           createDiagnostic(
             file,
