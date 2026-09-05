@@ -296,6 +296,35 @@ describe("Security Rules", () => {
     );
   });
 
+  test("no-secrets-in-env: credential-free URLs are endpoints, not secrets", () => {
+    const authUrl = parseDockerfile(`
+      ENV AUTH_URL=http://auth:8080
+      ENV TOKEN_ENDPOINT=https://id.example.com/oauth/token
+    `);
+    expect(noSecretsInEnv.check(authUrl, "Dockerfile")).toHaveLength(0);
+
+    const urlWithUserinfo = parseDockerfile(`
+      ENV DB_PASSWORD_URL=postgres://app:hunter2@db/app
+    `);
+    expect(noSecretsInEnv.check(urlWithUserinfo, "Dockerfile")).toHaveLength(1);
+  });
+
+  test("no-secrets-in-env: PGPASSWORD, APIKEY and PAT spellings", () => {
+    const spellings = parseDockerfile(`
+      ENV PGPASSWORD=hunter2
+      ENV OPENAI_APIKEY=sk-proj-abc
+      ENV GITHUB_PAT=ghp_abc
+      ENV PATH=/usr/local/bin:/usr/bin
+      ENV LOG_PATTERN=json
+    `);
+    const diags = noSecretsInEnv.check(spellings, "Dockerfile");
+    expect(diags.map((d) => d.message)).toEqual([
+      expect.stringContaining("'PGPASSWORD'"),
+      expect.stringContaining("'OPENAI_APIKEY'"),
+      expect.stringContaining("'GITHUB_PAT'"),
+    ]);
+  });
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
@@ -665,6 +694,21 @@ services:
   });
 });
 
+describe("Compose Rules — require-resource-limits", () => {
+  test("service-level mem_limit / cpus satisfy the rule", () => {
+    const composeContent = {
+      services: {
+        api: { cpus: 0.5, image: "acme/api:1.4.2", mem_limit: "512m" },
+        quota: { cpu_quota: 50_000, image: "acme/worker:1.4.2" },
+        unlimited: { image: "acme/web:1.4.2", mem_reservation: "256m" },
+      },
+    };
+    const diags = requireResourceLimits.check(composeContent, "compose.yml");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("'unlimited'");
+  });
+});
+
 describe("Compose Rules — pin-service-image", () => {
   test("flags untagged and latest images, skips pinned/built/variable ones", () => {
     const source = `services:
@@ -834,6 +878,28 @@ describe("Compose Security Rules", () => {
     expect(diags[0].line).toBe(5);
     expect(diags[1].message).toContain("'DB_PASSWORD'");
     expect(diags[1].line).toBe(11);
+  });
+
+  test("no-plaintext-secrets: URL endpoints are clean, agent-era key spellings are not", () => {
+    const composeContent = {
+      services: {
+        agent: {
+          environment: {
+            AUTH_URL: "http://auth:8080",
+            GITHUB_PAT: "ghp_abc",
+            OPENAI_APIKEY: "sk-proj-abc",
+            PGPASSWORD: "hunter2",
+            TOKEN_ENDPOINT: "https://id.example.com/oauth/token",
+          },
+        },
+      },
+    };
+    const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
+    expect(diags.map((d) => d.message)).toEqual([
+      expect.stringContaining("'GITHUB_PAT'"),
+      expect.stringContaining("'OPENAI_APIKEY'"),
+      expect.stringContaining("'PGPASSWORD'"),
+    ]);
   });
 
   test("compose security rules work without a locator", () => {

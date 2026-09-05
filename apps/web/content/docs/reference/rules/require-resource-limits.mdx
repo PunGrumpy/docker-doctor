@@ -44,6 +44,8 @@ services:
 
 `docker compose` applies `deploy.resources.limits` directly (no Swarm required). Size limits from observed usage plus real headroom — a limit that's too tight turns normal traffic spikes into OOM kills. Note that Java and Node runtimes size their heaps from the container limit only in recent versions; older runtimes may need explicit flags (`-Xmx`, `--max-old-space-size`) to match.
 
+The service-level `mem_limit`, `cpus`, and `cpu_quota` keys are the older spelling of the same limits and satisfy the rule too.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/require-resource-limits`

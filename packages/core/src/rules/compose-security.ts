@@ -1,7 +1,7 @@
 import type { ComposeRule, Diagnostic } from "../types/index";
 import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
-import { isSecretKey } from "./secret-keywords";
+import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 
 export const noPrivilegedService: ComposeRule = {
   category: "Compose",
@@ -148,11 +148,6 @@ export const noDockerSocketMount: ComposeRule = {
   message: "Do not bind-mount the Docker socket into services",
 };
 
-const isLiteralSecretValue = (value: unknown): boolean =>
-  // `$VAR` / `${VAR}` are interpolated from the host environment at
-  // `compose up` time, so the compose file itself holds no secret.
-  typeof value === "string" && value.length > 0 && !value.startsWith("$");
-
 export const noPlaintextSecrets: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -187,7 +182,11 @@ export const noPlaintextSecrets: ComposeRule = {
           }
           const key = entry.slice(0, eqIndex);
           const value = entry.slice(eqIndex + 1);
-          if (isSecretKey(key) && isLiteralSecretValue(value)) {
+          if (
+            isSecretKey(key) &&
+            typeof value === "string" &&
+            isLiteralSecretValue(value)
+          ) {
             flag(
               name,
               key,
@@ -197,7 +196,11 @@ export const noPlaintextSecrets: ComposeRule = {
         }
       } else if (environment && typeof environment === "object") {
         for (const [key, value] of Object.entries(environment)) {
-          if (isSecretKey(key) && isLiteralSecretValue(value)) {
+          if (
+            isSecretKey(key) &&
+            typeof value === "string" &&
+            isLiteralSecretValue(value)
+          ) {
             flag(
               name,
               key,
