@@ -54,7 +54,7 @@
     },
     "kits/docker-doctor": {
       "name": "docker-doctor-kit",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "@docker-doctor/cli": "0.5.0",
       },
@@ -73,7 +73,7 @@
     },
     "packages/docker-doctor": {
       "name": "@docker-doctor/cli",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "bin": {
         "docker-doctor": "dist/cli.mjs",
       },
