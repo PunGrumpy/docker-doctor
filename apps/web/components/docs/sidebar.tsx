@@ -60,7 +60,6 @@ const SidebarLink = ({
         ? "bg-muted text-foreground"
         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
     )}
-    data-active={active ? "true" : undefined}
     href={href}
   >
     {children}
@@ -133,7 +132,7 @@ export const DocsSidebar = ({ tree }: DocsSidebarProps) => {
   // A deep link can land on an entry far below the sidebar's own scroll.
   useEffect(() => {
     navRef.current
-      ?.querySelector('[data-active="true"]')
+      ?.querySelector(`a[href="${pathname}"]`)
       ?.scrollIntoView({ block: "nearest" });
   }, [pathname]);
 

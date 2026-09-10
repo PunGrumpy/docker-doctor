@@ -399,6 +399,10 @@ export const TerminalDemo = () => {
     if (!el) {
       return;
     }
+    // Tick 0 is the loop restarting: the body empties and grows again.
+    if (ticks === 0) {
+      lastScrollHeightRef.current = 0;
+    }
     if (el.scrollHeight <= lastScrollHeightRef.current) {
       lastScrollHeightRef.current = el.scrollHeight;
       return;

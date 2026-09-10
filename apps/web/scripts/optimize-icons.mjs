@@ -86,6 +86,18 @@ const SVGO_CONFIG = {
   ],
 };
 
+const formatBytes = (bytes) => {
+  if (bytes === 0) {
+    return "0 B";
+  }
+  const abs = Math.abs(bytes);
+  const sign = bytes < 0 ? "+" : "-";
+  if (abs < 1024) {
+    return `${sign}${abs} B`;
+  }
+  return `${sign}${(abs / 1024).toFixed(1)} KB`;
+};
+
 const processFile = async (filePath) => {
   let content = await fs.readFile(filePath, "utf-8");
   const original = content;
@@ -163,23 +175,14 @@ const processFile = async (filePath) => {
   console.log(`  ✓ ${path.basename(filePath)} (${formatBytes(saved)})`);
 };
 
-const formatBytes = (bytes) => {
-  if (bytes === 0) {
-    return "0 B";
-  }
-  const abs = Math.abs(bytes);
-  const sign = bytes < 0 ? "+" : "-";
-  if (abs < 1024) {
-    return `${sign}${abs} B`;
-  }
-  return `${sign}${(abs / 1024).toFixed(1)} KB`;
-};
-
 const main = async () => {
   const entries = await fs.readdir(ICONS_DIR, { withFileTypes: true });
-  const files = entries
-    .filter((e) => e.isFile() && e.name.endsWith(".tsx"))
-    .map((e) => path.join(ICONS_DIR, e.name));
+  const files = [];
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".tsx")) {
+      files.push(path.join(ICONS_DIR, entry.name));
+    }
+  }
 
   if (files.length === 0) {
     console.log("No TSX icon files found.");

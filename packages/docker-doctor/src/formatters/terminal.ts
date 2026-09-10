@@ -81,7 +81,7 @@ const printDiagnostics = (
       ruleCounts[d.rule] = (ruleCounts[d.rule] || 0) + 1;
     }
     const migrationRules = Object.entries(ruleCounts).filter(
-      ([_, count]) => count >= 5
+      ([, count]) => count >= 5
     );
     if (migrationRules.length > 0) {
       console.log();
