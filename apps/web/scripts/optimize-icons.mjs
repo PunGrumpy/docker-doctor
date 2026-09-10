@@ -177,9 +177,12 @@ const processFile = async (filePath) => {
 
 const main = async () => {
   const entries = await fs.readdir(ICONS_DIR, { withFileTypes: true });
-  const files = entries
-    .filter((e) => e.isFile() && e.name.endsWith(".tsx"))
-    .map((e) => path.join(ICONS_DIR, e.name));
+  const files = [];
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".tsx")) {
+      files.push(path.join(ICONS_DIR, entry.name));
+    }
+  }
 
   if (files.length === 0) {
     console.log("No TSX icon files found.");
