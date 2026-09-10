@@ -86,6 +86,18 @@ const SVGO_CONFIG = {
   ],
 };
 
+const formatBytes = (bytes) => {
+  if (bytes === 0) {
+    return "0 B";
+  }
+  const abs = Math.abs(bytes);
+  const sign = bytes < 0 ? "+" : "-";
+  if (abs < 1024) {
+    return `${sign}${abs} B`;
+  }
+  return `${sign}${(abs / 1024).toFixed(1)} KB`;
+};
+
 const processFile = async (filePath) => {
   let content = await fs.readFile(filePath, "utf-8");
   const original = content;
@@ -161,18 +173,6 @@ const processFile = async (filePath) => {
 
   const saved = original.length - content.length;
   console.log(`  ✓ ${path.basename(filePath)} (${formatBytes(saved)})`);
-};
-
-const formatBytes = (bytes) => {
-  if (bytes === 0) {
-    return "0 B";
-  }
-  const abs = Math.abs(bytes);
-  const sign = bytes < 0 ? "+" : "-";
-  if (abs < 1024) {
-    return `${sign}${abs} B`;
-  }
-  return `${sign}${(abs / 1024).toFixed(1)} KB`;
 };
 
 const main = async () => {
