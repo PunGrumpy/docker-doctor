@@ -17,9 +17,14 @@ interface DocsMobileNavProps {
 export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
+  const lastPathnameRef = useRef(pathname);
 
   // Close the drawer once navigation lands on the next page.
   useEffect(() => {
+    if (lastPathnameRef.current === pathname) {
+      return;
+    }
+    lastPathnameRef.current = pathname;
     dialogRef.current?.close();
   }, [pathname]);
 
@@ -66,7 +71,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
 
       <dialog
         aria-label="Documentation"
-        className="bg-background text-foreground fixed inset-y-0 start-auto end-0 z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none border-s border-dashed transition-[transform,overlay,display] transition-discrete duration-350 ease-[var(--ease-drawer)] backdrop:bg-black/40 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-350 backdrop:ease-[var(--ease-drawer)] open:translate-x-0 open:backdrop:opacity-100 motion-reduce:transition-none motion-reduce:backdrop:transition-none ltr:translate-x-full rtl:-translate-x-full starting:open:backdrop:opacity-0 starting:open:ltr:translate-x-full starting:open:rtl:-translate-x-full"
+        className="bg-background text-foreground fixed inset-y-0 inset-s-auto inset-e-0 z-50 m-0 h-dvh max-h-dvh w-[min(19rem,85vw)] max-w-none border-s border-dashed transition-[transform,overlay,display] transition-discrete duration-350 ease-[var(--ease-drawer)] backdrop:bg-black/40 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-350 backdrop:ease-[var(--ease-drawer)] open:translate-x-0 open:backdrop:opacity-100 motion-reduce:transition-none motion-reduce:backdrop:transition-none ltr:translate-x-full rtl:-translate-x-full starting:open:backdrop:opacity-0 starting:open:ltr:translate-x-full starting:open:rtl:-translate-x-full"
         id="docs-mobile-menu"
         onClose={() => {
           document.body.style.overflow = "";
