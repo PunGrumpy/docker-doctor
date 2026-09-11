@@ -93,9 +93,28 @@ jobs:
             ${{ runner.os }}-bun-
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      # Pushing the Version Packages PR with GITHUB_TOKEN gives it no CI:
+      # GitHub never runs workflows for events that token creates, so every
+      # pull_request run on changeset-release/main sat in action_required or
+      # failed with zero jobs (#125 and every release PR before it). Push it
+      # as a GitHub App instead. One-time setup: create an App with
+      # Contents: write and Pull requests: write, install it on this repo,
+      # then set the RELEASE_APP_ID repository variable and the
+      # RELEASE_APP_PRIVATE_KEY secret. Until both exist this step is skipped
+      # and the PR falls back to GITHUB_TOKEN (release still works, no CI).
+      - name: Mint a GitHub App token
+        id: app-token
+        if: ${{ vars.RELEASE_APP_ID != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
       - name: Create or update the Version Packages PR
         uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
           # changeset:version also resyncs bun.lock so the Version Packages
           # PR doesn't fail the Format CI job with a stale lockfile.
           script: bun run changeset:version
