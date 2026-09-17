@@ -443,7 +443,11 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   }
 };
 
-const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
+// Returns false when a post-scan step failed, so the caller can fold that into
+// the process exit code.
+const runInteractiveWizard = async (
+  context: WizardContext
+): Promise<boolean> => {
   try {
     const addGhActions = await askConfirm(
       "Add Docker Doctor to GitHub Actions?"
@@ -475,11 +479,17 @@ const runInteractiveWizard = async (context: WizardContext): Promise<void> => {
     }
 
     if (context.diagnostics.length === 0) {
-      return;
+      return true;
     }
     await runAgentHandoff(context);
-  } catch {
-    // Ignore prompt errors
+    return true;
+  } catch (error: unknown) {
+    // The prompts never reject, so anything caught here is a failed write:
+    // the workflow scaffold, .docker-doctor/, or .gitignore. Say so — a
+    // silent no-op after the user said "yes" is worse than the error.
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`\n  ${chalk.yellow("⚠")} Post-scan step failed: ${msg}`);
+    return false;
   }
 };
 
@@ -580,6 +590,10 @@ const runRulesEngine = async (
 // Exit 2 ("scan incomplete") outranks exit 1 ("findings"): a file we could not
 // analyze must never read as a clean pass.
 const SCAN_FAILURE_EXIT_CODE = 2;
+
+// A post-scan step that could not write its files is a failure of its own, but
+// never enough to outrank an incomplete scan.
+const POST_SCAN_FAILURE_EXIT_CODE = 1;
 
 // Parser errors are multi-line (they quote the offending source). Flatten them
 // so the summary stays a readable one-line-per-file list; the unflattened
@@ -754,14 +768,18 @@ program
           fileContents
         );
 
+        let wizardOk = true;
         if (process.stdout.isTTY && process.stdin.isTTY) {
-          await runInteractiveWizard({
+          wizardOk = await runInteractiveWizard({
             diagnostics,
             report: toJsonReport(diagnostics, score, label, project),
             rootDir,
           });
         }
-        process.exitCode = scanExitCode(scanIncomplete, hasErrors);
+        const exitCode = scanExitCode(scanIncomplete, hasErrors);
+        process.exitCode = wizardOk
+          ? exitCode
+          : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
