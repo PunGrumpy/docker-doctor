@@ -18,6 +18,8 @@ Unless you pass `--config <path>`, docker-doctor looks for the first of these, i
 
 If none of these exist, docker-doctor runs with its built-in defaults.
 
+The `.ts` form relies on Node.js importing TypeScript directly, which it does by default from 22.18 on. That version is the CLI's supported floor. On an older runtime docker-doctor exits with a message pointing here, so use the YAML or JSON form instead.
+
 ```bash
 npx @docker-doctor/cli@latest . --config ./custom-docker-doctor.config.ts
 ```
