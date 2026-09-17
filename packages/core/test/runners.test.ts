@@ -100,6 +100,20 @@ describe("runDockerfileRules", () => {
     expect(rootUserDiag?.severity).toBe("info");
     expect(pinVersionDiag?.severity).toBe("error");
   });
+
+  test("returns nothing for an instruction-free Dockerfile", () => {
+    const diagnostics = runDockerfileRules(
+      parseDockerfile("# only a comment\n"),
+      "Dockerfile",
+      []
+    );
+
+    expect(diagnostics).toEqual([]);
+    // The absence of a USER line used to be reported as running as root.
+    expect(
+      findByRule(diagnostics, "docker-doctor/no-root-user")
+    ).toBeUndefined();
+  });
 });
 
 describe("runComposeRules", () => {
