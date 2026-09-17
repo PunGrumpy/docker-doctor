@@ -45,9 +45,9 @@ export default {
     "docker-doctor/use-multi-stage": "warning",
   },
   // Per-category override. Categories: "Security" | "Performance" | "Best Practices" | "Compose" | "Image Size".
-  // Only "off" currently has any effect (it disables the whole category). Any other
-  // value here ("error" / "warning" / "info") is accepted by the schema but ignored —
-  // there is no category-level severity cascade today.
+  // Precedence: a per-rule entry wins over its category, which wins over the rule's
+  // default. Any severity works here, e.g. "error" upgrades every Security rule;
+  // "off" disables the whole category.
   categories: {
     "Image Size": "off",
   },
@@ -62,10 +62,11 @@ Match the change to the intent — prefer the narrowest one:
 
 - **User disagrees with one rule / it's a false positive** → set it off in `rules`: `"docker-doctor/<key>": "off"`. The rule stops running everywhere. This is the default for "I don't want this rule".
 - **Rule is fine but wrong severity** → set `"docker-doctor/<key>": "warning"` (or `"error"` / `"info"`) in `rules`. This works today via the per-rule override.
-- **A whole area is unwanted** (e.g. all image-size rules) → set the category off: `categories: { "Image Size": "off" }`. This is the only working `categories` value.
+- **A whole area is unwanted** (e.g. all image-size rules) → set the category off: `categories: { "Image Size": "off" }`.
+- **A whole area needs a different severity** → set the category to that severity: `categories: { Security: "error" }` makes every Security rule an error unless a `rules` entry overrides it.
 - **A specific file should be exempt from everything** → add a glob to `ignore.files` (e.g. `ignore: { files: ["vendored/**"] }`). docker-doctor drops matching files from discovery before any rule runs, so they don't appear in the report. `**` crosses directories; `*` and `?` stay within one path segment.
 
-How this actually combines: each rule's default severity can be overridden per-rule via `rules`. Separately, a whole category can be turned `"off"` via `categories`, which drops every diagnostic in that category regardless of per-rule settings. There is no severity cascade between `categories` and `rules` beyond that "off" check — a non-"off" `categories` value does nothing.
+How this actually combines: severity resolves in one cascade — a `rules` entry for the rule key, then a `categories` entry for the rule's category, then the rule's default. The first one present wins. `"off"` at either level drops the rule from the scan.
 
 ## Educating the user
 
