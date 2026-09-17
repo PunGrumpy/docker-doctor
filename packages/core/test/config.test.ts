@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { loadConfig } from "../src/config/loader";
+import {
+  isTypeScriptImportUnsupported,
+  loadConfig,
+} from "../src/config/loader";
 import { ConfigError } from "../src/errors";
 
 describe("loadConfig", () => {
@@ -131,6 +134,29 @@ describe("loadConfig", () => {
     );
     const config = await loadConfig(dir);
     expect(config).toEqual({ rules: { "from-ts": "warning" } });
+  });
+
+  test("detects runtimes that cannot import a .ts config", () => {
+    const tsConfig = path.join(dir, "docker-doctor.config.ts");
+    expect(
+      isTypeScriptImportUnsupported(tsConfig, {
+        code: "ERR_UNKNOWN_FILE_EXTENSION",
+      })
+    ).toBe(true);
+    expect(
+      isTypeScriptImportUnsupported(tsConfig, { code: "ERR_MODULE_NOT_FOUND" })
+    ).toBe(false);
+    expect(
+      isTypeScriptImportUnsupported(
+        path.join(dir, "docker-doctor.config.mjs"),
+        {
+          code: "ERR_UNKNOWN_FILE_EXTENSION",
+        }
+      )
+    ).toBe(false);
+    expect(isTypeScriptImportUnsupported(tsConfig, new Error("no code"))).toBe(
+      false
+    );
   });
 
   test("falls back to package.json#dockerDoctor when no config file exists", async () => {

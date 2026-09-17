@@ -33,6 +33,27 @@ const parseConfigFile = async (
   }
 };
 
+// Node < 22.18 (no default type stripping) cannot import a .ts config.
+const NODE_CANNOT_LOAD_TS_CODES = new Set([
+  "ERR_UNKNOWN_FILE_EXTENSION",
+  "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING",
+]);
+
+const TYPESCRIPT_CONFIG_PATTERN = /\.[cm]?ts$/u;
+
+// Exported for tests: under Bun the import always succeeds, so the predicate
+// is the only part of this branch that can be covered directly.
+export const isTypeScriptImportUnsupported = (
+  filePath: string,
+  error: unknown
+): boolean =>
+  TYPESCRIPT_CONFIG_PATTERN.test(filePath) &&
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  typeof error.code === "string" &&
+  NODE_CANNOT_LOAD_TS_CODES.has(error.code);
+
 const importConfig = async (filePath: string): Promise<unknown> => {
   if (filePath.endsWith(".json")) {
     return parseConfigFile(filePath, "JSON", JSON.parse);
@@ -46,6 +67,12 @@ const importConfig = async (filePath: string): Promise<unknown> => {
     const configModule = await import(filePath);
     return configModule.default || configModule;
   } catch (error: unknown) {
+    if (isTypeScriptImportUnsupported(filePath, error)) {
+      throw new ConfigError({
+        message: `Cannot load ${filePath}: this Node.js version (${process.version}) cannot import TypeScript config files. Use Node.js 22.18 or newer, or rename the config to docker-doctor.config.yaml / .json.`,
+      });
+    }
+
     const msg = error instanceof Error ? error.message : String(error);
     throw new ConfigError({
       message: `Failed to load config file ${filePath}: ${msg}`,
