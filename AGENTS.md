@@ -129,37 +129,43 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 
 # Architecture
 
-## Package Layout
+## Package layout
 
 ```tree
 .
 ├── packages/
-│   ├── core/                          PRIVATE  the diagnostic engine (runs JIT, exports src/index.ts)
+│   ├── core/                        PRIVATE    the diagnostic engine, consumed as raw TS ("main": src/index.ts)
 │   │   └── src/
-│   │       ├── types/                 PRIVATE shared cross-package TS types (DockerfileInstruction, Diagnostic, ProjectInfo, …)
-│   │       ├── project-info/          project discovery (discoverProject)
-│   │       ├── config/                configuration loader (loadConfig)
-│   │       ├── parsers/               Dockerfile and Compose parsers
-│   │       ├── rules/                 rule definitions (Security, Performance, Best Practices, etc.)
-│   │       ├── runners/               rule runner orchestration
-│   │       └── schemas/               schema validators for config and JSON reports
-│   └── docker-doctor/                 PUBLISHED  CLI wrapper (compiles via tsdown)
-└── apps/
-    └── web/                           PRIVATE  Next.js web application
+│   │       ├── types/               shared cross-package TS types (DockerfileInstruction, Diagnostic, ProjectInfo, …)
+│   │       ├── project-info/        project discovery (discoverProject)
+│   │       ├── config/              configuration loader (loadConfig)
+│   │       ├── parsers/             Dockerfile and Compose parsers
+│   │       ├── rules/               rule definitions (Security, Performance, Best Practices, Compose, Image Size)
+│   │       ├── runners/             rule orchestration; resolveSeverity applies the configured severity
+│   │       ├── schemas/             hand-rolled config validator (validateConfig)
+│   │       ├── errors/              ConfigError, ParseError, FileNotFoundError (plain Error subclasses)
+│   │       ├── report.ts            report assembly
+│   │       └── scoring.ts           SCORE_BUCKETS, getScoreBucket, calculateScore
+│   ├── docker-doctor/               PUBLISHED  the CLI, @docker-doctor/cli, bundled by tsdown
+│   │   └── src/
+│   │       ├── cli.ts               flag parsing, scan orchestration, exit codes
+│   │       ├── agents/              skill install, handoff payload, agent launching, clipboard
+│   │       ├── formatters/          terminal.ts, the human-readable report
+│   │       └── workflow-scaffold.ts writes .github/workflows/docker-doctor.yml
+│   └── videos/                      PRIVATE    Remotion release videos
+├── apps/
+│   └── web/                         PRIVATE    Next.js + fumadocs site (app/, components/, content/, lib/, scripts/)
+├── kits/
+│   └── docker-doctor/               PRIVATE    Docker Sandboxes kit; spec.yaml is synced by `bun run kit:sync`
+├── skills/                          docker-doctor (bundled into the npm package), docker-author, improve-docker
+├── scripts/                         generate-rules-doc.ts + rule-page-content.ts, sync-kit-spec.ts, render-github-action-comment.mjs
+└── action.yml                       composite GitHub Action
 ```
 
-## Effect v4 Conventions
+## Conventions worth knowing
 
-`effect@4.0.0-beta.70` is used NARROWLY in this repo — for two things only:
-
-- **`effect/Schema`** — config validation: `packages/core/src/schemas/config.ts` and `packages/core/src/config/loader.ts`.
-- **`effect/Data.TaggedError`** — the three error classes in `packages/core/src/errors/` (`config-error.ts`, `parse-error.ts`, `file-not-found-error.ts`).
-
-Rules and parsers (`packages/core/src/rules/`, `packages/core/src/parsers/`) are PLAIN SYNCHRONOUS functions — there are no Effect pipelines here, no generator-based effects, no tag-based error dispatch. Do not introduce `Effect.gen` or pipeline idioms without discussion first — the rule functions have no error/async/resource semantics that would benefit from them.
-
-### Imports
-
-- ALWAYS: `import * as Schema from "effect/Schema"`, `import * as Data from "effect/Data"` — one module per import line.
-- NEVER: `import { Schema, Data } from "effect"` — the umbrella import inflates the type-resolution graph.
-
-> `effect` is currently a runtime dependency of the published CLI for these two narrow uses only. Plan 011 proposes removing it — whoever executes 011 must revisit this section.
+- **Rules and parsers are plain synchronous functions**: `packages/core/src/rules/` and `packages/core/src/parsers/` return values directly. No async, no generators, no wrapper types. Keep them that way.
+- **Diagnostics come from one factory**: every rule builds its findings with `packages/core/src/rules/create-diagnostic.ts`. The runners in `packages/core/src/runners/` then apply the configured severity.
+- **Rule docs pages are generated**: author the prose in `scripts/rule-page-content.ts`, then run `bun run docs:rules`. Generation fails when a rule has no authored entry, and the Format CI job diffs the output.
+- **Two artifacts are copied at release time**: `skills/docker-doctor` is copied into the npm package at build, and `kits/docker-doctor/spec.yaml` is synced by `bun run kit:sync`.
+- **User-visible CLI changes need a changeset**: that includes edits to the bundled skill, since it ships inside `@docker-doctor/cli`.
