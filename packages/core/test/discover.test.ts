@@ -86,6 +86,24 @@ describe("discoverProject", () => {
       cleanup();
     }
   });
+
+  test("classifies <name>.dockerignore as an ignore file, not a Dockerfile", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "FROM node:22-alpine\n");
+      fs.writeFileSync(
+        path.join(root, "Dockerfile.dockerignore"),
+        "node_modules\n"
+      );
+
+      const project = await discoverProject(root);
+
+      expect(project.dockerfiles).toEqual(["Dockerfile"]);
+      expect(project.dockerignores ?? []).toContain("Dockerfile.dockerignore");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
 });
 
 describe("createIgnoreMatcher", () => {

@@ -48,8 +48,12 @@ export const discoverProject = async (
     }
     const base = path.basename(file).toLowerCase();
 
-    if (base === ".dockerignore") {
+    if (base.endsWith(".dockerignore")) {
+      // `.dockerignore` and BuildKit's per-Dockerfile `<name>.dockerignore`
+      // are ignore files, never Dockerfiles — even though the latter also
+      // matches the `Dockerfile.*` shape below.
       dockerignores.push(relative);
+      continue;
     }
 
     // Match Dockerfile, Dockerfile.*, *.dockerfile
