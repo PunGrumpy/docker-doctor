@@ -28,6 +28,7 @@ describe("runDockerfileRules", () => {
     const rootUserDiag = findByRule(diagnostics, "docker-doctor/no-root-user");
     expect(rootUserDiag).toBeDefined();
     expect(rootUserDiag?.severity).toBe("warning");
+    expect(rootUserDiag?.category).toBe("Security");
   });
 
   test('rules: { "docker-doctor/no-root-user": "off" } skips that rule, leaves others', () => {

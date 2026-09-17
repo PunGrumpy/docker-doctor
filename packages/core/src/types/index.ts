@@ -13,6 +13,8 @@ export interface Diagnostic {
   severity: DiagnosticSeverity;
   message: string;
   help: string;
+  // Set by the runners from the owning rule; rules never fill it themselves.
+  category?: RuleCategory;
   line?: number;
   column?: number;
 }
