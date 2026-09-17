@@ -587,6 +587,16 @@ services:
     expect(diags[0].line).toBeUndefined();
   });
 
+  test("composeServices yields nothing for a list-shaped services map", () => {
+    const composeContent = parseCompose(
+      "services:\n  - web\n  - db\n",
+      "compose.yaml"
+    );
+    expect(
+      requireRestartPolicy.check(composeContent, "compose.yaml")
+    ).toHaveLength(0);
+  });
+
   test("require-resource-limits", () => {
     const composeContent = {
       services: {
