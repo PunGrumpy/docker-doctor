@@ -789,7 +789,9 @@ program
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`Error: ${msg}`);
-      process.exit(1);
+      // Set the code rather than exiting: a pending stdout write (a piped
+      // --json report) must still be allowed to flush.
+      process.exitCode = 1;
     }
   });
 
@@ -857,12 +859,14 @@ program
       console.error(
         "Bundled skill not found — this looks like a broken installation."
       );
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     const agents = await resolveInstallAgents(options.agent);
     if (agents === null) {
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     if (agents.length === 0) {
       console.log("Nothing selected — skipped.");
@@ -875,7 +879,8 @@ program
     });
     if (!result) {
       console.error("Failed to install the skill.");
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     for (const installed of result.installed) {
       console.log(
@@ -921,7 +926,8 @@ rules
     const rule = findRule(ruleKey);
     if (!rule) {
       console.error(`Rule '${ruleKey}' not found.`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log(`\nRule:             ${rule.key}`);
     console.log(`Category:         ${rule.category}`);

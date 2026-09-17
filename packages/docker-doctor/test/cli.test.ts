@@ -54,6 +54,16 @@ describe("exit codes", () => {
     const { exitCode } = await runCli([fixture("clean"), "--score"]);
     expect(exitCode).toBe(0);
   });
+
+  test("rules explain with an unknown rule exits 1 and prints the error", async () => {
+    const { exitCode, stderr } = await runCli([
+      "rules",
+      "explain",
+      "docker-doctor/nope",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("not found");
+  });
 });
 
 describe("unanalyzable files", () => {
