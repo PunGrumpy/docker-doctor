@@ -1421,10 +1421,7 @@ describe("Best Practices Rules", () => {
     ).toBe(false);
   });
 
-  // Known false positive: the pipefail check reads inst.args with no quote
-  // awareness, so a regex alternation inside a quoted argument reads as a
-  // shell pipeline. Not fixed here - see plans/README.md deferred list.
-  test.todo("use-pipefail ignores pipes inside quoted arguments", () => {
+  test("use-pipefail ignores pipes inside quoted arguments", () => {
     const quotedPipe = parseDockerfile(`
       FROM node:22-alpine
       RUN grep -E "foo|bar" /etc/passwd
@@ -1470,14 +1467,38 @@ describe("Best Practices Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
-  // Known false positive: /\bcd\b/ matches path segments and words in
-  // strings, not just the cd command. Not fixed here.
-  test.todo("avoid-run-cd ignores cd inside paths and strings", () => {
+  test("avoid-run-cd ignores cd inside paths and strings", () => {
     const pathWithCd = parseDockerfile(`
       FROM node:22-alpine
       RUN mkdir -p /opt/cd && echo abcd
     `);
     expect(avoidRunCd.check(pathWithCd, "Dockerfile")).toHaveLength(0);
+
+    const urlWithCd = parseDockerfile(`
+      FROM node:22-alpine
+      RUN wget https://example.com/cd.tar.gz
+    `);
+    expect(avoidRunCd.check(urlWithCd, "Dockerfile")).toHaveLength(0);
+
+    const scriptNamedCd = parseDockerfile(`
+      FROM node:22-alpine
+      RUN ./scripts/cd-deploy.sh
+    `);
+    expect(avoidRunCd.check(scriptNamedCd, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("avoid-run-cd flags cd in command position", () => {
+    const leading = parseDockerfile(`
+      FROM node:22-alpine
+      RUN cd /app && npm ci
+    `);
+    expect(avoidRunCd.check(leading, "Dockerfile")).toHaveLength(1);
+
+    const afterSemicolon = parseDockerfile(`
+      FROM node:22-alpine
+      RUN npm ci; cd /app
+    `);
+    expect(avoidRunCd.check(afterSemicolon, "Dockerfile")).toHaveLength(1);
   });
 
   test("sort-multiline-args", () => {
