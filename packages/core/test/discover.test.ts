@@ -104,6 +104,24 @@ describe("discoverProject", () => {
       fs.rmSync(root, { force: true, recursive: true });
     }
   });
+
+  test("returns POSIX-separated relative paths", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+    try {
+      fs.mkdirSync(path.join(root, "svc", "api"), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, "svc", "api", "Dockerfile"),
+        "FROM node:22-alpine\n"
+      );
+
+      const project = await discoverProject(root);
+
+      expect(project.dockerfiles).toEqual(["svc/api/Dockerfile"]);
+      expect(project.dockerfiles.some((f) => f.includes("\\"))).toBe(false);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
 });
 
 describe("createIgnoreMatcher", () => {
