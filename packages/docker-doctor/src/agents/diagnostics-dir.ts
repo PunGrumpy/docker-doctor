@@ -37,8 +37,9 @@ export const groupDiagnosticsByRule = (
 };
 
 // Writes the full scan results into <root>/.docker-doctor/ — diagnostics.json
-// (the same shape as `--json`) plus one .txt per rule — so the handed-off
-// agent can read past the inline prompt. Recreated fresh on every handoff.
+// (the same shape as `--json`, with messages and paths flattened like the .txt
+// files) plus one .txt per rule — so the handed-off agent can read past the
+// inline prompt. Recreated fresh on every handoff.
 export const writeDiagnosticsDirectory = async (
   diagnostics: Diagnostic[],
   report: JsonReport,
@@ -48,9 +49,21 @@ export const writeDiagnosticsDirectory = async (
   await fs.rm(dir, { force: true, recursive: true });
   await fs.mkdir(dir, { recursive: true });
 
+  // The handoff prompt tells the agent to read this file in full, so it gets
+  // the same treatment as the .txt reports. `help` is authored by the rules,
+  // never by scanned content, so it is left as written.
+  const sanitizedReport: JsonReport = {
+    ...report,
+    diagnostics: report.diagnostics.map((d) => ({
+      ...d,
+      file: sanitizePath(d.file),
+      message: sanitizeMessage(d.message),
+    })),
+  };
+
   await fs.writeFile(
     path.join(dir, "diagnostics.json"),
-    JSON.stringify({ note: TRUST_BOUNDARY_NOTE, ...report }, null, 2),
+    JSON.stringify({ note: TRUST_BOUNDARY_NOTE, ...sanitizedReport }, null, 2),
     "utf-8"
   );
 
