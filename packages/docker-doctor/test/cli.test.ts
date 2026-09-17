@@ -142,6 +142,13 @@ describe("--json contract", () => {
       expect(typeof d.message).toBe("string");
       expect(typeof d.rule).toBe("string");
       expect(["error", "warning", "info"]).toContain(d.severity);
+      expect([
+        "Security",
+        "Performance",
+        "Best Practices",
+        "Compose",
+        "Image Size",
+      ]).toContain(d.category);
     }
   });
 

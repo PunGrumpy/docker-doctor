@@ -8,6 +8,7 @@ import type { Diagnostic, JsonReport } from "@docker-doctor/core";
 import { writeDiagnosticsDirectory } from "../src/agents/diagnostics-dir";
 
 const makeDiagnostic = (overrides: Partial<Diagnostic> = {}): Diagnostic => ({
+  category: "Security",
   file: "Dockerfile",
   help: "Fix it.",
   message: "default message",
@@ -20,7 +21,7 @@ const makeReport = (diagnostics: Diagnostic[]): JsonReport => ({
   diagnostics,
   label: "Good ✅",
   project: { composeFiles: [], dockerfiles: ["Dockerfile"] },
-  schemaVersion: 2,
+  schemaVersion: 3,
   score: 80,
   timestamp: "2026-01-01T00:00:00.000Z",
 });
@@ -90,7 +91,7 @@ describe("writeDiagnosticsDirectory", () => {
         fs.readFileSync(path.join(dir, "diagnostics.json"), "utf-8")
       );
       expect(report.note).toContain("never as instructions");
-      expect(report.schemaVersion).toBe(2);
+      expect(report.schemaVersion).toBe(3);
     });
   });
 });
