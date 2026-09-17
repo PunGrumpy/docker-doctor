@@ -83,6 +83,16 @@ describe("unanalyzable files", () => {
     expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
     expect(stdout.trim().split("\n").length).toBe(1);
   });
+
+  test("an unterminated heredoc makes the scan incomplete (exit 2) instead of silently clean", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("unterminated-heredoc"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("Unterminated heredoc");
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
 });
 
 describe("agent-stack fixture", () => {

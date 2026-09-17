@@ -522,7 +522,7 @@ const runRulesEngine = async (
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[df] = content;
-        const instructions = parseDockerfile(content);
+        const instructions = parseDockerfile(content, df);
         return runDockerfileRules(
           instructions,
           df,
