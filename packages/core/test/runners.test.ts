@@ -109,10 +109,6 @@ describe("runDockerfileRules", () => {
     );
 
     expect(diagnostics).toEqual([]);
-    // The absence of a USER line used to be reported as running as root.
-    expect(
-      findByRule(diagnostics, "docker-doctor/no-root-user")
-    ).toBeUndefined();
   });
 });
 
