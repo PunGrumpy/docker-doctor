@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { loadConfig } from "../src/config/loader";
+import { loadConfig, typeStrippingFailure } from "../src/config/loader";
 import { ConfigError } from "../src/errors";
 
 describe("loadConfig", () => {
@@ -131,6 +131,38 @@ describe("loadConfig", () => {
     );
     const config = await loadConfig(dir);
     expect(config).toEqual({ rules: { "from-ts": "warning" } });
+  });
+
+  test("explains a .ts config failure by cause, not by Node version", () => {
+    const tsConfig = path.join(dir, "docker-doctor.config.ts");
+
+    expect(
+      typeStrippingFailure(tsConfig, { code: "ERR_UNKNOWN_FILE_EXTENSION" })
+    ).toContain("not stripping TypeScript types");
+
+    // Below node_modules Node refuses at every version, so this one must not
+    // tell the user to upgrade.
+    const nodeModulesFailure = typeStrippingFailure(tsConfig, {
+      code: "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING",
+    });
+    expect(nodeModulesFailure).toContain("node_modules");
+    expect(nodeModulesFailure).not.toContain("22.18");
+  });
+
+  test("leaves unrelated config import failures alone", () => {
+    const tsConfig = path.join(dir, "docker-doctor.config.ts");
+
+    expect(
+      typeStrippingFailure(tsConfig, { code: "ERR_MODULE_NOT_FOUND" })
+    ).toBeUndefined();
+    expect(
+      typeStrippingFailure(path.join(dir, "docker-doctor.config.mjs"), {
+        code: "ERR_UNKNOWN_FILE_EXTENSION",
+      })
+    ).toBeUndefined();
+    expect(
+      typeStrippingFailure(tsConfig, new Error("no code"))
+    ).toBeUndefined();
   });
 
   test("falls back to package.json#dockerDoctor when no config file exists", async () => {

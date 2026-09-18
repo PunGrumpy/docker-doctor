@@ -290,6 +290,31 @@ describe("unknown config keys", () => {
   });
 });
 
+describe("TypeScript config", () => {
+  test("loads docker-doctor.config.ts on a runtime that strips types", async () => {
+    const { exitCode, stdout } = await runCli([fixture("ts-config"), "--json"]);
+
+    expect(exitCode).toBe(0);
+    const report = JSON.parse(stdout);
+    expect(
+      report.diagnostics.some(
+        (d: { rule: string }) => d.rule === "docker-doctor/require-labels"
+      )
+    ).toBe(false);
+  });
+
+  test("explains the failure when the runtime cannot import .ts", async () => {
+    const { exitCode, stderr } = await runCli(
+      [fixture("ts-config"), "--json"],
+      { env: { NODE_OPTIONS: "--no-experimental-strip-types" } }
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("not stripping TypeScript types");
+    expect(stderr).toContain("--no-experimental-strip-types");
+  });
+});
+
 describe("piped --json output is not truncated", () => {
   test("--json on a piped stdout exits (does not hang) and parses", async () => {
     const { exitCode, stdout } = await runCli([
