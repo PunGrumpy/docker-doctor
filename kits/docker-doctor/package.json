@@ -1,9 +1,9 @@
 {
   "name": "docker-doctor-kit",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Docker Sandboxes kit for docker-doctor. Changesets manages this version; `bun run kit:sync` mirrors it and the CLI pin into spec.yaml.",
   "dependencies": {
-    "@docker-doctor/cli": "0.5.1"
+    "@docker-doctor/cli": "0.5.2"
   }
 }
