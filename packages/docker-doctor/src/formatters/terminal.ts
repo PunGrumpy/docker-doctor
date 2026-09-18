@@ -305,8 +305,8 @@ export const formatTerminal = async (
   let errorsCount = 0;
 
   for (const d of diagnostics) {
-    const ruleDef = findRule(d.rule);
-    const category = ruleDef?.category || "Best Practices";
+    const category =
+      d.category ?? findRule(d.rule)?.category ?? "Best Practices";
     categoryIssueCounts[category] = (categoryIssueCounts[category] || 0) + 1;
 
     if (d.severity === "warning") {

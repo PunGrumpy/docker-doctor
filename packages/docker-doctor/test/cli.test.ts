@@ -93,6 +93,16 @@ describe("unanalyzable files", () => {
     expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
     expect(stdout.trim().split("\n").length).toBe(1);
   });
+
+  test("an unterminated heredoc makes the scan incomplete (exit 2) instead of silently clean", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("unterminated-heredoc"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("Unterminated heredoc");
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
 });
 
 describe("agent-stack fixture", () => {
@@ -152,6 +162,13 @@ describe("--json contract", () => {
       expect(typeof d.message).toBe("string");
       expect(typeof d.rule).toBe("string");
       expect(["error", "warning", "info"]).toContain(d.severity);
+      expect([
+        "Security",
+        "Performance",
+        "Best Practices",
+        "Compose",
+        "Image Size",
+      ]).toContain(d.category);
     }
   });
 
@@ -206,6 +223,21 @@ describe("empty project", () => {
     expect(exitCode).toBe(0);
     const report = JSON.parse(stdout);
     expect(report.diagnostics).toEqual([]);
+  });
+
+  test("a sibling <name>.dockerignore is never scanned as a Dockerfile", async () => {
+    const { stdout } = await runCli([
+      fixture("dockerignore-sibling"),
+      "--json",
+    ]);
+    const report = JSON.parse(stdout);
+    expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
+    expect(report.project.dockerignores).toContain("Dockerfile.dockerignore");
+    expect(
+      report.diagnostics.some(
+        (d: { file: string }) => d.file === "Dockerfile.dockerignore"
+      )
+    ).toBe(false);
   });
 });
 

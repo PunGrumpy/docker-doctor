@@ -1,5 +1,6 @@
 import { parseExecForm } from "../parsers/exec-form";
 import { isScratch, parseFromArgs } from "../parsers/image-ref";
+import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 
@@ -194,6 +195,11 @@ export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 // A RUN line uses a pipe: a single `|` not part of `||`.
 const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
 
+// `cd` only where a command can start: line start, or after a list/pipe
+// separator or a subshell open. Path segments (/opt/cd) and words never sit
+// in command position.
+const CD_COMMAND_RE = /(?:^|&&|\|\||;|\||\(|`|\$\()\s*cd(?=\s|$)/u;
+
 // SHELL takes exec form; joined, its argv is the prefix every shell-form RUN
 // is wrapped in (e.g. /bin/bash -o pipefail -c). Any other spelling is
 // rejected by Docker, so it cannot be enabling pipefail.
@@ -242,12 +248,17 @@ export const usePipefail: DockerfileRule = {
         continue;
       }
       const { args } = inst;
-      if (!HAS_PIPE_RE.test(args)) {
+      // SHELL only applies to shell-form RUN; exec-form RUN runs its own
+      // argv directly, so check the argv for pipefail instead. Exec-form
+      // argv elements arrive already unquoted, so a pipe inside them is a
+      // real pipe; shell-form text is masked so a `|` inside a quoted
+      // argument (grep -E "foo|bar") does not read as a pipeline.
+      const execArgv = parseExecForm(args);
+      const pipeText =
+        execArgv === null ? maskQuotedText(args) : execArgv.join(" ");
+      if (!HAS_PIPE_RE.test(pipeText)) {
         continue;
       }
-      // SHELL only applies to shell-form RUN; exec-form RUN runs its own
-      // argv directly, so check the argv for pipefail instead.
-      const execArgv = parseExecForm(args);
       const pipefailConfigured =
         execArgv === null
           ? shellHasPipefail || PIPEFAIL_SETTING_RE.test(args)
@@ -309,7 +320,13 @@ export const avoidRunCd: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
-      if (inst.instruction === "RUN" && /\bcd\b/u.test(inst.args)) {
+      // Exec-form RUN ["sh", "-c", "cd /app && make"] keeps its whole
+      // command inside quotes and is intentionally not flagged: this rule is
+      // about shell-form layering.
+      if (
+        inst.instruction === "RUN" &&
+        CD_COMMAND_RE.test(maskQuotedText(inst.args))
+      ) {
         diagnostics.push(
           createDiagnostic(
             file,

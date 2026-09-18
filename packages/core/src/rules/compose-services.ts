@@ -3,7 +3,8 @@
  * with a null body (`web:` with nothing under it) is returned as an empty
  * config so rules still check it: it is the least-configured service in
  * the file, not a service to skip. Scalar and array bodies are invalid
- * compose and are dropped.
+ * compose and are dropped. A `services:` written as a YAML sequence is
+ * invalid Compose and yields no services.
  */
 export const composeServices = (
   composeContent: unknown
@@ -16,7 +17,7 @@ export const composeServices = (
     return [];
   }
   const { services } = composeContent as { services?: unknown };
-  if (!services || typeof services !== "object") {
+  if (!services || typeof services !== "object" || Array.isArray(services)) {
     return [];
   }
 

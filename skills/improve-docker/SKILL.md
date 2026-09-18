@@ -16,11 +16,10 @@ Gather structured evidence before forming any opinion.
 
 ```bash
 npx @docker-doctor/cli@latest . --json > docker-doctor-report.json   # diagnostics + score + project files
-npx @docker-doctor/cli@latest rules list                             # rule -> category map (JSON has no category field)
 ```
 
 - The JSON `project` field lists every Dockerfile / Compose / .dockerignore discovered.
-- The JSON `diagnostics[]` carry `rule`, `severity`, `file`, `line`, `message`, `help` — but **not** category. Use `rules list` to map each `rule` back to its category.
+- The JSON `diagnostics[]` carry `rule`, `category`, `severity`, `file`, `line`, `message`, `help` (report `schemaVersion` 3+). Group by `category` directly — no second command is needed.
 - Note the `score` and `label` as the baseline.
 
 ## Phase 2 — Audit

@@ -31,6 +31,11 @@ const walk = async (
   return fileList;
 };
 
+// ProjectInfo paths are the public contract (JSON report `file`, PR-comment
+// links, rule helpers that split on "/"), so they are POSIX on every OS.
+const toPosixRelative = (rootDir: string, file: string): string =>
+  path.relative(rootDir, file).split(path.sep).join("/");
+
 export const discoverProject = async (
   rootDir: string,
   options?: { ignoreFiles?: readonly string[] }
@@ -42,14 +47,18 @@ export const discoverProject = async (
   const isIgnored = createIgnoreMatcher(options?.ignoreFiles);
 
   for (const file of allFiles) {
-    const relative = path.relative(rootDir, file);
+    const relative = toPosixRelative(rootDir, file);
     if (isIgnored(relative)) {
       continue;
     }
     const base = path.basename(file).toLowerCase();
 
-    if (base === ".dockerignore") {
+    if (base.endsWith(".dockerignore")) {
+      // `.dockerignore` and BuildKit's per-Dockerfile `<name>.dockerignore`
+      // are ignore files, never Dockerfiles — even though the latter also
+      // matches the `Dockerfile.*` shape below.
       dockerignores.push(relative);
+      continue;
     }
 
     // Match Dockerfile, Dockerfile.*, *.dockerfile

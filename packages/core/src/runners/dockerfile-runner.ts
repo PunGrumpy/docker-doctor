@@ -13,6 +13,13 @@ export const runDockerfileRules = (
   rulesConfig?: Record<string, RuleSeverity>,
   categoriesConfig?: Record<string, RuleSeverity>
 ): Diagnostic[] => {
+  // A file with no instructions (empty, comment-only, a stub) has nothing
+  // to check. Whole-file rules such as no-root-user would otherwise report
+  // the absence of a USER line as "runs as root".
+  if (instructions.length === 0) {
+    return [];
+  }
+
   const diagnostics: Diagnostic[] = [];
 
   for (const rule of allDockerfileRules) {
@@ -23,9 +30,9 @@ export const runDockerfileRules = (
 
     const ruleDiagnostics = rule.check(instructions, file, { projectFiles });
 
-    // Override severity if config resolved to something other than default
-    if (severity !== rule.defaultSeverity) {
-      for (const diag of ruleDiagnostics) {
+    for (const diag of ruleDiagnostics) {
+      diag.category = rule.category;
+      if (severity !== rule.defaultSeverity) {
         diag.severity = severity;
       }
     }
