@@ -1,4 +1,6 @@
+import { ParseError } from "../errors";
 import type { DockerfileInstruction } from "../types/index";
+import { maskQuotedText } from "./shell-quotes";
 
 const DOCKERFILE_KEYWORDS = new Set([
   "ADD",
@@ -34,9 +36,9 @@ const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>.*)$/u;
 // delimiter must be attached directly to `<<` with no whitespace, so
 // `$((1 << 3))` and shell `cat << EOF` (both redirection, not a Dockerfile
 // heredoc) don't match; (3) callers only invoke this for RUN/COPY/ADD, the
-// only instructions BuildKit supports heredocs on. Known accepted
-// limitation: `RUN echo "text <<EOF more"` still matches inside a quoted
-// string — correctly rejecting that needs a shell lexer, out of scope here.
+// only instructions BuildKit supports heredocs on. A fourth constraint lives
+// in findHeredocDelimiters: an opener whose `<<` sits inside a quoted string
+// (`RUN echo "text <<EOF more"`) is discarded.
 // Global so a single line (e.g. `COPY <<FILE1 <<FILE2 /dest/`) can open more
 // than one.
 const HEREDOC_OPENER_RE =
@@ -93,10 +95,15 @@ const matchInstructionKeyword = (
   return null;
 };
 
-const findHeredocDelimiters = (lineContent: string): string[] =>
-  [...lineContent.matchAll(HEREDOC_OPENER_RE)].map(
-    (m) => m.groups?.delim ?? ""
-  );
+// Openers are matched on the original text (a quoted delimiter like
+// <<'EOT' must keep its name) and then dropped when the `<<` itself sits
+// inside a quoted string — the masked copy has a space there instead.
+const findHeredocDelimiters = (lineContent: string): string[] => {
+  const masked = maskQuotedText(lineContent);
+  return [...lineContent.matchAll(HEREDOC_OPENER_RE)]
+    .filter((match) => masked[match.index] === "<")
+    .map((match) => match.groups?.delim ?? "");
+};
 
 // Heredoc body lines are never treated as instructions (not even comment
 // lines, which are shell-comment content here) — they are folded verbatim
@@ -154,7 +161,10 @@ const processInstructionLine = (
   }
 };
 
-export const parseDockerfile = (content: string): DockerfileInstruction[] => {
+export const parseDockerfile = (
+  content: string,
+  file = "Dockerfile"
+): DockerfileInstruction[] => {
   const state = createParserState();
   const lines = content.split(/\r?\n/u);
 
@@ -184,8 +194,18 @@ export const parseDockerfile = (content: string): DockerfileInstruction[] => {
     }
   }
 
-  // EOF: an unterminated heredoc (or a trailing backslash continuation)
-  // still emits whatever was accumulated so far, rather than dropping it.
+  // A heredoc that never closed swallowed every following instruction, so
+  // the rules would scan a truncated file and report it clean. BuildKit
+  // rejects this Dockerfile too, so fail it rather than scan a fiction.
+  if (state.heredocQueue.length > 0) {
+    throw new ParseError({
+      file,
+      message: `Unterminated heredoc: delimiter "${state.heredocQueue[0]}" (opened on line ${state.startLine}) never closed. BuildKit rejects this Dockerfile too.`,
+    });
+  }
+
+  // EOF: a trailing backslash continuation still emits whatever was
+  // accumulated so far, rather than dropping it.
   closeInstruction(state);
 
   return state.instructions;

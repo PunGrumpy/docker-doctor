@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
+import { ParseError } from "../src/errors";
 import { parseCompose } from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 
@@ -197,6 +198,55 @@ USER node
     `);
     expect(parsed).toHaveLength(3);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("ignores a heredoc-looking << inside a quoted string", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN echo "see <<EOF for details"
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
+  });
+
+  test("still opens a quoted-delimiter heredoc", () => {
+    const parsed = parseDockerfile(`
+FROM node:22
+RUN <<-'EOT'
+echo hello
+EOT
+USER node
+    `);
+    expect(parsed).toHaveLength(3);
+    expect(parsed[1].instruction).toBe("RUN");
+    expect(parsed[1].args).toContain("echo hello");
+    expect(parsed[2].instruction).toBe("USER");
+  });
+
+  test("throws ParseError on an unterminated heredoc", () => {
+    const content = "FROM node:22\nRUN <<EOF\necho hi\nUSER node\n";
+    expect(() => parseDockerfile(content, "svc/Dockerfile")).toThrow(
+      ParseError
+    );
+    try {
+      parseDockerfile(content, "svc/Dockerfile");
+      throw new Error("expected parseDockerfile to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ParseError);
+      expect((error as ParseError).file).toBe("svc/Dockerfile");
+      expect((error as ParseError).message).toContain("EOF");
+    }
+  });
+
+  test("a trailing backslash at EOF still emits the instruction", () => {
+    const parsed = parseDockerfile("FROM node:22\nRUN echo a \\\n");
+    expect(parsed).toHaveLength(2);
+    expect(parsed[1].instruction).toBe("RUN");
+    // The trailing space comes from the empty final line the continuation
+    // pulls in — pinned as-is, this test only guards against the
+    // instruction being dropped at EOF.
+    expect(parsed[1].args).toBe("echo a ");
   });
 });
 
