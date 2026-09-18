@@ -30,9 +30,9 @@ export const runDockerfileRules = (
 
     const ruleDiagnostics = rule.check(instructions, file, { projectFiles });
 
-    // Override severity if config resolved to something other than default
-    if (severity !== rule.defaultSeverity) {
-      for (const diag of ruleDiagnostics) {
+    for (const diag of ruleDiagnostics) {
+      diag.category = rule.category;
+      if (severity !== rule.defaultSeverity) {
         diag.severity = severity;
       }
     }
