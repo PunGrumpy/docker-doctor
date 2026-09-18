@@ -50,7 +50,7 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
 
   for (const [index, [rule, ruleDiagnostics]] of groups.entries()) {
     const [first] = ruleDiagnostics;
-    const category = findRule(rule)?.category ?? "General";
+    const category = first.category ?? findRule(rule)?.category ?? "General";
     const countBadge =
       ruleDiagnostics.length > 1 ? ` (×${ruleDiagnostics.length})` : "";
     lines.push(

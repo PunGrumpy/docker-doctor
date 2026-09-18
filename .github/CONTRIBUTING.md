@@ -10,31 +10,42 @@ Docker Doctor's source code is hosted on GitHub at [PunGrumpy/docker-doctor](htt
 
 Docker Doctor is a monorepo managed with [Bun](https://bun.sh) workspaces and [Turbo](https://turbo.build/repo):
 
-- `packages/core` - The diagnostic engine (private)
-  - `src/types/` - Shared TypeScript types
-  - `src/project-info/` - Project discovery
-  - `src/config/` - Configuration loader
-  - `src/parsers/` - Dockerfile and Compose parsers
-  - `src/rules/` - Rule definitions (Security, Performance, Best Practices, etc.)
-  - `src/runners/` - Rule runner orchestration
-  - `src/schemas/` - Schema validators
-- `packages/docker-doctor` - Published CLI wrapper (compiles via `tsdown`)
-- `apps/web` - Next.js web application (private)
+- `packages/core` (private): the diagnostic engine, consumed as raw TypeScript
+  - `src/types/`: shared TypeScript types
+  - `src/project-info/`: project discovery
+  - `src/config/`: configuration loader
+  - `src/parsers/`: Dockerfile and Compose parsers
+  - `src/rules/`: rule definitions (Security, Performance, Best Practices, Compose, Image Size)
+  - `src/runners/`: rule orchestration and severity resolution
+  - `src/schemas/`: hand-rolled config validator (`validateConfig`)
+  - `src/errors/`: `ConfigError`, `ParseError`, `FileNotFoundError`
+  - `src/report.ts` and `src/scoring.ts`: report assembly and scoring
+- `packages/docker-doctor` (published): the `@docker-doctor/cli` package, bundled by `tsdown`
+  - `src/cli.ts`: flag parsing, scan orchestration, exit codes
+  - `src/agents/`: skill install, handoff payload, agent launching
+  - `src/formatters/`: the terminal report
+- `packages/videos` (private): Remotion release videos
+- `apps/web` (private): Next.js + fumadocs documentation site
+- `kits/docker-doctor` (private): Docker Sandboxes kit; `spec.yaml` is synced by `bun run kit:sync`
+- `skills/`: `docker-doctor` (bundled into the npm package), `docker-author`, `improve-docker`
+- `scripts/`: rule docs generator, kit spec sync, GitHub Action comment renderer
+- `action.yml`: composite GitHub Action
 
 ## Getting Started
 
 1. Fork the repository on GitHub
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/docker-doctor.git`
 3. Install dependencies: `bun install`
-4. Create a new branch for your feature or bug fix: `git checkout -b fix/description`
-5. Make your changes
-6. Run tests: `bun run test`
-7. Build packages: `bun run build`
-8. Type-check: `bun run typecheck`
-9. Lint and format: `bun run check`
-10. Commit your changes with clear, descriptive commit messages
-11. Push to your fork
-12. Submit a Pull Request
+4. Set up the web app environment: if you are not working on the web app, export `SKIP_ENV_VALIDATION=1` before `bun run build` and `bun run typecheck`; otherwise copy `apps/web/.env.example` to `apps/web/.env` and fill it in
+5. Create a new branch for your feature or bug fix: `git checkout -b fix/description`
+6. Make your changes
+7. Run tests: `bun run test`
+8. Build packages: `bun run build`
+9. Type-check: `bun run typecheck`
+10. Lint and format: `bun run check`
+11. Commit your changes with clear, descriptive commit messages
+12. Push to your fork
+13. Submit a Pull Request
 
 ### Testing Your Changes Locally
 
@@ -91,16 +102,16 @@ We use [Changesets](https://github.com/changesets/changesets) to manage versions
 - Build configuration changes
 - README or contributing guide updates
 
-## Testing Rule Changes
+## Adding or changing a rule
 
-If you modify rules in `packages/core/src/rules/`:
+Work through this checklist in order:
 
-1. Test on various Dockerfile and Compose samples to verify correctness
-2. Run the test suite: `bun run test`
-3. Check for false positives and false negatives
-4. Consider backward compatibility
-5. Update the rule's documentation if behavior changes
-6. Run `bun run check` on the codebase itself
+1. Implement the rule in the matching `packages/core/src/rules/<category>.ts` and add it to that file's exported array, which `rules/index.ts` registers.
+2. Add positive **and** negative cases to `packages/core/test/rules.test.ts`, so the rule fires when it should and stays silent when it should not.
+3. Add the authored docs entry to `scripts/rule-page-content.ts`. Generation fails when a rule has no entry.
+4. Run `bun run docs:rules` and commit the generated page under `apps/web/content/docs/reference/rules/`. The Format CI job diffs this output.
+5. Add a changeset: `bun run changeset`, select `@docker-doctor/cli`, `minor` for a new rule or `patch` for a fix.
+6. Run `bun run fix && bun run test && bun run typecheck`.
 
 ## Pull Request Guidelines
 
@@ -148,7 +159,7 @@ From a specific package (e.g., `packages/core`):
 - Add comments only for complex logic that isn't obvious from the code
 - Use meaningful variable and function names
 - Follow TypeScript best practices — the linter will guide you
-- See [AGENTS.md](/AGENTS.md) for the full coding standards, including Effect v4 conventions
+- See [AGENTS.md](/AGENTS.md) for the coding standards and repo conventions
 
 ## Reporting Issues and Discussions
 

@@ -33,11 +33,14 @@ npx @docker-doctor/cli@latest . --json > report.json
 
 ### Exit codes
 
-| Mode         | Exit code                                              |
-| ------------ | ------------------------------------------------------ |
-| Default scan | Non-zero if any `error`-severity diagnostic is present |
-| `--score`    | Non-zero if any `error`-severity diagnostic is present |
-| `--json`     | Non-zero if any `error`-severity diagnostic is present |
+The same rules apply to the default scan, `--score`, and `--json`:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Scan complete, no `error`-severity diagnostics |
+| `1` | Scan complete, at least one `error`-severity diagnostic |
+| `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. |
+| `130` / `143` | Interrupted (SIGINT / SIGTERM) |
 
 ## Install for agents
 
