@@ -28,6 +28,7 @@ describe("runDockerfileRules", () => {
     const rootUserDiag = findByRule(diagnostics, "docker-doctor/no-root-user");
     expect(rootUserDiag).toBeDefined();
     expect(rootUserDiag?.severity).toBe("warning");
+    expect(rootUserDiag?.category).toBe("Security");
   });
 
   test('rules: { "docker-doctor/no-root-user": "off" } skips that rule, leaves others', () => {
@@ -99,6 +100,16 @@ describe("runDockerfileRules", () => {
     );
     expect(rootUserDiag?.severity).toBe("info");
     expect(pinVersionDiag?.severity).toBe("error");
+  });
+
+  test("returns nothing for an instruction-free Dockerfile", () => {
+    const diagnostics = runDockerfileRules(
+      parseDockerfile("# only a comment\n"),
+      "Dockerfile",
+      []
+    );
+
+    expect(diagnostics).toEqual([]);
   });
 });
 
