@@ -13,6 +13,13 @@ export const runDockerfileRules = (
   rulesConfig?: Record<string, RuleSeverity>,
   categoriesConfig?: Record<string, RuleSeverity>
 ): Diagnostic[] => {
+  // A file with no instructions (empty, comment-only, a stub) has nothing
+  // to check. Whole-file rules such as no-root-user would otherwise report
+  // the absence of a USER line as "runs as root".
+  if (instructions.length === 0) {
+    return [];
+  }
+
   const diagnostics: Diagnostic[] = [];
 
   for (const rule of allDockerfileRules) {
