@@ -3,10 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import {
-  isTypeScriptImportUnsupported,
-  loadConfig,
-} from "../src/config/loader";
+import { loadConfig, typeStrippingFailure } from "../src/config/loader";
 import { ConfigError } from "../src/errors";
 
 describe("loadConfig", () => {
@@ -136,27 +133,36 @@ describe("loadConfig", () => {
     expect(config).toEqual({ rules: { "from-ts": "warning" } });
   });
 
-  test("detects runtimes that cannot import a .ts config", () => {
+  test("explains a .ts config failure by cause, not by Node version", () => {
     const tsConfig = path.join(dir, "docker-doctor.config.ts");
+
     expect(
-      isTypeScriptImportUnsupported(tsConfig, {
+      typeStrippingFailure(tsConfig, { code: "ERR_UNKNOWN_FILE_EXTENSION" })
+    ).toContain("not stripping TypeScript types");
+
+    // Below node_modules Node refuses at every version, so this one must not
+    // tell the user to upgrade.
+    const nodeModulesFailure = typeStrippingFailure(tsConfig, {
+      code: "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING",
+    });
+    expect(nodeModulesFailure).toContain("node_modules");
+    expect(nodeModulesFailure).not.toContain("22.18");
+  });
+
+  test("leaves unrelated config import failures alone", () => {
+    const tsConfig = path.join(dir, "docker-doctor.config.ts");
+
+    expect(
+      typeStrippingFailure(tsConfig, { code: "ERR_MODULE_NOT_FOUND" })
+    ).toBeUndefined();
+    expect(
+      typeStrippingFailure(path.join(dir, "docker-doctor.config.mjs"), {
         code: "ERR_UNKNOWN_FILE_EXTENSION",
       })
-    ).toBe(true);
+    ).toBeUndefined();
     expect(
-      isTypeScriptImportUnsupported(tsConfig, { code: "ERR_MODULE_NOT_FOUND" })
-    ).toBe(false);
-    expect(
-      isTypeScriptImportUnsupported(
-        path.join(dir, "docker-doctor.config.mjs"),
-        {
-          code: "ERR_UNKNOWN_FILE_EXTENSION",
-        }
-      )
-    ).toBe(false);
-    expect(isTypeScriptImportUnsupported(tsConfig, new Error("no code"))).toBe(
-      false
-    );
+      typeStrippingFailure(tsConfig, new Error("no code"))
+    ).toBeUndefined();
   });
 
   test("falls back to package.json#dockerDoctor when no config file exists", async () => {

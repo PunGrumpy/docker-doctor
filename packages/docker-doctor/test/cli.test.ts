@@ -268,8 +268,8 @@ describe("TypeScript config", () => {
     );
 
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("cannot import TypeScript config files");
-    expect(stderr).toContain("Node.js 22.18");
+    expect(stderr).toContain("not stripping TypeScript types");
+    expect(stderr).toContain("--no-experimental-strip-types");
   });
 });
 
