@@ -1,5 +1,16 @@
 # @docker-doctor/cli
 
+## 0.5.2
+
+### Patch Changes
+
+- 590ea75: Fix three discovery false positives: `<name>.dockerignore` files (BuildKit's per-Dockerfile ignore convention) are no longer scanned as Dockerfiles, Dockerfiles with no instructions no longer produce `no-root-user` / `require-labels` findings, and discovered paths are always `/`-separated so the `.dockerignore` check and the JSON report behave the same on Windows.
+- 66816aa: The post-scan wizard now reports a failed write (workflow scaffold, `.docker-doctor/`, `.gitignore`) and exits non-zero instead of silently pretending it succeeded; `.docker-doctor/diagnostics.json` flattens messages and paths the same way the per-rule `.txt` files already did; and every CLI error path sets the exit code instead of calling `process.exit`, so piped output is never cut short.
+- 5b03d3d: Every diagnostic in the `--json` report (and in `.docker-doctor/diagnostics.json`) now carries its rule's `category`, so consumers no longer need a second `rules list` call to group findings. The report `schemaVersion` is now `3`; all existing fields are unchanged.
+- 61264f3: Raise the supported Node.js floor to 22.18. The CLI's dependencies already required Node 22, and `docker-doctor.config.ts` only loads on runtimes that strip TypeScript types natively (22.18+). On an older Node the CLI now explains the `.ts` config failure and points at the YAML/JSON alternatives instead of printing `Unknown file extension ".ts"`.
+- d9b9a43: Fix four false results from reading shell text without quote awareness: a `<<EOF` inside a quoted string no longer opens a heredoc, a heredoc that never closes now fails the file (exit 2, "scan incomplete") instead of silently dropping every instruction after it, `avoid-run-cd` only flags `cd` in command position (`/opt/cd` and `cd.tar.gz` no longer match), `use-pipefail` ignores `|` inside quoted arguments, and a `services:` written as a YAML list is treated as invalid Compose rather than as services named `0`, `1`, …
+- c30dd7f: The bundled `docker-doctor` skill no longer claims that category severities other than `"off"` are ignored — `categories` entries cascade to every rule in the category unless a per-rule entry overrides them.
+
 ## 0.5.1
 
 ### Patch Changes
