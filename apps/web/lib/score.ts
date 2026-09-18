@@ -7,13 +7,14 @@ export interface ScoreData {
 
 // NOTE: this mirrors `SCORE_BUCKETS` in `packages/core/src/scoring.ts`
 // (thresholds 90/75/50/0). It is intentionally NOT imported from
-// `@docker-doctor/core`: that package's raw-TS sources use regex named
-// capturing groups (e.g. dockerfile-parser.ts, rules/security.ts), which
-// require `target >= ES2018`, but this app's tsconfig targets ES2017 --
-// importing the package breaks `tsc --noEmit` for the whole app. See the
-// plan 007 report for the exact error; fixing this (bumping the web
-// target, or dropping named groups in core) is a decision for the
-// maintainer, not made here.
+// `@docker-doctor/core`: that package exposes one barrel, and the barrel
+// re-exports `discoverProject` and `loadConfig`, which import
+// `node:fs/promises`. `getScoreData` is called from client components
+// (`components/sections/leaderboard/leaderboard.tsx`), so importing the
+// barrel there fails the build with "the chunking context does not
+// support external modules (request: node:fs/promises)". Server routes
+// import core without trouble, which is why `app/schema.json/route.ts`
+// can. Removing this copy needs a `./scoring` subpath export on core.
 const SCORE_BUCKETS = [
   {
     background: "bg-green-500/10",
