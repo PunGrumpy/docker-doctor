@@ -197,6 +197,21 @@ describe("empty project", () => {
     const report = JSON.parse(stdout);
     expect(report.diagnostics).toEqual([]);
   });
+
+  test("a sibling <name>.dockerignore is never scanned as a Dockerfile", async () => {
+    const { stdout } = await runCli([
+      fixture("dockerignore-sibling"),
+      "--json",
+    ]);
+    const report = JSON.parse(stdout);
+    expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
+    expect(report.project.dockerignores).toContain("Dockerfile.dockerignore");
+    expect(
+      report.diagnostics.some(
+        (d: { file: string }) => d.file === "Dockerfile.dockerignore"
+      )
+    ).toBe(false);
+  });
 });
 
 describe("categories config", () => {

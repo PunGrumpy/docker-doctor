@@ -100,6 +100,16 @@ describe("runDockerfileRules", () => {
     expect(rootUserDiag?.severity).toBe("info");
     expect(pinVersionDiag?.severity).toBe("error");
   });
+
+  test("returns nothing for an instruction-free Dockerfile", () => {
+    const diagnostics = runDockerfileRules(
+      parseDockerfile("# only a comment\n"),
+      "Dockerfile",
+      []
+    );
+
+    expect(diagnostics).toEqual([]);
+  });
 });
 
 describe("runComposeRules", () => {
