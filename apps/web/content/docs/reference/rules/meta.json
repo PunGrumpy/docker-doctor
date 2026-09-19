@@ -25,6 +25,8 @@
     "pin-service-image",
     "no-privileged-service",
     "no-docker-socket-mount",
+    "no-broad-bind-mount",
+    "prefer-read-only-bind-mount",
     "no-plaintext-secrets",
     "undefined-model-reference",
     "pin-model-version",
