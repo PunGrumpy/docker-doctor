@@ -46,6 +46,17 @@ sbx exec <sandbox> -- ls ~/.claude/skills/docker-doctor
 
 Or just watch the agent: ask it to containerize something and it should run `docker-doctor` on its own before committing.
 
+## Mind the mounts
+
+A sandbox isolates the agent from the host, with one deliberate exception: the workspace you mount into it. That shared folder is served from the host, so a bug in the file server turns a writable mount into a hole in the VM. [CVE-2026-77179](https://accomplish.ai/blog/escaping-dockers-hypervisor/) was exactly that: a container on Docker VMM opened a file, deleted its directory, replaced it with a symlink, and read and wrote anywhere on the macOS host. It is fixed in Docker Sandboxes 0.42.0 and Docker Desktop 4.88.0.
+
+The defense that does not depend on the hypervisor is to mount less and mount read-only. Docker Doctor enforces that for the Compose files the agent writes:
+
+- [`no-broad-bind-mount`](/docs/reference/rules/no-broad-bind-mount) warns when a service bind-mounts `/`, `~`, a hidden directory like `~/.ssh`, a parent of the project, or a system directory.
+- [`prefer-read-only-bind-mount`](/docs/reference/rules/prefer-read-only-bind-mount) reports bind mounts outside the project that are not marked `:ro`.
+
+Apply the same rule to the sandbox itself: mount the one repository the agent is working on, not your home directory.
+
 ## Requirements
 
 - A base template with Node.js — every standard agent template ships it (`claude-code-minimal` does not).

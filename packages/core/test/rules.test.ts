@@ -30,9 +30,11 @@ import {
   undefinedModelReference,
 } from "../src/rules/compose-models";
 import {
+  noBroadBindMount,
   noDockerSocketMount,
   noPlaintextSecrets,
   noPrivilegedService,
+  preferReadOnlyBindMount,
 } from "../src/rules/compose-security";
 import {
   preferSlimBase,
@@ -864,6 +866,112 @@ describe("Compose Security Rules", () => {
     ).toHaveLength(0);
   });
 
+  test("no-broad-bind-mount: root, home, dotfiles, parent, and system directories", () => {
+    const source = `services:
+  agent:
+    image: my-agent:1.0
+    volumes:
+      - /:/host:ro
+      - ~:/home/agent
+      - ~/.ssh:/root/.ssh:ro
+      - \${HOME}/.aws:/root/.aws
+      - ../:/workspace
+      - /etc:/host-etc
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+      - C:\\:/mnt/c
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = noBroadBindMount.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags.map((d) => d.line)).toEqual([5, 6, 7, 8, 9, 10, 11, 15]);
+    expect(diags[0].message).toContain("the host's root filesystem");
+    expect(diags[1].message).toContain("the whole home directory");
+    expect(diags[2].message).toContain("hidden directory");
+    expect(diags[3].message).toContain("'~/.aws'");
+    expect(diags[4].message).toContain("above the Compose project");
+    expect(diags[5].message).toContain("host system directory");
+    expect(diags[7].message).toContain("'C:/'");
+  });
+
+  test("no-broad-bind-mount: project paths, narrow host paths, named volumes, and the socket are clean", () => {
+    const composeContent = {
+      services: {
+        web: {
+          volumes: [
+            ".:/app",
+            "./data:/data",
+            "src:/app/src",
+            "~/projects/site:/site",
+            "/opt/models:/models",
+            "/var/lib/app:/data",
+            "/dev/shm:/dev/shm",
+            "/var/run/docker.sock:/var/run/docker.sock",
+            // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+            "${DATA_DIR}:/data",
+            "/cache",
+            { source: "cache", target: "/cache", type: "volume" },
+            { target: "/tmp", type: "tmpfs" },
+          ],
+        },
+      },
+    };
+    expect(noBroadBindMount.check(composeContent, "compose.yml")).toHaveLength(
+      0
+    );
+  });
+
+  test("prefer-read-only-bind-mount: writable host paths in short and long syntax", () => {
+    const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - /opt/certs:/etc/nginx/certs
+      - /opt/certs:/etc/nginx/certs:ro
+      - /opt/certs:/etc/nginx/certs:z,ro
+      - ~/site:/usr/share/nginx/html
+      - ./html:/usr/share/nginx/html
+      - type: bind
+        source: /opt/models
+        target: /models
+      - type: bind
+        source: /opt/models
+        target: /models
+        read_only: true
+`;
+    const composeContent = parseCompose(source, "compose.yml");
+    const diags = preferReadOnlyBindMount.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+    expect(diags.map((d) => d.line)).toEqual([5, 8, 10]);
+    expect(diags[0].message).toContain("'/opt/certs'");
+    expect(diags[0].severity).toBe("info");
+  });
+
+  test("prefer-read-only-bind-mount: project mounts, named volumes, and the socket are clean", () => {
+    const composeContent = {
+      services: {
+        web: {
+          volumes: [
+            ".:/app",
+            "./src:/app/src",
+            "src:/app/src",
+            "/var/run/docker.sock:/var/run/docker.sock",
+            // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+            "${DATA_DIR}:/data",
+            { source: "cache", target: "/cache", type: "volume" },
+          ],
+        },
+      },
+    };
+    expect(
+      preferReadOnlyBindMount.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
+  });
+
   test("no-plaintext-secrets: map and list syntax, interpolation is clean", () => {
     const source = `services:
   agent:
@@ -918,13 +1026,15 @@ describe("Compose Security Rules", () => {
         agent: {
           environment: { API_KEY: "sk-live" },
           privileged: true,
-          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock", "/:/host"],
         },
       },
     };
     const rules = [
       noPrivilegedService,
       noDockerSocketMount,
+      noBroadBindMount,
+      preferReadOnlyBindMount,
       noPlaintextSecrets,
     ];
     for (const rule of rules) {

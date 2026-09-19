@@ -175,6 +175,27 @@ export const rulePageContent: Record<string, RulePageContent> = {
     why: "Three separate problems stack up. **Integrity:** `ADD` gives you no place to verify a checksum, so you're trusting the remote server and the network path at every build. **Size:** the downloaded file is committed to its own layer; even if a later instruction deletes it, the bytes stay in the image history. **Caching:** Docker cannot tell whether the remote content changed, leading to stale-or-rebuilt-forever cache behavior. A `RUN curl` line fixes all three in one move.",
   },
 
+  "docker-doctor/no-broad-bind-mount": {
+    bad: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    volumes:\n      - ~:/home/agent\n      - ~/.aws:/root/.aws",
+      lang: "yaml",
+      title: "compose.yaml — the whole home directory and cloud credentials",
+    },
+    description:
+      "Bind-mounting /, $HOME, ~/.ssh, or a parent directory into a Compose service exposes far more of the host than the service needs. Mount the narrowest path, read-only.",
+    good: {
+      code: "services:\n  agent:\n    image: my-agent:1.2.0\n    volumes:\n      - ./workspace:/home/agent/workspace\n      - ./config/aws:/root/.aws:ro",
+      lang: "yaml",
+      title: "compose.yaml — one project directory, credentials read-only",
+    },
+    intro:
+      // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
+      "`- ~:/home/agent` is the fastest way to give a container access to _something_ under your home directory, and it also gives it everything else: SSH keys, cloud credentials, browser profiles, every other project. This rule flags bind mounts whose host source is the root filesystem (`/`, `C:\\`), the home directory (`~`, `$HOME`), a hidden directory under it (`~/.ssh`, `~/.aws`, `~/.docker`, …), a parent of the Compose project (`../`), or a host system directory (`/etc`, `/proc`, `/run`, `/home`, …). Relative paths inside the project and narrow absolute paths like `/opt/models` pass. It understands both the short and long `volumes` syntax and resolves `${VAR:-default}` interpolation to its default.",
+    notes:
+      "Two things usually fix a broad mount:\n\n- **Narrow the source**: mount `./data` or `/srv/app/uploads`, not the directory that happens to contain it. For credentials, copy the one profile the service needs into a project-local directory that is gitignored, or hand the value over as a Compose `secrets` entry.\n- **Make it read-only**: append `:ro` (short syntax) or set `read_only: true` (long syntax). The [prefer-read-only-bind-mount](/docs/reference/rules/prefer-read-only-bind-mount) rule tracks that half.\n\nHost-monitoring agents (cAdvisor, node exporters) legitimately mount `/proc` and `/sys`. Keep those read-only, and set this rule to `off` in `docker-doctor.config.json` if the warning is noise in a project dedicated to host monitoring.\n\nThe Docker socket is a special case with its own rule, [no-docker-socket-mount](/docs/reference/rules/no-docker-socket-mount), and is not reported here.",
+    why: "A bind mount is a hole in the container boundary by design, and its size is whatever directory you name. Mounting `~` hands over `~/.ssh`, `~/.aws`, and `~/.docker/config.json`, so one compromised dependency in the service becomes a credential theft on the host. The problem got sharper when Docker Desktop and Docker Sandboxes moved to running containers in a VM: the file server for a bind mount runs on the host, and bugs in it turn a writable mount into a full VM escape. [CVE-2026-77179](https://accomplish.ai/blog/escaping-dockers-hypervisor/) did exactly that with an open file, a deleted directory, and a symlink, all from inside a mounted folder. A VM does not protect the host from a mount it shares with the guest; the only reliable defenses are mounting less and mounting read-only.",
+  },
+
   "docker-doctor/no-docker-socket-mount": {
     bad: {
       code: "services:\n  mcp-gateway:\n    image: docker/mcp-gateway:0.9.0\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock",
@@ -398,6 +419,27 @@ export const rulePageContent: Record<string, RulePageContent> = {
     notes:
       "The one legitimate `ADD` use: extracting a **local** tar archive into the image in a single instruction (`ADD rootfs.tar.gz /`), where the auto-extraction is the point. For remote URLs, `ADD` is flagged separately by [no-add-remote](/docs/reference/rules/no-add-remote) — use `RUN curl` with checksum verification instead.",
     why: "The magic is the problem. `ADD app.tar.gz /opt/` silently unpacks the archive — if you wanted the archive itself, you shipped a surprise instead. An `ADD` of a directory behaves like `COPY`, so the reader can't tell intent from the instruction. Docker's own best-practice guidance is blunt about it: use `COPY` unless you specifically need `ADD`'s extraction. Explicit beats implicit in a file that builds your production artifact.",
+  },
+
+  "docker-doctor/prefer-read-only-bind-mount": {
+    bad: {
+      code: "services:\n  web:\n    image: nginx:1.27-alpine\n    volumes:\n      - /opt/certs:/etc/nginx/certs\n      - type: bind\n        source: /srv/site\n        target: /usr/share/nginx/html",
+      lang: "yaml",
+      title:
+        "compose.yaml — host paths the service only reads, mounted writable",
+    },
+    description:
+      "Compose bind mounts are writable by default. When a service only reads a host directory, add :ro or read_only: true so a compromised container cannot change files on the host.",
+    good: {
+      code: "services:\n  web:\n    image: nginx:1.27-alpine\n    volumes:\n      - /opt/certs:/etc/nginx/certs:ro\n      - type: bind\n        source: /srv/site\n        target: /usr/share/nginx/html\n        read_only: true",
+      lang: "yaml",
+      title: "compose.yaml — the same mounts, read-only",
+    },
+    intro:
+      "A Compose bind mount is read-write unless you say otherwise, and most of them never needed to be: certificates, model weights, static assets, and configuration are read by the service and written by you. This rule reports bind mounts whose host source lies outside the Compose project (an absolute path, `~`, or `../`) and that are not marked read-only, in either the short syntax (`:ro`) or the long syntax (`read_only: true`). Relative mounts inside the project (`./src:/app/src`) are the usual dev-loop mounts and are not reported; neither is the Docker socket, which has [its own rule](/docs/reference/rules/no-docker-socket-mount).",
+    notes:
+      "Append `:ro` to a short-syntax mount, or add `read_only: true` under a long-syntax one. If the service does write there, ask whether the host directory is really the right place: a named volume keeps the data without exposing a host path at all, and [no-broad-bind-mount](/docs/reference/rules/no-broad-bind-mount) covers the case where the path is not just writable but far too wide.\n\nThe rule reports at `info` severity, so it does not affect the health score by much on its own. Raise it to `warning` in `docker-doctor.config.json` for services that run untrusted code, such as coding agents and CI runners.",
+    why: "Read-only is the cheapest hardening a bind mount can get, and it removes a whole class of attack rather than one bug. A container that can write to a host directory can plant files where the host will later execute or trust them. On Docker Desktop and Docker Sandboxes, where containers run in a VM and the mount is served from the host, a writable mount is also the precondition for VM-escape bugs: [CVE-2026-77179](https://accomplish.ai/blog/escaping-dockers-hypervisor/) needed to create a file, delete its directory, and replace it with a symlink, none of which works on a read-only mount. The isolation that a VM promises holds only for the paths the guest cannot write.",
   },
 
   "docker-doctor/prefer-slim-base": {
