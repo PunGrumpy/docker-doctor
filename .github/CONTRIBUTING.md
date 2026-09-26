@@ -97,10 +97,14 @@ We use [Changesets](https://github.com/changesets/changesets) to manage versions
 
 **When NOT to create a changeset:**
 
-- Changes to `packages/core` or `apps/web` (internal packages)
+- Changes to `apps/web` or `packages/videos` (never published)
 - Test updates
 - Build configuration changes
 - README or contributing guide updates
+
+`packages/core` is private but bundled into `@docker-doctor/cli`, so changes to it still need a changeset that names `@docker-doctor/cli`. The same goes for `skills/docker-doctor`, which is copied into the npm package at build time.
+
+The Verify Changesets workflow fails a pull request that changes `packages/core/src`, `packages/docker-doctor/src`, the CLI `package.json`, or `skills/docker-doctor` without adding one. For a change with no user-visible effect (a refactor, a comment fix), add the `skip-changeset` label to the pull request instead.
 
 ## Adding or changing a rule
 
