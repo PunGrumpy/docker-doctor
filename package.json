@@ -22,6 +22,7 @@
     "kit:sync": "bun scripts/sync-kit-spec.ts",
     "doctor": "react-doctor",
     "docs:rules": "bun scripts/generate-rules-doc.ts",
+    "check:rule-count": "bun scripts/check-rule-count.ts",
     "prepare": "husky"
   },
   "devDependencies": {
