@@ -17,8 +17,15 @@ const makeDiagnostic = (overrides: Partial<Diagnostic> = {}): Diagnostic => ({
   ...overrides,
 });
 
+type ReportDiagnostic = JsonReport["diagnostics"][number];
+
+const toReportDiagnostic = (diagnostic: Diagnostic): ReportDiagnostic => ({
+  ...diagnostic,
+  category: diagnostic.category ?? "Security",
+});
+
 const makeReport = (diagnostics: Diagnostic[]): JsonReport => ({
-  diagnostics,
+  diagnostics: diagnostics.map(toReportDiagnostic),
   label: "Good ✅",
   project: { composeFiles: [], dockerfiles: ["Dockerfile"] },
   schemaVersion: 3,
