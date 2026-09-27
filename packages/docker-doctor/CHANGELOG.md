@@ -1,5 +1,17 @@
 # @docker-doctor/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- f3a15f8: The JSON report (`--json`, schema 4) now includes `failures[]`, one entry with the error message for every discovered file that could not be read or parsed. The GitHub Action marks those files as Unanalyzed, says so in the summary, and fails the pull request check regardless of `blocking`. Before, an unparseable Dockerfile rendered as Clean with a score of 100.
+
+### Patch Changes
+
+- 23deed0: `--config` paths now resolve from the current directory like every other flag, so the Action's `config` input is relative to the repository root, the same as `directory`. A path that only exists relative to the scanned directory still loads, with a warning. A missing scan target or a file passed as the scan target now gets a plain error instead of a raw `scandir` failure. The terminal migration notice counts files instead of findings. The scaffolded workflow grants `statuses: write`, which the Action's default commit status needs, and uses `actions/checkout@v7`. `rules explain` accepts the short rule name, such as `no-root-user`.
+- 478cc64: A subdirectory that cannot be read, such as a root-owned `data/` volume directory, no longer fails the whole scan. docker-doctor skips it and prints a warning on stderr. Discovery also skips well-known dependency, VCS and cache directories (`.venv`, `__pycache__`, `.yarn`, `coverage`, `.cache` and others), and it no longer walks a directory excluded by an `ignore.files` pattern ending in `/**`.
+- 632961c: Fix ten wrong verdicts. The Dockerfile parser no longer ends a `\`-continued instruction at a blank line (BuildKit skips those lines too), so the rules see the whole instruction. `no-secrets-in-env` ignores empty quoted defaults such as `ARG TOKEN=""`. `combine-apt-update-install`, `clean-package-cache` and `sort-multiline-args` recognize `apt-get <options> install`. `avoid-dev-dependencies` checks each command for npm, yarn, pnpm or bun running a bare project install, so it skips global installs, named-package installs and production installs (`--omit=dev`, `--only=production`, `--prod`, `NODE_ENV=production`). `prefer-copy-over-add` exempts every tar format ADD auto-extracts, including `.tar.xz` and `.tar.bz2`, and reports `.zip`, which ADD copies without extracting. `sort-multiline-args` sorts only the package list, not the command text around it. `use-dockerignore` accepts BuildKit's per-Dockerfile `<name>.dockerignore`. `use-multi-stage` counts `make` and `cmake` only where a command starts, so `apk add make` is not a build step. Compose bind mounts from `${PWD}/…` are project paths, and a source that starts with any other variable with no default names no known host path. `no-plaintext-secrets` reports unquoted numeric values such as `POSTGRES_PASSWORD: 123456`.
+
 ## 0.5.3
 
 ### Patch Changes
