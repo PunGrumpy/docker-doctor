@@ -430,6 +430,25 @@ describe("Performance Rules", () => {
     );
   });
 
+  const buildToolCases = [
+    { expected: 0, run: "apk add --no-cache make g++ python3" },
+    { expected: 1, run: "make" },
+    { expected: 1, run: "cd src && make install" },
+    { expected: 1, run: "cmake --build ." },
+    { expected: 0, run: 'echo "make it so"' },
+  ];
+
+  test.each(buildToolCases)(
+    "use-multi-stage: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useMultiStage.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("minimize-layers", () => {
     const consecutive = parseDockerfile(`
         RUN step1

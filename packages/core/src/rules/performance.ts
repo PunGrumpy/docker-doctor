@@ -1,5 +1,11 @@
+import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+
+// `make` only where a command can start, so `apk add make` (installing the
+// tool) is not a build step while `cd src && make` is.
+const BUILD_TOOL_COMMAND_RE =
+  /(?:^|&&|\|\||;|\||\(|`|\$\()\s*(?:make|cmake)(?=\s|$)/u;
 
 export const useMultiStage: DockerfileRule = {
   category: "Performance",
@@ -16,7 +22,7 @@ export const useMultiStage: DockerfileRule = {
             inst.args.includes("yarn build") ||
             inst.args.includes("bun run build") ||
             inst.args.includes("cargo build") ||
-            inst.args.includes("make"))
+            BUILD_TOOL_COMMAND_RE.test(maskQuotedText(inst.args)))
       );
 
       if (hasBuildSteps) {
