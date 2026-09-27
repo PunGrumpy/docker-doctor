@@ -74,10 +74,11 @@ When your team trusts the signal, raise `blocking`:
     blocking: error # fail on error-severity findings ("warning" fails on warnings too)
 ```
 
-Two rules always hold:
+Three rules always hold:
 
 - Only `pull_request` events can fail. Pushes to your default branch are health snapshots — they never go red.
 - A scan that crashes without producing a report fails the run regardless of `blocking`, so a broken setup can't silently pass.
+- A scan that could not analyze one of the discovered files (the CLI exits `2`) fails the pull request check regardless of `blocking`. The summary marks those files **Unanalyzed**, so a broken Dockerfile can't pass as clean.
 
 ## Versioning
 
