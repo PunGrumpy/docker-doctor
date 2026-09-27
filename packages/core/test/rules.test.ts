@@ -1165,6 +1165,26 @@ models:
   });
 });
 
+// apt-get options may sit between the command and its subcommand.
+const aptOptionCases = [
+  {
+    clean: 1,
+    combine: 0,
+    run: "apt-get update && apt-get -y --no-install-recommends install curl",
+  },
+  {
+    clean: 0,
+    combine: 0,
+    run: "apt-get update && apt-get -y install curl && rm -rf /var/lib/apt/lists/*",
+  },
+  {
+    clean: 0,
+    combine: 0,
+    run: "apt-get -qq update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*",
+  },
+  { clean: 1, combine: 1, run: "apt-get -y install curl" },
+];
+
 describe("Image Size Rules", () => {
   test("prefer-slim-base", () => {
     const heavyBase = parseDockerfile(`
@@ -1274,6 +1294,17 @@ describe("Image Size Rules", () => {
     expect(cleanPackageCache.check(bindMount, "Dockerfile")).toHaveLength(1);
   });
 
+  test.each(aptOptionCases)(
+    "clean-package-cache: RUN $run reports $clean",
+    ({ run, clean }) => {
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(clean);
+    }
+  );
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder
@@ -1348,6 +1379,17 @@ describe("Image Size Rules", () => {
 });
 
 describe("Best Practices Rules", () => {
+  test.each(aptOptionCases)(
+    "combine-apt-update-install: RUN $run reports $combine",
+    ({ run, combine }) => {
+      const diagnostics = combineAptUpdateInstall.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(combine);
+    }
+  );
+
   test("combine-apt-update-install", () => {
     const uncombinedUpdate = parseDockerfile(`
       RUN apt-get update

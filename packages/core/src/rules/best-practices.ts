@@ -3,6 +3,7 @@ import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
 
 export const requireHealthcheck: DockerfileRule = {
   category: "Best Practices",
@@ -147,8 +148,8 @@ export const combineAptUpdateInstall: DockerfileRule = {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
-        const hasUpdate = inst.args.includes("apt-get update");
-        const hasInstall = inst.args.includes("apt-get install");
+        const hasUpdate = hasAptGetUpdate(inst.args);
+        const hasInstall = hasAptGetInstall(inst.args);
 
         if (hasUpdate && !hasInstall) {
           diagnostics.push(
@@ -355,7 +356,7 @@ export const sortMultilineArgs: DockerfileRule = {
       if (inst.instruction === "RUN") {
         const { raw } = inst;
         const isPackageInstall =
-          raw.includes("apt-get install") ||
+          hasAptGetInstall(raw) ||
           raw.includes("apk add") ||
           raw.includes("yum install") ||
           raw.includes("dnf install");

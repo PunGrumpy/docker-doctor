@@ -11,6 +11,7 @@ import type {
   DockerfileRule,
 } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+import { hasAptGetInstall } from "./package-managers";
 
 export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
@@ -117,7 +118,7 @@ export const cleanPackageCache: DockerfileRule = {
 
         // check apt-get install without cleanup
         if (
-          args.includes("apt-get install") &&
+          hasAptGetInstall(args) &&
           !args.includes("rm -rf /var/lib/apt/lists") &&
           !hasCacheMountFor(args, APT_CACHE_DIRS)
         ) {
