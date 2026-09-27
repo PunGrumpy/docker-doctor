@@ -18,6 +18,17 @@ const DIRS = [
   "omega",
 ];
 
+// chmod 000 does not stop root, and Windows has no POSIX modes.
+const canTestPermissions =
+  process.platform !== "win32" && process.getuid?.() !== 0;
+
+const writeDockerfiles = (root: string, files: readonly string[]): void => {
+  for (const file of files) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), "FROM node:22-alpine\n");
+  }
+};
+
 const makeProject = (): { root: string; cleanup: () => void } => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
   for (const dir of DIRS) {
@@ -82,6 +93,9 @@ describe("discoverProject", () => {
       expect(
         (project.dockerignores ?? []).some((f) => f.startsWith("alpha/"))
       ).toBe(false);
+
+      const pruned = await discoverProject(root, { ignoreFiles: ["alpha/**"] });
+      expect(pruned.dockerfiles).toHaveLength(DIRS.length - 1);
     } finally {
       cleanup();
     }
@@ -143,6 +157,70 @@ describe("discoverProject", () => {
 
       // `build/` is scanned on purpose: projects keep real Dockerfiles there.
       expect(project.dockerfiles).toEqual(["build/Dockerfile"]);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  // An unreadable directory inside the ignored tree makes readdir throw
+  // EACCES, so the scan only succeeds if the walk never opened the tree.
+  test.skipIf(!canTestPermissions)(
+    "a pattern ending in /** prunes the directory before reading it",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      const locked = path.join(root, "examples", "locked");
+      try {
+        writeDockerfiles(root, ["Dockerfile", "examples/sub/Dockerfile"]);
+        fs.mkdirSync(locked);
+        fs.chmodSync(locked, 0o000);
+
+        const project = await discoverProject(root, {
+          ignoreFiles: ["examples/**"],
+        });
+
+        expect(project.dockerfiles).toEqual(["Dockerfile"]);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
+  test.skipIf(!canTestPermissions)(
+    "**/vendor/** prunes a nested vendor directory",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      const locked = path.join(root, "a", "vendor", "locked");
+      try {
+        writeDockerfiles(root, ["a/Dockerfile", "a/vendor/Dockerfile"]);
+        fs.mkdirSync(locked);
+        fs.chmodSync(locked, 0o000);
+
+        const project = await discoverProject(root, {
+          ignoreFiles: ["**/vendor/**"],
+        });
+
+        expect(project.dockerfiles).toEqual(["a/Dockerfile"]);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
+  test("examples/* ignores direct children only and does not prune", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+    try {
+      writeDockerfiles(root, [
+        "examples/Dockerfile",
+        "examples/sub/Dockerfile",
+      ]);
+
+      const project = await discoverProject(root, {
+        ignoreFiles: ["examples/*"],
+      });
+
+      expect(project.dockerfiles).toEqual(["examples/sub/Dockerfile"]);
     } finally {
       fs.rmSync(root, { force: true, recursive: true });
     }

@@ -36,8 +36,34 @@ export const PRUNED_DIRECTORIES = [
 
 const PRUNED = new Set<string>(PRUNED_DIRECTORIES);
 
+// ProjectInfo paths are the public contract (JSON report `file`, PR-comment
+// links, rule helpers that split on "/"), so they are POSIX on every OS.
+const toPosixRelative = (rootDir: string, file: string): string =>
+  path.relative(rootDir, file).split(path.sep).join("/");
+
+const SUBTREE_SUFFIX = "/**";
+
+// A pattern `X/**` ignores every path under a directory that matches `X`,
+// so such a directory can be skipped without reading it. Other patterns
+// never prune: `examples/*` ignores only the direct children of `examples/`,
+// and the files below them must still be found.
+const createPrunedDirectoryMatcher = (
+  patterns: readonly string[] = []
+): ((relativeDir: string) => boolean) =>
+  createIgnoreMatcher(
+    patterns
+      .filter((pattern) => pattern.endsWith(SUBTREE_SUFFIX))
+      .map((pattern) => pattern.slice(0, -SUBTREE_SUFFIX.length))
+  );
+
+interface WalkOptions {
+  isPrunedByConfig: (relativeDir: string) => boolean;
+  rootDir: string;
+}
+
 const walk = async (
   dir: string,
+  options: WalkOptions,
   fileList: string[] = []
 ): Promise<string[]> => {
   const files = await fs.readdir(dir, { withFileTypes: true });
@@ -51,10 +77,13 @@ const walk = async (
         return;
       }
       if (file.isDirectory()) {
-        if (PRUNED.has(file.name)) {
+        if (
+          PRUNED.has(file.name) ||
+          options.isPrunedByConfig(toPosixRelative(options.rootDir, filePath))
+        ) {
           return;
         }
-        await walk(filePath, fileList);
+        await walk(filePath, options, fileList);
       } else {
         fileList.push(filePath);
       }
@@ -63,19 +92,19 @@ const walk = async (
   return fileList;
 };
 
-// ProjectInfo paths are the public contract (JSON report `file`, PR-comment
-// links, rule helpers that split on "/"), so they are POSIX on every OS.
-const toPosixRelative = (rootDir: string, file: string): string =>
-  path.relative(rootDir, file).split(path.sep).join("/");
-
 export const discoverProject = async (
   rootDir: string,
   options?: { ignoreFiles?: readonly string[] }
 ): Promise<ProjectInfo> => {
-  const allFiles = await walk(rootDir);
+  const allFiles = await walk(rootDir, {
+    isPrunedByConfig: createPrunedDirectoryMatcher(options?.ignoreFiles),
+    rootDir,
+  });
   const dockerfiles: string[] = [];
   const composeFiles: string[] = [];
   const dockerignores: string[] = [];
+  // Still needed after pruning: file patterns such as `**/compose.yaml`
+  // and `examples/*` are only applied here.
   const isIgnored = createIgnoreMatcher(options?.ignoreFiles);
 
   for (const file of allFiles) {
