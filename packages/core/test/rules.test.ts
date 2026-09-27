@@ -1797,6 +1797,25 @@ describe("Best Practices Rules", () => {
     ).toHaveLength(0);
   });
 
+  const addSourceCases = [
+    { args: "rootfs.tar.xz /", expected: 0 },
+    { args: "base.tar.bz2 /", expected: 0 },
+    { args: "app.tgz /app", expected: 0 },
+    { args: "app.zip /app", expected: 1 },
+    { args: "config.json /etc/", expected: 1 },
+  ];
+
+  test.each(addSourceCases)(
+    "prefer-copy-over-add: ADD $args reports $expected",
+    ({ args, expected }) => {
+      const diagnostics = preferCopyOverAdd.check(
+        parseDockerfile(`ADD ${args}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("use-exec-form", () => {
     const shellForm = parseDockerfile(`
         CMD node index.js

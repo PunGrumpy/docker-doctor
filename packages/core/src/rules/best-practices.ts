@@ -40,6 +40,19 @@ export const requireHealthcheck: DockerfileRule = {
   message: "Add a HEALTHCHECK instruction",
 };
 
+// ADD auto-extracts local tar archives (identity, gzip, bzip2, xz). Zip files
+// are copied verbatim, so COPY is the right instruction for them.
+const AUTO_EXTRACT_SUFFIXES = [
+  ".tar",
+  ".tar.gz",
+  ".tgz",
+  ".tar.bz2",
+  ".tbz2",
+  ".tbz",
+  ".tar.xz",
+  ".txz",
+] as const;
+
 export const preferCopyOverAdd: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
@@ -57,11 +70,9 @@ export const preferCopyOverAdd: DockerfileRule = {
         // If it's not a remote url (handled by security/no-add-remote) and not a compressed file
         const isRemote =
           src.startsWith("http://") || src.startsWith("https://");
-        const isArchive =
-          src.endsWith(".tar") ||
-          src.endsWith(".tar.gz") ||
-          src.endsWith(".tgz") ||
-          src.endsWith(".zip");
+        const isArchive = AUTO_EXTRACT_SUFFIXES.some((suffix) =>
+          src.toLowerCase().endsWith(suffix)
+        );
 
         if (!isRemote && !isArchive) {
           diagnostics.push(
