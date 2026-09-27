@@ -327,6 +327,26 @@ describe("Security Rules", () => {
     ]);
   });
 
+  const quotedSecretCases = [
+    { expected: 0, line: 'ARG GITHUB_TOKEN=""' },
+    { expected: 0, line: "ENV API_KEY=''" },
+    { expected: 0, line: 'ENV DB_PASSWORD ""' },
+    { expected: 1, line: 'ENV API_KEY="abc123"' },
+    { expected: 1, line: "ENV API_KEY=abc123" },
+    { expected: 0, line: 'ENV API_KEY="$SECRET"' },
+  ];
+
+  test.each(quotedSecretCases)(
+    "no-secrets-in-env: $line reports $expected",
+    ({ expected, line }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(line),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/

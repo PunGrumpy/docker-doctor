@@ -20,7 +20,15 @@ export const isSecretKey = (key: string): boolean =>
 // A URL with no userinfo in its authority. `user:pw@host` does not match.
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
 
-export const isLiteralSecretValue = (value: string): boolean =>
-  value.length > 0 &&
-  !value.startsWith("$") &&
-  !CREDENTIAL_FREE_URL.test(value);
+// `ENV TOKEN=""` / `ARG KEY=''` declare a build-time secret with no value;
+// the quotes are shell syntax, not a literal.
+const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/su;
+
+export const isLiteralSecretValue = (value: string): boolean => {
+  const unquoted = value.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? value;
+  return (
+    unquoted.length > 0 &&
+    !unquoted.startsWith("$") &&
+    !CREDENTIAL_FREE_URL.test(unquoted)
+  );
+};
