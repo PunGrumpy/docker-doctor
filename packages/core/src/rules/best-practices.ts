@@ -359,6 +359,32 @@ export const avoidRunCd: DockerfileRule = {
   message: "Avoid changing directories with cd in RUN",
 };
 
+const PACKAGE_LIST_START_RE =
+  /\b(?:apt-get(?:\s+-\S+)*\s+install|apk\s+add|yum\s+install|dnf\s+install)\b/u;
+const SHELL_SEPARATOR_RE = /[;|]|&&/u;
+const WHITESPACE_RE = /\s+/u;
+
+// The words after the install verb up to the next shell separator, minus
+// options and continuation backslashes. Everything past a separator belongs
+// to another command, so it is not part of the list.
+const collectPackageList = (raw: string): string[] => {
+  const start = PACKAGE_LIST_START_RE.exec(raw);
+  if (!start) {
+    return [];
+  }
+  const packages: string[] = [];
+  const tokens = raw.slice(start.index + start[0].length).split(WHITESPACE_RE);
+  for (const token of tokens) {
+    if (SHELL_SEPARATOR_RE.test(token)) {
+      break;
+    }
+    if (token !== "" && token !== "\\" && !token.startsWith("-")) {
+      packages.push(token);
+    }
+  }
+  return packages;
+};
+
 export const sortMultilineArgs: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
@@ -375,24 +401,12 @@ export const sortMultilineArgs: DockerfileRule = {
         const hasContinuation = raw.includes("\\\n") || raw.includes("\\\r\n");
 
         if (isPackageInstall && hasContinuation) {
-          const lines = raw.split(/\r?\n/u);
-          const packages = lines
-            .slice(1)
-            .map((line) => line.trim())
-            .filter(
-              (line) =>
-                line !== "" &&
-                !line.startsWith("&&") &&
-                !line.startsWith("-") &&
-                !line.includes("rm -rf")
-            )
-            .map((line) =>
-              line.endsWith("\\") ? line.slice(0, -1).trim() : line
-            )
-            .filter(Boolean);
+          const packages = collectPackageList(raw);
 
           if (packages.length > 1) {
-            const sorted = packages.toSorted((a, b) => a.localeCompare(b));
+            // The default comparator orders by code unit, so the verdict does
+            // not depend on the machine's locale.
+            const sorted = packages.toSorted();
             const isSorted = packages.every((val, idx) => val === sorted[idx]);
             if (!isSorted) {
               diagnostics.push(

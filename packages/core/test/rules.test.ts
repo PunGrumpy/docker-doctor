@@ -1732,6 +1732,61 @@ describe("Best Practices Rules", () => {
     ).toHaveLength(0);
   });
 
+  const packageListCases = [
+    {
+      dockerfile: `
+      RUN set -eux; \\
+        apt-get update; \\
+        apt-get install -y --no-install-recommends \\
+          ca-certificates \\
+          curl \\
+        ; \\
+        rm -rf /var/lib/apt/lists/*
+    `,
+      expected: 0,
+      name: "commands after a ; separator are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y --no-install-recommends \\
+        acl \\
+        curl
+    `,
+      expected: 0,
+      name: "options on the install line are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y \\
+        tmux \\
+        curl \\
+        && rm -rf /var/lib/apt/lists/*
+    `,
+      expected: 1,
+      name: "an unsorted list before && still reports",
+    },
+    {
+      dockerfile: `
+      RUN apk add --no-cache \\
+        curl \\
+        bash
+    `,
+      expected: 1,
+      name: "an unsorted apk list reports",
+    },
+  ];
+
+  test.each(packageListCases)(
+    "sort-multiline-args: $name",
+    ({ dockerfile, expected }) => {
+      const diagnostics = sortMultilineArgs.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("useradd-no-log-init", () => {
     const withoutFlag = parseDockerfile(`
       RUN useradd -r -g mygroup myuser
