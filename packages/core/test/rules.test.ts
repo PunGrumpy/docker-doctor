@@ -1137,6 +1137,31 @@ describe("Compose Security Rules", () => {
     ]);
   });
 
+  const scalarSecretCases = [
+    { entry: "POSTGRES_PASSWORD: 123456", expected: 1 },
+    { entry: 'API_TOKEN: "abc123"', expected: 1 },
+    { entry: "AUTH_ENABLED: true", expected: 0 },
+    { entry: `DB_PASSWORD: \${DB_PASSWORD}`, expected: 0 },
+  ];
+
+  test.each(scalarSecretCases)(
+    "no-plaintext-secrets: $entry reports $expected",
+    ({ entry, expected }) => {
+      const source = `services:
+  db:
+    image: postgres:17
+    environment:
+      ${entry}
+`;
+      const diagnostics = noPlaintextSecrets.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("compose security rules work without a locator", () => {
     const composeContent = {
       services: {

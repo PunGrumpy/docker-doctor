@@ -166,6 +166,19 @@ export const preferReadOnlyBindMount: ComposeRule = {
   message: "Bind mounts outside the project should be read-only",
 };
 
+// YAML reads an unquoted `123456` as a number, and it is still a literal
+// value in the file. Booleans are left out: `AUTH_ENABLED: true` matches the
+// `auth` key pattern but holds no secret.
+const literalValue = (value: unknown): string | undefined => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  return undefined;
+};
+
 export const noPlaintextSecrets: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -200,11 +213,7 @@ export const noPlaintextSecrets: ComposeRule = {
           }
           const key = entry.slice(0, eqIndex);
           const value = entry.slice(eqIndex + 1);
-          if (
-            isSecretKey(key) &&
-            typeof value === "string" &&
-            isLiteralSecretValue(value)
-          ) {
+          if (isSecretKey(key) && isLiteralSecretValue(value)) {
             flag(
               name,
               key,
@@ -214,10 +223,11 @@ export const noPlaintextSecrets: ComposeRule = {
         }
       } else if (environment && typeof environment === "object") {
         for (const [key, value] of Object.entries(environment)) {
+          const literal = literalValue(value);
           if (
+            literal !== undefined &&
             isSecretKey(key) &&
-            typeof value === "string" &&
-            isLiteralSecretValue(value)
+            isLiteralSecretValue(literal)
           ) {
             flag(
               name,
