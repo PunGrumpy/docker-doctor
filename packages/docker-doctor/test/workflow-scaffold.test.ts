@@ -45,6 +45,8 @@ describe("scaffoldActionWorkflow", () => {
       expect(status).toBe("created");
       expect(read()).toContain("name: Docker Doctor");
       expect(read()).toContain(`uses: ${ACTION_REF}`);
+      expect(read()).toContain("statuses: write");
+      expect(read()).toContain("uses: actions/checkout@v7");
       const cwdWorkflowAfter = fs.existsSync(cwdWorkflow)
         ? fs.readFileSync(cwdWorkflow, "utf-8")
         : null;

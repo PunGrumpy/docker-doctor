@@ -16,7 +16,7 @@ npx @docker-doctor/cli@latest [dir]
 | `--verbose` | `-v` | Show the affected file, line, an explanation, and a `Help:` fix hint for every diagnostic |
 | `--score` | `-s` | Print only the numeric health score |
 | `--json` | `-j` | Output the full report as JSON |
-| `--config <path>` | `-c` | Use a custom config file path |
+| `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
 | `--version` | `-V` | Print the CLI version |
 
 ## Piped / CI output
@@ -71,7 +71,7 @@ List every built-in rule, its category, default severity, and description:
 npx @docker-doctor/cli@latest rules list
 ```
 
-Explain a single rule and its fix in detail (requires the full rule key):
+Explain a single rule and its fix in detail (the full key or the short name after `docker-doctor/` both work):
 
 ```bash
 npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user

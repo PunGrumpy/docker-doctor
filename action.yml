@@ -28,7 +28,7 @@ inputs:
     required: false
     default: "true"
   config:
-    description: "Path to a docker-doctor config file, passed to the CLI as --config"
+    description: "Path to a docker-doctor config file, relative to the repository root, passed to the CLI as --config"
     required: false
     default: ""
 

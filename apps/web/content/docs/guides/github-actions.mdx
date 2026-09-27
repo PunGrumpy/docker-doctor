@@ -21,7 +21,7 @@ jobs:
   docker-doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: PunGrumpy/docker-doctor@v1
 ```
 
@@ -52,7 +52,7 @@ Every run also publishes a commit status on the scanned commit: `Docker Doctor �
 | `blocking` | `none` | Which severities fail the check on pull requests: `none` (advisory), `warning`, or `error`. |
 | `comment` | `true` | Post/update the sticky summary comment on pull requests. |
 | `commit-status` | `true` | Publish a commit status with the score and issue counts, linking to the run. Requires `statuses: write`. |
-| `config` | — | Path to a [config file](/docs/reference/configuration), passed to the CLI as `--config`. |
+| `config` | — | Path to a [config file](/docs/reference/configuration), relative to the repository root, passed to the CLI as `--config`. |
 
 ## Outputs
 

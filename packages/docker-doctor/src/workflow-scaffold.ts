@@ -38,11 +38,12 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write
 jobs:
   docker-doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ${options.actionRef}
 `;
 

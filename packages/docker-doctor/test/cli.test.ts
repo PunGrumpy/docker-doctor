@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { allRules } from "@docker-doctor/core";
+
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
 
@@ -63,6 +65,37 @@ describe("exit codes", () => {
     ]);
     expect(exitCode).toBe(1);
     expect(stderr).toContain("not found");
+  });
+});
+
+describe("rules subcommands", () => {
+  test("rules explain accepts the short rule name", async () => {
+    const { exitCode, stdout } = await runCli([
+      "rules",
+      "explain",
+      "no-root-user",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("docker-doctor/no-root-user");
+    expect(stdout).toContain("Help / Fix");
+  });
+
+  test("rules explain accepts the full rule key", async () => {
+    const { exitCode, stdout } = await runCli([
+      "rules",
+      "explain",
+      "docker-doctor/no-root-user",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Help / Fix");
+  });
+
+  test("rules list prints every rule", async () => {
+    const { exitCode, stdout } = await runCli(["rules", "list"]);
+    expect(exitCode).toBe(0);
+    for (const rule of allRules) {
+      expect(stdout).toContain(`- ${rule.key}`);
+    }
   });
 });
 
@@ -308,6 +341,72 @@ describe("categories config", () => {
     );
     expect(rootUserDiag).toBeDefined();
     expect(rootUserDiag.severity).toBe("error");
+  });
+});
+
+describe("--config resolution", () => {
+  const packageDir = path.join(import.meta.dir, "..");
+
+  test("resolves relative to the current directory", async () => {
+    const { exitCode, stderr } = await runCli(
+      [
+        fixture("clean"),
+        "--json",
+        "--config",
+        "test/fixtures/with-category-config/docker-doctor.config.yaml",
+      ],
+      { cwd: packageDir }
+    );
+    expect(stderr).not.toContain("not found");
+    expect(exitCode).toBe(0);
+  });
+
+  test("falls back to the scanned directory with a warning", async () => {
+    const { exitCode, stderr } = await runCli(
+      [
+        fixture("with-category-config"),
+        "--json",
+        "--config",
+        "docker-doctor.config.yaml",
+      ],
+      { cwd: packageDir }
+    );
+    expect(stderr).toContain("found relative to the scanned directory");
+    // The fixture's config escalates no-root-user to error.
+    expect(exitCode).toBe(1);
+  });
+
+  test("reports a missing config with the cwd-relative path", async () => {
+    const { exitCode, stderr } = await runCli(
+      [fixture("clean"), "--json", "--config", "does-not-exist.yaml"],
+      { cwd: packageDir }
+    );
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain(
+      `Specified config file not found at ${path.join(packageDir, "does-not-exist.yaml")}`
+    );
+  });
+});
+
+describe("scan target validation", () => {
+  test("a nonexistent path exits 1 with a plain error", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("does-not-exist"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Directory not found");
+    expect(stdout).toBe("");
+  });
+
+  test("a file path exits 1 and asks for the directory", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      path.join(fixture("clean"), "Dockerfile"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("is not a directory");
+    expect(stdout).toBe("");
   });
 });
 

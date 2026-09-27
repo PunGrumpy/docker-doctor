@@ -624,6 +624,56 @@ const reportScanFailures = (failures: ScanFailure[]): void => {
   }
 };
 
+const pathExists = async (filePath: string): Promise<boolean> => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Flag paths resolve from where the command was run, like every other CLI.
+// Earlier releases resolved --config from the scanned directory. That still
+// works when the cwd-relative path does not exist, with a warning.
+const resolveConfigPath = async (
+  configOption: string | undefined,
+  rootDir: string
+): Promise<string | undefined> => {
+  if (!configOption) {
+    return undefined;
+  }
+  const fromCwd = path.resolve(process.cwd(), configOption);
+  if (await pathExists(fromCwd)) {
+    return fromCwd;
+  }
+  const fromRoot = path.resolve(rootDir, configOption);
+  if (fromRoot !== fromCwd && (await pathExists(fromRoot))) {
+    console.error(
+      `Warning: --config ${configOption} was found relative to the scanned directory, not the current directory. Pass a path relative to the current directory or an absolute path.`
+    );
+    return fromRoot;
+  }
+  // Found nowhere: loadConfig reports "Specified config file not found at"
+  // with the cwd-relative path, which is where the user should look.
+  return fromCwd;
+};
+
+// Project discovery would otherwise fail with a raw ENOENT or ENOTDIR from
+// scandir.
+const findScanTargetProblem = async (
+  rootDir: string
+): Promise<string | null> => {
+  const rootStat = await fs.stat(rootDir).catch(() => null);
+  if (rootStat === null) {
+    return `Directory not found: ${rootDir}`;
+  }
+  if (!rootStat.isDirectory()) {
+    return `${rootDir} is not a directory. Pass the directory that contains your Dockerfile or Compose file.`;
+  }
+  return null;
+};
+
 const program = new Command();
 
 program
@@ -661,6 +711,14 @@ program
 
     try {
       const rootDir = path.resolve(dir);
+      // Checked before the spinner starts, so the error path never hides
+      // the cursor.
+      const scanTargetProblem = await findScanTargetProblem(rootDir);
+      if (scanTargetProblem !== null) {
+        console.error(`Error: ${scanTargetProblem}`);
+        process.exitCode = 1;
+        return;
+      }
       const startTime = Date.now();
 
       let statusText = "Discovering workspace...";
@@ -693,7 +751,8 @@ program
         // Load config first
         // Warnings go to stderr so the --json and --score stdout contracts
         // stay machine-readable.
-        const config = await loadConfig(rootDir, options.config, (message) => {
+        const configPath = await resolveConfigPath(options.config, rootDir);
+        const config = await loadConfig(rootDir, configPath, (message) => {
           console.error(`Warning: ${message}`);
         });
 
@@ -934,7 +993,7 @@ rules
   .command("explain <rule>")
   .description("explain a specific rule in detail")
   .action((ruleKey) => {
-    const rule = findRule(ruleKey);
+    const rule = findRule(ruleKey) ?? findRule(`docker-doctor/${ruleKey}`);
     if (!rule) {
       console.error(`Rule '${ruleKey}' not found.`);
       process.exitCode = 1;
