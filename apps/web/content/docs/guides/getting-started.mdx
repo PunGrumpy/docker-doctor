@@ -31,16 +31,23 @@ npx @docker-doctor/cli@latest ./path/to/project
 
 ## Read the output
 
-A scan prints one line per diagnostic — the file and line, the severity, a short message, and the rule key that raised it — followed by an overall health score:
+A scan prints how many issues it found per category, then the health score with its label. A scan of the `packages/docker-doctor/test/fixtures/with-error` fixture in the docker-doctor repository prints:
 
 ```text
-Dockerfile
-  10:1  warning  Container should not run as root user  docker-doctor/no-root-user
+All 3 issues
 
-Score: 94 Good ✅
+Security › 1 issue
+Performance › 0 issues
+Best Practices › 2 issues
+Compose › 0 issues
+Image Size › 0 issues
+
+Run docker-doctor --verbose to list every error and warning
+
+84 / 100 Good ✅
 ```
 
-Add `--verbose` to see the affected file, an explanation, and a `Help:` fix hint for every diagnostic:
+Add `--verbose` to see every finding with its file and line, a code frame, an explanation, and a `Help:` fix hint:
 
 ```bash
 npx @docker-doctor/cli@latest . --verbose
