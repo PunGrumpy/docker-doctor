@@ -13,14 +13,14 @@ import {
 
 Your Dockerfiles are probably wrong. docker-doctor finds out why.
 
-docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 31 rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
+docker-doctor is an opinionated static analysis tool for Dockerfile and Docker Compose files. It scans your project, runs 33 rules across security, performance, best practices, Compose, and image size — then gives you a health score and fix guidance.
 
 Works with any project that uses Docker.
 
 ## Key features
 
 <Cards>
-  <Card icon={<Layers />} title="25 built-in rules">
+  <Card icon={<Layers />} title="33 built-in rules">
     Across five categories: Security, Performance, Best Practices, Compose, and
     Image Size.
   </Card>
@@ -37,8 +37,8 @@ Works with any project that uses Docker.
     `docker-doctor.config.ts` — or YAML/JSON with a published schema.
   </Card>
   <Card icon={<TerminalSquare />} title="CI-friendly">
-    Machine-readable `--json` output and a `--score` mode that exits non-zero
-    below a health threshold.
+    Machine-readable `--json` output and a `--score` mode that prints only the
+    number. Any `error`-severity finding exits non-zero, so a scan can gate CI.
   </Card>
 </Cards>
 
