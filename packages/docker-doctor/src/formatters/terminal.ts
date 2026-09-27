@@ -75,21 +75,33 @@ const printDiagnostics = (
       `\n  Run ${chalk.cyan("docker-doctor --verbose")} to list every error and warning`
     );
 
-    // Migration-scale checks
-    const ruleCounts: Record<string, number> = {};
+    // Migration-scale checks: the same rule firing many times.
+    const findingsByRule = new Map<
+      string,
+      { count: number; files: Set<string> }
+    >();
     for (const d of diagnostics) {
-      ruleCounts[d.rule] = (ruleCounts[d.rule] || 0) + 1;
+      const findings = findingsByRule.get(d.rule) ?? {
+        count: 0,
+        files: new Set<string>(),
+      };
+      findings.count += 1;
+      findings.files.add(d.file);
+      findingsByRule.set(d.rule, findings);
     }
-    const migrationRules = Object.entries(ruleCounts).filter(
-      ([, count]) => count >= 5
+    const migrationRules = [...findingsByRule].filter(
+      ([, { count }]) => count >= 5
     );
     if (migrationRules.length > 0) {
       console.log();
       console.log(
         `  ${chalk.yellow("⚠ Migration-scale change: sample before you sweep")}`
       );
-      for (const [rule, count] of migrationRules) {
-        console.log(`    ${chalk.cyan(rule)} ×${count} across ${count} files`);
+      for (const [rule, { count, files }] of migrationRules) {
+        const fileWord = files.size === 1 ? "file" : "files";
+        console.log(
+          `    ${chalk.cyan(rule)} ×${count} across ${files.size} ${fileWord}`
+        );
       }
       console.log(
         `    Fixing all of them at once is hard to review and prone to`
@@ -171,7 +183,6 @@ const easeOutCubic = (x: number): number => 1 - (1 - x) ** 3;
 const printScoreBox = async (
   score: number,
   label: string,
-  categoryIssueCounts: Record<string, number>,
   warningsCount: number,
   errorsCount: number
 ): Promise<void> => {
@@ -318,11 +329,5 @@ export const formatTerminal = async (
 
   printDiagnostics(diagnostics, verbose, fileContents, categoryIssueCounts);
 
-  await printScoreBox(
-    score,
-    label,
-    categoryIssueCounts,
-    warningsCount,
-    errorsCount
-  );
+  await printScoreBox(score, label, warningsCount, errorsCount);
 };
