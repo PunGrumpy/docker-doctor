@@ -77,7 +77,7 @@ When your team trusts the signal, raise `blocking`:
 Three rules always hold:
 
 - Only `pull_request` events can fail. Pushes to your default branch are health snapshots — they never go red.
-- A scan that crashes without producing a report fails the run regardless of `blocking`, so a broken setup can't silently pass.
+- On pull requests, a scan that crashes without producing a report fails the check regardless of `blocking`, so a broken setup can't silently pass. On pushes it stays advisory, like every other result.
 - A scan that could not analyze one of the discovered files (the CLI exits `2`) fails the pull request check regardless of `blocking`. The summary marks those files **Unanalyzed**, so a broken Dockerfile can't pass as clean.
 
 ## Versioning
