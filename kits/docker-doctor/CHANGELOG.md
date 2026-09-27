@@ -1,5 +1,15 @@
 # docker-doctor-kit
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [23deed0]
+- Updated dependencies [478cc64]
+- Updated dependencies [f3a15f8]
+- Updated dependencies [632961c]
+  - @docker-doctor/cli@0.6.0
+
 ## 0.1.8
 
 ### Patch Changes
