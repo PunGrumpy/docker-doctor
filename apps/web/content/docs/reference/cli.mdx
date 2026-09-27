@@ -18,6 +18,7 @@ npx @docker-doctor/cli@latest [dir]
 | `--json` | `-j` | Output the full report as JSON |
 | `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
 | `--version` | `-V` | Print the CLI version |
+| `--help` | `-h` | Print usage for the command |
 
 ## Piped / CI output
 
@@ -38,9 +39,18 @@ The same rules apply to the default scan, `--score`, and `--json`:
 | Code | Meaning |
 | --- | --- |
 | `0` | Scan complete, no `error`-severity diagnostics |
-| `1` | Scan complete, at least one `error`-severity diagnostic |
+| `1` | Scan complete, at least one `error`-severity diagnostic. In interactive mode, also returned when docker-doctor can't write the workflow scaffold, the `.docker-doctor/` handoff files or the `.gitignore` entry for them. |
 | `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures` (report `schemaVersion` 4). |
 | `130` / `143` | Interrupted (SIGINT / SIGTERM) |
+
+### Environment variables
+
+| Variable | Effect |
+| --- | --- |
+| `FORCE_COLOR=0` | Disable colors in the terminal report. `TERM=dumb` and a stdout that isn't a TTY also turn them off. |
+| `CI`, `NO_ANIMATION`, `TERM=dumb` | Print the score box without animating it. This also happens when stdout isn't a TTY. |
+
+The CLI doesn't read `NO_COLOR`. Set `FORCE_COLOR=0` instead.
 
 ## Install for agents
 

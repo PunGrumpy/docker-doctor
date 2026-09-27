@@ -115,4 +115,4 @@ export default defineConfig({
 
 `defineConfig` is a real runtime import — a config that uses it fails to load when the package isn't installed in the project, so prefer the `satisfies` form for npx-only projects.
 
-Unknown top-level keys and unknown category names are silently dropped rather than rejected, matching the legacy config schema's behavior. Invalid severities throw a config error with the offending rule/category name.
+docker-doctor reports unknown rule keys and unknown category names on stderr (`Warning: Unknown rule "…" in config`, `Warning: Unknown category "…" in config`), so a typo in a rule or category name doesn't go unnoticed. It drops unknown top-level keys without a warning. An invalid severity throws a config error that names the rule or category.
