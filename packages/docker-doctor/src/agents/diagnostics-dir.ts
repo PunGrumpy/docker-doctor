@@ -59,6 +59,10 @@ export const writeDiagnosticsDirectory = async (
       file: sanitizePath(d.file),
       message: sanitizeMessage(d.message),
     })),
+    failures: report.failures.map((failure) => ({
+      file: sanitizePath(failure.file),
+      message: sanitizeMessage(failure.message),
+    })),
   };
 
   await fs.writeFile(
