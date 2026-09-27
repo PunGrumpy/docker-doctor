@@ -123,6 +123,31 @@ describe("discoverProject", () => {
     }
   });
 
+  test("never enters pruned directories", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+    try {
+      for (const dir of [
+        "node_modules/pkg",
+        ".venv/lib",
+        "coverage",
+        "build",
+      ]) {
+        fs.mkdirSync(path.join(root, dir), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, dir, "Dockerfile"),
+          "FROM node:22-alpine\n"
+        );
+      }
+
+      const project = await discoverProject(root);
+
+      // `build/` is scanned on purpose: projects keep real Dockerfiles there.
+      expect(project.dockerfiles).toEqual(["build/Dockerfile"]);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   test.skipIf(process.platform === "win32")(
     "does not traverse symlinked directories and does not hang on a symlink cycle",
     async () => {

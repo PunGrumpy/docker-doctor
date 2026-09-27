@@ -4,6 +4,38 @@ import path from "node:path";
 import type { ProjectInfo } from "../types/index";
 import { createIgnoreMatcher } from "./ignore";
 
+// Directories that never contain a user's own Dockerfiles: VCS metadata,
+// installed dependencies, caches and build output. `build/`, `out/`,
+// `target/` and `vendor/` are deliberately absent. Real Dockerfiles live in
+// them often enough that skipping would hide findings; use `ignore.files`.
+export const PRUNED_DIRECTORIES = [
+  ".git",
+  ".hg",
+  ".svn",
+  "node_modules",
+  "bower_components",
+  ".pnpm-store",
+  ".yarn",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".tox",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".gradle",
+  ".turbo",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".parcel-cache",
+  ".cache",
+  "coverage",
+  "dist",
+] as const;
+
+const PRUNED = new Set<string>(PRUNED_DIRECTORIES);
+
 const walk = async (
   dir: string,
   fileList: string[] = []
@@ -19,13 +51,7 @@ const walk = async (
         return;
       }
       if (file.isDirectory()) {
-        if (
-          file.name === "node_modules" ||
-          file.name === ".git" ||
-          file.name === ".next" ||
-          file.name === "dist" ||
-          file.name === ".turbo"
-        ) {
+        if (PRUNED.has(file.name)) {
           return;
         }
         await walk(filePath, fileList);
