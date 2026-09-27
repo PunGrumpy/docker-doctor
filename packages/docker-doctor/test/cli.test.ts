@@ -355,6 +355,28 @@ describe("--config resolution", () => {
   });
 });
 
+describe("scan target validation", () => {
+  test("a nonexistent path exits 1 with a plain error", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("does-not-exist"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Directory not found");
+    expect(stdout).toBe("");
+  });
+
+  test("a file path exits 1 and asks for the directory", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      path.join(fixture("clean"), "Dockerfile"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("is not a directory");
+    expect(stdout).toBe("");
+  });
+});
+
 describe("ignore.files config", () => {
   test("ignored files are excluded from the scan and the report", async () => {
     // The vendored/ Dockerfile holds an error-severity finding; ignoring it

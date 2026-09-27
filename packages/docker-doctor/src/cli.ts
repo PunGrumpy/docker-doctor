@@ -659,6 +659,21 @@ const resolveConfigPath = async (
   return fromCwd;
 };
 
+// Project discovery would otherwise fail with a raw ENOENT or ENOTDIR from
+// scandir.
+const findScanTargetProblem = async (
+  rootDir: string
+): Promise<string | null> => {
+  const rootStat = await fs.stat(rootDir).catch(() => null);
+  if (rootStat === null) {
+    return `Directory not found: ${rootDir}`;
+  }
+  if (!rootStat.isDirectory()) {
+    return `${rootDir} is not a directory. Pass the directory that contains your Dockerfile or Compose file.`;
+  }
+  return null;
+};
+
 const program = new Command();
 
 program
@@ -696,6 +711,14 @@ program
 
     try {
       const rootDir = path.resolve(dir);
+      // Checked before the spinner starts, so the error path never hides
+      // the cursor.
+      const scanTargetProblem = await findScanTargetProblem(rootDir);
+      if (scanTargetProblem !== null) {
+        console.error(`Error: ${scanTargetProblem}`);
+        process.exitCode = 1;
+        return;
+      }
       const startTime = Date.now();
 
       let statusText = "Discovering workspace...";
