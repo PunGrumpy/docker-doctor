@@ -1,0 +1,66 @@
+name: Verify Changesets
+
+# Everything that ships inside @docker-doctor/cli needs a changeset: the CLI
+# source, the private core package it bundles, its manifest, and the skill
+# that is copied into the npm package at build time. This job fails a PR that
+# touches any of those without adding a changeset naming @docker-doctor/cli.
+#
+# Exempt:
+#   - the Version Packages PR (changeset-release/main) — it consumes the
+#     changesets and bumps package.json itself
+#   - PRs labeled `skip-changeset` — refactors, comment-only edits, and
+#     anything else with no user-visible effect
+#
+# The kit has its own guard in kit-push.yml.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches:
+      - main
+    paths:
+      - ".changeset/*.md"
+      - "packages/core/src/**"
+      - "packages/docker-doctor/src/**"
+      - "packages/docker-doctor/package.json"
+      - "skills/docker-doctor/**"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-changesets:
+    name: Verify Changesets
+    runs-on: ubuntu-latest
+    if: ${{ github.head_ref != 'changeset-release/main' && !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Require a changeset for @docker-doctor/cli changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "$BASE_SHA"
+          shipped_files="$(git diff --name-only "$BASE_SHA" HEAD -- \
+            'packages/core/src/**' \
+            'packages/docker-doctor/src/**' \
+            'packages/docker-doctor/package.json' \
+            'skills/docker-doctor/**')"
+          if [ -z "$shipped_files" ]; then
+            echo "No files that ship in @docker-doctor/cli changed."
+            exit 0
+          fi
+          # Read each added changeset from HEAD, not the working tree, and
+          # never let an empty list pass: `xargs -r grep` skips grep entirely
+          # when nothing was added, and the pipeline then exits 0.
+          for changeset in $(git diff --name-only --diff-filter=A "$BASE_SHA" HEAD -- '.changeset/*.md'); do
+            if git show "HEAD:$changeset" | grep -qE '^"?@docker-doctor/cli"?:'; then
+              echo "Found a changeset for @docker-doctor/cli: $changeset"
+              exit 0
+            fi
+          done
+          echo "::error::This PR changes files that ship in @docker-doctor/cli without a changeset — run \`bun run changeset\` and pick @docker-doctor/cli (minor for new behavior, patch for fixes), or add the \`skip-changeset\` label if nothing user-visible changed."
+          echo "$shipped_files"
+          exit 1
