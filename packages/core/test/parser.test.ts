@@ -243,10 +243,35 @@ USER node
     const parsed = parseDockerfile("FROM node:22\nRUN echo a \\\n");
     expect(parsed).toHaveLength(2);
     expect(parsed[1].instruction).toBe("RUN");
-    // The trailing space comes from the empty final line the continuation
-    // pulls in — pinned as-is, this test only guards against the
-    // instruction being dropped at EOF.
-    expect(parsed[1].args).toBe("echo a ");
+    // The empty final line is skipped like any blank continuation line, so
+    // it adds nothing to args. This test guards against the instruction
+    // being dropped at EOF.
+    expect(parsed[1].args).toBe("echo a");
+  });
+
+  test("keeps a continuation open across a blank line", () => {
+    const parsed = parseDockerfile(
+      "FROM debian:bookworm-slim\nRUN apt-get update && \\\n\n    apt-get install -y --no-install-recommends curl && \\\n    rm -rf /var/lib/apt/lists/*\n"
+    );
+    expect(parsed).toHaveLength(2);
+    expect(parsed[1].args).toBe(
+      "apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*"
+    );
+    expect(parsed[1].line).toBe(2);
+  });
+
+  test("does not turn a keyword-looking continuation line into an instruction", () => {
+    const parsed = parseDockerfile(
+      "RUN make && \\\n\n    env FOO=bar make install\n"
+    );
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].instruction).toBe("RUN");
+    expect(parsed[0].args).toBe("make && env FOO=bar make install");
+  });
+
+  test("still skips blank lines between instructions", () => {
+    const parsed = parseDockerfile("FROM x\n\nRUN y\n");
+    expect(parsed).toHaveLength(2);
   });
 });
 
