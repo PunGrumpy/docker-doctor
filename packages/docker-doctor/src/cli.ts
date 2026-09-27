@@ -993,7 +993,7 @@ rules
   .command("explain <rule>")
   .description("explain a specific rule in detail")
   .action((ruleKey) => {
-    const rule = findRule(ruleKey);
+    const rule = findRule(ruleKey) ?? findRule(`docker-doctor/${ruleKey}`);
     if (!rule) {
       console.error(`Rule '${ruleKey}' not found.`);
       process.exitCode = 1;

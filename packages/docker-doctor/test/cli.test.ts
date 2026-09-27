@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { allRules } from "@docker-doctor/core";
+
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
 
@@ -63,6 +65,37 @@ describe("exit codes", () => {
     ]);
     expect(exitCode).toBe(1);
     expect(stderr).toContain("not found");
+  });
+});
+
+describe("rules subcommands", () => {
+  test("rules explain accepts the short rule name", async () => {
+    const { exitCode, stdout } = await runCli([
+      "rules",
+      "explain",
+      "no-root-user",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("docker-doctor/no-root-user");
+    expect(stdout).toContain("Help / Fix");
+  });
+
+  test("rules explain accepts the full rule key", async () => {
+    const { exitCode, stdout } = await runCli([
+      "rules",
+      "explain",
+      "docker-doctor/no-root-user",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Help / Fix");
+  });
+
+  test("rules list prints every rule", async () => {
+    const { exitCode, stdout } = await runCli(["rules", "list"]);
+    expect(exitCode).toBe(0);
+    for (const rule of allRules) {
+      expect(stdout).toContain(`- ${rule.key}`);
+    }
   });
 });
 
