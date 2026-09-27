@@ -39,7 +39,7 @@ The same rules apply to the default scan, `--score`, and `--json`:
 | --- | --- |
 | `0` | Scan complete, no `error`-severity diagnostics |
 | `1` | Scan complete, at least one `error`-severity diagnostic |
-| `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. |
+| `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures` (report `schemaVersion` 4). |
 | `130` / `143` | Interrupted (SIGINT / SIGTERM) |
 
 ## Install for agents

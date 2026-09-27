@@ -27,7 +27,7 @@ jobs:
           - name: Typecheck
             command: bun run typecheck
           - name: Test
-            command: bun run test
+            command: bun run test && bun run test:scripts
     steps:
       - name: Checkout
         uses: actions/checkout@v7

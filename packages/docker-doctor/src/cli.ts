@@ -754,7 +754,13 @@ program
           process.exitCode = scanExitCode(scanIncomplete, hasErrors);
           return;
         } else if (options.json) {
-          const report = toJsonReport(diagnostics, score, label, project);
+          const report = toJsonReport(
+            diagnostics,
+            score,
+            label,
+            project,
+            failures
+          );
           console.log(JSON.stringify(report, null, 2));
           process.exitCode = scanExitCode(scanIncomplete, hasErrors);
           return;
@@ -772,7 +778,7 @@ program
         if (process.stdout.isTTY && process.stdin.isTTY) {
           wizardOk = await runInteractiveWizard({
             diagnostics,
-            report: toJsonReport(diagnostics, score, label, project),
+            report: toJsonReport(diagnostics, score, label, project, failures),
             rootDir,
           });
         }

@@ -12,6 +12,7 @@
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:scripts": "bun test ./scripts",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "clean": "turbo run clean && git clean -xdf node_modules",

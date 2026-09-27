@@ -103,6 +103,18 @@ describe("unanalyzable files", () => {
     expect(stderr).toContain("Unterminated heredoc");
     expect(() => JSON.parse(stdout)).not.toThrow();
   });
+
+  test("the JSON report lists the file that could not be analyzed", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("unterminated-heredoc"),
+      "--json",
+    ]);
+    expect(exitCode).toBe(2);
+    const report = JSON.parse(stdout);
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures[0].file).toBe("Dockerfile");
+    expect(report.failures[0].message).toContain("Unterminated heredoc");
+  });
 });
 
 describe("agent-stack fixture", () => {
@@ -135,6 +147,7 @@ describe("--json contract", () => {
     expect(Object.keys(report).toSorted()).toEqual(
       [
         "diagnostics",
+        "failures",
         "label",
         "project",
         "schemaVersion",
@@ -142,6 +155,12 @@ describe("--json contract", () => {
         "timestamp",
       ].toSorted()
     );
+  });
+
+  test("a complete scan reports an empty failures list", async () => {
+    const { stdout } = await runCli([fixture("clean"), "--json"]);
+    const report = JSON.parse(stdout);
+    expect(report.failures).toEqual([]);
   });
 
   test("score is a number in [0, 100]", async () => {

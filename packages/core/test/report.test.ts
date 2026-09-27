@@ -18,6 +18,7 @@ const ALL_CATEGORIES: RuleCategory[] = [
 
 const TOP_LEVEL_KEYS = [
   "diagnostics",
+  "failures",
   "label",
   "project",
   "schemaVersion",
@@ -58,12 +59,12 @@ const diagnostic = (
 // commit, because external consumers (the GitHub Action renderer, the
 // benchmarks scanner, the improve-docker skill) key off that number.
 describe("JSON report contract", () => {
-  test("schemaVersion is 3", () => {
-    expect(REPORT_SCHEMA_VERSION).toBe(3);
+  test("schemaVersion is 4", () => {
+    expect(REPORT_SCHEMA_VERSION).toBe(4);
     expect(
       toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT)
         .schemaVersion
-    ).toBe(3);
+    ).toBe(4);
   });
 
   test("top-level keys are exactly the documented set", () => {
@@ -74,6 +75,17 @@ describe("JSON report contract", () => {
       EMPTY_PROJECT
     );
     expect(Object.keys(report).toSorted()).toEqual(TOP_LEVEL_KEYS);
+  });
+
+  test("carries failures and defaults to an empty list", () => {
+    expect(
+      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT).failures
+    ).toEqual([]);
+    const failures = [{ file: "Dockerfile", message: "boom" }];
+    expect(
+      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT, failures)
+        .failures
+    ).toEqual(failures);
   });
 
   test("every diagnostic carries exactly the documented keys", () => {

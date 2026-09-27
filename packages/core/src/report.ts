@@ -4,7 +4,14 @@ import type { Diagnostic, ProjectInfo, RuleCategory } from "./types/index";
 // Bump whenever the JSON report shape or the score formula/weights change.
 // The unversioned shape shipped before this field existed is implicitly 1.
 // v3 (2026-09): added diagnostics[].category.
-export const REPORT_SCHEMA_VERSION = 3;
+// v4 (2026-09): added failures[], the files discovered but not analyzed
+// (read or parse errors).
+export const REPORT_SCHEMA_VERSION = 4;
+
+export interface ReportFailure {
+  file: string;
+  message: string;
+}
 
 export interface JsonReport {
   diagnostics: {
@@ -17,6 +24,7 @@ export interface JsonReport {
     rule: string;
     severity: "error" | "warning" | "info";
   }[];
+  failures: ReportFailure[];
   label: string;
   project: ProjectInfo;
   schemaVersion: number;
@@ -40,7 +48,8 @@ export const toJsonReport = (
   diagnostics: Diagnostic[],
   score: number,
   label: string,
-  project: ProjectInfo
+  project: ProjectInfo,
+  failures: ReportFailure[] = []
 ): JsonReport => ({
   diagnostics: diagnostics.map((d) => ({
     category: resolveCategory(d),
@@ -52,6 +61,7 @@ export const toJsonReport = (
     rule: d.rule,
     severity: d.severity,
   })),
+  failures: failures.map(({ file, message }) => ({ file, message })),
   label,
   project,
   schemaVersion: REPORT_SCHEMA_VERSION,
