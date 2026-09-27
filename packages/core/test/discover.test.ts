@@ -208,6 +208,53 @@ describe("discoverProject", () => {
     }
   );
 
+  test.skipIf(!canTestPermissions)(
+    "skips an unreadable subdirectory and reports it",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      const locked = path.join(root, "locked");
+      try {
+        writeDockerfiles(root, ["ok/Dockerfile", "locked/Dockerfile"]);
+        fs.chmodSync(locked, 0o000);
+        const skipped: string[] = [];
+
+        const project = await discoverProject(root, {
+          onSkippedDirectory: (dir) => skipped.push(dir),
+        });
+
+        expect(project.dockerfiles).toEqual(["ok/Dockerfile"]);
+        expect(skipped).toEqual(["locked"]);
+
+        // A pruned directory is never opened, so it is not reported either.
+        skipped.length = 0;
+        await discoverProject(root, {
+          ignoreFiles: ["locked/**"],
+          onSkippedDirectory: (dir) => skipped.push(dir),
+        });
+        expect(skipped).toEqual([]);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
+  test.skipIf(!canTestPermissions)(
+    "an unreadable scan root still throws",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      try {
+        writeDockerfiles(root, ["Dockerfile"]);
+        fs.chmodSync(root, 0o000);
+
+        await expect(discoverProject(root)).rejects.toThrow();
+      } finally {
+        fs.chmodSync(root, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
   test("examples/* ignores direct children only and does not prune", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
     try {

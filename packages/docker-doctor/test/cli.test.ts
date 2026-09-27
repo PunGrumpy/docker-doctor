@@ -117,6 +117,41 @@ describe("unanalyzable files", () => {
   });
 });
 
+describe("unreadable directories", () => {
+  // chmod 000 does not stop root, and Windows has no POSIX modes.
+  const canTestPermissions =
+    process.platform !== "win32" && process.getuid?.() !== 0;
+
+  test.skipIf(!canTestPermissions)(
+    "an unreadable subdirectory is skipped with a warning and the scan completes",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-unreadable-"));
+      const locked = path.join(root, "locked");
+      try {
+        for (const dir of ["ok", "locked"]) {
+          fs.mkdirSync(path.join(root, dir));
+          fs.writeFileSync(
+            path.join(root, dir, "Dockerfile"),
+            'FROM node:22-alpine\nUSER node\nCMD ["node"]\n'
+          );
+        }
+        fs.chmodSync(locked, 0o000);
+
+        const { exitCode, stderr, stdout } = await runCli([root, "--json"]);
+
+        expect(exitCode).toBe(0);
+        expect(stderr).toContain("skipped unreadable directory locked");
+        expect(JSON.parse(stdout).project.dockerfiles).toEqual([
+          "ok/Dockerfile",
+        ]);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+});
+
 describe("agent-stack fixture", () => {
   test("reports the interpolated socket mount and the provider-syntax model", async () => {
     const { exitCode, stdout } = await runCli([

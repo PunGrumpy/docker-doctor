@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -58,15 +59,33 @@ const createPrunedDirectoryMatcher = (
 
 interface WalkOptions {
   isPrunedByConfig: (relativeDir: string) => boolean;
+  onSkippedDirectory?: (relativeDir: string) => void;
   rootDir: string;
 }
+
+const isPermissionError = (error: unknown): boolean =>
+  error instanceof Error &&
+  "code" in error &&
+  (error.code === "EACCES" || error.code === "EPERM");
 
 const walk = async (
   dir: string,
   options: WalkOptions,
   fileList: string[] = []
 ): Promise<string[]> => {
-  const files = await fs.readdir(dir, { withFileTypes: true });
+  let files: Dirent[];
+  try {
+    files = await fs.readdir(dir, { withFileTypes: true });
+  } catch (error: unknown) {
+    // An unreadable subdirectory, such as a root-owned volume directory
+    // left by `docker compose up`, is skipped. Errors on the scan root
+    // itself still fail the scan.
+    if (dir !== options.rootDir && isPermissionError(error)) {
+      options.onSkippedDirectory?.(toPosixRelative(options.rootDir, dir));
+      return fileList;
+    }
+    throw error;
+  }
   await Promise.all(
     files.map(async (file) => {
       const filePath = path.join(dir, file.name);
@@ -94,10 +113,16 @@ const walk = async (
 
 export const discoverProject = async (
   rootDir: string,
-  options?: { ignoreFiles?: readonly string[] }
+  options?: {
+    ignoreFiles?: readonly string[];
+    // Called once per subdirectory that could not be read (EACCES/EPERM),
+    // with its root-relative POSIX path. The scan continues without it.
+    onSkippedDirectory?: (relativeDir: string) => void;
+  }
 ): Promise<ProjectInfo> => {
   const allFiles = await walk(rootDir, {
     isPrunedByConfig: createPrunedDirectoryMatcher(options?.ignoreFiles),
+    onSkippedDirectory: options?.onSkippedDirectory,
     rootDir,
   });
   const dockerfiles: string[] = [];

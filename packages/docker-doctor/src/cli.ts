@@ -701,6 +701,11 @@ program
         // Project discovery, minus anything the config ignores
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
+          onSkippedDirectory: (skippedDir) => {
+            console.error(
+              `Warning: skipped unreadable directory ${skippedDir} (permission denied)`
+            );
+          },
         });
 
         // Collect all diagnostics
