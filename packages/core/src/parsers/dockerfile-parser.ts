@@ -180,8 +180,10 @@ export const parseDockerfile = (
       continue;
     }
 
-    // Skip empty lines if not in a multi-line block
-    if (!state.currentInstruction && !insideHeredoc && trimmed === "") {
+    // Blank lines never carry instruction text. Outside a heredoc they are
+    // skipped even mid-continuation. BuildKit does the same (with a
+    // deprecation warning) instead of ending the instruction there.
+    if (!insideHeredoc && trimmed === "") {
       continue;
     }
 

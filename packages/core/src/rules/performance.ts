@@ -1,5 +1,11 @@
+import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+
+// `make` only where a command can start, so `apk add make` (installing the
+// tool) is not a build step while `cd src && make` is.
+const BUILD_TOOL_COMMAND_RE =
+  /(?:^|&&|\|\||;|\||\(|`|\$\()\s*(?:make|cmake)(?=\s|$)/u;
 
 export const useMultiStage: DockerfileRule = {
   category: "Performance",
@@ -16,7 +22,7 @@ export const useMultiStage: DockerfileRule = {
             inst.args.includes("yarn build") ||
             inst.args.includes("bun run build") ||
             inst.args.includes("cargo build") ||
-            inst.args.includes("make"))
+            BUILD_TOOL_COMMAND_RE.test(maskQuotedText(inst.args)))
       );
 
       if (hasBuildSteps) {
@@ -156,9 +162,11 @@ export const minimizeLayers: DockerfileRule = {
 };
 
 // Docker reads .dockerignore from the build-context root, which we cannot know
-// statically. Accept the two locations that cover real usage: next to the
-// Dockerfile, or at the scan root (the common monorepo-root build context).
-// Paths here are scan-root-relative and always "/"-separated.
+// statically. Accept the locations that cover real usage: next to the
+// Dockerfile, at the scan root (the common monorepo-root build context), or
+// BuildKit's per-Dockerfile `<Dockerfile>.dockerignore`, which it prefers
+// when building with `-f`. Paths here are scan-root-relative and always
+// "/"-separated.
 const hasDockerignoreFor = (
   dockerfilePath: string,
   projectFiles: string[]
@@ -166,7 +174,10 @@ const hasDockerignoreFor = (
   const lastSlash = dockerfilePath.lastIndexOf("/");
   const dir = lastSlash === -1 ? "" : dockerfilePath.slice(0, lastSlash);
   const adjacent = dir === "" ? ".dockerignore" : `${dir}/.dockerignore`;
-  return projectFiles.some((f) => f === adjacent || f === ".dockerignore");
+  const perDockerfile = `${dockerfilePath}.dockerignore`;
+  return projectFiles.some(
+    (f) => f === adjacent || f === perDockerfile || f === ".dockerignore"
+  );
 };
 
 export const useDockerignore: DockerfileRule = {

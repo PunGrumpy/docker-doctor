@@ -327,6 +327,26 @@ describe("Security Rules", () => {
     ]);
   });
 
+  const quotedSecretCases = [
+    { expected: 0, line: 'ARG GITHUB_TOKEN=""' },
+    { expected: 0, line: "ENV API_KEY=''" },
+    { expected: 0, line: 'ENV DB_PASSWORD ""' },
+    { expected: 1, line: 'ENV API_KEY="abc123"' },
+    { expected: 1, line: "ENV API_KEY=abc123" },
+    { expected: 0, line: 'ENV API_KEY="$SECRET"' },
+  ];
+
+  test.each(quotedSecretCases)(
+    "no-secrets-in-env: $line reports $expected",
+    ({ expected, line }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(line),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
@@ -410,6 +430,25 @@ describe("Performance Rules", () => {
     );
   });
 
+  const buildToolCases = [
+    { expected: 0, run: "apk add --no-cache make g++ python3" },
+    { expected: 1, run: "make" },
+    { expected: 1, run: "cd src && make install" },
+    { expected: 1, run: "cmake --build ." },
+    { expected: 0, run: 'echo "make it so"' },
+  ];
+
+  test.each(buildToolCases)(
+    "use-multi-stage: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useMultiStage.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("minimize-layers", () => {
     const consecutive = parseDockerfile(`
         RUN step1
@@ -488,6 +527,36 @@ describe("Performance Rules", () => {
       })
     ).toHaveLength(0);
   });
+  const perDockerfileIgnoreCases = [
+    {
+      expected: 0,
+      file: "Dockerfile",
+      projectFiles: ["Dockerfile", "Dockerfile.dockerignore"],
+    },
+    {
+      expected: 0,
+      file: "svc/api.dockerfile",
+      projectFiles: ["svc/api.dockerfile", "svc/api.dockerfile.dockerignore"],
+    },
+    {
+      expected: 1,
+      file: "svc/api.dockerfile",
+      projectFiles: ["svc/api.dockerfile", "svc/other.dockerfile.dockerignore"],
+    },
+  ];
+
+  test.each(perDockerfileIgnoreCases)(
+    "use-dockerignore: $file with $projectFiles reports $expected",
+    ({ expected, file, projectFiles }) => {
+      const instructions = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+      expect(
+        useDockerignore.check(instructions, file, { projectFiles })
+      ).toHaveLength(expected);
+    }
+  );
 });
 
 describe("Compose Rules", () => {
@@ -972,6 +1041,54 @@ describe("Compose Security Rules", () => {
     ).toHaveLength(0);
   });
 
+  const interpolatedSourceCases = [
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 0,
+      volume: `\${PWD}/data:/var/lib/postgresql/data`,
+    },
+    { broad: 0, readOnly: 0, socket: 0, volume: "$PWD/data:/data:ro" },
+    { broad: 0, readOnly: 0, socket: 0, volume: `\${DATA_DIR}/pg:/data` },
+    { broad: 1, readOnly: 1, socket: 0, volume: `/etc/\${X}/foo:/data` },
+    { broad: 0, readOnly: 1, socket: 0, volume: `/var/lib/\${X}/foo:/data` },
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 1,
+      volume: `\${VAR}/docker.sock:/var/run/docker.sock`,
+    },
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 1,
+      volume: `\${DOCKER_SOCK}:/var/run/docker.sock`,
+    },
+  ];
+
+  test.each(interpolatedSourceCases)(
+    "bind-mount rules: $volume",
+    ({ broad, readOnly, socket, volume }) => {
+      const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - ${volume}
+`;
+      const composeContent = parseCompose(source, "compose.yaml");
+      const context = { locate: createComposeLocator(source) };
+      expect(
+        noBroadBindMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(broad);
+      expect(
+        preferReadOnlyBindMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(readOnly);
+      expect(
+        noDockerSocketMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(socket);
+    }
+  );
+
   test("no-plaintext-secrets: map and list syntax, interpolation is clean", () => {
     const source = `services:
   agent:
@@ -1019,6 +1136,31 @@ describe("Compose Security Rules", () => {
       expect.stringContaining("'PGPASSWORD'"),
     ]);
   });
+
+  const scalarSecretCases = [
+    { entry: "POSTGRES_PASSWORD: 123456", expected: 1 },
+    { entry: 'API_TOKEN: "abc123"', expected: 1 },
+    { entry: "AUTH_ENABLED: true", expected: 0 },
+    { entry: `DB_PASSWORD: \${DB_PASSWORD}`, expected: 0 },
+  ];
+
+  test.each(scalarSecretCases)(
+    "no-plaintext-secrets: $entry reports $expected",
+    ({ entry, expected }) => {
+      const source = `services:
+  db:
+    image: postgres:17
+    environment:
+      ${entry}
+`;
+      const diagnostics = noPlaintextSecrets.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
 
   test("compose security rules work without a locator", () => {
     const composeContent = {
@@ -1145,6 +1287,26 @@ models:
   });
 });
 
+// apt-get options may sit between the command and its subcommand.
+const aptOptionCases = [
+  {
+    clean: 1,
+    combine: 0,
+    run: "apt-get update && apt-get -y --no-install-recommends install curl",
+  },
+  {
+    clean: 0,
+    combine: 0,
+    run: "apt-get update && apt-get -y install curl && rm -rf /var/lib/apt/lists/*",
+  },
+  {
+    clean: 0,
+    combine: 0,
+    run: "apt-get -qq update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*",
+  },
+  { clean: 1, combine: 1, run: "apt-get -y install curl" },
+];
+
 describe("Image Size Rules", () => {
   test("prefer-slim-base", () => {
     const heavyBase = parseDockerfile(`
@@ -1254,6 +1416,17 @@ describe("Image Size Rules", () => {
     expect(cleanPackageCache.check(bindMount, "Dockerfile")).toHaveLength(1);
   });
 
+  test.each(aptOptionCases)(
+    "clean-package-cache: RUN $run reports $clean",
+    ({ run, clean }) => {
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(clean);
+    }
+  );
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder
@@ -1271,6 +1444,31 @@ describe("Image Size Rules", () => {
     const diags2 = avoidDevDependencies.check(withoutDev, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
+
+  const devDependencyCases = [
+    { expected: 1, run: "npm install" },
+    { expected: 1, run: "pnpm install" },
+    { expected: 1, run: "yarn install" },
+    { expected: 0, run: "npm install -g pnpm" },
+    { expected: 0, run: "pnpm install --prod" },
+    { expected: 0, run: "npm ci --only=production" },
+    { expected: 0, run: "NODE_ENV=production npm install" },
+    { expected: 0, run: "yarn install --production" },
+    { expected: 0, run: "bun install --production" },
+    { expected: 0, run: "npm install express" },
+    { expected: 0, run: "npm ci && npm run build && npm prune --production" },
+  ];
+
+  test.each(devDependencyCases)(
+    "avoid-dev-dependencies: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
 
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
@@ -1328,6 +1526,17 @@ describe("Image Size Rules", () => {
 });
 
 describe("Best Practices Rules", () => {
+  test.each(aptOptionCases)(
+    "combine-apt-update-install: RUN $run reports $combine",
+    ({ run, combine }) => {
+      const diagnostics = combineAptUpdateInstall.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(combine);
+    }
+  );
+
   test("combine-apt-update-install", () => {
     const uncombinedUpdate = parseDockerfile(`
       RUN apt-get update
@@ -1645,6 +1854,61 @@ describe("Best Practices Rules", () => {
     ).toHaveLength(0);
   });
 
+  const packageListCases = [
+    {
+      dockerfile: `
+      RUN set -eux; \\
+        apt-get update; \\
+        apt-get install -y --no-install-recommends \\
+          ca-certificates \\
+          curl \\
+        ; \\
+        rm -rf /var/lib/apt/lists/*
+    `,
+      expected: 0,
+      name: "commands after a ; separator are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y --no-install-recommends \\
+        acl \\
+        curl
+    `,
+      expected: 0,
+      name: "options on the install line are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y \\
+        tmux \\
+        curl \\
+        && rm -rf /var/lib/apt/lists/*
+    `,
+      expected: 1,
+      name: "an unsorted list before && still reports",
+    },
+    {
+      dockerfile: `
+      RUN apk add --no-cache \\
+        curl \\
+        bash
+    `,
+      expected: 1,
+      name: "an unsorted apk list reports",
+    },
+  ];
+
+  test.each(packageListCases)(
+    "sort-multiline-args: $name",
+    ({ dockerfile, expected }) => {
+      const diagnostics = sortMultilineArgs.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("useradd-no-log-init", () => {
     const withoutFlag = parseDockerfile(`
       RUN useradd -r -g mygroup myuser
@@ -1709,6 +1973,25 @@ describe("Best Practices Rules", () => {
       preferCopyOverAdd.check(addArchiveWithChown, "Dockerfile")
     ).toHaveLength(0);
   });
+
+  const addSourceCases = [
+    { args: "rootfs.tar.xz /", expected: 0 },
+    { args: "base.tar.bz2 /", expected: 0 },
+    { args: "app.tgz /app", expected: 0 },
+    { args: "app.zip /app", expected: 1 },
+    { args: "config.json /etc/", expected: 1 },
+  ];
+
+  test.each(addSourceCases)(
+    "prefer-copy-over-add: ADD $args reports $expected",
+    ({ args, expected }) => {
+      const diagnostics = preferCopyOverAdd.check(
+        parseDockerfile(`ADD ${args}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
 
   test("use-exec-form", () => {
     const shellForm = parseDockerfile(`

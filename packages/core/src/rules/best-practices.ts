@@ -3,6 +3,7 @@ import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
+import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
 
 export const requireHealthcheck: DockerfileRule = {
   category: "Best Practices",
@@ -39,6 +40,19 @@ export const requireHealthcheck: DockerfileRule = {
   message: "Add a HEALTHCHECK instruction",
 };
 
+// ADD auto-extracts local tar archives (identity, gzip, bzip2, xz). Zip files
+// are copied verbatim, so COPY is the right instruction for them.
+const AUTO_EXTRACT_SUFFIXES = [
+  ".tar",
+  ".tar.gz",
+  ".tgz",
+  ".tar.bz2",
+  ".tbz2",
+  ".tbz",
+  ".tar.xz",
+  ".txz",
+] as const;
+
 export const preferCopyOverAdd: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
@@ -56,11 +70,9 @@ export const preferCopyOverAdd: DockerfileRule = {
         // If it's not a remote url (handled by security/no-add-remote) and not a compressed file
         const isRemote =
           src.startsWith("http://") || src.startsWith("https://");
-        const isArchive =
-          src.endsWith(".tar") ||
-          src.endsWith(".tar.gz") ||
-          src.endsWith(".tgz") ||
-          src.endsWith(".zip");
+        const isArchive = AUTO_EXTRACT_SUFFIXES.some((suffix) =>
+          src.toLowerCase().endsWith(suffix)
+        );
 
         if (!isRemote && !isArchive) {
           diagnostics.push(
@@ -147,8 +159,8 @@ export const combineAptUpdateInstall: DockerfileRule = {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
-        const hasUpdate = inst.args.includes("apt-get update");
-        const hasInstall = inst.args.includes("apt-get install");
+        const hasUpdate = hasAptGetUpdate(inst.args);
+        const hasInstall = hasAptGetInstall(inst.args);
 
         if (hasUpdate && !hasInstall) {
           diagnostics.push(
@@ -347,6 +359,32 @@ export const avoidRunCd: DockerfileRule = {
   message: "Avoid changing directories with cd in RUN",
 };
 
+const PACKAGE_LIST_START_RE =
+  /\b(?:apt-get(?:\s+-\S+)*\s+install|apk\s+add|yum\s+install|dnf\s+install)\b/u;
+const SHELL_SEPARATOR_RE = /[;|]|&&/u;
+const WHITESPACE_RE = /\s+/u;
+
+// The words after the install verb up to the next shell separator, minus
+// options and continuation backslashes. Everything past a separator belongs
+// to another command, so it is not part of the list.
+const collectPackageList = (raw: string): string[] => {
+  const start = PACKAGE_LIST_START_RE.exec(raw);
+  if (!start) {
+    return [];
+  }
+  const packages: string[] = [];
+  const tokens = raw.slice(start.index + start[0].length).split(WHITESPACE_RE);
+  for (const token of tokens) {
+    if (SHELL_SEPARATOR_RE.test(token)) {
+      break;
+    }
+    if (token !== "" && token !== "\\" && !token.startsWith("-")) {
+      packages.push(token);
+    }
+  }
+  return packages;
+};
+
 export const sortMultilineArgs: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
@@ -355,7 +393,7 @@ export const sortMultilineArgs: DockerfileRule = {
       if (inst.instruction === "RUN") {
         const { raw } = inst;
         const isPackageInstall =
-          raw.includes("apt-get install") ||
+          hasAptGetInstall(raw) ||
           raw.includes("apk add") ||
           raw.includes("yum install") ||
           raw.includes("dnf install");
@@ -363,24 +401,12 @@ export const sortMultilineArgs: DockerfileRule = {
         const hasContinuation = raw.includes("\\\n") || raw.includes("\\\r\n");
 
         if (isPackageInstall && hasContinuation) {
-          const lines = raw.split(/\r?\n/u);
-          const packages = lines
-            .slice(1)
-            .map((line) => line.trim())
-            .filter(
-              (line) =>
-                line !== "" &&
-                !line.startsWith("&&") &&
-                !line.startsWith("-") &&
-                !line.includes("rm -rf")
-            )
-            .map((line) =>
-              line.endsWith("\\") ? line.slice(0, -1).trim() : line
-            )
-            .filter(Boolean);
+          const packages = collectPackageList(raw);
 
           if (packages.length > 1) {
-            const sorted = packages.toSorted((a, b) => a.localeCompare(b));
+            // The default comparator orders by code unit, so the verdict does
+            // not depend on the machine's locale.
+            const sorted = packages.toSorted();
             const isSorted = packages.every((val, idx) => val === sorted[idx]);
             if (!isSorted) {
               diagnostics.push(
