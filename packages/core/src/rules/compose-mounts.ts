@@ -14,12 +14,24 @@ const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*/gu;
 // `$HOME` and `${HOME}` name the same directory `~` does; fold them before
 // the generic interpolation pass would erase them.
 const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?![A-Za-z0-9_])/gu;
+// Compose runs from the project directory, so `$PWD` and `${PWD}` name it.
+const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?![A-Za-z0-9_])/gu;
+// A source that starts with an unresolved variable, e.g. `${DATA_DIR}/pg`.
+const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*)/u;
 
-export const resolveInterpolationDefaults = (value: string): string =>
+// Folds `$HOME`/`$PWD` and applies `${VAR:-default}` defaults, but leaves
+// interpolations with no default in place.
+const applyFoldsAndDefaults = (value: string): string =>
   value
     .replace(HOME_INTERPOLATION, "~")
-    .replace(INTERPOLATION_WITH_DEFAULT, (_match, fallback: string) => fallback)
-    .replace(INTERPOLATION_WITHOUT_DEFAULT, "");
+    .replace(PWD_INTERPOLATION, ".")
+    .replace(
+      INTERPOLATION_WITH_DEFAULT,
+      (_match, fallback: string) => fallback
+    );
+
+export const resolveInterpolationDefaults = (value: string): string =>
+  applyFoldsAndDefaults(value).replace(INTERPOLATION_WITHOUT_DEFAULT, "");
 
 // Named volumes cannot start with a path prefix, so only path-shaped
 // sources are bind mounts.
@@ -111,7 +123,9 @@ export const volumeMount = (volume: unknown): VolumeMount | undefined => {
  * The host path a bind mount reads from, with interpolation defaults
  * applied and Windows separators folded to `/`. Undefined when the entry is
  * not a bind mount (named volume, tmpfs, anonymous volume) or when the
- * source is an interpolation with no default, which names no host path.
+ * source starts with an interpolation that has no default. A source such as
+ * `${DATA_DIR}/pg` names no known host location, so no rule can say whether
+ * it is inside the project.
  */
 export const bindMountSource = (mount: VolumeMount): string | undefined => {
   if (mount.type !== undefined && mount.type !== "bind") {
@@ -120,10 +134,13 @@ export const bindMountSource = (mount: VolumeMount): string | undefined => {
   if (!mount.source) {
     return undefined;
   }
-  const resolved = resolveInterpolationDefaults(mount.source).replaceAll(
-    "\\",
-    "/"
-  );
+  const withDefaults = applyFoldsAndDefaults(mount.source);
+  if (LEADING_INTERPOLATION_RE.test(withDefaults)) {
+    return undefined;
+  }
+  const resolved = withDefaults
+    .replace(INTERPOLATION_WITHOUT_DEFAULT, "")
+    .replaceAll("\\", "/");
   if (resolved === "" || !PATH_SHAPED.test(resolved)) {
     return undefined;
   }
@@ -137,8 +154,8 @@ const DOCKER_SOCKET_TARGET = "/var/run/docker.sock";
 
 /**
  * Whether the entry bind-mounts the Docker socket, under any of its host
- * spellings. A bare `${VAR}` source names no host path, but a socket target
- * still tells the story.
+ * spellings. A source that starts with `${VAR}` names no known host path,
+ * but a `/docker.sock` suffix or a socket target still identifies it.
  */
 export const mountsDockerSocket = (mount: VolumeMount): boolean => {
   const source = bindMountSource(mount);
@@ -151,9 +168,11 @@ export const mountsDockerSocket = (mount: VolumeMount): boolean => {
   if (!mount.source) {
     return false;
   }
+  const remainder = resolveInterpolationDefaults(mount.source);
   return (
-    resolveInterpolationDefaults(mount.source) === "" &&
-    resolveInterpolationDefaults(mount.target ?? "") === DOCKER_SOCKET_TARGET
+    isDockerSocketPath(remainder) ||
+    (remainder === "" &&
+      resolveInterpolationDefaults(mount.target ?? "") === DOCKER_SOCKET_TARGET)
   );
 };
 

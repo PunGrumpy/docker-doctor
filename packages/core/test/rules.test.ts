@@ -1041,6 +1041,54 @@ describe("Compose Security Rules", () => {
     ).toHaveLength(0);
   });
 
+  const interpolatedSourceCases = [
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 0,
+      volume: `\${PWD}/data:/var/lib/postgresql/data`,
+    },
+    { broad: 0, readOnly: 0, socket: 0, volume: "$PWD/data:/data:ro" },
+    { broad: 0, readOnly: 0, socket: 0, volume: `\${DATA_DIR}/pg:/data` },
+    { broad: 1, readOnly: 1, socket: 0, volume: `/etc/\${X}/foo:/data` },
+    { broad: 0, readOnly: 1, socket: 0, volume: `/var/lib/\${X}/foo:/data` },
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 1,
+      volume: `\${VAR}/docker.sock:/var/run/docker.sock`,
+    },
+    {
+      broad: 0,
+      readOnly: 0,
+      socket: 1,
+      volume: `\${DOCKER_SOCK}:/var/run/docker.sock`,
+    },
+  ];
+
+  test.each(interpolatedSourceCases)(
+    "bind-mount rules: $volume",
+    ({ broad, readOnly, socket, volume }) => {
+      const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - ${volume}
+`;
+      const composeContent = parseCompose(source, "compose.yaml");
+      const context = { locate: createComposeLocator(source) };
+      expect(
+        noBroadBindMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(broad);
+      expect(
+        preferReadOnlyBindMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(readOnly);
+      expect(
+        noDockerSocketMount.check(composeContent, "compose.yaml", context)
+      ).toHaveLength(socket);
+    }
+  );
+
   test("no-plaintext-secrets: map and list syntax, interpolation is clean", () => {
     const source = `services:
   agent:
