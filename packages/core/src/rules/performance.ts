@@ -156,9 +156,11 @@ export const minimizeLayers: DockerfileRule = {
 };
 
 // Docker reads .dockerignore from the build-context root, which we cannot know
-// statically. Accept the two locations that cover real usage: next to the
-// Dockerfile, or at the scan root (the common monorepo-root build context).
-// Paths here are scan-root-relative and always "/"-separated.
+// statically. Accept the locations that cover real usage: next to the
+// Dockerfile, at the scan root (the common monorepo-root build context), or
+// BuildKit's per-Dockerfile `<Dockerfile>.dockerignore`, which it prefers
+// when building with `-f`. Paths here are scan-root-relative and always
+// "/"-separated.
 const hasDockerignoreFor = (
   dockerfilePath: string,
   projectFiles: string[]
@@ -166,7 +168,10 @@ const hasDockerignoreFor = (
   const lastSlash = dockerfilePath.lastIndexOf("/");
   const dir = lastSlash === -1 ? "" : dockerfilePath.slice(0, lastSlash);
   const adjacent = dir === "" ? ".dockerignore" : `${dir}/.dockerignore`;
-  return projectFiles.some((f) => f === adjacent || f === ".dockerignore");
+  const perDockerfile = `${dockerfilePath}.dockerignore`;
+  return projectFiles.some(
+    (f) => f === adjacent || f === perDockerfile || f === ".dockerignore"
+  );
 };
 
 export const useDockerignore: DockerfileRule = {

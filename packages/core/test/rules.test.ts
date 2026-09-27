@@ -508,6 +508,36 @@ describe("Performance Rules", () => {
       })
     ).toHaveLength(0);
   });
+  const perDockerfileIgnoreCases = [
+    {
+      expected: 0,
+      file: "Dockerfile",
+      projectFiles: ["Dockerfile", "Dockerfile.dockerignore"],
+    },
+    {
+      expected: 0,
+      file: "svc/api.dockerfile",
+      projectFiles: ["svc/api.dockerfile", "svc/api.dockerfile.dockerignore"],
+    },
+    {
+      expected: 1,
+      file: "svc/api.dockerfile",
+      projectFiles: ["svc/api.dockerfile", "svc/other.dockerfile.dockerignore"],
+    },
+  ];
+
+  test.each(perDockerfileIgnoreCases)(
+    "use-dockerignore: $file with $projectFiles reports $expected",
+    ({ expected, file, projectFiles }) => {
+      const instructions = parseDockerfile(`
+      FROM node:22-alpine
+      COPY . .
+    `);
+      expect(
+        useDockerignore.check(instructions, file, { projectFiles })
+      ).toHaveLength(expected);
+    }
+  );
 });
 
 describe("Compose Rules", () => {
