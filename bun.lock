@@ -85,6 +85,7 @@
       },
       "devDependencies": {
         "@docker-doctor/core": "workspace:*",
+        "@types/bun": "^1.4.2",
         "@types/node": "^26.5.1",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
