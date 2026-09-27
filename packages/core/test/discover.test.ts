@@ -122,6 +122,50 @@ describe("discoverProject", () => {
       fs.rmSync(root, { force: true, recursive: true });
     }
   });
+
+  test.skipIf(process.platform === "win32")(
+    "does not traverse symlinked directories and does not hang on a symlink cycle",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      try {
+        fs.writeFileSync(
+          path.join(root, "Dockerfile"),
+          "FROM node:22-alpine\n"
+        );
+        fs.symlinkSync(root, path.join(root, "loop"));
+
+        const project = await discoverProject(root);
+
+        expect(project.dockerfiles).toEqual(["Dockerfile"]);
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "reads a symlinked Dockerfile through the link",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      try {
+        fs.mkdirSync(path.join(root, "ok"));
+        fs.writeFileSync(
+          path.join(root, "ok", "Dockerfile"),
+          "FROM node:22-alpine\n"
+        );
+        fs.symlinkSync("ok/Dockerfile", path.join(root, "Dockerfile.link"));
+
+        const project = await discoverProject(root);
+
+        expect(project.dockerfiles).toEqual([
+          "Dockerfile.link",
+          "ok/Dockerfile",
+        ]);
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
 });
 
 describe("createIgnoreMatcher", () => {

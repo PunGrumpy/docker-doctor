@@ -12,6 +12,12 @@ const walk = async (
   await Promise.all(
     files.map(async (file) => {
       const filePath = path.join(dir, file.name);
+      if (file.isSymbolicLink()) {
+        // Never traverse a symlinked directory (cycles, trees outside the
+        // root). A symlinked file is listed and later read through the link.
+        fileList.push(filePath);
+        return;
+      }
       if (file.isDirectory()) {
         if (
           file.name === "node_modules" ||
