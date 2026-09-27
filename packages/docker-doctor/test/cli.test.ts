@@ -311,6 +311,50 @@ describe("categories config", () => {
   });
 });
 
+describe("--config resolution", () => {
+  const packageDir = path.join(import.meta.dir, "..");
+
+  test("resolves relative to the current directory", async () => {
+    const { exitCode, stderr } = await runCli(
+      [
+        fixture("clean"),
+        "--json",
+        "--config",
+        "test/fixtures/with-category-config/docker-doctor.config.yaml",
+      ],
+      { cwd: packageDir }
+    );
+    expect(stderr).not.toContain("not found");
+    expect(exitCode).toBe(0);
+  });
+
+  test("falls back to the scanned directory with a warning", async () => {
+    const { exitCode, stderr } = await runCli(
+      [
+        fixture("with-category-config"),
+        "--json",
+        "--config",
+        "docker-doctor.config.yaml",
+      ],
+      { cwd: packageDir }
+    );
+    expect(stderr).toContain("found relative to the scanned directory");
+    // The fixture's config escalates no-root-user to error.
+    expect(exitCode).toBe(1);
+  });
+
+  test("reports a missing config with the cwd-relative path", async () => {
+    const { exitCode, stderr } = await runCli(
+      [fixture("clean"), "--json", "--config", "does-not-exist.yaml"],
+      { cwd: packageDir }
+    );
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain(
+      `Specified config file not found at ${path.join(packageDir, "does-not-exist.yaml")}`
+    );
+  });
+});
+
 describe("ignore.files config", () => {
   test("ignored files are excluded from the scan and the report", async () => {
     // The vendored/ Dockerfile holds an error-severity finding; ignoring it

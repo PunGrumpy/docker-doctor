@@ -24,6 +24,8 @@ The `.ts` form relies on Node.js importing TypeScript directly, which it does by
 npx @docker-doctor/cli@latest . --config ./custom-docker-doctor.config.ts
 ```
 
+The path is resolved from the directory you run the command in, not from `[dir]`. Earlier releases resolved it from the scanned directory; that still works with a warning on stderr.
+
 ## Shape
 
 ```ts
