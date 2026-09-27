@@ -80,8 +80,11 @@ runs:
           > "$report_file" 2> "$RUNNER_TEMP/docker-doctor-stderr.log"
         status=$?
         # Exit 1 with a report present just means error-severity findings —
-        # the gate step decides whether that fails the job.
+        # the gate step decides whether that fails the job. Exit 2 means a
+        # file could not be analyzed; the renderer reads it to fail the check
+        # even when the CLI is too old to list failures in the report.
         echo "report-file=$report_file" >> "$GITHUB_OUTPUT"
+        echo "exit-status=$status" >> "$GITHUB_OUTPUT"
         if [ ! -s "$report_file" ]; then
           echo "::warning::Docker Doctor exited with status $status without producing a JSON report"
           cat "$RUNNER_TEMP/docker-doctor-stderr.log" >&2 || true
@@ -94,6 +97,7 @@ runs:
       shell: bash
       env:
         DOCTOR_REPORT_FILE: ${{ steps.scan.outputs.report-file }}
+        DOCTOR_EXIT_STATUS: ${{ steps.scan.outputs.exit-status }}
         DOCTOR_DIRECTORY: ${{ inputs.directory }}
         DOCTOR_BLOCKING: ${{ inputs.blocking }}
         DOCTOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
