@@ -5,6 +5,7 @@ import {
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
+import { maskQuotedText } from "../parsers/shell-quotes";
 import type {
   Diagnostic,
   DockerfileInstruction,
@@ -163,13 +164,57 @@ export const cleanPackageCache: DockerfileRule = {
   message: "Clean up package manager cache in the same RUN layer",
 };
 
+const SHELL_SEPARATOR_RE = /\s*(?:&&|\|\||;|\|)\s*/u;
+const WHITESPACE_RE = /\s+/u;
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
+const INSTALL_VERBS = new Set(["install", "ci", "i"]);
+// Flags that mean the install leaves devDependencies out of the image.
+// `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
+// production flag and `-p` is bun's.
+const NON_DEV_INSTALL_FLAGS = new Set([
+  "-g",
+  "--global",
+  "--production",
+  "--omit=dev",
+  "--only=prod",
+  "--only=production",
+  "--prod",
+  "-P",
+  "-p",
+]);
+
+// One shell command, e.g. `NODE_ENV=production npm ci --omit=dev`. Only a
+// bare project install counts: a positional word after the verb
+// (`npm install express`) installs named packages, not devDependencies.
+const segmentInstallsDevDependencies = (segment: string): boolean => {
+  const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
+  const commandStart = tokens.findIndex(
+    (token) => !ENV_ASSIGNMENT_RE.test(token)
+  );
+  if (commandStart === -1) {
+    return false;
+  }
+  const [manager, verb, ...options] = tokens.slice(commandStart);
+  if (!(NODE_PACKAGE_MANAGERS.has(manager) && INSTALL_VERBS.has(verb))) {
+    return false;
+  }
+  const setsProductionEnv = tokens
+    .slice(0, commandStart)
+    .includes("NODE_ENV=production");
+  return (
+    !setsProductionEnv &&
+    options.every(
+      (option) => option.startsWith("-") && !NON_DEV_INSTALL_FLAGS.has(option)
+    )
+  );
+};
+
 const installsDevDependencies = (args: string): boolean =>
-  (args.includes("npm install") ||
-    args.includes("npm ci") ||
-    args.includes("yarn install")) &&
-  !args.includes("--production") &&
-  !args.includes("--omit=dev") &&
-  !args.includes("prune");
+  !args.includes("prune") &&
+  maskQuotedText(args)
+    .split(SHELL_SEPARATOR_RE)
+    .some(segmentInstallsDevDependencies);
 
 export const avoidDevDependencies: DockerfileRule = {
   category: "Image Size",

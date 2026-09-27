@@ -1323,6 +1323,31 @@ describe("Image Size Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  const devDependencyCases = [
+    { expected: 1, run: "npm install" },
+    { expected: 1, run: "pnpm install" },
+    { expected: 1, run: "yarn install" },
+    { expected: 0, run: "npm install -g pnpm" },
+    { expected: 0, run: "pnpm install --prod" },
+    { expected: 0, run: "npm ci --only=production" },
+    { expected: 0, run: "NODE_ENV=production npm install" },
+    { expected: 0, run: "yarn install --production" },
+    { expected: 0, run: "bun install --production" },
+    { expected: 0, run: "npm install express" },
+    { expected: 0, run: "npm ci && npm run build && npm prune --production" },
+  ];
+
+  test.each(devDependencyCases)(
+    "avoid-dev-dependencies: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
     // final image, so a dev install there ships too.
