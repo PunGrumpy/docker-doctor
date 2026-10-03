@@ -1,0 +1,5 @@
+---
+"@docker-doctor/cli": patch
+---
+
+Fix nine false positives on correct Dockerfiles. `useradd-no-log-init` accepts `-l`, the short form of `--no-log-init`, also inside a cluster such as `-rl`. `absolute-workdir` reads a quoted path such as `WORKDIR "/app"` the way BuildKit does. `clean-package-cache` recognizes any recursive `rm` that removes the apt lists or the apk cache, such as `rm -fr`, `rm -r` and `rm -rf /tmp/* /var/lib/apt/lists/*`. `sort-multiline-args` ends a package list at the newline inside a heredoc body. The pinning rules and `prefer-slim-base` treat `node:$TAG` as a variable, like `node:${TAG}`. `avoid-dev-dependencies` skips installs that run under `ENV NODE_ENV=production` and `yarn install --production=true`. `prefer-slim-base` checks only the stages that reach the final image and recognizes Chainguard, Wolfi, UBI minimal and micro, chiseled and minideb bases. `no-root-user` accepts distroless `:nonroot` images, which do not run as root. `no-add-remote` no longer reports a download verified with `ADD --checksum`.
