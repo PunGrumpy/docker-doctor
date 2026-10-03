@@ -369,17 +369,24 @@ const PACKAGE_LIST_START_RE =
   /\b(?:apt-get(?:\s+-\S+)*\s+install|apk\s+add|yum\s+install|dnf\s+install)\b/u;
 const SHELL_SEPARATOR_RE = /[;|]|&&/u;
 const WHITESPACE_RE = /\s+/u;
+// A newline with no backslash before it. In a heredoc body it ends the
+// command. A `\`-continued RUN has none.
+const UNCONTINUED_NEWLINE_RE = /(?<!\\[ \t]*)\r?\n/u;
 
-// The words after the install verb up to the next shell separator, minus
-// options and continuation backslashes. Everything past a separator belongs
-// to another command, so it is not part of the list.
+// The words after the install verb up to the next shell separator or
+// command-ending newline, minus options and continuation backslashes.
+// Everything past that point belongs to another command, so it is not part
+// of the list.
 const collectPackageList = (raw: string): string[] => {
   const start = PACKAGE_LIST_START_RE.exec(raw);
   if (!start) {
     return [];
   }
   const packages: string[] = [];
-  const tokens = raw.slice(start.index + start[0].length).split(WHITESPACE_RE);
+  const [command] = raw
+    .slice(start.index + start[0].length)
+    .split(UNCONTINUED_NEWLINE_RE);
+  const tokens = command.split(WHITESPACE_RE);
   for (const token of tokens) {
     if (SHELL_SEPARATOR_RE.test(token)) {
       break;

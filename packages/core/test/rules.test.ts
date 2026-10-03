@@ -1923,6 +1923,36 @@ describe("Best Practices Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  test("sort-multiline-args: a heredoc body ends the list at the newline", () => {
+    const sortedHeredoc = parseDockerfile(
+      [
+        "RUN <<EOF",
+        "apt-get update",
+        "apt-get install -y --no-install-recommends \\",
+        "    ca-certificates \\",
+        "    curl",
+        "rm -rf /var/lib/apt/lists/*",
+        "EOF",
+      ].join("\n")
+    );
+    expect(sortMultilineArgs.check(sortedHeredoc, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const unsortedHeredoc = parseDockerfile(
+      [
+        "RUN <<EOF",
+        "apt-get install -y \\",
+        "    curl \\",
+        "    ca-certificates",
+        "EOF",
+      ].join("\n")
+    );
+    expect(sortMultilineArgs.check(unsortedHeredoc, "Dockerfile")).toHaveLength(
+      1
+    );
+  });
+
   test("sort-multiline-args ignores comment lines inside the list", () => {
     const sortedWithComment = parseDockerfile(`
       RUN apt-get update && apt-get install -y --no-install-recommends \\
