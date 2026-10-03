@@ -79,6 +79,22 @@ export const isHardenedRuntimeImage = (imagePart: string): boolean => {
   return !(tag === "dev" || tag?.endsWith("-dev"));
 };
 
+const DISTROLESS_NONROOT_TAG_RE = /(?:^|-)nonroot(?:-|$)/u;
+
+/**
+ * Distroless images tagged `nonroot` (also `debug-nonroot` and the
+ * per-architecture `nonroot-amd64` forms) run as uid 65532.
+ */
+export const isDistrolessNonroot = (imagePart: string): boolean => {
+  const { name, registry, tag } = parseImageRef(imagePart);
+  return (
+    registry === "gcr.io" &&
+    name.startsWith("distroless/") &&
+    tag !== undefined &&
+    DISTROLESS_NONROOT_TAG_RE.test(tag)
+  );
+};
+
 /**
  * Why a reference would resolve differently over time: no tag at all, or
  * the mutable `latest` tag without a digest. `undefined` means the ref is

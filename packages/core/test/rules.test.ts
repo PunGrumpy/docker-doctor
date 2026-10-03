@@ -236,6 +236,34 @@ describe("Security Rules", () => {
     expect(pinImageVersion.check(digestPinned, "Dockerfile")).toHaveLength(0);
   });
 
+  const distrolessUserCases = [
+    { base: "gcr.io/distroless/static-debian12:nonroot", expected: 0 },
+    { base: "gcr.io/distroless/base-debian12:debug-nonroot", expected: 0 },
+    { base: "gcr.io/distroless/nodejs22-debian12:nonroot-amd64", expected: 0 },
+    { base: "gcr.io/distroless/static-debian12:latest", expected: 1 },
+    { base: "gcr.io/distroless/static-debian12:debug", expected: 1 },
+    { base: "example.com/distroless/static:nonroot", expected: 1 },
+  ];
+
+  test.each(distrolessUserCases)(
+    "no-root-user: FROM $base reports $expected",
+    ({ base, expected }) => {
+      const diagnostics = noRootUser.check(
+        parseDockerfile(`FROM ${base}\nENTRYPOINT ["/app"]`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("no-root-user: USER root after a distroless nonroot base still reports", () => {
+    const overridden = parseDockerfile(`
+      FROM gcr.io/distroless/static-debian12:nonroot
+      USER root
+    `);
+    expect(noRootUser.check(overridden, "Dockerfile")).toHaveLength(1);
+  });
+
   test("no-secrets-in-env", () => {
     const withSecret = parseDockerfile(`
       ENV DB_PASSWORD=my-secret-pass

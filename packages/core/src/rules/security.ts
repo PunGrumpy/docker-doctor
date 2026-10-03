@@ -1,5 +1,6 @@
 import {
   collectStageAliases,
+  isDistrolessNonroot,
   isHardenedRuntimeImage,
   isScratch,
   mutableRefIssue,
@@ -30,10 +31,13 @@ export const noRootUser: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         const { base, stage } = parseFromArgs(inst.args);
-        // DHI runtime bases default to a nonroot user; "nonroot" is a
-        // sentinel that isRootUser treats as safe until a USER overrides it.
+        // DHI runtime bases and distroless `:nonroot` tags default to a
+        // nonroot user. "nonroot" is a sentinel that isRootUser treats as
+        // safe until a USER overrides it.
         const baseDefaultUser =
-          base && isHardenedRuntimeImage(base) ? "nonroot" : "root";
+          base && (isHardenedRuntimeImage(base) || isDistrolessNonroot(base))
+            ? "nonroot"
+            : "root";
         lastUser = stageUser.get(base?.toLowerCase() ?? "") ?? baseDefaultUser;
         lastUserLine = inst.line;
         currentStage = stage?.toLowerCase() ?? null;
