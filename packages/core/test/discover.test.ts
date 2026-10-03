@@ -162,8 +162,9 @@ describe("discoverProject", () => {
     }
   });
 
-  // An unreadable directory inside the ignored tree makes readdir throw
-  // EACCES, so the scan only succeeds if the walk never opened the tree.
+  // The walk reports an unreadable directory through onSkippedDirectory when
+  // it tries to open it. With one inside the ignored tree, an empty list
+  // proves the walk never opened the tree.
   test.skipIf(!canTestPermissions)(
     "a pattern ending in /** prunes the directory before reading it",
     async () => {
@@ -174,11 +175,15 @@ describe("discoverProject", () => {
         fs.mkdirSync(locked);
         fs.chmodSync(locked, 0o000);
 
+        const skipped: string[] = [];
+
         const project = await discoverProject(root, {
           ignoreFiles: ["examples/**"],
+          onSkippedDirectory: (dir) => skipped.push(dir),
         });
 
         expect(project.dockerfiles).toEqual(["Dockerfile"]);
+        expect(skipped).toEqual([]);
       } finally {
         fs.chmodSync(locked, 0o755);
         fs.rmSync(root, { force: true, recursive: true });
@@ -196,11 +201,15 @@ describe("discoverProject", () => {
         fs.mkdirSync(locked);
         fs.chmodSync(locked, 0o000);
 
+        const skipped: string[] = [];
+
         const project = await discoverProject(root, {
           ignoreFiles: ["**/vendor/**"],
+          onSkippedDirectory: (dir) => skipped.push(dir),
         });
 
         expect(project.dockerfiles).toEqual(["a/Dockerfile"]);
+        expect(skipped).toEqual([]);
       } finally {
         fs.chmodSync(locked, 0o755);
         fs.rmSync(root, { force: true, recursive: true });
