@@ -312,6 +312,23 @@ describe("empty project", () => {
     expect(report.diagnostics).toEqual([]);
   });
 
+  test("--json and --score warn on stderr and keep their stdout contract", async () => {
+    const json = await runCli([fixture("empty"), "--json"]);
+    expect(json.exitCode).toBe(0);
+    expect(json.stderr).toContain("No Dockerfiles or Compose files found");
+    expect(JSON.parse(json.stdout).score).toBe(100);
+
+    const score = await runCli([fixture("empty"), "--score"]);
+    expect(score.exitCode).toBe(0);
+    expect(score.stderr).toContain("No Dockerfiles or Compose files found");
+    expect(score.stdout.trim()).toBe("100");
+  });
+
+  test("a project with files gets no such warning", async () => {
+    const { stderr } = await runCli([fixture("clean"), "--json"]);
+    expect(stderr).not.toContain("No Dockerfiles or Compose files found");
+  });
+
   test("a sibling <name>.dockerignore is never scanned as a Dockerfile", async () => {
     const { stdout } = await runCli([
       fixture("dockerignore-sibling"),

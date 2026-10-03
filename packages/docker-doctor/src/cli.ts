@@ -624,6 +624,25 @@ const reportScanFailures = (failures: ScanFailure[]): void => {
   }
 };
 
+const noFilesFoundMessage = (rootDir: string): string =>
+  `No Dockerfiles or Compose files found in ${rootDir}`;
+
+// A scan with no files has no findings and scores 100. The usual report
+// would call that project healthy, so the terminal prints this notice
+// instead.
+const printNothingScanned = (rootDir: string): void => {
+  console.log(`\n${chalk.yellow("⚠")} ${noFilesFoundMessage(rootDir)}.`);
+  console.log(
+    `  docker-doctor scans files named Dockerfile, Dockerfile.*, *.dockerfile,`
+  );
+  console.log(
+    `  compose.yaml, docker-compose.yaml and variants such as compose.prod.yaml`
+  );
+  console.log(
+    `  (.yaml or .yml). Check the directory and your ignore.files patterns.`
+  );
+};
+
 const pathExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
@@ -778,6 +797,9 @@ program
           ...project.composeFiles,
           ...(project.dockerignores || []),
         ];
+        // .dockerignore files are discovered for use-dockerignore, not scanned.
+        const scannedFileCount =
+          project.dockerfiles.length + project.composeFiles.length;
 
         const { diagnostics, failures } = await runRulesEngine(
           rootDir,
@@ -805,12 +827,24 @@ program
 
         if (showProgress) {
           console.log(
-            `${chalk.green("✔")} Scanned ${projectFilesList.length} files in ${duration}s [~${concurrency} workers]`
+            `${chalk.green("✔")} Scanned ${scannedFileCount} files in ${duration}s [~${concurrency} workers]`
           );
         }
 
         reportScanFailures(failures);
         const scanIncomplete = failures.length > 0;
+
+        if (scannedFileCount === 0) {
+          // --json and --score keep their stdout contract (an empty report,
+          // score 100), so they only get a warning on stderr.
+          if (isSilent) {
+            console.error(`Warning: ${noFilesFoundMessage(rootDir)}`);
+          } else {
+            printNothingScanned(rootDir);
+            process.exitCode = 0;
+            return;
+          }
+        }
 
         // Every output mode gates on the same condition, so the same
         // project cannot pass in one mode and fail in another.

@@ -52,6 +52,15 @@ describe("terminal report", () => {
     expect(stdout).toContain("Help:");
   });
 
+  test("an empty project gets a notice instead of a healthy score", async () => {
+    const { exitCode, stdout } = await runPlain([fixture("empty")]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("No Dockerfiles or Compose files found");
+    expect(stdout).not.toContain("looks healthy");
+    expect(stdout).not.toContain("/ 100");
+    expect(stdout).not.toContain("Share:");
+  });
+
   test("no ANSI escape sequences when colors are disabled", async () => {
     const [plain, verbose] = await Promise.all([
       runPlain([fixture("with-error")]),
