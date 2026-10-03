@@ -400,6 +400,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   const payload = buildHandoffPayload({
     diagnostics: context.diagnostics,
+    projectDir: context.rootDir,
     projectName: path.basename(context.rootDir),
   });
 
