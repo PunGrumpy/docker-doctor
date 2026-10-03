@@ -1,5 +1,6 @@
-# The GitHub Action (action.yml + scripts/) is versioned independently of
-# the CLI, with two tag tiers (pattern adapted from millionco/react-doctor):
+# The GitHub Action (action.yml + the comment renderer it runs) is versioned
+# independently of the CLI, with two tag tiers (pattern adapted from
+# millionco/react-doctor):
 #
 #   - immutable vX.Y.Z per release, bumped from the merged PR's conventional
 #     title: feat → minor, everything else → patch
@@ -16,9 +17,12 @@ on:
   push:
     branches:
       - main
+    # Only the files the action runs. The rule docs generator and the kit
+    # sync script also live in scripts/, and a change to them is not a change
+    # to the action.
     paths:
       - action.yml
-      - "scripts/**"
+      - scripts/render-github-action-comment.mjs
 
 permissions:
   contents: write
