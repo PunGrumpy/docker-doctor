@@ -338,6 +338,10 @@ describe("Security Rules", () => {
     { expected: 0, line: "ENV DB_PASSWORD_FILE /run/secrets/db" },
     { expected: 0, line: "ENV JWT_PRIVATE_KEY_PATH=/etc/keys/jwt.pem" },
     { expected: 1, line: "ENV DB_PASSWORD_URL=postgres://app:hunter2@db/app" },
+    { expected: 0, line: "ENV AUTH_ENABLED=true" },
+    { expected: 0, line: 'ENV AUTH_ENABLED="False"' },
+    { expected: 0, line: "ENV MYSQL_ALLOW_EMPTY_PASSWORD=yes" },
+    { expected: 1, line: "ENV PGPASSWORD=truest" },
   ];
 
   test.each(quotedSecretCases)(
@@ -1149,7 +1153,27 @@ describe("Compose Security Rules", () => {
     { entry: "POSTGRES_PASSWORD_FILE: /run/secrets/db_password", expected: 0 },
     { entry: "TLS_PRIVATE_KEY_PATH: /certs/tls.key", expected: 0 },
     { entry: "POSTGRES_PASSWORD: hunter2", expected: 1 },
+    { entry: 'AUTH_ENABLED: "true"', expected: 0 },
+    { entry: "MYSQL_ALLOW_EMPTY_PASSWORD: yes", expected: 0 },
   ];
+
+  test("no-plaintext-secrets: list syntax skips secret files and booleans", () => {
+    const composeContent = {
+      services: {
+        db: {
+          environment: [
+            "POSTGRES_PASSWORD_FILE=/run/secrets/db_password",
+            "AUTH_ENABLED=true",
+            "POSTGRES_PASSWORD=hunter2",
+          ],
+        },
+      },
+    };
+    const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
+    expect(diags.map((d) => d.message)).toEqual([
+      expect.stringContaining("'POSTGRES_PASSWORD'"),
+    ]);
+  });
 
   test.each(scalarSecretCases)(
     "no-plaintext-secrets: $entry reports $expected",

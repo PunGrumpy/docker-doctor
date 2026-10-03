@@ -26,6 +26,10 @@ export const isSecretKey = (key: string): boolean =>
 // A URL with no userinfo in its authority. `user:pw@host` does not match.
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
 
+// An on/off switch is not a secret. `AUTH_ENABLED=true` matches the `auth`
+// key pattern and `MYSQL_ALLOW_EMPTY_PASSWORD=yes` matches `password`.
+const SWITCH_VALUE = /^(?:true|false|yes|no|on|off)$/iu;
+
 // `ENV TOKEN=""` / `ARG KEY=''` declare a build-time secret with no value;
 // the quotes are shell syntax, not a literal.
 const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/su;
@@ -35,6 +39,7 @@ export const isLiteralSecretValue = (value: string): boolean => {
   return (
     unquoted.length > 0 &&
     !unquoted.startsWith("$") &&
+    !SWITCH_VALUE.test(unquoted) &&
     !CREDENTIAL_FREE_URL.test(unquoted)
   );
 };
