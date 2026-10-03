@@ -6,7 +6,7 @@ description: >-
   privileged: true in Docker Compose disables nearly every container isolation mechanism. What it actually grants and the narrower alternatives.
 ---
 
-`privileged: true` is the biggest hammer in the Compose vocabulary: it gives the container every Linux capability, access to every host device, and turns off the seccomp, AppArmor, and cgroup device protections that make a container a container. It usually enters a file as a workaround, because some device wouldn't open or some syscall was blocked, and then never leaves. This rule flags every service that sets it.
+`privileged: true` is the biggest hammer in the Compose vocabulary: it gives the container every Linux capability, access to every host device, and turns off the seccomp, AppArmor, and cgroup device protections that make a container a container. It usually enters a file as a workaround, because some device wouldn't open or some syscall was blocked, and then never leaves. This rule flags every service that sets it, including the other spellings Compose reads as true (`"true"`, `yes`, `on`).
 
 ## What the rule catches
 

@@ -1,3 +1,4 @@
+import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
@@ -22,7 +23,9 @@ export const useMultiStage: DockerfileRule = {
             inst.args.includes("yarn build") ||
             inst.args.includes("bun run build") ||
             inst.args.includes("cargo build") ||
-            BUILD_TOOL_COMMAND_RE.test(maskQuotedText(inst.args)))
+            BUILD_TOOL_COMMAND_RE.test(
+              maskQuotedText(stripRunFlags(inst.args))
+            ))
       );
 
       if (hasBuildSteps) {

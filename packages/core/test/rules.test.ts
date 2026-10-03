@@ -896,6 +896,65 @@ describe("Compose Security Rules", () => {
     expect(diags[0].line).toBe(4);
   });
 
+  const privilegedSpellingCases = [
+    { expected: 1, value: "true" },
+    { expected: 1, value: '"true"' },
+    { expected: 1, value: "yes" },
+    { expected: 1, value: "'yes'" },
+    { expected: 1, value: "on" },
+    { expected: 1, value: "Y" },
+    { expected: 0, value: "false" },
+    { expected: 0, value: '"false"' },
+    { expected: 0, value: "no" },
+    { expected: 0, value: "off" },
+  ];
+
+  test.each(privilegedSpellingCases)(
+    "no-privileged-service: privileged: $value reports $expected",
+    ({ expected, value }) => {
+      const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    privileged: ${value}
+`;
+      const diagnostics = noPrivilegedService.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+      expect(diagnostics).toHaveLength(expected);
+      expect(diagnostics.map((d) => d.line)).toEqual(expected === 1 ? [4] : []);
+    }
+  );
+
+  const readOnlySpellingCases = [
+    { expected: 0, value: "true" },
+    { expected: 0, value: '"true"' },
+    { expected: 0, value: "yes" },
+    { expected: 1, value: "false" },
+    { expected: 1, value: '"no"' },
+  ];
+
+  test.each(readOnlySpellingCases)(
+    "prefer-read-only-bind-mount: read_only: $value reports $expected",
+    ({ expected, value }) => {
+      const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - type: bind
+        source: /opt/data
+        target: /data
+        read_only: ${value}
+`;
+      const diagnostics = preferReadOnlyBindMount.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("no-privileged-service: privileged false or absent is clean", () => {
     const composeContent = {
       services: {
@@ -2330,5 +2389,52 @@ describe("Best Practices Rules", () => {
       LABEL org.opencontainers.image.authors="team@example.com" org.opencontainers.image.version="1.0.0"
     `);
     expect(requireLabels.check(withOciLabels, "Dockerfile")).toHaveLength(0);
+  });
+});
+
+describe("BuildKit RUN flags", () => {
+  const CACHE_MOUNT = "--mount=type=cache,target=/root/.npm";
+
+  const devInstallCases = [
+    { expected: 1, run: `${CACHE_MOUNT} npm ci` },
+    { expected: 0, run: `${CACHE_MOUNT} npm ci --omit=dev` },
+    {
+      expected: 1,
+      run: "--mount=type=cache,target=/pnpm/store --network=default pnpm install --frozen-lockfile",
+    },
+  ];
+
+  test.each(devInstallCases)(
+    "avoid-dev-dependencies: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("avoid-run-cd sees the command behind a RUN flag", () => {
+    const withMount = parseDockerfile(`RUN ${CACHE_MOUNT} cd /app && npm ci`);
+    expect(avoidRunCd.check(withMount, "Dockerfile")).toHaveLength(1);
+
+    const noCd = parseDockerfile(`RUN ${CACHE_MOUNT} npm ci`);
+    expect(avoidRunCd.check(noCd, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("use-multi-stage sees a build step behind a RUN flag", () => {
+    const withMount = parseDockerfile(`
+      FROM gcc:14
+      RUN --mount=type=cache,target=/ccache make all
+    `);
+    expect(useMultiStage.check(withMount, "Dockerfile")).toHaveLength(1);
+
+    // Installing the tool is still not a build step.
+    const installsMake = parseDockerfile(`
+      FROM alpine:3.20
+      RUN --mount=type=cache,target=/var/cache/apk apk add make
+    `);
+    expect(useMultiStage.check(installsMake, "Dockerfile")).toHaveLength(0);
   });
 });

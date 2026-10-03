@@ -6,7 +6,7 @@ import {
   mountsDockerSocket,
   volumeMount,
 } from "./compose-mounts";
-import { composeServices } from "./compose-services";
+import { composeServices, isComposeTrue } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 
@@ -16,7 +16,7 @@ export const noPrivilegedService: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
-      if (config.privileged === true) {
+      if (isComposeTrue(config.privileged)) {
         diagnostics.push(
           createDiagnostic(
             file,

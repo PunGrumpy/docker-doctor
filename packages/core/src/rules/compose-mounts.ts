@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { isComposeTrue } from "./compose-services";
+
 /**
  * Shared parsing for Compose `volumes:` entries, used by every rule that
  * reasons about bind mounts. A Compose volume entry is either the short
@@ -110,7 +112,7 @@ export const volumeMount = (volume: unknown): VolumeMount | undefined => {
       type,
     } = volume as Record<string, unknown>;
     return {
-      readOnly: readOnly === true,
+      readOnly: isComposeTrue(readOnly),
       source: typeof source === "string" ? source : undefined,
       target: typeof target === "string" ? target : undefined,
       type: typeof type === "string" ? type : undefined,

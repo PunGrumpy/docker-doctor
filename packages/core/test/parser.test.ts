@@ -224,6 +224,36 @@ USER node
     expect(parsed[2].instruction).toBe("USER");
   });
 
+  const heredocDelimiterCases = [
+    { opener: "<<END-OF-SCRIPT", terminator: "END-OF-SCRIPT" },
+    { opener: "<<'END-OF-SCRIPT'", terminator: "END-OF-SCRIPT" },
+    { opener: "<<nginx.conf", terminator: "nginx.conf" },
+  ];
+
+  test.each(heredocDelimiterCases)(
+    "closes a heredoc opened with $opener",
+    ({ opener, terminator }) => {
+      const insts = parseDockerfile(
+        `FROM alpine:3.20\nRUN ${opener}\necho hi\nUSER root\n${terminator}\nUSER 1000\n`
+      );
+      // The body's USER line is shell text, not an instruction.
+      expect(insts.map((inst) => inst.instruction)).toEqual([
+        "FROM",
+        "RUN",
+        "USER",
+      ]);
+      expect(insts[2].args).toBe("1000");
+      expect(insts[2].line).toBe(6);
+    }
+  );
+
+  test("a redirect or separator attached to the delimiter is not part of it", () => {
+    for (const opener of ["cat <<EOF>/etc/motd", "cat <<EOF; echo done"]) {
+      const insts = parseDockerfile(`RUN ${opener}\nhello\nEOF\nUSER 1000\n`);
+      expect(insts.map((inst) => inst.instruction)).toEqual(["RUN", "USER"]);
+    }
+  });
+
   test("throws ParseError on an unterminated heredoc", () => {
     const content = "FROM node:22\nRUN <<EOF\necho hi\nUSER node\n";
     expect(() => parseDockerfile(content, "svc/Dockerfile")).toThrow(

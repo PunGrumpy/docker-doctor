@@ -1,3 +1,13 @@
+// Compose casts these spellings to `true` (compose-go's `toBoolean`), so
+// `privileged: "true"` and `privileged: yes` run the service privileged
+// like `privileged: true` does. The YAML parser types only a bare `true`
+// as a boolean.
+const TRUE_SPELLINGS = new Set(["true", "y", "yes", "on"]);
+
+export const isComposeTrue = (value: unknown): boolean =>
+  value === true ||
+  (typeof value === "string" && TRUE_SPELLINGS.has(value.trim().toLowerCase()));
+
 /**
  * Narrows an unknown compose document to its service entries. A service
  * with a null body (`web:` with nothing under it) is returned as an empty

@@ -40,9 +40,11 @@ const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>.*)$/u;
 // in findHeredocDelimiters: an opener whose `<<` sits inside a quoted string
 // (`RUN echo "text <<EOF more"`) is discarded.
 // Global so a single line (e.g. `COPY <<FILE1 <<FILE2 /dest/`) can open more
-// than one.
+// than one. BuildKit takes any word as the delimiter (`<<END-OF-SCRIPT`,
+// `<<nginx.conf`), so the name ends at the next whitespace, quote or shell
+// operator.
 const HEREDOC_OPENER_RE =
-  /(?<=^|\s)<<-?(?<quote>['"]?)(?<delim>\w+)\k<quote>/gu;
+  /(?<=^|\s)<<-?(?<quote>['"]?)(?<delim>[^\s'"<>;&|()]+)\k<quote>/gu;
 
 interface ParserState {
   instructions: DockerfileInstruction[];
