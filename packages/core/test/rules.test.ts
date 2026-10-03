@@ -1377,18 +1377,68 @@ describe("Image Size Rules", () => {
     expect(preferSlimBase.check(variableTag, "Dockerfile")).toHaveLength(0);
   });
 
-  test("prefer-slim-base recognizes minimal images by name", () => {
-    const minimal = parseDockerfile(`
-      FROM alpine:3.19
-      FROM busybox:1.36
-      FROM gcr.io/distroless/static:nonroot
-    `);
-    expect(preferSlimBase.check(minimal, "Dockerfile")).toHaveLength(0);
+  const slimBaseCases = [
+    { base: "alpine:3.19", expected: 0 },
+    { base: "busybox:1.36", expected: 0 },
+    { base: "gcr.io/distroless/static:nonroot", expected: 0 },
+    { base: "cgr.dev/chainguard/node:22", expected: 0 },
+    { base: "cgr.dev/chainguard/wolfi-base:20240101", expected: 0 },
+    { base: "registry.access.redhat.com/ubi9/ubi-minimal:9.4", expected: 0 },
+    { base: "registry.access.redhat.com/ubi9/ubi-micro:9.4", expected: 0 },
+    { base: "amazonlinux:2023-minimal", expected: 0 },
+    { base: "bitnami/minideb:bookworm", expected: 0 },
+    {
+      base: "mcr.microsoft.com/dotnet/runtime-deps:8.0-jammy-chiseled",
+      expected: 0,
+    },
+    { base: "ubuntu:24.04", expected: 1 },
+    { base: "registry.access.redhat.com/ubi9/ubi:9.4", expected: 1 },
+    { base: "microsoft/dotnet:8.0", expected: 1 },
+    { base: "mcr.microsoft.com/dotnet/sdk:8.0", expected: 1 },
+  ];
 
-    const fullOs = parseDockerfile(`
-      FROM ubuntu:24.04
+  test.each(slimBaseCases)(
+    "prefer-slim-base: FROM $base reports $expected",
+    ({ base, expected }) => {
+      const diagnostics = preferSlimBase.check(
+        parseDockerfile(`FROM ${base}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("prefer-slim-base only checks the stages that ship", () => {
+    // The builder stage is discarded, so its full image costs the final
+    // image nothing.
+    const discardedBuilder = parseDockerfile(`
+      FROM node:22 AS build
+      RUN npm ci
+      FROM node:22-slim
+      COPY --from=build /app/dist ./dist
     `);
-    expect(preferSlimBase.check(fullOs, "Dockerfile")).toHaveLength(1);
+    expect(preferSlimBase.check(discardedBuilder, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    // The final stage builds FROM base, so base's layers ship.
+    const inheritedBase = parseDockerfile(`
+      FROM node:22 AS base
+      FROM base AS build
+      RUN npm ci
+      FROM base
+    `);
+    const inherited = preferSlimBase.check(inheritedBase, "Dockerfile");
+    expect(inherited).toHaveLength(1);
+    expect(inherited[0].line).toBe(2);
+
+    const fullFinal = parseDockerfile(`
+      FROM node:22-slim AS build
+      FROM node:22
+    `);
+    const final = preferSlimBase.check(fullFinal, "Dockerfile");
+    expect(final).toHaveLength(1);
+    expect(final[0].line).toBe(3);
   });
 
   test("prefer-slim-base: Docker Hardened Images are minimal by construction", () => {

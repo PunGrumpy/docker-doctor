@@ -77,63 +77,78 @@ const shippedStages = (stages: BuildStage[]): BuildStage[] => {
   return shipped;
 };
 
+// Minimal bases identify themselves either in the name (alpine, busybox,
+// gcr.io/distroless/*, cgr.dev/chainguard/*) or in the tag (node:22-slim,
+// runtime-deps:8.0-jammy-chiseled). Judging by tag alone flagged
+// `alpine:3.19`.
+const MINIMAL_BASE_MARKERS = [
+  "alpine",
+  "slim",
+  "distroless",
+  "busybox",
+  "chainguard",
+  "wolfi",
+  "chiseled",
+  "minideb",
+  "nanoserver",
+] as const;
+
+// Short words that only count as a whole name or tag segment: `ubi-minimal`,
+// `ubi-micro` and `amazonlinux:2023-minimal`, but not `microsoft/dotnet`.
+const MINIMAL_BASE_SEGMENT_RE = /(?:^|[/_. -])(?:minimal|micro)(?:$|[/_. -])/u;
+
 export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     const stageAliases = collectStageAliases(instructions);
 
-    for (const inst of instructions) {
-      if (inst.instruction === "FROM") {
-        const imagePart = parseFromArgs(inst.args).base;
-        if (!imagePart || isScratch(imagePart)) {
-          continue;
-        }
+    // A build stage that is discarded never reaches the image, so its base
+    // has no effect on the image's size.
+    for (const { from } of shippedStages(collectStages(instructions))) {
+      const imagePart = parseFromArgs(from.args).base;
+      if (!imagePart || isScratch(imagePart)) {
+        continue;
+      }
 
-        const ref = parseImageRef(imagePart);
+      const ref = parseImageRef(imagePart);
 
-        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
-          continue;
-        }
+      if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+        continue;
+      }
 
-        // Docker Hardened Images are minimal by construction (dev variants
-        // included), whatever their name and tag say.
-        if (isHardenedImage(imagePart)) {
-          continue;
-        }
+      // Docker Hardened Images are minimal by construction (dev variants
+      // included), whatever their name and tag say.
+      if (isHardenedImage(imagePart)) {
+        continue;
+      }
 
-        // Digest pins are already fully deterministic; not our concern here.
-        if (ref.digest) {
-          continue;
-        }
+      // Digest pins are already fully deterministic; not our concern here.
+      if (ref.digest) {
+        continue;
+      }
 
-        // No tag: pin-image-version owns the untagged case, don't double-report.
-        if (!ref.tag) {
-          continue;
-        }
+      // No tag: pin-image-version owns the untagged case, don't double-report.
+      if (!ref.tag) {
+        continue;
+      }
 
-        // Minimal bases identify themselves either in the name (alpine,
-        // busybox, gcr.io/distroless/*) or in the tag (node:22-slim,
-        // python:3.13-alpine). Judging by tag alone flagged `alpine:3.19`.
-        const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
-        const isSlim =
-          haystack.includes("alpine") ||
-          haystack.includes("slim") ||
-          haystack.includes("distroless") ||
-          haystack.includes("busybox");
+      const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
+      const isSlim =
+        MINIMAL_BASE_MARKERS.some((marker) => haystack.includes(marker)) ||
+        MINIMAL_BASE_SEGMENT_RE.test(haystack);
 
-        if (!isSlim) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity,
-              `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
-              this.help,
-              inst.line
-            )
-          );
-        }
+      if (!isSlim) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
+            this.help,
+            from.line
+          )
+        );
       }
     }
 
