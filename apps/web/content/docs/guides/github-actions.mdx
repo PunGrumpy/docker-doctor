@@ -31,13 +31,15 @@ That's the whole setup. The action is advisory by default — it reports finding
 
 Every pull request gets one sticky comment that updates in place on each push:
 
-- A per-file status table — status dot, issue counts, and when the scan ran — sorted worst-first, with every file linked at the scanned commit.
+- A per-file status table — status dot, issue counts, and when the scan ran — sorted worst-first, with every file linked at the scanned commit. The first 20 files are visible. The rest are in a collapsed list.
 - The health score, linking to a shareable score card.
-- Every finding grouped by file with a link to the exact line, the message, and the rule id. Findings stay collapsed unless there are errors.
+- Up to 50 findings grouped by file with a link to the exact line, the message, and the rule id. Findings stay collapsed unless there are errors.
 
 See a live comment on [this pull request](https://github.com/PunGrumpy/docker-doctor/pull/38).
 
-The same summary is mirrored to the workflow's job summary. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there — pushes never fail the check either way.
+The same summary is mirrored to the workflow's job summary. GitHub limits a comment to 65,536 characters. On a repository with hundreds of Docker files, the comment lists fewer files and refers you to the job summary, which always has the full table. Add a `push` trigger (`push: branches: [main]`) alongside `pull_request` if you also want scans of your default branch visible there. Pushes never fail the check either way.
+
+On a pull request from a fork, GitHub gives the workflow a read-only token. The action then skips the comment and the commit status with a warning. The job summary and the `blocking` gate still work.
 
 ## Commit status
 
@@ -78,7 +80,7 @@ Three rules always hold:
 
 - Only `pull_request` events can fail. Pushes to your default branch are health snapshots — they never go red.
 - On pull requests, a scan that crashes without producing a report fails the check regardless of `blocking`, so a broken setup can't silently pass. On pushes it stays advisory, like every other result.
-- A scan that could not analyze one of the discovered files (the CLI exits `2`) fails the pull request check regardless of `blocking`. The summary marks those files **Unanalyzed**, so a broken Dockerfile can't pass as clean.
+- A scan that could not analyze one of the discovered files (the CLI exits `2`) fails the pull request check regardless of `blocking`. The summary marks those files **Unanalyzed**, so a broken Dockerfile can't pass as clean. The parser's message and any config warnings are in the workflow log, in the **Docker Doctor CLI output** group.
 
 ## Versioning
 
