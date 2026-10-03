@@ -14,7 +14,13 @@ const SECRET_KEY_PATTERNS: readonly RegExp[] = [
   /(?:^|[_-])pat(?:[_-]|$)/iu,
 ];
 
+// A key that names the file a secret is stored in, not the secret.
+// Docker's official images read `POSTGRES_PASSWORD_FILE=/run/secrets/...`,
+// which is the setup both secrets rules recommend.
+const SECRET_LOCATION_SUFFIX = /[_-](?:file|path)$/iu;
+
 export const isSecretKey = (key: string): boolean =>
+  !SECRET_LOCATION_SUFFIX.test(key) &&
   SECRET_KEY_PATTERNS.some((regex) => regex.test(key));
 
 // A URL with no userinfo in its authority. `user:pw@host` does not match.
