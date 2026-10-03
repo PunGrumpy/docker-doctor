@@ -61,6 +61,23 @@ describe("terminal report", () => {
     expect(stdout).not.toContain("Share:");
   });
 
+  test("an incomplete scan claims no healthy project and offers no share link", async () => {
+    const { exitCode, stdout } = await runPlain([
+      fixture("unterminated-heredoc"),
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stdout).toContain("Incomplete scan: 1 file could not be analyzed");
+    expect(stdout).not.toContain("looks healthy");
+    expect(stdout).not.toContain("Share:");
+  });
+
+  test("a complete scan still offers the share link", async () => {
+    const { exitCode, stdout } = await runPlain([fixture("clean")]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Share:");
+    expect(stdout).not.toContain("Incomplete scan");
+  });
+
   test("no ANSI escape sequences when colors are disabled", async () => {
     const [plain, verbose] = await Promise.all([
       runPlain([fixture("with-error")]),

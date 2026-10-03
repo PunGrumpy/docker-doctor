@@ -872,7 +872,8 @@ program
           label,
           project,
           options.verbose,
-          fileContents
+          fileContents,
+          failures.length
         );
 
         let wizardOk = true;
