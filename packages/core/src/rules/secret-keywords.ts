@@ -14,11 +14,21 @@ const SECRET_KEY_PATTERNS: readonly RegExp[] = [
   /(?:^|[_-])pat(?:[_-]|$)/iu,
 ];
 
+// A key that names the file a secret is stored in, not the secret.
+// Docker's official images read `POSTGRES_PASSWORD_FILE=/run/secrets/...`,
+// which is the setup both secrets rules recommend.
+const SECRET_LOCATION_SUFFIX = /[_-](?:file|path)$/iu;
+
 export const isSecretKey = (key: string): boolean =>
+  !SECRET_LOCATION_SUFFIX.test(key) &&
   SECRET_KEY_PATTERNS.some((regex) => regex.test(key));
 
 // A URL with no userinfo in its authority. `user:pw@host` does not match.
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
+
+// An on/off switch is not a secret. `AUTH_ENABLED=true` matches the `auth`
+// key pattern and `MYSQL_ALLOW_EMPTY_PASSWORD=yes` matches `password`.
+const SWITCH_VALUE = /^(?:true|false|yes|no|on|off)$/iu;
 
 // `ENV TOKEN=""` / `ARG KEY=''` declare a build-time secret with no value;
 // the quotes are shell syntax, not a literal.
@@ -29,6 +39,7 @@ export const isLiteralSecretValue = (value: string): boolean => {
   return (
     unquoted.length > 0 &&
     !unquoted.startsWith("$") &&
+    !SWITCH_VALUE.test(unquoted) &&
     !CREDENTIAL_FREE_URL.test(unquoted)
   );
 };
