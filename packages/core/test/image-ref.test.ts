@@ -26,6 +26,18 @@ describe("parseImageRef", () => {
     expect(ref.tag).toBe("latest");
   });
 
+  test("any $ marks the reference as a variable", () => {
+    for (const ref of [
+      `node:\${NODE_VERSION}`,
+      "node:$NODE_VERSION",
+      "$REGISTRY/app:1.0",
+      "myregistry.example.com/$IMAGE",
+    ]) {
+      expect(parseImageRef(ref).isVariable).toBe(true);
+    }
+    expect(parseImageRef("node:22").isVariable).toBe(false);
+  });
+
   test("registry with a port and no tag", () => {
     const ref = parseImageRef("myregistry.example.com:5000/team/app");
     expect(ref.registry).toBe("myregistry.example.com:5000");

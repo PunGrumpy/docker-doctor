@@ -9,7 +9,10 @@ export interface ImageRef {
 }
 
 export const parseImageRef = (ref: string): ImageRef => {
-  if (ref.includes("${") || ref.startsWith("$")) {
+  // `$` is not valid in an image reference, so any `$` means a build
+  // argument or Compose interpolation. `node:$NODE_VERSION` counts as much
+  // as `node:${NODE_VERSION}`.
+  if (ref.includes("$")) {
     return { isVariable: true, name: ref };
   }
 
@@ -74,6 +77,22 @@ export const isHardenedRuntimeImage = (imagePart: string): boolean => {
   }
   const { tag } = parseImageRef(imagePart);
   return !(tag === "dev" || tag?.endsWith("-dev"));
+};
+
+const DISTROLESS_NONROOT_TAG_RE = /(?:^|-)nonroot(?:-|$)/u;
+
+/**
+ * Distroless images tagged `nonroot` (also `debug-nonroot` and the
+ * per-architecture `nonroot-amd64` forms) run as uid 65532.
+ */
+export const isDistrolessNonroot = (imagePart: string): boolean => {
+  const { name, registry, tag } = parseImageRef(imagePart);
+  return (
+    registry === "gcr.io" &&
+    name.startsWith("distroless/") &&
+    tag !== undefined &&
+    DISTROLESS_NONROOT_TAG_RE.test(tag)
+  );
 };
 
 /**

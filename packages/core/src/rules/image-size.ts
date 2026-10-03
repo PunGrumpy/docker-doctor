@@ -14,63 +14,141 @@ import type {
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall } from "./package-managers";
 
+interface BuildStage {
+  base: string;
+  from: DockerfileInstruction;
+  name: string | null;
+  // The RUN instructions that do not run under `ENV NODE_ENV=production`.
+  runs: DockerfileInstruction[];
+}
+
+// `ENV NODE_ENV=production` and the legacy `ENV NODE_ENV production`, quoted
+// or not, anywhere in a multi-variable ENV.
+const NODE_ENV_ASSIGNMENT_RE =
+  /(?:^|\s)NODE_ENV(?:=|\s+)["']?(?<value>[^\s"']*)/u;
+
+const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
+  const stages: BuildStage[] = [];
+  // npm, pnpm and Yarn 1 skip devDependencies when NODE_ENV is
+  // "production". A stage built FROM this one inherits the ENV.
+  const productionEnv: boolean[] = [];
+  for (const inst of instructions) {
+    if (inst.instruction === "FROM") {
+      const { base, stage } = parseFromArgs(inst.args);
+      const baseKey = base?.toLowerCase() ?? "";
+      const parent = stages.findIndex(
+        (s) => s.name !== null && s.name === baseKey
+      );
+      productionEnv.push(parent !== -1 && productionEnv[parent]);
+      stages.push({
+        base: baseKey,
+        from: inst,
+        name: stage?.toLowerCase() ?? null,
+        runs: [],
+      });
+    } else if (inst.instruction === "ENV" && stages.length > 0) {
+      const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
+      if (value !== undefined) {
+        productionEnv[stages.length - 1] = value === "production";
+      }
+    } else if (
+      inst.instruction === "RUN" &&
+      stages.length > 0 &&
+      !productionEnv[stages.length - 1]
+    ) {
+      stages.at(-1)?.runs.push(inst);
+    }
+  }
+  return stages;
+};
+
+// The default build target is the last stage, and its image contains every
+// layer of the local stages it builds FROM. Every other stage is discarded.
+const shippedStages = (stages: BuildStage[]): BuildStage[] => {
+  const shipped: BuildStage[] = [];
+  let index = stages.length - 1;
+  while (index >= 0) {
+    shipped.unshift(stages[index]);
+    const { base } = stages[index];
+    index = stages
+      .slice(0, index)
+      .findIndex((s) => s.name !== null && s.name === base);
+  }
+  return shipped;
+};
+
+// Minimal bases identify themselves either in the name (alpine, busybox,
+// gcr.io/distroless/*, cgr.dev/chainguard/*) or in the tag (node:22-slim,
+// runtime-deps:8.0-jammy-chiseled). Judging by tag alone flagged
+// `alpine:3.19`.
+const MINIMAL_BASE_MARKERS = [
+  "alpine",
+  "slim",
+  "distroless",
+  "busybox",
+  "chainguard",
+  "wolfi",
+  "chiseled",
+  "minideb",
+  "nanoserver",
+] as const;
+
+// Short words that only count as a whole name or tag segment: `ubi-minimal`,
+// `ubi-micro` and `amazonlinux:2023-minimal`, but not `microsoft/dotnet`.
+const MINIMAL_BASE_SEGMENT_RE = /(?:^|[/_. -])(?:minimal|micro)(?:$|[/_. -])/u;
+
 export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     const stageAliases = collectStageAliases(instructions);
 
-    for (const inst of instructions) {
-      if (inst.instruction === "FROM") {
-        const imagePart = parseFromArgs(inst.args).base;
-        if (!imagePart || isScratch(imagePart)) {
-          continue;
-        }
+    // A build stage that is discarded never reaches the image, so its base
+    // has no effect on the image's size.
+    for (const { from } of shippedStages(collectStages(instructions))) {
+      const imagePart = parseFromArgs(from.args).base;
+      if (!imagePart || isScratch(imagePart)) {
+        continue;
+      }
 
-        const ref = parseImageRef(imagePart);
+      const ref = parseImageRef(imagePart);
 
-        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
-          continue;
-        }
+      if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+        continue;
+      }
 
-        // Docker Hardened Images are minimal by construction (dev variants
-        // included), whatever their name and tag say.
-        if (isHardenedImage(imagePart)) {
-          continue;
-        }
+      // Docker Hardened Images are minimal by construction (dev variants
+      // included), whatever their name and tag say.
+      if (isHardenedImage(imagePart)) {
+        continue;
+      }
 
-        // Digest pins are already fully deterministic; not our concern here.
-        if (ref.digest) {
-          continue;
-        }
+      // Digest pins are already fully deterministic; not our concern here.
+      if (ref.digest) {
+        continue;
+      }
 
-        // No tag: pin-image-version owns the untagged case, don't double-report.
-        if (!ref.tag) {
-          continue;
-        }
+      // No tag: pin-image-version owns the untagged case, don't double-report.
+      if (!ref.tag) {
+        continue;
+      }
 
-        // Minimal bases identify themselves either in the name (alpine,
-        // busybox, gcr.io/distroless/*) or in the tag (node:22-slim,
-        // python:3.13-alpine). Judging by tag alone flagged `alpine:3.19`.
-        const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
-        const isSlim =
-          haystack.includes("alpine") ||
-          haystack.includes("slim") ||
-          haystack.includes("distroless") ||
-          haystack.includes("busybox");
+      const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
+      const isSlim =
+        MINIMAL_BASE_MARKERS.some((marker) => haystack.includes(marker)) ||
+        MINIMAL_BASE_SEGMENT_RE.test(haystack);
 
-        if (!isSlim) {
-          diagnostics.push(
-            createDiagnostic(
-              file,
-              this.key,
-              this.defaultSeverity,
-              `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
-              this.help,
-              inst.line
-            )
-          );
-        }
+      if (!isSlim) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Base image '${imagePart}' may be a full-OS distribution. Consider using a slim or alpine alternative.`,
+            this.help,
+            from.line
+          )
+        );
       }
     }
 
@@ -100,6 +178,17 @@ const cacheMountTargets = (args: string): string[] =>
         .map((option) => option.slice(option.indexOf("=") + 1))
     );
 
+// A recursive `rm` and its operands, which end at the next shell separator.
+// `rm -rf`, `rm -fr`, `rm -r` and `rm -Rf` all count.
+const RECURSIVE_RM_RE =
+  /\brm\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*[rR][A-Za-z]*\s(?<operands>[^;&|]*)/gu;
+
+// `rm -rf /tmp/* <dir>/*` removes <dir> as much as `rm -rf <dir>/*` does.
+const removesRecursively = (args: string, dir: string): boolean =>
+  [...args.matchAll(RECURSIVE_RM_RE)].some((match) =>
+    (match.groups?.operands ?? "").includes(dir)
+  );
+
 const APT_CACHE_DIRS = ["/var/lib/apt", "/var/cache/apt"];
 const APK_CACHE_DIRS = ["/var/cache/apk", "/etc/apk/cache"];
 
@@ -120,7 +209,7 @@ export const cleanPackageCache: DockerfileRule = {
         // check apt-get install without cleanup
         if (
           hasAptGetInstall(args) &&
-          !args.includes("rm -rf /var/lib/apt/lists") &&
+          !removesRecursively(args, "/var/lib/apt/lists") &&
           !hasCacheMountFor(args, APT_CACHE_DIRS)
         ) {
           diagnostics.push(
@@ -139,7 +228,7 @@ export const cleanPackageCache: DockerfileRule = {
         if (
           args.includes("apk add") &&
           !args.includes("--no-cache") &&
-          !args.includes("rm -rf /var/cache/apk") &&
+          !removesRecursively(args, "/var/cache/apk") &&
           !hasCacheMountFor(args, APK_CACHE_DIRS)
         ) {
           diagnostics.push(
@@ -176,6 +265,7 @@ const NON_DEV_INSTALL_FLAGS = new Set([
   "-g",
   "--global",
   "--production",
+  "--production=true",
   "--omit=dev",
   "--only=prod",
   "--only=production",
@@ -221,49 +311,18 @@ export const avoidDevDependencies: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
-    const stages: {
-      name: string | null;
-      base: string;
-      runs: DockerfileInstruction[];
-    }[] = [];
-    for (const inst of instructions) {
-      if (inst.instruction === "FROM") {
-        const { base, stage } = parseFromArgs(inst.args);
-        stages.push({
-          base: base?.toLowerCase() ?? "",
-          name: stage?.toLowerCase() ?? null,
-          runs: [],
-        });
-      } else if (inst.instruction === "RUN" && stages.length > 0) {
-        stages.at(-1)?.runs.push(inst);
-      }
-    }
-    if (stages.length === 0) {
-      return diagnostics;
-    }
+    const stages = collectStages(instructions);
+    const finalStage = stages.at(-1);
 
-    // The default build target is the last stage, and its image contains
-    // every layer of the local stages it builds FROM — so a dev install in
-    // an inherited stage ships just like one in the final stage itself.
-    const auditedIndices: number[] = [];
-    let index = stages.length - 1;
-    while (index >= 0) {
-      auditedIndices.push(index);
-      const { base } = stages[index];
-      index = stages
-        .slice(0, index)
-        .findIndex((s) => s.name !== null && s.name === base);
-    }
-
-    const finalIndex = stages.length - 1;
-    for (const stageIndex of auditedIndices.toReversed()) {
-      const stage = stages[stageIndex];
+    // A dev install in an inherited stage ships just like one in the final
+    // stage itself.
+    for (const stage of shippedStages(stages)) {
       for (const inst of stage.runs) {
         if (!installsDevDependencies(inst.args)) {
           continue;
         }
         const where =
-          stageIndex === finalIndex
+          stage === finalStage
             ? "in the final stage"
             : `in stage '${stage.name}', whose layers the final stage inherits,`;
         diagnostics.push(

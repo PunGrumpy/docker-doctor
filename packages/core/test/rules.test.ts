@@ -236,6 +236,34 @@ describe("Security Rules", () => {
     expect(pinImageVersion.check(digestPinned, "Dockerfile")).toHaveLength(0);
   });
 
+  const distrolessUserCases = [
+    { base: "gcr.io/distroless/static-debian12:nonroot", expected: 0 },
+    { base: "gcr.io/distroless/base-debian12:debug-nonroot", expected: 0 },
+    { base: "gcr.io/distroless/nodejs22-debian12:nonroot-amd64", expected: 0 },
+    { base: "gcr.io/distroless/static-debian12:latest", expected: 1 },
+    { base: "gcr.io/distroless/static-debian12:debug", expected: 1 },
+    { base: "example.com/distroless/static:nonroot", expected: 1 },
+  ];
+
+  test.each(distrolessUserCases)(
+    "no-root-user: FROM $base reports $expected",
+    ({ base, expected }) => {
+      const diagnostics = noRootUser.check(
+        parseDockerfile(`FROM ${base}\nENTRYPOINT ["/app"]`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("no-root-user: USER root after a distroless nonroot base still reports", () => {
+    const overridden = parseDockerfile(`
+      FROM gcr.io/distroless/static-debian12:nonroot
+      USER root
+    `);
+    expect(noRootUser.check(overridden, "Dockerfile")).toHaveLength(1);
+  });
+
   test("no-secrets-in-env", () => {
     const withSecret = parseDockerfile(`
       ENV DB_PASSWORD=my-secret-pass
@@ -368,6 +396,18 @@ describe("Security Rules", () => {
     expect(noAddRemote.check(localArchiveWithChown, "Dockerfile")).toHaveLength(
       0
     );
+  });
+
+  test("no-add-remote: a download verified with --checksum is clean", () => {
+    const verified = parseDockerfile(`
+      ADD --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool.tar.gz /tmp/
+    `);
+    expect(noAddRemote.check(verified, "Dockerfile")).toHaveLength(0);
+
+    const verifiedWithChown = parseDockerfile(`
+      ADD --chown=node:node --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool /usr/local/bin/tool
+    `);
+    expect(noAddRemote.check(verifiedWithChown, "Dockerfile")).toHaveLength(0);
   });
 
   test("no-add-remote: remote URL with --chown flag", () => {
@@ -1369,18 +1409,76 @@ describe("Image Size Rules", () => {
     expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
   });
 
-  test("prefer-slim-base recognizes minimal images by name", () => {
-    const minimal = parseDockerfile(`
-      FROM alpine:3.19
-      FROM busybox:1.36
-      FROM gcr.io/distroless/static:nonroot
+  test("prefer-slim-base skips a tag that is a build argument", () => {
+    const variableTag = parseDockerfile(`
+      ARG NODE_VERSION=22-alpine
+      FROM node:$NODE_VERSION
     `);
-    expect(preferSlimBase.check(minimal, "Dockerfile")).toHaveLength(0);
+    expect(preferSlimBase.check(variableTag, "Dockerfile")).toHaveLength(0);
+  });
 
-    const fullOs = parseDockerfile(`
-      FROM ubuntu:24.04
+  const slimBaseCases = [
+    { base: "alpine:3.19", expected: 0 },
+    { base: "busybox:1.36", expected: 0 },
+    { base: "gcr.io/distroless/static:nonroot", expected: 0 },
+    { base: "cgr.dev/chainguard/node:22", expected: 0 },
+    { base: "cgr.dev/chainguard/wolfi-base:20240101", expected: 0 },
+    { base: "registry.access.redhat.com/ubi9/ubi-minimal:9.4", expected: 0 },
+    { base: "registry.access.redhat.com/ubi9/ubi-micro:9.4", expected: 0 },
+    { base: "amazonlinux:2023-minimal", expected: 0 },
+    { base: "bitnami/minideb:bookworm", expected: 0 },
+    {
+      base: "mcr.microsoft.com/dotnet/runtime-deps:8.0-jammy-chiseled",
+      expected: 0,
+    },
+    { base: "ubuntu:24.04", expected: 1 },
+    { base: "registry.access.redhat.com/ubi9/ubi:9.4", expected: 1 },
+    { base: "microsoft/dotnet:8.0", expected: 1 },
+    { base: "mcr.microsoft.com/dotnet/sdk:8.0", expected: 1 },
+  ];
+
+  test.each(slimBaseCases)(
+    "prefer-slim-base: FROM $base reports $expected",
+    ({ base, expected }) => {
+      const diagnostics = preferSlimBase.check(
+        parseDockerfile(`FROM ${base}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("prefer-slim-base only checks the stages that ship", () => {
+    // The builder stage is discarded, so its full image costs the final
+    // image nothing.
+    const discardedBuilder = parseDockerfile(`
+      FROM node:22 AS build
+      RUN npm ci
+      FROM node:22-slim
+      COPY --from=build /app/dist ./dist
     `);
-    expect(preferSlimBase.check(fullOs, "Dockerfile")).toHaveLength(1);
+    expect(preferSlimBase.check(discardedBuilder, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    // The final stage builds FROM base, so base's layers ship.
+    const inheritedBase = parseDockerfile(`
+      FROM node:22 AS base
+      FROM base AS build
+      RUN npm ci
+      FROM base
+    `);
+    const inherited = preferSlimBase.check(inheritedBase, "Dockerfile");
+    expect(inherited).toHaveLength(1);
+    expect(inherited[0].line).toBe(2);
+
+    const fullFinal = parseDockerfile(`
+      FROM node:22-slim AS build
+      FROM node:22
+    `);
+    const final = preferSlimBase.check(fullFinal, "Dockerfile");
+    expect(final).toHaveLength(1);
+    expect(final[0].line).toBe(3);
   });
 
   test("prefer-slim-base: Docker Hardened Images are minimal by construction", () => {
@@ -1458,6 +1556,39 @@ describe("Image Size Rules", () => {
     }
   );
 
+  const APT_INSTALL = "apt-get update && apt-get install -y curl";
+  const cacheCleanupCases = [
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm -rf /tmp/* /var/lib/apt/lists/*`,
+    },
+    { expected: 0, run: `${APT_INSTALL} && rm -fr /var/lib/apt/lists/*` },
+    { expected: 0, run: `${APT_INSTALL} && rm -r /var/lib/apt/lists/*` },
+    { expected: 0, run: `${APT_INSTALL} && rm -Rf /var/lib/apt/lists/*` },
+    { expected: 1, run: `${APT_INSTALL} && rm -f /var/lib/apt/lists/lock` },
+    { expected: 1, run: `${APT_INSTALL} && apt-get clean` },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && rm -rf /tmp/x && echo /var/lib/apt/lists`,
+    },
+    { expected: 0, run: "apk add curl && rm -rf /tmp/* /var/cache/apk/*" },
+    {
+      expected: 1,
+      run: "apk add curl && rm -f /var/cache/apk/APKINDEX.tar.gz",
+    },
+  ];
+
+  test.each(cacheCleanupCases)(
+    "clean-package-cache: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder
@@ -1488,6 +1619,8 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "bun install --production" },
     { expected: 0, run: "npm install express" },
     { expected: 0, run: "npm ci && npm run build && npm prune --production" },
+    { expected: 0, run: "yarn install --production=true" },
+    { expected: 1, run: "yarn install --production=false" },
   ];
 
   test.each(devDependencyCases)(
@@ -1500,6 +1633,56 @@ describe("Image Size Rules", () => {
       expect(diagnostics).toHaveLength(expected);
     }
   );
+
+  const nodeEnvCases = [
+    { dockerfile: "ENV NODE_ENV=production\nRUN npm ci", expected: 0 },
+    {
+      dockerfile: "ENV NODE_ENV production\nRUN yarn install --frozen-lockfile",
+      expected: 0,
+    },
+    {
+      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN pnpm install',
+      expected: 0,
+    },
+    { dockerfile: "RUN npm ci\nENV NODE_ENV=production", expected: 1 },
+    { dockerfile: "ENV NODE_ENV=development\nRUN npm ci", expected: 1 },
+    {
+      dockerfile:
+        "ENV NODE_ENV=production\nENV NODE_ENV=development\nRUN npm ci",
+      expected: 1,
+    },
+    { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
+  ];
+
+  test.each(nodeEnvCases)(
+    "avoid-dev-dependencies: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\n${dockerfile}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("avoid-dev-dependencies: ENV NODE_ENV follows the FROM chain", () => {
+    const inherited = parseDockerfile(`
+      FROM node:22-alpine AS base
+      ENV NODE_ENV=production
+      FROM base
+      RUN npm ci
+    `);
+    expect(avoidDevDependencies.check(inherited, "Dockerfile")).toHaveLength(0);
+
+    // A fresh base image does not inherit the build stage's ENV.
+    const freshBase = parseDockerfile(`
+      FROM node:22-alpine AS build
+      ENV NODE_ENV=production
+      FROM node:22-alpine
+      RUN npm ci
+    `);
+    expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
+  });
 
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
@@ -1779,6 +1962,24 @@ describe("Best Practices Rules", () => {
     expect(usePipefail.check(quotedPipe, "Dockerfile")).toHaveLength(0);
   });
 
+  const workdirCases = [
+    { expected: 0, workdir: '"/app"' },
+    { expected: 0, workdir: "'/my app'" },
+    { expected: 1, workdir: '"app"' },
+    { expected: 1, workdir: "app" },
+  ];
+
+  test.each(workdirCases)(
+    "absolute-workdir: WORKDIR $workdir reports $expected",
+    ({ expected, workdir }) => {
+      const diagnostics = absoluteWorkdir.check(
+        parseDockerfile(`WORKDIR ${workdir}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("absolute-workdir", () => {
     const relative = parseDockerfile(`
       WORKDIR app/src
@@ -1872,6 +2073,36 @@ describe("Best Practices Rules", () => {
     expect(diags2).toHaveLength(0);
   });
 
+  test("sort-multiline-args: a heredoc body ends the list at the newline", () => {
+    const sortedHeredoc = parseDockerfile(
+      [
+        "RUN <<EOF",
+        "apt-get update",
+        "apt-get install -y --no-install-recommends \\",
+        "    ca-certificates \\",
+        "    curl",
+        "rm -rf /var/lib/apt/lists/*",
+        "EOF",
+      ].join("\n")
+    );
+    expect(sortMultilineArgs.check(sortedHeredoc, "Dockerfile")).toHaveLength(
+      0
+    );
+
+    const unsortedHeredoc = parseDockerfile(
+      [
+        "RUN <<EOF",
+        "apt-get install -y \\",
+        "    curl \\",
+        "    ca-certificates",
+        "EOF",
+      ].join("\n")
+    );
+    expect(sortMultilineArgs.check(unsortedHeredoc, "Dockerfile")).toHaveLength(
+      1
+    );
+  });
+
   test("sort-multiline-args ignores comment lines inside the list", () => {
     const sortedWithComment = parseDockerfile(`
       RUN apt-get update && apt-get install -y --no-install-recommends \\
@@ -1934,6 +2165,28 @@ describe("Best Practices Rules", () => {
     ({ dockerfile, expected }) => {
       const diagnostics = sortMultilineArgs.check(
         parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  const useraddCases = [
+    { expected: 0, run: "useradd -l -r -u 1001 app" },
+    { expected: 0, run: "useradd -rl -u 1001 app" },
+    {
+      expected: 0,
+      run: "groupadd -r app && useradd --no-log-init -r -g app app",
+    },
+    { expected: 1, run: "useradd app && ls -l /home" },
+    { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
+  ];
+
+  test.each(useraddCases)(
+    "useradd-no-log-init: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(`RUN ${run}`),
         "Dockerfile"
       );
       expect(diagnostics).toHaveLength(expected);

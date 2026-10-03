@@ -6,7 +6,7 @@ description: >-
   useradd with a high UID can add gigabytes to a Docker image via /var/log/faillog. Why useradd needs --no-log-init in Dockerfiles.
 ---
 
-`RUN useradd -u 100000 appuser` can silently add **gigabytes** to an image. `useradd` initializes the `/var/log/faillog` and `/var/log/lastlog` accounting files, which are indexed by UID — creating a high-UID user makes them enormous sparse files, and Docker's layer format stores sparse files at their full apparent size. This rule flags `useradd` calls without `--no-log-init`.
+`RUN useradd -u 100000 appuser` can silently add **gigabytes** to an image. `useradd` initializes the `/var/log/faillog` and `/var/log/lastlog` accounting files, which are indexed by UID — creating a high-UID user makes them enormous sparse files, and Docker's layer format stores sparse files at their full apparent size. This rule flags `useradd` calls without `--no-log-init` or its short form `-l`.
 
 ## What the rule catches
 
@@ -29,7 +29,7 @@ This is a genuine footgun (docker/docker#5419): the Dockerfile looks completely 
 
 ## How to fix it
 
-Pass `--no-log-init` flag to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).
+Pass `--no-log-init` or its short form `-l` to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).
 
 ```dockerfile title="Dockerfile — accounting files never created"
 FROM debian:12-slim

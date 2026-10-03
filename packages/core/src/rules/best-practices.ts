@@ -296,13 +296,19 @@ export const usePipefail: DockerfileRule = {
   message: "Use pipefail to catch pipeline command failures",
 };
 
+// BuildKit strips one pair of surrounding quotes from the WORKDIR path, which
+// is how a path with spaces is written: `WORKDIR "/my app"`.
+const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/u;
+
 export const absoluteWorkdir: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
       if (inst.instruction === "WORKDIR") {
-        const path = inst.args.trim();
+        const trimmed = inst.args.trim();
+        const path =
+          trimmed.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? trimmed;
         const isAbsolute = /^(?:\/|\\|\$|[a-zA-Z]:)/u.test(path);
 
         if (!isAbsolute) {
@@ -363,17 +369,24 @@ const PACKAGE_LIST_START_RE =
   /\b(?:apt-get(?:\s+-\S+)*\s+install|apk\s+add|yum\s+install|dnf\s+install)\b/u;
 const SHELL_SEPARATOR_RE = /[;|]|&&/u;
 const WHITESPACE_RE = /\s+/u;
+// A newline with no backslash before it. In a heredoc body it ends the
+// command. A `\`-continued RUN has none.
+const UNCONTINUED_NEWLINE_RE = /(?<!\\[ \t]*)\r?\n/u;
 
-// The words after the install verb up to the next shell separator, minus
-// options and continuation backslashes. Everything past a separator belongs
-// to another command, so it is not part of the list.
+// The words after the install verb up to the next shell separator or
+// command-ending newline, minus options and continuation backslashes.
+// Everything past that point belongs to another command, so it is not part
+// of the list.
 const collectPackageList = (raw: string): string[] => {
   const start = PACKAGE_LIST_START_RE.exec(raw);
   if (!start) {
     return [];
   }
   const packages: string[] = [];
-  const tokens = raw.slice(start.index + start[0].length).split(WHITESPACE_RE);
+  const [command] = raw
+    .slice(start.index + start[0].length)
+    .split(UNCONTINUED_NEWLINE_RE);
+  const tokens = command.split(WHITESPACE_RE);
   for (const token of tokens) {
     if (SHELL_SEPARATOR_RE.test(token)) {
       break;
@@ -432,16 +445,29 @@ export const sortMultilineArgs: DockerfileRule = {
   message: "Sort multi-line arguments alphanumerically",
 };
 
+const USERADD_COMMAND_RE = /\buseradd\b/u;
+// `-l` is the short spelling of `--no-log-init`, and short options cluster
+// (`useradd -rl app`).
+const NO_LOG_INIT_FLAG_RE =
+  /(?:^|\s)(?:--no-log-init|-[A-Za-z]*l[A-Za-z]*)(?=\s|$)/u;
+
+// True when a `useradd` command in this RUN writes the login logs. The flag
+// must belong to the same command as `useradd`, so `useradd app && ls -l`
+// has none.
+const useraddWritesLoginLogs = (args: string): boolean =>
+  args
+    .split(SHELL_SEPARATOR_RE)
+    .some(
+      (command) =>
+        USERADD_COMMAND_RE.test(command) && !NO_LOG_INIT_FLAG_RE.test(command)
+    );
+
 export const useraddNoLogInit: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
-      if (
-        inst.instruction === "RUN" &&
-        /\buseradd\b/u.test(inst.args) &&
-        !inst.args.includes("--no-log-init")
-      ) {
+      if (inst.instruction === "RUN" && useraddWritesLoginLogs(inst.args)) {
         diagnostics.push(
           createDiagnostic(
             file,
@@ -457,7 +483,7 @@ export const useraddNoLogInit: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Pass `--no-log-init` flag to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).",
+  help: "Pass `--no-log-init` or its short form `-l` to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).",
   key: "docker-doctor/useradd-no-log-init",
   message: "Use --no-log-init with useradd",
 };
