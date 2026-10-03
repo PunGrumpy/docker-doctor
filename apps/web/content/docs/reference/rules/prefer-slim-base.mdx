@@ -43,7 +43,9 @@ Choosing between the variants:
 
 If a build tool is missing in a slim base, install it in the build stage — not by retreating to the full image for production.
 
-Images pulled from the `dhi.io` registry ([Docker Hardened Images](https://docs.docker.com/dhi/)) are minimal by construction, `-dev` variants included, so this rule skips them.
+Images pulled from the `dhi.io` registry ([Docker Hardened Images](https://docs.docker.com/dhi/)) are minimal by construction, `-dev` variants included, so this rule skips them. The rule also recognizes Chainguard, Wolfi, UBI `-minimal` and `-micro`, chiseled Ubuntu and minideb images as minimal by name.
+
+The rule checks only the stages that end up in the image: the final stage and any earlier stage it builds `FROM`. A full image in a discarded build stage adds nothing to the final image.
 
 ## Rule details
 

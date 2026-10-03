@@ -54,6 +54,8 @@ CMD ["node", "dist/server.js"]
 
 Equivalents across ecosystems: `yarn install --production`, `pnpm install --prod`, `pip install` from a runtime-only requirements file, `bundle install --without development test`. Also prefer `npm ci` over `npm install` in images — it installs exactly what the lockfile says and fails loudly on drift, which is precisely what you want from a reproducible build.
 
+The rule doesn't report an install that runs under `ENV NODE_ENV=production`, because npm, pnpm and Yarn 1 skip `devDependencies` when it is set.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/avoid-dev-dependencies`

@@ -6,7 +6,7 @@ description: >-
   Why ADD with a URL in a Dockerfile is a bad idea, and the curl/wget pattern to download files into an image instead.
 ---
 
-`ADD https://…` downloads a file straight into an image layer. It looks convenient, but the download is unverified, never cache-busted correctly, and — unlike `ADD` with a local archive — a remote archive is **not** auto-extracted, so the compressed file itself lands in the layer. This rule flags every `ADD` whose source is a remote URL.
+`ADD https://…` downloads a file straight into an image layer. It looks convenient, but the download is unverified, never cache-busted correctly, and — unlike `ADD` with a local archive — a remote archive is **not** auto-extracted, so the compressed file itself lands in the layer. This rule flags every `ADD` whose source is a remote URL, unless the instruction sets `--checksum`.
 
 ## What the rule catches
 
@@ -25,11 +25,11 @@ Scanning this file reports:
 
 ## Why it matters
 
-Three separate problems stack up. **Integrity:** `ADD` gives you no place to verify a checksum, so you're trusting the remote server and the network path at every build. **Size:** the downloaded file is committed to its own layer; even if a later instruction deletes it, the bytes stay in the image history. **Caching:** Docker cannot tell whether the remote content changed, leading to stale-or-rebuilt-forever cache behavior. A `RUN curl` line fixes all three in one move.
+Three separate problems stack up. **Integrity:** without `--checksum`, nothing verifies the download, so you're trusting the remote server and the network path at every build. **Size:** the downloaded file is committed to its own layer; even if a later instruction deletes it, the bytes stay in the image history. **Caching:** Docker cannot tell whether the remote content changed, leading to stale-or-rebuilt-forever cache behavior. A `RUN curl` line fixes all three in one move.
 
 ## How to fix it
 
-Use `RUN curl` or `RUN wget` instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.
+Add `--checksum=sha256:<digest>` so BuildKit verifies the download, or use `RUN curl` or `RUN wget` and delete the downloaded archive in the same layer to minimize size.
 
 ```dockerfile title="Dockerfile — download, verify, extract, and clean in one layer"
 FROM debian:12-slim
@@ -40,6 +40,8 @@ RUN curl -fsSL https://example.com/tool.tar.gz -o /tmp/tool.tar.gz \
 ```
 
 Because the download, checksum verification, extraction, and cleanup happen inside a single `RUN`, the archive never survives into any layer — the image only contains the extracted tool. The `rm` in the bad example above does _not_ achieve this: it removes the file in a later layer while the `ADD` layer still carries the full archive.
+
+`ADD --checksum=sha256:<digest> <url> <dest>` is the other fix. BuildKit verifies the download, and the rule doesn't report it. The file still gets its own layer, so use this form for files you keep, such as a single binary. Keep `RUN curl` for archives you extract and delete.
 
 ## Rule details
 
