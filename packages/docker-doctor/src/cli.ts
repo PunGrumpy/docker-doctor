@@ -690,10 +690,13 @@ program
   .option("-c, --config <path>", "custom config file path")
   .action(async (dir, options) => {
     const isSilent = options.score || options.json;
+    // The spinner and progress lines only make sense on an interactive
+    // terminal in the default output mode.
+    const showProgress = Boolean(process.stdout.isTTY) && !isSilent;
 
     // Helper to safely show terminal cursor
     const restoreCursor = (): void => {
-      if (process.stdout.isTTY && !isSilent) {
+      if (showProgress) {
         process.stdout.write("\u001B[?25h");
       }
     };
@@ -730,7 +733,7 @@ program
         statusText = text;
       };
 
-      if (process.stdout.isTTY && !isSilent) {
+      if (showProgress) {
         // Hide cursor during progress/spinner
         process.stdout.write("\u001B[?25l");
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
@@ -743,7 +746,7 @@ program
       }
 
       try {
-        if (process.stdout.isTTY && !isSilent) {
+        if (showProgress) {
           await setTimeout(150);
         }
 
@@ -800,7 +803,7 @@ program
           process.stdout.write("\r\u001B[K\u001B[?25h");
         }
 
-        if (process.stdout.isTTY && !isSilent) {
+        if (showProgress) {
           console.log(
             `${chalk.green("✔")} Scanned ${projectFilesList.length} files in ${duration}s [~${concurrency} workers]`
           );
