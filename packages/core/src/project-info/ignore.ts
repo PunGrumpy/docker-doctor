@@ -36,6 +36,19 @@ const globToRegExp = (pattern: string): RegExp => {
   return new RegExp(`${source}$`, "u");
 };
 
+const LEADING_DOT_SLASH_RE = /^(?:\.\/)+/u;
+
+/**
+ * Accepts two spellings people bring from `.gitignore`. A leading `./` is
+ * dropped because patterns are already root-relative, and a trailing `/`
+ * means the whole directory. `vendor/` and `./vendor/**` both become
+ * `vendor/**`.
+ */
+export const normalizeIgnorePattern = (pattern: string): string => {
+  const rootRelative = pattern.replace(LEADING_DOT_SLASH_RE, "");
+  return rootRelative.endsWith("/") ? `${rootRelative}**` : rootRelative;
+};
+
 /**
  * Builds a predicate over root-relative paths from `ignore.files`
  * patterns. Windows separators in the tested path are normalized to `/`
@@ -47,7 +60,7 @@ export const createIgnoreMatcher = (
   if (!patterns || patterns.length === 0) {
     return () => false;
   }
-  const regexps = patterns.map(globToRegExp);
+  const regexps = patterns.map(normalizeIgnorePattern).map(globToRegExp);
   return (relativePath) => {
     const normalized = relativePath.replaceAll("\\", "/");
     return regexps.some((regexp) => regexp.test(normalized));

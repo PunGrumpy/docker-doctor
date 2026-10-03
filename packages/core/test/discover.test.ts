@@ -264,6 +264,56 @@ describe("discoverProject", () => {
     }
   );
 
+  const directoryPatternCases = [
+    { patterns: ["vendor/", "build/"] },
+    { patterns: ["./vendor/**", "./build/"] },
+  ];
+
+  test.each(directoryPatternCases)(
+    "$patterns ignores the whole directories",
+    async ({ patterns }) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      try {
+        writeDockerfiles(root, [
+          "app/Dockerfile",
+          "build/Dockerfile",
+          "vendor/lib/Dockerfile",
+        ]);
+
+        const project = await discoverProject(root, { ignoreFiles: patterns });
+
+        expect(project.dockerfiles).toEqual(["app/Dockerfile"]);
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
+  test.skipIf(!canTestPermissions)(
+    "a pattern ending in / prunes the directory before reading it",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+      const locked = path.join(root, "vendor", "locked");
+      try {
+        writeDockerfiles(root, ["Dockerfile", "vendor/Dockerfile"]);
+        fs.mkdirSync(locked);
+        fs.chmodSync(locked, 0o000);
+        const skipped: string[] = [];
+
+        const project = await discoverProject(root, {
+          ignoreFiles: ["vendor/"],
+          onSkippedDirectory: (dir) => skipped.push(dir),
+        });
+
+        expect(project.dockerfiles).toEqual(["Dockerfile"]);
+        expect(skipped).toEqual([]);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+
   test("examples/* ignores direct children only and does not prune", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
     try {
