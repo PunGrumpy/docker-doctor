@@ -468,6 +468,69 @@ describe("TypeScript config", () => {
   });
 });
 
+const RULES_OFF = '{ rules: { "docker-doctor/require-labels": "off" } }';
+
+const scanWithConfig = async (
+  dirPrefix: string,
+  configFile: string,
+  configSource: string
+) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), dirPrefix));
+  try {
+    fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+    fs.writeFileSync(path.join(root, configFile), configSource);
+    return await runCli([root, "--json"]);
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
+  }
+};
+
+const reportsRequireLabels = (stdout: string): boolean =>
+  JSON.parse(stdout).diagnostics.some(
+    (d: { rule: string }) => d.rule === "docker-doctor/require-labels"
+  );
+
+describe("JavaScript config", () => {
+  const configCases = [
+    {
+      file: "docker-doctor.config.mjs",
+      source: `export default ${RULES_OFF};`,
+    },
+    {
+      file: "docker-doctor.config.cjs",
+      source: `module.exports = ${RULES_OFF};`,
+    },
+    {
+      file: "docker-doctor.config.js",
+      source: `module.exports = ${RULES_OFF};`,
+    },
+  ];
+
+  test.each(configCases)("loads $file", async ({ file, source }) => {
+    const { exitCode, stderr, stdout } = await scanWithConfig(
+      "dd-jsconfig-",
+      file,
+      source
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(reportsRequireLabels(stdout)).toBe(false);
+  });
+
+  // `#` and `%` are URL syntax, so import() of a bare path under a directory
+  // named like this fails with "Cannot find module".
+  test("loads a config from a directory whose name has URL characters", async () => {
+    const { exitCode, stderr, stdout } = await scanWithConfig(
+      "dd-c#-100%-",
+      "docker-doctor.config.mjs",
+      `export default ${RULES_OFF};`
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(reportsRequireLabels(stdout)).toBe(false);
+  });
+});
+
 describe("piped --json output is not truncated", () => {
   test("--json on a piped stdout exits (does not hang) and parses", async () => {
     const { exitCode, stdout } = await runCli([

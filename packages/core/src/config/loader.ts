@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
@@ -77,7 +78,10 @@ const importConfig = async (filePath: string): Promise<unknown> => {
   }
 
   try {
-    const configModule = await import(filePath);
+    // import() takes a URL, not a path. On Windows, Node reads the drive
+    // letter of `C:\...` as a URL scheme and rejects it. On every platform
+    // it reads `#`, `?` and `%` in a path as URL syntax.
+    const configModule = await import(pathToFileURL(filePath).href);
     return configModule.default || configModule;
   } catch (error: unknown) {
     const reason = typeStrippingFailure(filePath, error);
