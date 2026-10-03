@@ -14,6 +14,69 @@ import type {
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall } from "./package-managers";
 
+interface BuildStage {
+  base: string;
+  from: DockerfileInstruction;
+  name: string | null;
+  // The RUN instructions that do not run under `ENV NODE_ENV=production`.
+  runs: DockerfileInstruction[];
+}
+
+// `ENV NODE_ENV=production` and the legacy `ENV NODE_ENV production`, quoted
+// or not, anywhere in a multi-variable ENV.
+const NODE_ENV_ASSIGNMENT_RE =
+  /(?:^|\s)NODE_ENV(?:=|\s+)["']?(?<value>[^\s"']*)/u;
+
+const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
+  const stages: BuildStage[] = [];
+  // npm, pnpm and Yarn 1 skip devDependencies when NODE_ENV is
+  // "production". A stage built FROM this one inherits the ENV.
+  const productionEnv: boolean[] = [];
+  for (const inst of instructions) {
+    if (inst.instruction === "FROM") {
+      const { base, stage } = parseFromArgs(inst.args);
+      const baseKey = base?.toLowerCase() ?? "";
+      const parent = stages.findIndex(
+        (s) => s.name !== null && s.name === baseKey
+      );
+      productionEnv.push(parent !== -1 && productionEnv[parent]);
+      stages.push({
+        base: baseKey,
+        from: inst,
+        name: stage?.toLowerCase() ?? null,
+        runs: [],
+      });
+    } else if (inst.instruction === "ENV" && stages.length > 0) {
+      const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
+      if (value !== undefined) {
+        productionEnv[stages.length - 1] = value === "production";
+      }
+    } else if (
+      inst.instruction === "RUN" &&
+      stages.length > 0 &&
+      !productionEnv[stages.length - 1]
+    ) {
+      stages.at(-1)?.runs.push(inst);
+    }
+  }
+  return stages;
+};
+
+// The default build target is the last stage, and its image contains every
+// layer of the local stages it builds FROM. Every other stage is discarded.
+const shippedStages = (stages: BuildStage[]): BuildStage[] => {
+  const shipped: BuildStage[] = [];
+  let index = stages.length - 1;
+  while (index >= 0) {
+    shipped.unshift(stages[index]);
+    const { base } = stages[index];
+    index = stages
+      .slice(0, index)
+      .findIndex((s) => s.name !== null && s.name === base);
+  }
+  return shipped;
+};
+
 export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
@@ -187,6 +250,7 @@ const NON_DEV_INSTALL_FLAGS = new Set([
   "-g",
   "--global",
   "--production",
+  "--production=true",
   "--omit=dev",
   "--only=prod",
   "--only=production",
@@ -232,49 +296,18 @@ export const avoidDevDependencies: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
-    const stages: {
-      name: string | null;
-      base: string;
-      runs: DockerfileInstruction[];
-    }[] = [];
-    for (const inst of instructions) {
-      if (inst.instruction === "FROM") {
-        const { base, stage } = parseFromArgs(inst.args);
-        stages.push({
-          base: base?.toLowerCase() ?? "",
-          name: stage?.toLowerCase() ?? null,
-          runs: [],
-        });
-      } else if (inst.instruction === "RUN" && stages.length > 0) {
-        stages.at(-1)?.runs.push(inst);
-      }
-    }
-    if (stages.length === 0) {
-      return diagnostics;
-    }
+    const stages = collectStages(instructions);
+    const finalStage = stages.at(-1);
 
-    // The default build target is the last stage, and its image contains
-    // every layer of the local stages it builds FROM — so a dev install in
-    // an inherited stage ships just like one in the final stage itself.
-    const auditedIndices: number[] = [];
-    let index = stages.length - 1;
-    while (index >= 0) {
-      auditedIndices.push(index);
-      const { base } = stages[index];
-      index = stages
-        .slice(0, index)
-        .findIndex((s) => s.name !== null && s.name === base);
-    }
-
-    const finalIndex = stages.length - 1;
-    for (const stageIndex of auditedIndices.toReversed()) {
-      const stage = stages[stageIndex];
+    // A dev install in an inherited stage ships just like one in the final
+    // stage itself.
+    for (const stage of shippedStages(stages)) {
       for (const inst of stage.runs) {
         if (!installsDevDependencies(inst.args)) {
           continue;
         }
         const where =
-          stageIndex === finalIndex
+          stage === finalStage
             ? "in the final stage"
             : `in stage '${stage.name}', whose layers the final stage inherits,`;
         diagnostics.push(

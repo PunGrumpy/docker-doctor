@@ -1529,6 +1529,8 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "bun install --production" },
     { expected: 0, run: "npm install express" },
     { expected: 0, run: "npm ci && npm run build && npm prune --production" },
+    { expected: 0, run: "yarn install --production=true" },
+    { expected: 1, run: "yarn install --production=false" },
   ];
 
   test.each(devDependencyCases)(
@@ -1541,6 +1543,56 @@ describe("Image Size Rules", () => {
       expect(diagnostics).toHaveLength(expected);
     }
   );
+
+  const nodeEnvCases = [
+    { dockerfile: "ENV NODE_ENV=production\nRUN npm ci", expected: 0 },
+    {
+      dockerfile: "ENV NODE_ENV production\nRUN yarn install --frozen-lockfile",
+      expected: 0,
+    },
+    {
+      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN pnpm install',
+      expected: 0,
+    },
+    { dockerfile: "RUN npm ci\nENV NODE_ENV=production", expected: 1 },
+    { dockerfile: "ENV NODE_ENV=development\nRUN npm ci", expected: 1 },
+    {
+      dockerfile:
+        "ENV NODE_ENV=production\nENV NODE_ENV=development\nRUN npm ci",
+      expected: 1,
+    },
+    { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
+  ];
+
+  test.each(nodeEnvCases)(
+    "avoid-dev-dependencies: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\n${dockerfile}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("avoid-dev-dependencies: ENV NODE_ENV follows the FROM chain", () => {
+    const inherited = parseDockerfile(`
+      FROM node:22-alpine AS base
+      ENV NODE_ENV=production
+      FROM base
+      RUN npm ci
+    `);
+    expect(avoidDevDependencies.check(inherited, "Dockerfile")).toHaveLength(0);
+
+    // A fresh base image does not inherit the build stage's ENV.
+    const freshBase = parseDockerfile(`
+      FROM node:22-alpine AS build
+      ENV NODE_ENV=production
+      FROM node:22-alpine
+      RUN npm ci
+    `);
+    expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
+  });
 
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
