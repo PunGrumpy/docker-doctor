@@ -398,6 +398,18 @@ describe("Security Rules", () => {
     );
   });
 
+  test("no-add-remote: a download verified with --checksum is clean", () => {
+    const verified = parseDockerfile(`
+      ADD --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool.tar.gz /tmp/
+    `);
+    expect(noAddRemote.check(verified, "Dockerfile")).toHaveLength(0);
+
+    const verifiedWithChown = parseDockerfile(`
+      ADD --chown=node:node --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool /usr/local/bin/tool
+    `);
+    expect(noAddRemote.check(verifiedWithChown, "Dockerfile")).toHaveLength(0);
+  });
+
   test("no-add-remote: remote URL with --chown flag", () => {
     const remoteAddWithChown = parseDockerfile(`
       ADD --chown=node:node https://example.com/file.txt /app/

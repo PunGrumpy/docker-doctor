@@ -209,8 +209,11 @@ export const noAddRemote: DockerfileRule = {
       if (inst.instruction === "ADD") {
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
+        // BuildKit verifies a download when ADD has `--checksum`, the form
+        // Docker's guidance recommends for remote artifacts.
+        const isVerified = parts.some((p) => p.startsWith("--checksum="));
 
-        if (!src) {
+        if (!src || isVerified) {
           continue;
         }
 
@@ -232,7 +235,7 @@ export const noAddRemote: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Use `RUN curl` or `RUN wget` instead of ADD for remote URLs, and delete the downloaded archive in the same layer to minimize size.",
+  help: "Add `--checksum=sha256:<digest>` so BuildKit verifies the download, or use `RUN curl` or `RUN wget` and delete the downloaded archive in the same layer to minimize size.",
   key: "docker-doctor/no-add-remote",
   message: "Avoid using ADD with remote URLs",
 };
