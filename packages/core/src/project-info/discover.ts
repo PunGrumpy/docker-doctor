@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { ProjectInfo } from "../types/index";
-import { createIgnoreMatcher } from "./ignore";
+import { createIgnoreMatcher, normalizeIgnorePattern } from "./ignore";
 
 // Directories that never contain a user's own Dockerfiles: VCS metadata,
 // installed dependencies, caches and build output. `build/`, `out/`,
@@ -53,6 +53,7 @@ const createPrunedDirectoryMatcher = (
 ): ((relativeDir: string) => boolean) =>
   createIgnoreMatcher(
     patterns
+      .map(normalizeIgnorePattern)
       .filter((pattern) => pattern.endsWith(SUBTREE_SUFFIX))
       .map((pattern) => pattern.slice(0, -SUBTREE_SUFFIX.length))
   );

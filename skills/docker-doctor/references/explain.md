@@ -25,10 +25,10 @@ npx @docker-doctor/cli@latest . --verbose
 
 ```bash
 npx @docker-doctor/cli@latest rules list              # every rule + category + default severity + description
-npx @docker-doctor/cli@latest rules explain <rule>    # why it matters + how to fix. FULL key required
+npx @docker-doctor/cli@latest rules explain <rule>    # why it matters + how to fix. Full key or short name
 ```
 
-> Rule references require the **full** key (`docker-doctor/no-root-user`). The bare id (`no-root-user`) is rejected. `rules list` and `rules explain` are the only `rules` subcommands — everything else is done in the config file.
+> The config file needs the **full** key (`docker-doctor/no-root-user`). A bare id (`no-root-user`) matches nothing there and prints an `Unknown rule` warning. `rules explain` accepts either form. `rules list` and `rules explain` are the only `rules` subcommands — everything else is done in the config file.
 
 ## Config shape
 

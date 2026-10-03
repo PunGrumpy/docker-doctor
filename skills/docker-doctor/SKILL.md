@@ -18,6 +18,8 @@ npx @docker-doctor/cli@latest . --score   # note the number BEFORE editing, and 
 
 The CLI scans the whole project — there is no changed-only scope — so compare the two whole-project scores. If the score dropped, fix the regressions before committing.
 
+Check the exit code as well as the number. Exit `2` means docker-doctor could not read or parse a file, so the score covers fewer files and you can't compare it with the earlier one. Fix the file named on stderr, then scan again. A warning that no Dockerfiles or Compose files were found means the scan had no files, so its `100` says nothing about the project.
+
 ## For general cleanup or code improvement:
 
 Run the full scan and fix by severity — `ERROR` first, then `WARN`, then `INFO`.
@@ -34,7 +36,7 @@ When the user types `/docker-doctor`, says "run docker doctor", or asks for a fu
 
 1. **Scan.** `npx @docker-doctor/cli@latest . --verbose` and read every diagnostic. Each one carries its rule key (e.g. `docker-doctor/no-root-user`), severity, file:line, and a `Help:` line with the canonical fix.
 2. **Triage.** Order by severity: `ERROR` → `WARN` → `INFO`. Within a severity, prefer security fixes first. Skip nothing silently — if you choose not to fix something, say why.
-3. **Fix.** Apply the `Help:` recipe from the scan output to the working tree. When you need more depth on a rule than the inline hint gives, run `npx @docker-doctor/cli@latest rules explain <rule>` (full key required, e.g. `docker-doctor/no-secrets-in-env`).
+3. **Fix.** Apply the `Help:` recipe from the scan output to the working tree. When you need more depth on a rule than the inline hint gives, run `npx @docker-doctor/cli@latest rules explain <rule>` (the full key `docker-doctor/no-secrets-in-env` or the short name `no-secrets-in-env`).
 4. **Validate.** Re-run `npx @docker-doctor/cli@latest . --verbose` and confirm the diagnostics you targeted are gone and the score rose. Repeat until errors are cleared and the score stops improving.
 
 ## Configuring or explaining rules
@@ -51,10 +53,10 @@ npx @docker-doctor/cli@latest . --verbose
 | --- | --- |
 | `.` | Directory to scan (default `.`) |
 | `--verbose`, `-v` | Show affected file, line, explanation, and fix hint per diagnostic |
-| `--score`, `-s` | Output only the numeric score (exits 1 if any error-severity diagnostic) |
-| `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic) |
+| `--score`, `-s` | Output only the numeric score (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
+| `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
 | `--config <path>`, `-c` | Use a custom config file |
 | `rules list` | List every rule with its category, default severity, and description |
-| `rules explain <rule>` | Explain one rule + its fix. Requires the **full** key (`docker-doctor/no-root-user`), not the bare id |
+| `rules explain <rule>` | Explain one rule + its fix. Accepts the full key (`docker-doctor/no-root-user`) or the short name (`no-root-user`) |
 
-> The default scan exits non-zero when any `ERROR`-severity diagnostic is present — useful as a CI gate. Inside this repo (monorepo source), run the CLI with `bun packages/docker-doctor/src/cli.ts` instead of `npx`.
+> The default scan exits non-zero when any `ERROR`-severity diagnostic is present — useful as a CI gate. Exit `2` means a discovered file could not be read or parsed. Inside this repo (monorepo source), run the CLI with `bun packages/docker-doctor/src/cli.ts` instead of `npx`.
