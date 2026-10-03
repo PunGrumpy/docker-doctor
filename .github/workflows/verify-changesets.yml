@@ -32,7 +32,10 @@ jobs:
   verify-changesets:
     name: Verify Changesets
     runs-on: ubuntu-latest
-    if: ${{ github.head_ref != 'changeset-release/main' && !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
+    # The branch name alone does not prove this is the Version Packages PR.
+    # A fork can use the same name, so the exemption also requires this
+    # repository.
+    if: ${{ !(github.head_ref == 'changeset-release/main' && github.event.pull_request.head.repo.full_name == github.repository) && !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
