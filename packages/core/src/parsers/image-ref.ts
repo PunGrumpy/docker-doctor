@@ -9,7 +9,10 @@ export interface ImageRef {
 }
 
 export const parseImageRef = (ref: string): ImageRef => {
-  if (ref.includes("${") || ref.startsWith("$")) {
+  // `$` is not valid in an image reference, so any `$` means a build
+  // argument or Compose interpolation. `node:$NODE_VERSION` counts as much
+  // as `node:${NODE_VERSION}`.
+  if (ref.includes("$")) {
     return { isVariable: true, name: ref };
   }
 

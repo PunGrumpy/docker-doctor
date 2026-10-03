@@ -1369,6 +1369,14 @@ describe("Image Size Rules", () => {
     expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
   });
 
+  test("prefer-slim-base skips a tag that is a build argument", () => {
+    const variableTag = parseDockerfile(`
+      ARG NODE_VERSION=22-alpine
+      FROM node:$NODE_VERSION
+    `);
+    expect(preferSlimBase.check(variableTag, "Dockerfile")).toHaveLength(0);
+  });
+
   test("prefer-slim-base recognizes minimal images by name", () => {
     const minimal = parseDockerfile(`
       FROM alpine:3.19
