@@ -1940,6 +1940,28 @@ describe("Best Practices Rules", () => {
     }
   );
 
+  const useraddCases = [
+    { expected: 0, run: "useradd -l -r -u 1001 app" },
+    { expected: 0, run: "useradd -rl -u 1001 app" },
+    {
+      expected: 0,
+      run: "groupadd -r app && useradd --no-log-init -r -g app app",
+    },
+    { expected: 1, run: "useradd app && ls -l /home" },
+    { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
+  ];
+
+  test.each(useraddCases)(
+    "useradd-no-log-init: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("useradd-no-log-init", () => {
     const withoutFlag = parseDockerfile(`
       RUN useradd -r -g mygroup myuser

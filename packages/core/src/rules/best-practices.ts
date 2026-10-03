@@ -432,16 +432,29 @@ export const sortMultilineArgs: DockerfileRule = {
   message: "Sort multi-line arguments alphanumerically",
 };
 
+const USERADD_COMMAND_RE = /\buseradd\b/u;
+// `-l` is the short spelling of `--no-log-init`, and short options cluster
+// (`useradd -rl app`).
+const NO_LOG_INIT_FLAG_RE =
+  /(?:^|\s)(?:--no-log-init|-[A-Za-z]*l[A-Za-z]*)(?=\s|$)/u;
+
+// True when a `useradd` command in this RUN writes the login logs. The flag
+// must belong to the same command as `useradd`, so `useradd app && ls -l`
+// has none.
+const useraddWritesLoginLogs = (args: string): boolean =>
+  args
+    .split(SHELL_SEPARATOR_RE)
+    .some(
+      (command) =>
+        USERADD_COMMAND_RE.test(command) && !NO_LOG_INIT_FLAG_RE.test(command)
+    );
+
 export const useraddNoLogInit: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
-      if (
-        inst.instruction === "RUN" &&
-        /\buseradd\b/u.test(inst.args) &&
-        !inst.args.includes("--no-log-init")
-      ) {
+      if (inst.instruction === "RUN" && useraddWritesLoginLogs(inst.args)) {
         diagnostics.push(
           createDiagnostic(
             file,
@@ -457,7 +470,7 @@ export const useraddNoLogInit: DockerfileRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Pass `--no-log-init` flag to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).",
+  help: "Pass `--no-log-init` or its short form `-l` to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).",
   key: "docker-doctor/useradd-no-log-init",
   message: "Use --no-log-init with useradd",
 };
