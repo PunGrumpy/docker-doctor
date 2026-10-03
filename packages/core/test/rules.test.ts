@@ -2332,3 +2332,50 @@ describe("Best Practices Rules", () => {
     expect(requireLabels.check(withOciLabels, "Dockerfile")).toHaveLength(0);
   });
 });
+
+describe("BuildKit RUN flags", () => {
+  const CACHE_MOUNT = "--mount=type=cache,target=/root/.npm";
+
+  const devInstallCases = [
+    { expected: 1, run: `${CACHE_MOUNT} npm ci` },
+    { expected: 0, run: `${CACHE_MOUNT} npm ci --omit=dev` },
+    {
+      expected: 1,
+      run: "--mount=type=cache,target=/pnpm/store --network=default pnpm install --frozen-lockfile",
+    },
+  ];
+
+  test.each(devInstallCases)(
+    "avoid-dev-dependencies: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("avoid-run-cd sees the command behind a RUN flag", () => {
+    const withMount = parseDockerfile(`RUN ${CACHE_MOUNT} cd /app && npm ci`);
+    expect(avoidRunCd.check(withMount, "Dockerfile")).toHaveLength(1);
+
+    const noCd = parseDockerfile(`RUN ${CACHE_MOUNT} npm ci`);
+    expect(avoidRunCd.check(noCd, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("use-multi-stage sees a build step behind a RUN flag", () => {
+    const withMount = parseDockerfile(`
+      FROM gcc:14
+      RUN --mount=type=cache,target=/ccache make all
+    `);
+    expect(useMultiStage.check(withMount, "Dockerfile")).toHaveLength(1);
+
+    // Installing the tool is still not a build step.
+    const installsMake = parseDockerfile(`
+      FROM alpine:3.20
+      RUN --mount=type=cache,target=/var/cache/apk apk add make
+    `);
+    expect(useMultiStage.check(installsMake, "Dockerfile")).toHaveLength(0);
+  });
+});

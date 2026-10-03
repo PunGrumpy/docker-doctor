@@ -1,5 +1,6 @@
 import { parseExecForm } from "../parsers/exec-form";
 import { isScratch, parseFromArgs } from "../parsers/image-ref";
+import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
@@ -343,7 +344,7 @@ export const avoidRunCd: DockerfileRule = {
       // about shell-form layering.
       if (
         inst.instruction === "RUN" &&
-        CD_COMMAND_RE.test(maskQuotedText(inst.args))
+        CD_COMMAND_RE.test(maskQuotedText(stripRunFlags(inst.args)))
       ) {
         diagnostics.push(
           createDiagnostic(

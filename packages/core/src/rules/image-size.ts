@@ -5,6 +5,7 @@ import {
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
+import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import type {
   Diagnostic,
@@ -302,7 +303,7 @@ const segmentInstallsDevDependencies = (segment: string): boolean => {
 
 const installsDevDependencies = (args: string): boolean =>
   !args.includes("prune") &&
-  maskQuotedText(args)
+  maskQuotedText(stripRunFlags(args))
     .split(SHELL_SEPARATOR_RE)
     .some(segmentInstallsDevDependencies);
 
