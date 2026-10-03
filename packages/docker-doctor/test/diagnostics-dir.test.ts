@@ -84,6 +84,25 @@ describe("writeDiagnosticsDirectory", () => {
     });
   });
 
+  test("the directory ignores itself", async () => {
+    await withTempRoot(async (root) => {
+      const diagnostics = [makeDiagnostic()];
+
+      await writeDiagnosticsDirectory(
+        diagnostics,
+        makeReport(diagnostics),
+        root
+      );
+
+      expect(
+        fs.readFileSync(
+          path.join(root, ".docker-doctor", ".gitignore"),
+          "utf-8"
+        )
+      ).toBe("*\n");
+    });
+  });
+
   test("diagnostics.json carries the same sanitized message and path as the .txt file", async () => {
     await withTempRoot(async (root) => {
       const diagnostics = [

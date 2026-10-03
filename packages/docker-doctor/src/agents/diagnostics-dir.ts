@@ -65,6 +65,11 @@ export const writeDiagnosticsDirectory = async (
     })),
   };
 
+  // The directory ignores itself. When the scanned directory is a
+  // subdirectory of a repository, the .gitignore handling below finds no
+  // `.git` and adds nothing.
+  await fs.writeFile(path.join(dir, ".gitignore"), "*\n", "utf-8");
+
   await fs.writeFile(
     path.join(dir, "diagnostics.json"),
     JSON.stringify({ note: TRUST_BOUNDARY_NOTE, ...sanitizedReport }, null, 2),
