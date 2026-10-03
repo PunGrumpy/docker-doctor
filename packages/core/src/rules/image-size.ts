@@ -100,6 +100,17 @@ const cacheMountTargets = (args: string): string[] =>
         .map((option) => option.slice(option.indexOf("=") + 1))
     );
 
+// A recursive `rm` and its operands, which end at the next shell separator.
+// `rm -rf`, `rm -fr`, `rm -r` and `rm -Rf` all count.
+const RECURSIVE_RM_RE =
+  /\brm\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*[rR][A-Za-z]*\s(?<operands>[^;&|]*)/gu;
+
+// `rm -rf /tmp/* <dir>/*` removes <dir> as much as `rm -rf <dir>/*` does.
+const removesRecursively = (args: string, dir: string): boolean =>
+  [...args.matchAll(RECURSIVE_RM_RE)].some((match) =>
+    (match.groups?.operands ?? "").includes(dir)
+  );
+
 const APT_CACHE_DIRS = ["/var/lib/apt", "/var/cache/apt"];
 const APK_CACHE_DIRS = ["/var/cache/apk", "/etc/apk/cache"];
 
@@ -120,7 +131,7 @@ export const cleanPackageCache: DockerfileRule = {
         // check apt-get install without cleanup
         if (
           hasAptGetInstall(args) &&
-          !args.includes("rm -rf /var/lib/apt/lists") &&
+          !removesRecursively(args, "/var/lib/apt/lists") &&
           !hasCacheMountFor(args, APT_CACHE_DIRS)
         ) {
           diagnostics.push(
@@ -139,7 +150,7 @@ export const cleanPackageCache: DockerfileRule = {
         if (
           args.includes("apk add") &&
           !args.includes("--no-cache") &&
-          !args.includes("rm -rf /var/cache/apk") &&
+          !removesRecursively(args, "/var/cache/apk") &&
           !hasCacheMountFor(args, APK_CACHE_DIRS)
         ) {
           diagnostics.push(

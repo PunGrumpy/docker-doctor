@@ -1458,6 +1458,39 @@ describe("Image Size Rules", () => {
     }
   );
 
+  const APT_INSTALL = "apt-get update && apt-get install -y curl";
+  const cacheCleanupCases = [
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm -rf /tmp/* /var/lib/apt/lists/*`,
+    },
+    { expected: 0, run: `${APT_INSTALL} && rm -fr /var/lib/apt/lists/*` },
+    { expected: 0, run: `${APT_INSTALL} && rm -r /var/lib/apt/lists/*` },
+    { expected: 0, run: `${APT_INSTALL} && rm -Rf /var/lib/apt/lists/*` },
+    { expected: 1, run: `${APT_INSTALL} && rm -f /var/lib/apt/lists/lock` },
+    { expected: 1, run: `${APT_INSTALL} && apt-get clean` },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && rm -rf /tmp/x && echo /var/lib/apt/lists`,
+    },
+    { expected: 0, run: "apk add curl && rm -rf /tmp/* /var/cache/apk/*" },
+    {
+      expected: 1,
+      run: "apk add curl && rm -f /var/cache/apk/APKINDEX.tar.gz",
+    },
+  ];
+
+  test.each(cacheCleanupCases)(
+    "clean-package-cache: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder
