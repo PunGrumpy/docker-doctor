@@ -89,6 +89,6 @@ npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user
 
 ## Interactive mode
 
-When run in a TTY without `--score` or `--json`, docker-doctor shows a spinner while scanning and, after printing results, offers to scaffold a `.github/workflows/docker-doctor.yml` CI workflow for you.
+When run in a TTY without `--score` or `--json`, docker-doctor shows a spinner while scanning and, after printing results, offers to scaffold a `.github/workflows/docker-doctor.yml` CI workflow for you. It writes the workflow at the root of the repository that contains the scanned directory. When you scan a subdirectory, the workflow passes that path as the action's `directory` input.
 
 If the scan found issues, it then offers to hand them to a coding agent detected on your machine — launching the agent with the issues as its prompt — or to copy that prompt to your clipboard. See the [Coding Agents guide](/docs/guides/coding-agents).
