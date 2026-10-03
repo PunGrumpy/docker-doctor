@@ -1779,6 +1779,24 @@ describe("Best Practices Rules", () => {
     expect(usePipefail.check(quotedPipe, "Dockerfile")).toHaveLength(0);
   });
 
+  const workdirCases = [
+    { expected: 0, workdir: '"/app"' },
+    { expected: 0, workdir: "'/my app'" },
+    { expected: 1, workdir: '"app"' },
+    { expected: 1, workdir: "app" },
+  ];
+
+  test.each(workdirCases)(
+    "absolute-workdir: WORKDIR $workdir reports $expected",
+    ({ expected, workdir }) => {
+      const diagnostics = absoluteWorkdir.check(
+        parseDockerfile(`WORKDIR ${workdir}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("absolute-workdir", () => {
     const relative = parseDockerfile(`
       WORKDIR app/src

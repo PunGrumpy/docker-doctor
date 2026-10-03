@@ -296,13 +296,19 @@ export const usePipefail: DockerfileRule = {
   message: "Use pipefail to catch pipeline command failures",
 };
 
+// BuildKit strips one pair of surrounding quotes from the WORKDIR path, which
+// is how a path with spaces is written: `WORKDIR "/my app"`.
+const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/u;
+
 export const absoluteWorkdir: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     for (const inst of instructions) {
       if (inst.instruction === "WORKDIR") {
-        const path = inst.args.trim();
+        const trimmed = inst.args.trim();
+        const path =
+          trimmed.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? trimmed;
         const isAbsolute = /^(?:\/|\\|\$|[a-zA-Z]:)/u.test(path);
 
         if (!isAbsolute) {
