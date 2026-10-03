@@ -62,11 +62,15 @@ jobs:
             echo "Kit version: ${base:-<none>} -> $head (bumped in this PR)"
             exit 0
           fi
-          if git diff --name-only --diff-filter=A "$BASE_SHA" HEAD -- '.changeset/*.md' \
-            | xargs -r grep -lE '^"?docker-doctor-kit"?:' >/dev/null; then
-            echo "Found a changeset for docker-doctor-kit."
-            exit 0
-          fi
+          # Read each added changeset from HEAD. An empty list must not pass.
+          # `xargs -r grep` skips grep when nothing was added, and the
+          # pipeline then exits 0.
+          for changeset in $(git diff --name-only --diff-filter=A "$BASE_SHA" HEAD -- '.changeset/*.md'); do
+            if git show "HEAD:$changeset" | grep -qE '^"?docker-doctor-kit"?:'; then
+              echo "Found a changeset for docker-doctor-kit: $changeset"
+              exit 0
+            fi
+          done
           echo "::error::This PR changes the kit without a changeset — run \`bunx changeset\` and pick docker-doctor-kit (minor for new behavior, patch for fixes)."
           exit 1
 
