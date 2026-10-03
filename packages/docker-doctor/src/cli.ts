@@ -400,6 +400,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   const payload = buildHandoffPayload({
     diagnostics: context.diagnostics,
+    projectDir: context.rootDir,
     projectName: path.basename(context.rootDir),
   });
 
@@ -418,7 +419,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const agentId = launchable[choice];
 
   const confirmedLaunch = await askConfirm(
-    `Launch ${AGENT_BINARIES[agentId]} with ${AGENT_AUTO_FLAGS[agentId].join(" ")}? It will edit files without asking for approval.`
+    `Launch ${AGENT_BINARIES[agentId]} with ${AGENT_AUTO_FLAGS[agentId].join(" ")} in ${context.rootDir}? It will edit files without asking for approval.`
   );
   if (!confirmedLaunch) {
     printAgentPrompt(payload);
@@ -434,7 +435,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
     );
   }
   console.log(`\n  Handing off to ${agentDisplayName(agentId)}...\n`);
-  const launched = await launchAgent(agentId, payload);
+  const launched = await launchAgent(agentId, payload, context.rootDir);
   if (!launched) {
     console.log(
       `  ${chalk.yellow("⚠")} Couldn't launch ${AGENT_BINARIES[agentId]}. Here's the prompt instead:`

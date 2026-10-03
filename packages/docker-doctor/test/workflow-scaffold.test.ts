@@ -56,6 +56,47 @@ describe("scaffoldActionWorkflow", () => {
     }
   });
 
+  test("a scan of a repository subdirectory writes the workflow at the repository root", async () => {
+    const { root, read, cleanup } = makeProject({ withWorkflow: false });
+    const scanned = path.join(root, "services", "api");
+    try {
+      fs.mkdirSync(path.join(root, ".git"));
+      fs.mkdirSync(scanned, { recursive: true });
+
+      const status = await scaffoldActionWorkflow({
+        actionRef: ACTION_REF,
+        confirmOverwrite: neverCalled,
+        rootDir: scanned,
+      });
+
+      expect(status).toBe("created");
+      expect(read()).toContain(
+        `      - uses: ${ACTION_REF}\n        with:\n          directory: "services/api"\n`
+      );
+      expect(fs.existsSync(path.join(scanned, ".github"))).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("a scan of the repository root passes no directory input", async () => {
+    const { root, read, cleanup } = makeProject({ withWorkflow: false });
+    try {
+      fs.mkdirSync(path.join(root, ".git"));
+
+      await scaffoldActionWorkflow({
+        actionRef: ACTION_REF,
+        confirmOverwrite: neverCalled,
+        rootDir: root,
+      });
+
+      expect(read()).not.toContain("with:");
+      expect(read().endsWith(`      - uses: ${ACTION_REF}\n`)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
   test("keeps an existing workflow when the overwrite is declined", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: true });
     try {

@@ -24,6 +24,8 @@ const SEVERITY_LABEL: Record<Diagnostic["severity"], string> = {
 
 export interface HandoffPayloadInput {
   diagnostics: Diagnostic[];
+  // The scanned directory. Every file path in the prompt is relative to it.
+  projectDir: string;
   projectName: string;
 }
 
@@ -44,6 +46,7 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
   const ruleWord = groups.length === 1 ? "rule" : "rules";
   const lines: string[] = [
     `Fix the ${issueCount} Docker Doctor ${issueWord} (${groups.length} ${ruleWord}) in ${sanitizePath(input.projectName)}.`,
+    `Every path below is relative to ${sanitizePath(input.projectDir)}. Work from that directory.`,
     TRUST_BOUNDARY_NOTE,
     "",
   ];

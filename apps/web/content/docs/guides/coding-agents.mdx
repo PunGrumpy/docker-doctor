@@ -65,15 +65,15 @@ When an interactive scan finds issues, Docker Doctor asks what to do next:
   Skip
 ```
 
-- **&lt;agent name&gt;** — shown for each agent CLI found on your `PATH` (`claude`, `codex`, `cursor-agent`). Docker Doctor installs the skill for that agent, then launches it in your terminal with a prompt describing every issue, its fix, and the affected files. The agent runs in its auto-approve mode so it can fix the issues end-to-end.
+- **&lt;agent name&gt;** — shown for each agent CLI found on your `PATH` (`claude`, `codex`, `cursor-agent`). Docker Doctor installs the skill for that agent, then launches it in your terminal, in the directory you scanned, with a prompt describing every issue, its fix, and the affected files. The agent runs in its auto-approve mode so it can fix the issues end-to-end. Before it launches, Docker Doctor names the flag and the directory and asks you to confirm.
 - **Copy prompt to clipboard** — copies the same prompt so you can paste it into any agent or chat.
 - **Skip** — do nothing.
 
 ## The `.docker-doctor/` report directory
 
-Before handing off, Docker Doctor writes the full scan results to `.docker-doctor/` in your project root:
+Before handing off, Docker Doctor writes the full scan results to `.docker-doctor/` in the directory you scanned:
 
 - `diagnostics.json` — the same report as `--json`
 - one `.txt` per rule with the fix recipe and every affected file
 
-The prompt references this directory so the agent can read past the inline summary. Docker Doctor adds `.docker-doctor/` to your `.gitignore` automatically (only if the project is a git repository and the entry is missing).
+The prompt references this directory so the agent can read past the inline summary. Docker Doctor adds `.docker-doctor/` to your `.gitignore` automatically (only if the project is a git repository and the entry is missing). The directory also contains its own `.gitignore`, so it stays out of version control when you scan a subdirectory of a repository.
