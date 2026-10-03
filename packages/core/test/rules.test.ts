@@ -896,6 +896,65 @@ describe("Compose Security Rules", () => {
     expect(diags[0].line).toBe(4);
   });
 
+  const privilegedSpellingCases = [
+    { expected: 1, value: "true" },
+    { expected: 1, value: '"true"' },
+    { expected: 1, value: "yes" },
+    { expected: 1, value: "'yes'" },
+    { expected: 1, value: "on" },
+    { expected: 1, value: "Y" },
+    { expected: 0, value: "false" },
+    { expected: 0, value: '"false"' },
+    { expected: 0, value: "no" },
+    { expected: 0, value: "off" },
+  ];
+
+  test.each(privilegedSpellingCases)(
+    "no-privileged-service: privileged: $value reports $expected",
+    ({ expected, value }) => {
+      const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    privileged: ${value}
+`;
+      const diagnostics = noPrivilegedService.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+      expect(diagnostics).toHaveLength(expected);
+      expect(diagnostics.map((d) => d.line)).toEqual(expected === 1 ? [4] : []);
+    }
+  );
+
+  const readOnlySpellingCases = [
+    { expected: 0, value: "true" },
+    { expected: 0, value: '"true"' },
+    { expected: 0, value: "yes" },
+    { expected: 1, value: "false" },
+    { expected: 1, value: '"no"' },
+  ];
+
+  test.each(readOnlySpellingCases)(
+    "prefer-read-only-bind-mount: read_only: $value reports $expected",
+    ({ expected, value }) => {
+      const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - type: bind
+        source: /opt/data
+        target: /data
+        read_only: ${value}
+`;
+      const diagnostics = preferReadOnlyBindMount.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("no-privileged-service: privileged false or absent is clean", () => {
     const composeContent = {
       services: {
