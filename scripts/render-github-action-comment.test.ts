@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   readContext,
   readReportText,
+  renderComment,
   renderFailure,
   renderReport,
   safeLabel,
@@ -58,20 +59,39 @@ const diagnostic = (
 
 // Goes through readReportText like the action does, so every case also
 // covers the parsing and normalization of the untrusted report file.
-const render = (env: Record<string, string>, report: TestReport) => {
+const parseReport = (report: TestReport) => {
   const parsed = readReportText(JSON.stringify(report));
   if (parsed === null) {
     throw new Error("test report failed validation");
   }
-  return renderReport(
+  return parsed;
+};
+
+const render = (env: Record<string, string>, report: TestReport) =>
+  renderReport(
     readContext({
       DOCTOR_HEAD_SHA: "abcdef1234567",
       GITHUB_EVENT_NAME: "pull_request",
       GITHUB_REPOSITORY: "o/r",
       ...env,
     }),
-    parsed
+    parseReport(report)
   );
+
+const manyFiles = (count: number, directory: string): TestReport => {
+  const dockerfiles = Array.from(
+    { length: count },
+    (_, index) => `${directory}${index}/Dockerfile`
+  );
+  return makeReport({
+    diagnostics: dockerfiles.map((file) => ({
+      ...diagnostic("warning"),
+      file,
+    })),
+    label: "Critical 🚨",
+    project: { composeFiles: [], dockerfiles },
+    score: 0,
+  });
 };
 
 const dockerfileRow = (body: string): string | undefined =>
@@ -216,6 +236,51 @@ describe("untrusted report fields", () => {
   test("safeLabel keeps only the known score buckets", () => {
     expect(safeLabel("Good ✅")).toBe("Good");
     expect(safeLabel("Bogus")).toBe("");
+  });
+});
+
+describe("comment size", () => {
+  // GitHub rejects an issue comment longer than this.
+  const GITHUB_COMMENT_LIMIT = 65_536;
+  const context = readContext({
+    DOCTOR_HEAD_SHA: "abcdef1234567",
+    GITHUB_EVENT_NAME: "pull_request",
+    GITHUB_REPOSITORY: "o/r",
+  });
+
+  test("a small report is the same in the comment and the job summary", () => {
+    const report = parseReport(
+      makeReport({ diagnostics: [diagnostic("warning")] })
+    );
+
+    expect(renderComment(context, report).body).toBe(
+      renderReport(context, report).body
+    );
+  });
+
+  test("a 300-file report drops table rows until the comment fits", () => {
+    const report = parseReport(manyFiles(300, "services/svc"));
+    const full = renderReport(context, report);
+    const comment = renderComment(context, report);
+
+    expect(full.body.length).toBeGreaterThan(GITHUB_COMMENT_LIMIT);
+    expect(comment.body.length).toBeLessThanOrEqual(GITHUB_COMMENT_LIMIT);
+    expect(comment.body).toContain("more files not listed here");
+    expect(comment.body).toContain("**Score:**");
+    // The gate and the counts never depend on how much was rendered.
+    expect(comment.outputs).toEqual(full.outputs);
+  });
+
+  test("very long paths fall back to the score line", () => {
+    const report = parseReport(
+      manyFiles(300, "long-directory-name-".repeat(15))
+    );
+    const comment = renderComment(context, report);
+
+    expect(comment.body.length).toBeLessThanOrEqual(GITHUB_COMMENT_LIMIT);
+    expect(comment.body).toContain("too long for a comment");
+    expect(comment.body).toContain("0 errors · 300 warnings");
+    expect(comment.outputs["warning-count"]).toBe("300");
   });
 });
 

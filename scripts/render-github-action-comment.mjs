@@ -26,6 +26,12 @@ const SHORT_SHA_LENGTH = 7;
 const MAX_SCORE = 100;
 // The CLI exits 2 when it could not read or parse a discovered file.
 const SCAN_INCOMPLETE_EXIT_STATUS = "2";
+// GitHub rejects an issue comment longer than 65,536 characters. The margin
+// covers characters GitHub counts as more than one.
+const MAX_COMMENT_LENGTH = 60_000;
+// How many rows the collapsed "more files" table may hold, tried in order
+// until the comment fits. The job summary always gets the full table.
+const OVERFLOW_ROW_STEPS = [Number.POSITIVE_INFINITY, 100, 40, 0];
 
 export const readContext = (env = process.env) => ({
   blocking: env.DOCTOR_BLOCKING ?? "none",
@@ -262,7 +268,7 @@ const TABLE_HEADER = [
   "| :--- | :----- | :----- | :------ |",
 ];
 
-const buildTable = (ctx, report) => {
+const buildTable = (ctx, report, maxOverflowRows) => {
   const failureMessages = new Map(
     report.failures.map(({ file, message }) => [file, message])
   );
@@ -287,17 +293,27 @@ const buildTable = (ctx, report) => {
     ...TABLE_HEADER,
     ...rows.slice(0, MAX_TABLE_ROWS).map((row) => row.markdown),
   ];
+  // Rows are sorted worst first, so the ones a cap leaves out are the files
+  // with the least to report.
   const overflow = rows.slice(MAX_TABLE_ROWS);
-  if (overflow.length > 0) {
+  const listed = overflow.slice(0, maxOverflowRows);
+  if (listed.length > 0) {
     lines.push(
       "",
       "<details>",
-      `<summary>${plural(overflow.length, "more file")}</summary>`,
+      `<summary>${plural(listed.length, "more file")}</summary>`,
       "",
       ...TABLE_HEADER,
-      ...overflow.map((row) => row.markdown),
+      ...listed.map((row) => row.markdown),
       "",
       "</details>"
+    );
+  }
+  const unlisted = overflow.length - listed.length;
+  if (unlisted > 0) {
+    lines.push(
+      "",
+      `…and ${plural(unlisted, "more file")} not listed here. The job summary of this workflow run has the full table.`
     );
   }
   return lines;
@@ -405,7 +421,11 @@ const gateStatus = (ctx, { errors, incomplete, warnings }) => {
   return "0";
 };
 
-export const renderReport = (ctx, report) => {
+export const renderReport = (
+  ctx,
+  report,
+  { maxOverflowRows = Number.POSITIVE_INFINITY } = {}
+) => {
   const count = (severity) =>
     report.diagnostics.filter((d) => d.severity === severity).length;
   const errors = count("error");
@@ -425,7 +445,7 @@ export const renderReport = (ctx, report) => {
       `**Docker Doctor** found no Dockerfiles or Compose files in \`${sanitizeText(ctx.scanDirectory)}\`.`
     );
   } else {
-    lines.push(...buildTable(ctx, report), "");
+    lines.push(...buildTable(ctx, report, maxOverflowRows), "");
     if (incomplete) {
       lines.push(incompleteNotice(failureCount), "");
     }
@@ -461,6 +481,32 @@ export const renderReport = (ctx, report) => {
   };
 };
 
+// The PR comment has a hard size limit and the job summary does not, so the
+// comment drops rows from the collapsed table until it fits. Past the last
+// step (enormous file paths) it falls back to the score line alone.
+export const renderComment = (ctx, report) => {
+  for (const maxOverflowRows of OVERFLOW_ROW_STEPS) {
+    const rendered = renderReport(ctx, report, { maxOverflowRows });
+    if (rendered.body.length <= MAX_COMMENT_LENGTH) {
+      return rendered;
+    }
+  }
+  const { outputs } = renderReport(ctx, report);
+  return {
+    body: [
+      MARKER,
+      INTRO,
+      "",
+      `**Score:** ${outputs.score} / 100 · ${plural(Number(outputs["error-count"]), "error")} · ${plural(Number(outputs["warning-count"]), "warning")}`,
+      "",
+      "The full report is too long for a comment. The job summary of this workflow run has it.",
+      "",
+      footer(ctx),
+    ].join("\n"),
+    outputs,
+  };
+};
+
 export const main = (ctx = readContext()) => {
   const report =
     ctx.reportFile && existsSync(ctx.reportFile)
@@ -471,7 +517,7 @@ export const main = (ctx = readContext()) => {
     : renderFailure(ctx);
 
   const commentFile = path.join(ctx.runnerTemp, "docker-doctor-comment.md");
-  writeFileSync(commentFile, body);
+  writeFileSync(commentFile, report ? renderComment(ctx, report).body : body);
   outputs["comment-file"] = commentFile;
 
   if (ctx.githubOutput) {
