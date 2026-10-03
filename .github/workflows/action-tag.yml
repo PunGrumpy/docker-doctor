@@ -24,21 +24,25 @@ on:
       - action.yml
       - scripts/render-github-action-comment.mjs
 
-permissions:
-  contents: write
+# No default permissions. Each job declares its own.
+permissions: {}
 
 concurrency:
   group: action-tag
   cancel-in-progress: false
 
 jobs:
-  tag:
+  # The smoke test runs the published CLI through npx, which is code fetched
+  # from npm at run time. It gets a read-only token and no stored
+  # credentials, so nothing it runs can push a tag.
+  smoke:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          persist-credentials: false
 
       # Smoke-test the action at this exact SHA before pointing every
       # consumer at it: scan a fixture with known findings and require a
@@ -50,6 +54,7 @@ jobs:
           directory: packages/docker-doctor/test/fixtures/with-error
           blocking: none
           comment: "false"
+          commit-status: "false"
 
       - name: Assert the smoke test produced results
         env:
@@ -60,6 +65,17 @@ jobs:
             echo "::error::Action smoke test returned no results (score='$SMOKE_SCORE', total-issues='$SMOKE_TOTAL') — not tagging"
             exit 1
           fi
+
+  tag:
+    needs: smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       # Classify from the merged PR's title — a merge commit subject like
       # "Merge pull request #N" would silently downgrade every bump to a
