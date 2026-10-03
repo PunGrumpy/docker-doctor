@@ -38,7 +38,7 @@ The same rules apply to the default scan, `--score`, and `--json`:
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Scan complete, no `error`-severity diagnostics |
+| `0` | Scan complete, no `error`-severity diagnostics. Also returned when docker-doctor finds no Dockerfile or Compose file. The terminal output says so, and `--json` and `--score` print a warning on stderr. |
 | `1` | Scan complete, at least one `error`-severity diagnostic. In interactive mode, also returned when docker-doctor can't write the workflow scaffold, the `.docker-doctor/` handoff files or the `.gitignore` entry for them. |
 | `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures` (report `schemaVersion` 4). |
 | `130` / `143` | Interrupted (SIGINT / SIGTERM) |

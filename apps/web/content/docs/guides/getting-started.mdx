@@ -29,6 +29,15 @@ You can point it at any directory:
 npx @docker-doctor/cli@latest ./path/to/project
 ```
 
+docker-doctor searches that directory and its subdirectories for these file names. Letter case doesn't matter:
+
+| Kind | File names |
+| --- | --- |
+| Dockerfile | `Dockerfile`, `Dockerfile.*` (such as `Dockerfile.dev`) and `*.dockerfile` |
+| Compose | `compose.yaml`, `docker-compose.yaml` and variants such as `compose.prod.yaml` or `docker-compose.override.yaml`, with `.yaml` or `.yml` |
+
+docker-doctor doesn't scan files with other names, such as `Containerfile` or `Dockerfile-prod`. When no file matches, it says so instead of printing a score.
+
 ## Read the output
 
 A scan prints how many issues it found per category, then the health score with its label. A scan of the `packages/docker-doctor/test/fixtures/with-error` fixture in the docker-doctor repository prints:
