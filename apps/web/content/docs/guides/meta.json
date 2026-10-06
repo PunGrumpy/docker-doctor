@@ -4,6 +4,9 @@
     "getting-started",
     "coding-agents",
     "docker-sandboxes",
-    "github-actions"
+    "github-actions",
+    "ci-and-git-hooks",
+    "comparison",
+    "faq"
   ]
 }

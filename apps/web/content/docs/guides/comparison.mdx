@@ -1,0 +1,75 @@
+---
+title: Comparison
+description: How docker-doctor relates to hadolint, Docker build checks, DCLint and infrastructure scanners, and when to run them together.
+---
+
+docker-doctor is not the only tool that reads a Dockerfile. This page says what each tool is good at, so you can pick one or run several side by side. None of them replaces the others.
+
+## At a glance
+
+|  | docker-doctor | hadolint | Docker build checks | DCLint | Trivy, Checkov |
+| --- | --- | --- | --- | --- | --- |
+| Dockerfile rules | Yes | Yes | Yes | No | Yes |
+| Docker Compose rules | Yes | No | No | Yes | No |
+| Shell linting inside `RUN` | No | Yes, through ShellCheck | No | No | No |
+| Fixes files in place | No | No | No | Yes | No |
+| Scans built images for CVEs | No | No | No | No | Trivy does |
+| Health score from 0 to 100 | Yes | No | No | No | No |
+| Skill for coding agents | Yes | No | No | No | No |
+| Needs Docker installed | No | No | Yes | No | No |
+| Runtime | Node.js 22.18 or later | Single binary | Docker with Buildx | Node.js or Docker | Single binary or Python |
+
+## hadolint
+
+[hadolint](https://github.com/hadolint/hadolint) is the long-standing Dockerfile linter. It ships as one binary, has a large rule set, and uses ShellCheck to lint the shell code inside `RUN` instructions. It also writes reports in formats such as SARIF, Checkstyle and JUnit.
+
+Choose hadolint when you want deep shell linting, a binary with no runtime, or one of those report formats.
+
+About half of docker-doctor's 21 Dockerfile rules have a hadolint equivalent. Both tools flag a container that runs as root, an unpinned base image, `ADD` where `COPY` would do, shell-form `CMD`, a missing `pipefail`, `cd` inside `RUN` and `useradd` without `--no-log-init`. If you already run hadolint, those findings are not new.
+
+What docker-doctor adds:
+
+- Compose files. Twelve of the 33 rules check Compose services for things like privileged mode, Docker socket mounts, broad bind mounts, missing resource limits and unpinned images.
+- Build cache order. [`order-layers`](/docs/reference/rules/order-layers) flags an install that runs after the source copy, and [`use-dockerignore`](/docs/reference/rules/use-dockerignore) looks at the project around the Dockerfile.
+- A [health score](/docs/reference/scoring) you can track over time and show on a pull request.
+- A [skill for coding agents](/docs/guides/coding-agents) that teaches the agent to scan, fix and rescan.
+
+Running both is fine. Turn off the docker-doctor rule in your [config](/docs/reference/configuration) when you would rather keep the hadolint finding.
+
+## Docker build checks
+
+`docker build --check` runs the [build checks](https://docs.docker.com/reference/build-checks/) that ship with BuildKit. They focus on Dockerfile syntax and correctness: instruction casing, duplicate stage names, undefined variables, deprecated instructions and similar mistakes. They come from Docker itself and need no extra tool when Docker is already installed.
+
+Three build checks overlap with docker-doctor rules. `SecretsUsedInArgOrEnv` matches [`no-secrets-in-env`](/docs/reference/rules/no-secrets-in-env), `JSONArgsRecommended` matches [`use-exec-form`](/docs/reference/rules/use-exec-form), and `WorkdirRelativePath` matches [`absolute-workdir`](/docs/reference/rules/absolute-workdir). docker-doctor has no rule for the casing and syntax checks. It reads the file as a design and asks whether the image runs as root, whether the layer order wastes the build cache, and whether the Compose file is safe to deploy. It also runs without Docker, which matters in a CI job or a sandbox that has no daemon.
+
+Use build checks to catch a Dockerfile that is wrong. Use docker-doctor to catch one that builds but is slow, large or unsafe.
+
+## DCLint
+
+[DCLint](https://github.com/zavoloklom/docker-compose-linter) is a linter for Docker Compose files. It validates the file, enforces style and ordering rules, and can fix some findings in place. It does not read Dockerfiles.
+
+docker-doctor has fewer Compose rules and aims them at deployment risk: privileged services, Docker socket mounts, broad bind mounts, secrets in `environment`, missing limits and unpinned images. It does not check key order or formatting, and it does not edit files. Use DCLint when you want consistent Compose style and automatic fixes.
+
+## Trivy and Checkov
+
+[Trivy](https://trivy.dev) and [Checkov](https://www.checkov.io) scan many kinds of infrastructure code, and a Dockerfile is one input among Terraform, Kubernetes manifests and more. Trivy also scans built images for known vulnerabilities in their packages.
+
+docker-doctor does not look inside images and has no vulnerability database. It reads only the Dockerfiles and Compose files in your repository. Keep an image scanner in your pipeline for CVEs, and use docker-doctor for the files your team writes by hand.
+
+## Running them together
+
+A setup that works well in CI:
+
+1. `docker build --check` fails fast on a broken Dockerfile.
+2. docker-doctor reviews Dockerfiles and Compose files and comments on the pull request. See the [GitHub Actions guide](/docs/guides/github-actions) or the recipes for [other CI systems](/docs/guides/ci-and-git-hooks).
+3. hadolint lints the shell code in `RUN` instructions when your Dockerfiles have a lot of it.
+4. DCLint keeps Compose files in a consistent style.
+5. An image scanner checks the built image for vulnerable packages.
+
+## What docker-doctor does not do
+
+- It does not build, pull or run images. Every finding comes from static analysis of the files.
+- It does not lint shell syntax inside `RUN`.
+- It does not rewrite your files. It explains each fix, and a [coding agent](/docs/guides/coding-agents) can apply them.
+- It has no inline ignore comments. You change severities and ignore files in the [config file](/docs/reference/configuration).
+- It does not write SARIF. Use `--json` for a machine-readable report.

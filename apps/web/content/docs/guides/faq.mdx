@@ -1,0 +1,65 @@
+---
+title: FAQ
+description: Short answers to the questions people ask before they adopt docker-doctor.
+---
+
+## Do I need Docker installed?
+
+No. docker-doctor reads your Dockerfiles and Compose files as text. It never builds, pulls or runs an image, so it works on a laptop without Docker, in a CI job without a daemon and inside a sandbox.
+
+## What do I need to run it?
+
+Node.js 22.18 or later. `npx @docker-doctor/cli@latest` downloads the CLI and runs it. `bunx @docker-doctor/cli@latest` works too.
+
+## Does it send my code or usage data anywhere?
+
+No. The CLI has no telemetry and the scan makes no network requests. `npx` fetches the package from the npm registry, and that is the only download.
+
+One optional step does share the report. After an interactive scan you can hand the findings to a coding agent on your machine. That agent sends them to its model provider like any other prompt. docker-doctor asks first and never does this in CI.
+
+## Which files does it scan?
+
+`Dockerfile`, `Dockerfile.*`, `*.dockerfile`, and Compose files named `compose.yaml` or `docker-compose.yaml` with their variants. It does not scan a `Containerfile` or other names. [Getting Started](/docs/guides/getting-started#run-a-scan) has the full table.
+
+## Does it fix the problems it finds?
+
+Not by itself. Every finding has a `Help:` line with the fix, and `rules explain <rule>` goes deeper. To have the fixes applied for you, install the [agent skill](/docs/guides/coding-agents). Your coding agent then scans, edits the files and scans again to confirm the score went up.
+
+## How do I turn a rule off?
+
+Set it to `"off"` in a [config file](/docs/reference/configuration). You can also turn off a whole category, or ignore files with a glob.
+
+```yaml
+# docker-doctor.config.yaml
+rules:
+  "docker-doctor/require-labels": "off"
+ignore:
+  files:
+    - "examples/**"
+```
+
+docker-doctor has no inline ignore comments.
+
+## Will it fail my build?
+
+A finding fails the build only when it has `error` severity. Out of the box four rules have it: secrets in `ENV` or `ARG`, privileged Compose services, Docker socket mounts and references to an undeclared model. Warnings and info findings lower the score and never change the exit code. The CLI also exits `2` when it cannot read or parse a file it found. The [GitHub Action](/docs/guides/github-actions) is advisory by default and fails a pull request only after you raise its `blocking` input.
+
+## Why is my score low when each file looks fine?
+
+The score adds up every finding in the scan, so a repository with many Docker files collects more penalties than one with a single Dockerfile. Scan one service at a time to judge a single file, and compare a project with its own earlier score instead of with another project. [Scoring](/docs/reference/scoring) explains the formula.
+
+## How is it different from hadolint?
+
+hadolint goes deep on Dockerfiles and lints the shell code inside `RUN`. About half of docker-doctor's Dockerfile rules overlap with it. docker-doctor adds Compose rules, build cache order, a health score and a skill for coding agents. See the [comparison](/docs/guides/comparison).
+
+## Can I use it outside GitHub?
+
+Yes. It is one command with stable exit codes. See [Other CI and Git Hooks](/docs/guides/ci-and-git-hooks) for GitLab CI, generic pipelines and pre-commit.
+
+## Can I add my project to the leaderboard?
+
+Yes. The [leaderboard](/leaderboard) is built from a public list of repositories. Open a pull request against [docker-doctor-benchmarks](https://github.com/PunGrumpy/docker-doctor-benchmarks) that adds your repository to `repos.yaml`.
+
+## Is it free?
+
+Yes. docker-doctor is open source under the MIT license.
