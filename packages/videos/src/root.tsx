@@ -9,6 +9,12 @@ import {
 } from "./compose-agents-composition";
 import { DockerDoctor, DURATION, FPS, HEIGHT, WIDTH } from "./composition";
 import {
+  DURATION as LAUNCH_DURATION,
+  FPS as LAUNCH_FPS,
+  Launch,
+  SIZE as LAUNCH_SIZE,
+} from "./launch-composition";
+import {
   DURATION as SANDBOX_DURATION,
   FPS as SANDBOX_FPS,
   SandboxKit,
@@ -42,6 +48,14 @@ export const RemotionRoot = () => (
       height={COMPOSE_AGENTS_HEIGHT}
       id="ComposeAgents"
       width={COMPOSE_AGENTS_WIDTH}
+    />
+    <Composition
+      component={Launch}
+      durationInFrames={LAUNCH_DURATION}
+      fps={LAUNCH_FPS}
+      height={LAUNCH_SIZE}
+      id="Launch"
+      width={LAUNCH_SIZE}
     />
   </>
 );
