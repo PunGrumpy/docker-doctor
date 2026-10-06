@@ -59,12 +59,12 @@ const diagnostic = (
 // commit, because external consumers (the GitHub Action renderer, the
 // benchmarks scanner, the improve-docker skill) key off that number.
 describe("JSON report contract", () => {
-  test("schemaVersion is 4", () => {
-    expect(REPORT_SCHEMA_VERSION).toBe(4);
+  test("schemaVersion is 5", () => {
+    expect(REPORT_SCHEMA_VERSION).toBe(5);
     expect(
       toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT)
         .schemaVersion
-    ).toBe(4);
+    ).toBe(5);
   });
 
   test("top-level keys are exactly the documented set", () => {

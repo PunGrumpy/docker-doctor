@@ -814,7 +814,10 @@ program
         );
 
         // Calculate score
-        const { score, label } = calculateScore(diagnostics);
+        const { score, label } = calculateScore(
+          diagnostics,
+          scannedFileCount - failures.length
+        );
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
