@@ -21,5 +21,9 @@ export const Footer = () => (
         </a>
       </div>
     </footer>
+    <p className="text-muted-foreground/70 w-full pt-4 text-xs text-pretty">
+      Docker Doctor is an independent open source project. It is not affiliated
+      with or endorsed by Docker, Inc. Docker is a trademark of Docker, Inc.
+    </p>
   </Section>
 );
