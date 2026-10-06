@@ -1,6 +1,6 @@
 ---
 title: Comparison
-description: How docker-doctor relates to hadolint, Docker build checks, DCLint and infrastructure scanners, and when to run them together.
+description: How docker-doctor relates to hadolint, Dockadvisor, Docker build checks, DCLint and infrastructure scanners, and when to run them together.
 ---
 
 docker-doctor is not the only tool that reads a Dockerfile. This page says what each tool is good at, so you can pick one or run several side by side. None of them replaces the others.
@@ -35,6 +35,12 @@ What docker-doctor adds:
 - A [skill for coding agents](/docs/guides/coding-agents) that teaches the agent to scan, fix and rescan.
 
 Running both is fine. Turn off the docker-doctor rule in your [config](/docs/reference/configuration) when you would rather keep the hadolint finding.
+
+## Dockadvisor
+
+[Dockadvisor](https://github.com/deckrun/dockadvisor) is a Dockerfile linter written in Go. It has more than 60 rules, gives each Dockerfile a score from 0 to 100, and also runs in the browser through WebAssembly. It reads Dockerfiles and not Compose files.
+
+Choose Dockadvisor when you want a Go binary or library, or a linter you can embed in a web page. docker-doctor scores the whole project across Dockerfiles and Compose files, comments on pull requests through its GitHub Action, and ships a skill for coding agents.
 
 ## Docker build checks
 
