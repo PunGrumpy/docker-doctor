@@ -32,6 +32,11 @@ const sitemap = (): MetadataRoute.Sitemap => {
       priority: 0.8,
       url: new URL("/leaderboard", url).toString(),
     },
+    {
+      changeFrequency: "weekly",
+      priority: 0.6,
+      url: new URL("/changelog", url).toString(),
+    },
     ...pages,
   ];
 };

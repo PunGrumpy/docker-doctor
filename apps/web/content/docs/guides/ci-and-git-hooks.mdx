@@ -1,0 +1,123 @@
+---
+title: Other CI and Git Hooks
+description: Run docker-doctor in GitLab CI, any other pipeline, and as a pre-commit hook.
+---
+
+The [GitHub Action](/docs/guides/github-actions) is the quickest setup on GitHub. Everywhere else, docker-doctor is one command that needs Node.js 22.18 or later. Images that still ship Node.js 20 are too old, so pick a `node:22` image or newer. It does not need Docker or a daemon. `npx` downloads the package from the npm registry, and the scan itself makes no network calls.
+
+## How a pipeline reads the result
+
+A scan without a terminal attached prints the report and exits. It shows no spinner and asks no questions.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | No `error`-severity finding. |
+| `1` | At least one `error`-severity finding. Also returned when the scan cannot start, for example on an invalid config file. |
+| `2` | A discovered file could not be read or parsed, so the scan is incomplete. |
+
+Warnings and info findings never fail the command. To fail on a warning, raise that rule to `error` in your [config file](/docs/reference/configuration). The [CLI reference](/docs/reference/cli#exit-codes) has the full table.
+
+## GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+docker-doctor:
+  image: node:22
+  script:
+    - npx --yes @docker-doctor/cli@latest . --verbose
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+```
+
+To keep the report as a job artifact, write the JSON form to a file. `--json` uses the same exit codes.
+
+```yaml
+docker-doctor:
+  image: node:22
+  script:
+    - npx --yes @docker-doctor/cli@latest . --json > docker-doctor.json
+  artifacts:
+    when: always
+    paths:
+      - docker-doctor.json
+```
+
+## Any other CI system
+
+Use an image or runner that has Node.js 22.18 or later, then run the same command. This works in CircleCI, Jenkins, Buildkite, Azure Pipelines and Bitbucket Pipelines.
+
+```bash
+npx --yes @docker-doctor/cli@latest . --verbose
+```
+
+Pin the version instead of `latest` when you want a new rule to arrive in a change you review, not in the middle of someone else's merge request.
+
+```bash
+npx --yes @docker-doctor/cli@0.6.1 . --verbose
+```
+
+## Gate on the score
+
+`--score` prints only the number, so a shell test can enforce a floor.
+
+```bash
+set -e
+score=$(npx --yes @docker-doctor/cli@latest . --score)
+echo "Docker Doctor score: $score"
+[ "$score" -ge 80 ]
+```
+
+The scan still exits `1` on an `error`-severity finding and `2` on an incomplete scan. `set -e` stops the script there, before the comparison runs.
+
+A directory with no Dockerfile or Compose file scores `100` and exits `0`, with a warning on stderr. A mistyped path therefore passes this gate. Scan a path you know holds Docker files.
+
+## Git hooks
+
+A hook catches a finding before it reaches a pull request. The hook scans the files in your working tree, not only the staged changes.
+
+`@latest` asks the npm registry for the newest version on every run, which adds a delay and fails offline. For hooks, install the CLI as a dev dependency with `npm install --save-dev @docker-doctor/cli` and call `npx docker-doctor`, or pin a version in the command.
+
+### pre-commit
+
+Add a local hook to `.pre-commit-config.yaml`. It runs only when a commit touches a Dockerfile or a Compose file.
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: docker-doctor
+        name: docker-doctor
+        entry: npx --yes @docker-doctor/cli@latest .
+        language: system
+        pass_filenames: false
+        files: (?i)(^|/)(dockerfile(\..*)?|.*\.dockerfile|(docker-)?compose(\..*)?\.ya?ml|\.dockerignore)$
+```
+
+### Husky
+
+```bash
+# .husky/pre-commit
+npx --yes @docker-doctor/cli@latest . < /dev/null
+```
+
+Git runs a hook with your terminal attached. In a terminal docker-doctor offers to set up a workflow and to hand findings to a coding agent. `< /dev/null` detaches the input, so the hook prints the report and exits.
+
+### Plain Git
+
+```bash
+#!/bin/sh
+# .git/hooks/pre-commit
+npx --yes @docker-doctor/cli@latest . < /dev/null
+```
+
+Make the file executable with `chmod +x .git/hooks/pre-commit`.
+
+## Monorepos
+
+docker-doctor scans the directory you give it and every directory below it. Run it once at the repository root to cover every service, or pass a path to scan one service.
+
+```bash
+npx --yes @docker-doctor/cli@latest services/api
+```
+
+docker-doctor reads one config file, from the directory you scan. A config file inside `services/api` applies only when you scan `services/api`. See [Configuration](/docs/reference/configuration).
