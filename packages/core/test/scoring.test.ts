@@ -85,6 +85,34 @@ describe("calculateScore (asymptotic curve, K=70)", () => {
   });
 });
 
+describe("calculateScore averages the penalty over analyzed files", () => {
+  test("one file scores the same with or without the count", () => {
+    expect(calculateScore(many("warning", 6), 1).score).toBe(
+      calculateScore(many("warning", 6)).score
+    );
+  });
+
+  test("two warnings in each of 96 files score 89, not 0", () => {
+    expect(calculateScore(many("warning", 192), 96).score).toBe(89);
+    expect(calculateScore(many("warning", 192)).score).toBe(0);
+  });
+
+  test("the same findings spread over more files score higher", () => {
+    expect(calculateScore(many("warning", 10), 1).score).toBe(56);
+    expect(calculateScore(many("warning", 10), 2).score).toBe(75);
+    expect(calculateScore(many("warning", 10), 5).score).toBe(89);
+  });
+
+  test("a clean file next to a bad one pulls the score up", () => {
+    expect(calculateScore(many("error", 4), 1).score).toBe(56);
+    expect(calculateScore(many("error", 4), 2).score).toBe(75);
+  });
+
+  test("a count of zero is treated as one file", () => {
+    expect(calculateScore(many("warning", 1), 0).score).toBe(94);
+  });
+});
+
 describe("getScoreBucket", () => {
   test("returns the matching bucket for a boundary score", () => {
     expect(getScoreBucket(0).label).toBe("Critical");

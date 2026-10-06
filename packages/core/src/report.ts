@@ -6,7 +6,8 @@ import type { Diagnostic, ProjectInfo, RuleCategory } from "./types/index";
 // v3 (2026-09): added diagnostics[].category.
 // v4 (2026-09): added failures[], the files discovered but not analyzed
 // (read or parse errors).
-export const REPORT_SCHEMA_VERSION = 4;
+// v5 (2026-10): the score averages the penalty over the analyzed files.
+export const REPORT_SCHEMA_VERSION = 5;
 
 export interface ReportFailure {
   file: string;

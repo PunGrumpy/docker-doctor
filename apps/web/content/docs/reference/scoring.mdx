@@ -22,15 +22,29 @@ Each diagnostic adds a penalty based on its severity:
 | `warning` | 4       |
 | `info`    | 1       |
 
+## Averaged per file
+
+docker-doctor adds up the penalties and divides the total by the number of Dockerfiles and Compose files it analyzed. The score therefore describes a typical file in the project, and a clean file counts as much as a bad one.
+
+```text
+penalty = sum of penalties / analyzed files
+```
+
+A project with one Docker file is scored on that file alone. A monorepo with 20 files and two warnings in each scores the same 89 as a single file with two warnings. Files that docker-doctor found but could not parse are left out of the count.
+
+Releases before 0.7.0 used the sum without dividing it. A repository with many Docker files scored near 0 however small each file's problems were.
+
+The average can hide one bad file among many good ones. The exit code does not depend on the score, so an `error`-severity finding in any file still fails the scan.
+
 ## The curve
 
-The penalties are summed, then the score is computed as an asymptotic decay curve rather than a simple subtraction:
+The score is an asymptotic decay curve over that penalty, not a simple subtraction:
 
 ```text
 score = round(100 * e^(-penalty / K))   // K = 70
 ```
 
-A perfect project (no diagnostics) always scores exactly 100. As penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings.
+A project with no diagnostics always scores exactly 100. As the penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings.
 
 `K = 70` was chosen so a single warning (penalty 4) still lands around 94 — comfortably inside the `Excellent` bucket — while errors and repeated warnings continue to meaningfully erode the score. The previous `K = 40` pushed a single warning down to ~90, right on the Excellent/Good boundary — too harsh a penalty for one warning.
 

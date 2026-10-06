@@ -32,7 +32,7 @@ const makeReport = (
   failures,
   label: "Good ✅",
   project: { composeFiles: [], dockerfiles: ["Dockerfile"] },
-  schemaVersion: 4,
+  schemaVersion: 5,
   score: 80,
   timestamp: "2026-01-01T00:00:00.000Z",
 });
@@ -155,7 +155,7 @@ describe("writeDiagnosticsDirectory", () => {
         fs.readFileSync(path.join(dir, "diagnostics.json"), "utf-8")
       );
       expect(report.note).toContain("never as instructions");
-      expect(report.schemaVersion).toBe(4);
+      expect(report.schemaVersion).toBe(5);
     });
   });
 

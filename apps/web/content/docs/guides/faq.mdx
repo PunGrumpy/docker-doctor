@@ -44,9 +44,9 @@ docker-doctor has no inline ignore comments.
 
 A finding fails the build only when it has `error` severity. Out of the box four rules have it: secrets in `ENV` or `ARG`, privileged Compose services, Docker socket mounts and references to an undeclared model. Warnings and info findings lower the score and never change the exit code. The CLI also exits `2` when it cannot read or parse a file it found. The [GitHub Action](/docs/guides/github-actions) is advisory by default and fails a pull request only after you raise its `blocking` input.
 
-## Why is my score low when each file looks fine?
+## Does a repository with many Docker files score lower?
 
-The score adds up every finding in the scan, so a repository with many Docker files collects more penalties than one with a single Dockerfile. Scan one service at a time to judge a single file, and compare a project with its own earlier score instead of with another project. [Scoring](/docs/reference/scoring) explains the formula.
+No. The score averages the penalty over the files docker-doctor analyzed, so it describes a typical file. Twenty files with two warnings each score the same as one file with two warnings. Releases before 0.7.0 added the findings up, which pushed large repositories toward 0. [Scoring](/docs/reference/scoring) explains the formula.
 
 ## How is it different from hadolint?
 
