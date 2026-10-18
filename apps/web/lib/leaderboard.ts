@@ -29,6 +29,26 @@ export interface LeaderboardData {
   schemaVersion: number;
 }
 
+interface ResultsBody {
+  doctorVersion?: unknown;
+  entries?: unknown;
+  generatedAt?: unknown;
+  schemaVersion?: unknown;
+}
+
+// Any JSON object can be read field by field. The fields are checked below.
+const isResultsBody = (value: unknown): value is ResultsBody =>
+  typeof value === "object" && value !== null;
+
+const isString = (value: unknown): value is string => typeof value === "string";
+
+// The entries themselves are not checked, as before.
+const isLeaderboardData = (body: ResultsBody): body is LeaderboardData =>
+  body.schemaVersion === RESULTS_SCHEMA_VERSION &&
+  Array.isArray(body.entries) &&
+  isString(body.doctorVersion) &&
+  isString(body.generatedAt);
+
 export const getLeaderboard = async (): Promise<LeaderboardData> => {
   const res = await fetch(RESULTS_URL, {
     next: { revalidate: REVALIDATE_SECONDS },
@@ -36,11 +56,17 @@ export const getLeaderboard = async (): Promise<LeaderboardData> => {
   if (!res.ok) {
     throw new Error(`Failed to fetch leaderboard results: ${res.status}`);
   }
-  const data = (await res.json()) as LeaderboardData;
-  if (data.schemaVersion !== RESULTS_SCHEMA_VERSION) {
+  const body: unknown = await res.json();
+  const schemaVersion = isResultsBody(body) ? body.schemaVersion : undefined;
+  if (schemaVersion !== RESULTS_SCHEMA_VERSION) {
     throw new Error(
-      `Leaderboard results schemaVersion ${data.schemaVersion} does not match expected ${RESULTS_SCHEMA_VERSION}`
+      `Leaderboard results schemaVersion ${String(schemaVersion)} does not match expected ${RESULTS_SCHEMA_VERSION}`
     );
   }
-  return data;
+  if (!(isResultsBody(body) && isLeaderboardData(body))) {
+    throw new Error(
+      "Leaderboard results lack doctorVersion, entries or generatedAt"
+    );
+  }
+  return body;
 };

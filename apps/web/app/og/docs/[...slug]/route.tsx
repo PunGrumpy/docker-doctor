@@ -33,10 +33,7 @@ export const GET = async (
     readFile(path.join(process.cwd(), "app/og/docs/[...slug]/background.png")),
   ]);
 
-  const backgroundImageData = backgroundImage.buffer.slice(
-    backgroundImage.byteOffset,
-    backgroundImage.byteOffset + backgroundImage.byteLength
-  );
+  const backgroundImageUrl = `data:image/png;base64,${backgroundImage.toString("base64")}`;
 
   return new ImageResponse(
     <div style={{ fontFamily: "Geist" }} tw="flex h-full w-full bg-black">
@@ -44,7 +41,7 @@ export const GET = async (
       <img
         alt="Docker Doctor OpenGraph Background"
         height={630}
-        src={backgroundImageData as never}
+        src={backgroundImageUrl}
         width={1200}
       />
       {/* background.png draws a dotted baseline grid; pt-[240px] top-anchors

@@ -13,9 +13,8 @@ const getNodeText = (node: ReactNode): string => {
   if (Array.isArray(node)) {
     return node.map(getNodeText).join("");
   }
-  if (isValidElement(node)) {
-    const { children } = node.props as { children?: ReactNode };
-    return getNodeText(children);
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return getNodeText(node.props.children);
   }
   return "";
 };
@@ -262,18 +261,16 @@ export const Cards = ({ children }: { readonly children: ReactNode }) => (
   <div className="my-6 grid gap-3 sm:grid-cols-2">{children}</div>
 );
 
-const SEVERITY_HUE = {
-  error: "red",
-  info: "blue",
-  warning: "amber",
-} as const;
+type PillVariant = NonNullable<ComponentProps<typeof Pill>["variant"]>;
+
+const SEVERITY_HUE = new Map<string, PillVariant>([
+  ["error", "red"],
+  ["info", "blue"],
+  ["warning", "amber"],
+]);
 
 export const SeverityPill = ({ severity }: { readonly severity: string }) => (
-  <Pill
-    contrast="low"
-    size="sm"
-    variant={SEVERITY_HUE[severity as keyof typeof SEVERITY_HUE] ?? "gray"}
-  >
+  <Pill contrast="low" size="sm" variant={SEVERITY_HUE.get(severity) ?? "gray"}>
     {severity}
   </Pill>
 );

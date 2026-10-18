@@ -122,7 +122,7 @@ const LATE_BEAM = {
   "--beam-delay": "0.35s",
   "--beam-end": "50%",
   "--beam-start": "25%",
-} as CSSProperties;
+} satisfies CSSProperties;
 
 const OUTCOMES = [
   {
