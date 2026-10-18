@@ -1635,6 +1635,30 @@ describe("Image Size Rules", () => {
       expected: 1,
       run: "apk add curl && rm -f /var/cache/apk/APKINDEX.tar.gz",
     },
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm --recursive --force /var/lib/apt/lists/*`,
+    },
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm --force --recursive /var/lib/apt/lists/*`,
+    },
+    { expected: 0, run: `${APT_INSTALL} && rm -rf "/var/lib/apt/lists"/*` },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && rm --force /var/lib/apt/lists/lock`,
+    },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && echo "rm -rf /var/lib/apt/lists/*"`,
+    },
+    { expected: 1, run: "apk add gcc && pip install --no-cache-dir flask" },
+    {
+      expected: 0,
+      run: "apk add --no-cache gcc && pip install --no-cache-dir flask",
+    },
+    { expected: 1, run: "apk add gcc && docker build --no-cache ." },
+    { expected: 1, run: 'apk add gcc && echo "apk add --no-cache"' },
   ];
 
   test.each(cacheCleanupCases)(

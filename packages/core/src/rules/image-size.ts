@@ -229,15 +229,23 @@ const cacheMountTargets = (args: string): string[] =>
     );
 
 // A recursive `rm` and its operands, which end at the next shell separator.
-// `rm -rf`, `rm -fr`, `rm -r` and `rm -Rf` all count.
+// `rm -rf`, `rm -fr`, `rm -r`, `rm -Rf` and `rm --recursive --force` all
+// count.
 const RECURSIVE_RM_RE =
-  /\brm\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*[rR][A-Za-z]*\s(?<operands>[^;&|]*)/gu;
+  /\brm\s+(?:--?[A-Za-z][A-Za-z-]*\s+)*?(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive)\s[^;&|]*/gu;
 
 // `rm -rf /tmp/* <dir>/*` removes <dir> as much as `rm -rf <dir>/*` does.
+// The match runs on the text with quoted spans blanked, so
+// `echo "rm -rf <dir>"` is not a cleanup. The operands are read from the
+// original text, so `rm -rf "<dir>"/*` still is.
 const removesRecursively = (args: string, dir: string): boolean =>
-  [...args.matchAll(RECURSIVE_RM_RE)].some((match) =>
-    (match.groups?.operands ?? "").includes(dir)
+  [...maskQuotedText(args).matchAll(RECURSIVE_RM_RE)].some((match) =>
+    args.slice(match.index, match.index + match[0].length).includes(dir)
   );
+
+// `apk add --no-cache`, with the option as a whole word in the same command.
+// `pip install --no-cache-dir` in a later command does not count.
+const APK_ADD_NO_CACHE_RE = /\bapk\s+add\b[^;&|]*\s--no-cache(?=[\s;&|]|$)/u;
 
 // apt-get keeps the package lists here. A cache mount on `/var/cache/apt`
 // alone leaves them in the layer, so Docker's apt example mounts
@@ -289,7 +297,7 @@ export const cleanPackageCache: DockerfileRule = {
         // check apk add without --no-cache
         if (
           args.includes("apk add") &&
-          !args.includes("--no-cache") &&
+          !APK_ADD_NO_CACHE_RE.test(maskQuotedText(args)) &&
           !removesRecursively(args, "/var/cache/apk") &&
           !hasCacheMountFor(args, APK_CACHE_DIRS)
         ) {
