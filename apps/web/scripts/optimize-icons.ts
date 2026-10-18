@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { optimize } from "svgo";
+import type { Config } from "svgo";
 
 const __dirname = import.meta.dirname;
 const ICONS_DIR = path.resolve(__dirname, "../components/icons");
@@ -65,7 +66,9 @@ const SVG_ATTR_RE = new RegExp(
   "gu"
 );
 
-const SVGO_CONFIG = {
+const SVG_ELEMENT_RE = /(?<svg><svg[\s\S]*?<\/svg>)/u;
+
+const SVGO_CONFIG: Config = {
   js2svg: { indent: 2, pretty: true },
   multipass: true,
   plugins: [
@@ -86,7 +89,7 @@ const SVGO_CONFIG = {
   ],
 };
 
-const formatBytes = (bytes) => {
+const formatBytes = (bytes: number) => {
   if (bytes === 0) {
     return "0 B";
   }
@@ -98,17 +101,15 @@ const formatBytes = (bytes) => {
   return `${sign}${(abs / 1024).toFixed(1)} KB`;
 };
 
-const processFile = async (filePath) => {
+const processFile = async (filePath: string) => {
   let content = await fs.readFile(filePath, "utf-8");
   const original = content;
 
-  const svgMatch = content.match(/(?<svg><svg[\s\S]*?<\/svg>)/u);
-  if (!svgMatch) {
+  const originalSvg = SVG_ELEMENT_RE.exec(content)?.groups?.svg;
+  if (originalSvg === undefined) {
     console.log(`  ⏭  no SVG found in ${path.basename(filePath)}`);
     return;
   }
-
-  const originalSvg = svgMatch.groups.svg;
 
   const hasClassName = originalSvg.includes("className=");
   const hasSpread = originalSvg.includes("{...");
@@ -120,8 +121,10 @@ const processFile = async (filePath) => {
 
   // Convert React camelCase attributes to SVG hyphenated form
   if (hasReactAttrs) {
-    preprocessed = preprocessed.replace(REACT_ATTR_RE, (match, attr) =>
-      match.replace(attr, REACT_SVG_ATTR_MAP[attr])
+    preprocessed = preprocessed.replace(
+      REACT_ATTR_RE,
+      (match, attr: keyof typeof REACT_SVG_ATTR_MAP) =>
+        match.replace(attr, REACT_SVG_ATTR_MAP[attr])
     );
   }
 
@@ -129,7 +132,7 @@ const processFile = async (filePath) => {
     preprocessed = preprocessed.replaceAll(/\bclassName\s*=/gu, "class=");
   }
 
-  const spreads = [];
+  const spreads: string[] = [];
   if (hasSpread) {
     preprocessed = preprocessed.replaceAll(/\s*\{\.\.\.\w+\}/gu, (match) => {
       spreads.push(match);

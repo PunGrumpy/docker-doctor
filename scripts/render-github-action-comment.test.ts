@@ -282,7 +282,10 @@ describe("untrusted report fields", () => {
     // rely on that, so this case skips the parser.
     const { body, outputs } = renderReport(
       readContext({ GITHUB_EVENT_NAME: "pull_request" }),
-      makeReport({ label: "<img src=x>", score: "99](https://evil)" })
+      {
+        ...makeReport({ label: "<img src=x>", score: "99](https://evil)" }),
+        failures: [],
+      }
     );
     expect(body).not.toContain("evil");
     expect(body).not.toContain("<img");

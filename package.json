@@ -10,7 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck && tsc -p scripts",
     "test": "turbo run test",
     "test:scripts": "bun test ./scripts",
     "check": "ultracite check",
@@ -27,6 +27,8 @@
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
+    "@types/bun": "^1.4.3",
+    "@types/node": "^26.6.5",
     "husky": "^9.1.7",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
