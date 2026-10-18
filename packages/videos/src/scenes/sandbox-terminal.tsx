@@ -30,8 +30,18 @@ type Tone = "good" | "warn";
 
 type Severity = "error" | "warning";
 
+type SandboxLineKind =
+  | "cmd"
+  | "blank"
+  | "ok"
+  | "working"
+  | "finding"
+  | "key"
+  | "ask"
+  | "note";
+
 interface SandboxLine extends BaseLine {
-  kind: "cmd" | "blank" | "ok" | "working" | "finding" | "key" | "ask" | "note";
+  kind: SandboxLineKind;
   /** ok lines: green when the step succeeded, amber when it found something. */
   tone?: Tone;
   severity?: Severity;

@@ -31,17 +31,19 @@ type Tone = "good" | "warn";
 
 type Severity = "error" | "warning";
 
+type LaunchLineKind =
+  | "cmd"
+  | "blank"
+  | "ok"
+  | "working"
+  | "finding"
+  | "key"
+  | "more"
+  | "hand"
+  | "score";
+
 interface LaunchLine extends BaseLine {
-  kind:
-    | "cmd"
-    | "blank"
-    | "ok"
-    | "working"
-    | "finding"
-    | "key"
-    | "more"
-    | "hand"
-    | "score";
+  kind: LaunchLineKind;
   /** ok lines: green when the step succeeded, amber when it found something. */
   tone?: Tone;
   severity?: Severity;
