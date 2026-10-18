@@ -7,7 +7,7 @@ export const revalidate = false;
 
 export const generateStaticParams = () => source.generateParams();
 
-export const GET = async (
+const serveDocMarkdown = async (
   _request: Request,
   { params }: { params: Promise<{ slug?: string[] }> }
 ) => {
@@ -22,3 +22,5 @@ export const GET = async (
     headers: { "Content-Type": "text/markdown; charset=utf-8" },
   });
 };
+
+export { serveDocMarkdown as GET };

@@ -3,12 +3,14 @@ import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import { hasText } from "../text";
-import type { Diagnostic, DockerfileRule } from "../types/index";
+import type { Diagnostic, DockerfileRule, RuleCategory } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
 
+const BEST_PRACTICES = "Best Practices" satisfies RuleCategory;
+
 export const requireHealthcheck: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const hasHealthcheck = instructions.some(
       (inst) => inst.instruction === "HEALTHCHECK"
@@ -57,7 +59,7 @@ const AUTO_EXTRACT_SUFFIXES = [
 ] as const;
 
 export const preferCopyOverAdd: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -102,7 +104,7 @@ export const preferCopyOverAdd: DockerfileRule = {
 };
 
 export const useExecForm: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -135,7 +137,7 @@ export const useExecForm: DockerfileRule = {
 };
 
 export const requireLabels: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const hasLabel = instructions.some((inst) => inst.instruction === "LABEL");
 
@@ -161,7 +163,7 @@ export const requireLabels: DockerfileRule = {
 };
 
 export const combineAptUpdateInstall: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -210,7 +212,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
 // a shell name) also works inside joined exec-form argv, and cannot backtrack
 // pathologically. Known limitation: the word inside quotes (e.g.
 // `echo "set -o pipefail" >> .bashrc`) still matches — same class as the
-// existing test.todo for quoted pipes.
+// existing pending test for quoted pipes.
 export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 
 // A RUN line uses a pipe: a single `|` not part of `||`.
@@ -230,8 +232,34 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
   return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
+// True when a RUN pipes without pipefail. SHELL only applies to shell-form
+// RUN; exec-form RUN runs its own argv directly, so check the argv for
+// pipefail instead. Exec-form argv elements arrive already unquoted, so a
+// pipe inside them is a real pipe; shell-form text is masked so a `|` inside
+// a quoted argument (grep -E "foo|bar") does not read as a pipeline.
+const pipesWithoutPipefail = (
+  args: string,
+  shellHasPipefail: boolean
+): boolean => {
+  const execArgv = parseExecForm(args);
+
+  const pipeText =
+    execArgv === null ? maskQuotedText(args) : execArgv.join(" ");
+
+  if (!HAS_PIPE_RE.test(pipeText)) {
+    return false;
+  }
+
+  const pipefailConfigured =
+    execArgv === null
+      ? shellHasPipefail || PIPEFAIL_SETTING_RE.test(args)
+      : PIPEFAIL_SETTING_RE.test(execArgv.join(" "));
+
+  return !pipefailConfigured;
+};
+
 export const usePipefail: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     // FROM <previous stage> inherits that stage's image config — SHELL
@@ -261,45 +289,16 @@ export const usePipefail: DockerfileRule = {
         if (hasText(currentStage)) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
-
-        continue;
-      }
-
-      if (inst.instruction === "SHELL") {
+      } else if (inst.instruction === "SHELL") {
         shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
 
         if (hasText(currentStage)) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
-
-        continue;
-      }
-
-      if (inst.instruction !== "RUN") {
-        continue;
-      }
-
-      const { args } = inst;
-      // SHELL only applies to shell-form RUN; exec-form RUN runs its own
-      // argv directly, so check the argv for pipefail instead. Exec-form
-      // argv elements arrive already unquoted, so a pipe inside them is a
-      // real pipe; shell-form text is masked so a `|` inside a quoted
-      // argument (grep -E "foo|bar") does not read as a pipeline.
-      const execArgv = parseExecForm(args);
-
-      const pipeText =
-        execArgv === null ? maskQuotedText(args) : execArgv.join(" ");
-
-      if (!HAS_PIPE_RE.test(pipeText)) {
-        continue;
-      }
-
-      const pipefailConfigured =
-        execArgv === null
-          ? shellHasPipefail || PIPEFAIL_SETTING_RE.test(args)
-          : PIPEFAIL_SETTING_RE.test(execArgv.join(" "));
-
-      if (!pipefailConfigured) {
+      } else if (
+        inst.instruction === "RUN" &&
+        pipesWithoutPipefail(inst.args, shellHasPipefail)
+      ) {
         diagnostics.push(
           createDiagnostic(
             file,
@@ -326,7 +325,7 @@ export const usePipefail: DockerfileRule = {
 const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/u;
 
 export const absoluteWorkdir: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -363,7 +362,7 @@ export const absoluteWorkdir: DockerfileRule = {
 };
 
 export const avoidRunCd: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -404,7 +403,7 @@ const WHITESPACE_RE = /\s+/u;
 
 // A newline with no backslash before it. In a heredoc body it ends the
 // command. A `\`-continued RUN has none.
-const UNCONTINUED_NEWLINE_RE = /(?<!\\[ \t]*)\r?\n/u;
+const UNCONTINUED_NEWLINE_RE = /\r\n(?<!\\[ \t]*\r\n)|\n(?<!\\[ \t]*\n)/u;
 
 // Options whose value is the next word, as listed in apt-get(8), apk(8) and
 // apk-add(8). `apk add --virtual .build-deps gcc` names a group, not a
@@ -473,13 +472,18 @@ const collectPackageList = (raw: string): string[] => {
     .split(UNCONTINUED_NEWLINE_RE);
 
   const tokens = command.split(WHITESPACE_RE);
+
+  // The words up to the first shell separator belong to this command.
+  const separatorIndex = tokens.findIndex((token) =>
+    SHELL_SEPARATOR_RE.test(token)
+  );
+
+  const words =
+    separatorIndex === -1 ? tokens : tokens.slice(0, separatorIndex);
+
   let isOptionValue = false;
 
-  for (const token of tokens) {
-    if (SHELL_SEPARATOR_RE.test(token)) {
-      break;
-    }
-
+  for (const token of words) {
     if (token === "" || token === "\\") {
       continue;
     }
@@ -497,7 +501,7 @@ const collectPackageList = (raw: string): string[] => {
 };
 
 export const sortMultilineArgs: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -591,7 +595,7 @@ const useraddWritesLoginLogs = (args: string): boolean =>
     );
 
 export const useraddNoLogInit: DockerfileRule = {
-  category: "Best Practices",
+  category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 

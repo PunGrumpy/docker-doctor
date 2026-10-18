@@ -47,6 +47,17 @@ const makeReport = (overrides: Partial<TestReport> = {}): TestReport => ({
   ...overrides,
 });
 
+// A report as schema 3 wrote it, before the failures list existed.
+const makeReportWithoutFailures = (
+  overrides: Partial<TestReport> = {}
+): TestReport => {
+  const report = makeReport(overrides);
+
+  delete report.failures;
+
+  return report;
+};
+
 const diagnostic = (
   severity: TestReport["diagnostics"][number]["severity"]
 ): TestReport["diagnostics"][number] => ({
@@ -167,9 +178,7 @@ describe("incomplete scans", () => {
   });
 
   test("a schema 3 report with exit status 2 still fails the check", () => {
-    const { failures: _omitted, ...schema3 } = makeReport({
-      schemaVersion: 3,
-    });
+    const schema3 = makeReportWithoutFailures({ schemaVersion: 3 });
 
     const { body, outputs } = render(
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "2" },
@@ -182,9 +191,7 @@ describe("incomplete scans", () => {
   });
 
   test("a schema 3 report with exit status 0 renders as complete", () => {
-    const { failures: _omitted, ...schema3 } = makeReport({
-      schemaVersion: 3,
-    });
+    const schema3 = makeReportWithoutFailures({ schemaVersion: 3 });
 
     const { body, outputs } = render(
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "0" },
@@ -327,7 +334,7 @@ describe("untrusted report fields", () => {
   });
 
   test("readReportText defaults a missing failures list to empty", () => {
-    const { failures: _omitted, ...schema3 } = makeReport();
+    const schema3 = makeReportWithoutFailures();
     expect(readReportText(JSON.stringify(schema3))?.failures).toEqual([]);
   });
 

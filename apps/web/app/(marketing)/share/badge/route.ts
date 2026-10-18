@@ -29,7 +29,7 @@ const getScoreColor = (score: number): string => {
   }
 };
 
-export const GET = (req: Request): Response => {
+const renderBadge = (req: Request): Response => {
   const { searchParams } = new URL(req.url);
   const score = parseScoreQuery(searchParams.get("s"), 100);
 
@@ -77,3 +77,5 @@ export const GET = (req: Request): Response => {
     },
   });
 };
+
+export { renderBadge as GET };

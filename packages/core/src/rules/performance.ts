@@ -4,10 +4,34 @@ import { hasText } from "../text";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 
+const BUILD_SCRIPTS = [
+  "npm run build",
+  "yarn build",
+  "bun run build",
+  "cargo build",
+];
+
+const COPY_ALL_SOURCES = new Set([".", "", "*", "src"]);
+
+const INSTALL_COMMANDS = [
+  "npm install",
+  "npm ci",
+  "yarn install",
+  "bun install",
+  "pip install",
+  "cargo fetch",
+];
+
 // `make` only where a command can start, so `apk add make` (installing the
 // tool) is not a build step while `cd src && make` is.
 const BUILD_TOOL_COMMAND_RE =
   /(?:^|&&|\|\||;|\||\(|`|\$\()\s*(?:make|cmake)(?=\s|$)/u;
+
+// A build script or a build tool command, whose toolchain a single-stage
+// image would ship.
+const runsBuild = (args: string): boolean =>
+  BUILD_SCRIPTS.some((script) => args.includes(script)) ||
+  BUILD_TOOL_COMMAND_RE.test(maskQuotedText(stripRunFlags(args)));
 
 export const useMultiStage: DockerfileRule = {
   category: "Performance",
@@ -19,15 +43,7 @@ export const useMultiStage: DockerfileRule = {
     if (fromCount === 1) {
       // Check if it's not a trivial/short Dockerfile (e.g., has some build steps)
       const hasBuildSteps = instructions.some(
-        (inst) =>
-          inst.instruction === "RUN" &&
-          (inst.args.includes("npm run build") ||
-            inst.args.includes("yarn build") ||
-            inst.args.includes("bun run build") ||
-            inst.args.includes("cargo build") ||
-            BUILD_TOOL_COMMAND_RE.test(
-              maskQuotedText(stripRunFlags(inst.args))
-            ))
+        (inst) => inst.instruction === "RUN" && runsBuild(inst.args)
       );
 
       if (hasBuildSteps) {
@@ -76,11 +92,7 @@ export const orderLayers: DockerfileRule = {
         const normalized = src.replace(/^\.\//u, "");
 
         const isCopyAll =
-          normalized === "." ||
-          normalized === "" ||
-          normalized === "*" ||
-          normalized === "src" ||
-          normalized.startsWith("src/");
+          COPY_ALL_SOURCES.has(normalized) || normalized.startsWith("src/");
 
         if (isCopyAll && copyAllLine === -1) {
           copyAllLine = inst.line;
@@ -90,14 +102,7 @@ export const orderLayers: DockerfileRule = {
       if (inst.instruction === "RUN" && copyAllLine !== -1) {
         const args = inst.args.toLowerCase();
 
-        if (
-          args.includes("npm install") ||
-          args.includes("npm ci") ||
-          args.includes("yarn install") ||
-          args.includes("bun install") ||
-          args.includes("pip install") ||
-          args.includes("cargo fetch")
-        ) {
+        if (INSTALL_COMMANDS.some((command) => args.includes(command))) {
           diagnostics.push(
             createDiagnostic(
               file,

@@ -17,6 +17,24 @@ export interface ChangelogData {
   versions: VersionEntry[];
 }
 
+type Section = "minor" | "patch";
+
+// The section a `### ...` heading opens. Changes under any other heading are
+// not collected.
+const sectionOf = (line: string): Section | null => {
+  const section = line.slice(4).trim().toLowerCase();
+
+  if (section === "minor changes") {
+    return "minor";
+  }
+
+  if (section === "patch changes") {
+    return "patch";
+  }
+
+  return null;
+};
+
 export const parseChangelog = (filePath: string): ChangelogData => {
   const text = readFileSync(filePath, "utf-8");
   const lines = text.split("\n");
@@ -24,7 +42,7 @@ export const parseChangelog = (filePath: string): ChangelogData => {
   let packageName = "";
   const versions: VersionEntry[] = [];
   let currentVersion: VersionEntry | null = null;
-  let currentSection: "minor" | "patch" | null = null;
+  let currentSection: Section | null = null;
   let currentChange: Change | null = null;
 
   for (const rawLine of lines) {
@@ -45,16 +63,7 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       currentSection = null;
       currentChange = null;
     } else if (line.startsWith("### ")) {
-      const section = line.slice(4).trim().toLowerCase();
-
-      if (section === "minor changes") {
-        currentSection = "minor";
-      } else if (section === "patch changes") {
-        currentSection = "patch";
-      } else {
-        currentSection = null;
-      }
-
+      currentSection = sectionOf(line);
       currentChange = null;
     } else if (line.startsWith("- ") && currentSection && currentVersion) {
       // oxlint-disable-next-line prefer-named-capture-group

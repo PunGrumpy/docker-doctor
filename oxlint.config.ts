@@ -7,7 +7,7 @@ import next from "ultracite/oxlint/next";
 import nextJsPlugins from "ultracite/oxlint/next/js-plugins";
 import react from "ultracite/oxlint/react";
 
-const jsPlugins = selectJsPlugins(["github", "react-doctor"]);
+const jsPlugins = selectJsPlugins(["github", "sonarjs", "react-doctor"]);
 
 export default defineConfig({
   env: core.env,

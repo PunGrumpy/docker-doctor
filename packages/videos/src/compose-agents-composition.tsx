@@ -409,7 +409,7 @@ const THUMP_FRAMES = [
 // rising through D minor pentatonic and landing the octave on 31.
 // The frames replicate SceneCount's interpolate so blips sit exactly on the
 // displayed value changes.
-const COUNT_EASE = (t: number): number => 1 - (1 - t) ** 2;
+const countEase = (t: number): number => 1 - (1 - t) ** 2;
 const COUNT_BLIPS: { frame: number; rate: number }[] = [];
 const BLIP_RATES = [1, 6 / 5, 4 / 3, 3 / 2, 16 / 9, 2];
 
@@ -417,7 +417,7 @@ const BLIP_RATES = [1, 6 / 5, 4 / 3, 3 / 2, 16 / 9, 2];
   let shown = 25;
 
   for (let f = 10; f <= 48 && COUNT_BLIPS.length < BLIP_RATES.length; f += 1) {
-    const value = Math.round(25 + 6 * COUNT_EASE((f - 10) / 38));
+    const value = Math.round(25 + 6 * countEase((f - 10) / 38));
 
     if (value > shown) {
       shown = value;

@@ -6,7 +6,7 @@ import type { NextRequest } from "next/server";
 
 import { getScoreData, parseScoreQuery } from "@/lib/score";
 
-export const GET = async (request: NextRequest) => {
+const renderShareImage = async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const score = parseScoreQuery(searchParams.get("s"), 100);
   const { color } = getScoreData(score);
@@ -59,3 +59,5 @@ export const GET = async (request: NextRequest) => {
     }
   );
 };
+
+export { renderShareImage as GET };

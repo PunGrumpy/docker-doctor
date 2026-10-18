@@ -112,10 +112,81 @@ const warmVoice = (freq: number, t: number): number =>
   Math.sin(TWO_PI * freq * 1.0018 * t) +
   0.25 * Math.sin(TWO_PI * freq * 2 * t);
 
+// Sidechain: duck after the kicks on beats 1 and 3.
+const sidechainDuck = (t: number): number => {
+  const sinceKick = t < 2 * BEAT ? t : t - 2 * BEAT;
+
+  return 1 - 0.4 * Math.exp(-sinceKick / 0.16);
+};
+
+// Pad: soft attack, held across the bar, released at its end.
+const padEdge = (t: number, lastBar: boolean): number =>
+  lastBar ? Math.min(1, t / 0.09) : Math.min(1, t / 0.09, (BAR - t) / 0.12);
+
+const padSample = (chord: readonly number[], time: number): number => {
+  let pad = 0;
+
+  for (const f of chord) {
+    pad += warmVoice(f, time);
+  }
+
+  return pad;
+};
+
+// Sub bass: root with a soft octave touch on beat 4.
+const subSample = (bass: number, t: number, time: number): number => {
+  let sub = Math.sin(TWO_PI * bass * time);
+
+  if (t > 3 * BEAT && t < 3.5 * BEAT) {
+    sub += 0.4 * Math.sin(TWO_PI * bass * 2 * time);
+  }
+
+  return sub;
+};
+
+// Kick: beats 1 and 3, a small sine drop, quiet and round. Each kick is
+// added to the sample on its own, so the sums round as they always did.
+const addKicks = (out: Float64Array, i: number, t: number): void => {
+  for (const kickT of [0, 2 * BEAT]) {
+    const dt = t - kickT;
+
+    if (dt >= 0 && dt < 0.22) {
+      const freq = 100 * Math.exp(-dt * 22) + 42;
+      out[i] += Math.sin(TWO_PI * freq * dt) * Math.exp(-dt * 17) * 0.5;
+    }
+  }
+};
+
+const EIGHTH = BEAT / 2;
+
+// Arpeggio: quiet eighth-note plucks over the chord tones.
+const addPluck = (
+  out: Float64Array,
+  i: number,
+  t: number,
+  arp: readonly number[],
+  duck: number
+): void => {
+  if (arp.length === 0) {
+    return;
+  }
+
+  const step = Math.floor(t / EIGHTH);
+  const dt = t - step * EIGHTH;
+
+  if (dt < 0.24) {
+    const note = arp[step % arp.length];
+
+    const pluck =
+      Math.sin(TWO_PI * note * dt) + 0.2 * Math.sin(TWO_PI * note * 2 * dt);
+
+    out[i] += pluck * Math.exp(-dt * 16) * 0.075 * duck;
+  }
+};
+
 const music = (rate = 22_050): Float64Array => {
   const n = Math.floor(rate * BAR * BARS.length);
   const out = new Float64Array(n);
-  const eighth = BEAT / 2;
 
   for (const [barIndex, { chord, bass, arp }] of BARS.entries()) {
     const barStart = barIndex * BAR;
@@ -125,58 +196,13 @@ const music = (rate = 22_050): Float64Array => {
 
     for (let i = i0; i < i1; i += 1) {
       const t = i / rate - barStart;
+      const duck = sidechainDuck(t);
+      const edge = padEdge(t, lastBar);
 
-      // Sidechain: duck after the kicks on beats 1 and 3.
-      const sinceKick = t < 2 * BEAT ? t : t - 2 * BEAT;
-      const duck = 1 - 0.4 * Math.exp(-sinceKick / 0.16);
-
-      // Pad: soft attack, held across the bar, released at its end.
-      const edge = lastBar
-        ? Math.min(1, t / 0.09)
-        : Math.min(1, t / 0.09, (BAR - t) / 0.12);
-
-      let pad = 0;
-
-      for (const f of chord) {
-        pad += warmVoice(f, i / rate);
-      }
-
-      out[i] += pad * 0.055 * edge * duck;
-
-      // Sub bass: root with a soft octave touch on beat 4.
-      let sub = Math.sin(TWO_PI * bass * (i / rate));
-
-      if (t > 3 * BEAT && t < 3.5 * BEAT) {
-        sub += 0.4 * Math.sin(TWO_PI * bass * 2 * (i / rate));
-      }
-
-      out[i] += sub * 0.3 * edge * duck;
-
-      // Kick: beats 1 and 3, a small sine drop, quiet and round.
-      for (const kickT of [0, 2 * BEAT]) {
-        const dt = t - kickT;
-
-        if (dt >= 0 && dt < 0.22) {
-          const freq = 100 * Math.exp(-dt * 22) + 42;
-          out[i] += Math.sin(TWO_PI * freq * dt) * Math.exp(-dt * 17) * 0.5;
-        }
-      }
-
-      // Arpeggio: quiet eighth-note plucks over the chord tones.
-      if (arp.length > 0) {
-        const step = Math.floor(t / eighth);
-        const dt = t - step * eighth;
-
-        if (dt < 0.24) {
-          const note = arp[step % arp.length];
-
-          const pluck =
-            Math.sin(TWO_PI * note * dt) +
-            0.2 * Math.sin(TWO_PI * note * 2 * dt);
-
-          out[i] += pluck * Math.exp(-dt * 16) * 0.075 * duck;
-        }
-      }
+      out[i] += padSample(chord, i / rate) * 0.055 * edge * duck;
+      out[i] += subSample(bass, t, i / rate) * 0.3 * edge * duck;
+      addKicks(out, i, t);
+      addPluck(out, i, t, arp, duck);
     }
   }
 

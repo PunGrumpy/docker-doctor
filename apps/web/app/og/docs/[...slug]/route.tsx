@@ -10,7 +10,7 @@ export const generateStaticParams = () =>
     slug: getPageImageUrl(page).segments,
   }));
 
-export const GET = async (
+const renderDocImage = async (
   _request: Request,
   { params }: { params: Promise<{ slug: string[] }> }
 ) => {
@@ -86,3 +86,5 @@ export const GET = async (
     }
   );
 };
+
+export { renderDocImage as GET };

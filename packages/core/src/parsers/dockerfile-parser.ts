@@ -27,7 +27,7 @@ const DOCKERFILE_KEYWORDS = new Set([
 // The only instructions BuildKit supports heredocs on.
 const HEREDOC_INSTRUCTIONS = new Set(["ADD", "COPY", "RUN"]);
 
-const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>.*)$/u;
+const INSTRUCTION_LINE_RE = /^(?<inst>[A-Za-z]+)\s+(?<args>(?:\S.*)?)$/u;
 
 // Matches a BuildKit heredoc opener like <<EOF, <<-EOF, <<'EOF', <<"EOF".
 // Three constraints keep this from matching shell constructs that aren't
@@ -185,14 +185,10 @@ export const parseDockerfile = (
     // Comment lines are dropped by Docker's parser even mid-continuation, so
     // keep them out of args AND `raw` — raw-based rules must not see them.
     // Heredoc bodies are exempt: a leading `#` there is shell content.
-    if (!insideHeredoc && trimmed.startsWith("#")) {
-      continue;
-    }
-
     // Blank lines never carry instruction text. Outside a heredoc they are
     // skipped even mid-continuation. BuildKit does the same (with a
     // deprecation warning) instead of ending the instruction there.
-    if (!insideHeredoc && trimmed === "") {
+    if (!insideHeredoc && (trimmed.startsWith("#") || trimmed === "")) {
       continue;
     }
 

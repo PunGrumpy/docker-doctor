@@ -4,7 +4,7 @@ import { source } from "@/lib/source";
 // cached forever
 export const revalidate = false;
 
-export const GET = async () => {
+const serveFullLlmsText = async () => {
   const pages = source
     .getPages()
     .toSorted((a, b) => a.url.localeCompare(b.url));
@@ -16,3 +16,5 @@ export const GET = async () => {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 };
+
+export { serveFullLlmsText as GET };

@@ -20,17 +20,17 @@ import { isComposeTrue } from "./compose-services";
 // `${VAR:-default}` resolves to its default; `${VAR}`, `$VAR` and the
 // `?error` forms resolve to nothing.
 const INTERPOLATION_WITH_DEFAULT = /\$\{[^}:?-]+:?-(?<fallback>[^}]*)\}/gu;
-const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*/gu;
+const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_]\w*/gu;
 
 // `$HOME` and `${HOME}` name the same directory `~` does; fold them before
 // the generic interpolation pass would erase them.
-const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?![A-Za-z0-9_])/gu;
+const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?!\w)/gu;
 
 // Compose runs from the project directory, so `$PWD` and `${PWD}` name it.
-const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?![A-Za-z0-9_])/gu;
+const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?!\w)/gu;
 
 // A source that starts with an unresolved variable, e.g. `${DATA_DIR}/pg`.
-const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*)/u;
+const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_]\w*)/u;
 
 // Folds `$HOME`/`$PWD` and applies `${VAR:-default}` defaults, but leaves
 // interpolations with no default in place.
@@ -101,8 +101,8 @@ export interface VolumeMount {
   target: string | undefined;
   /** `:ro` in the short syntax, `read_only: true` in the long syntax. */
   readOnly: boolean;
-  /** Long-syntax `type`; the short syntax leaves it undefined. */
-  type: string | undefined;
+  /** Long-syntax `type`; the short syntax leaves it out. */
+  type?: string;
 }
 
 const shortSyntaxReadOnly = (mode: string | undefined): boolean =>
@@ -127,7 +127,6 @@ export const volumeMount = (
       readOnly: shortSyntaxReadOnly(mode),
       source,
       target,
-      type: undefined,
     };
   }
 
@@ -251,7 +250,7 @@ export const classifyHostPath = (hostPath: string): HostPathScope => {
   const collapsed = path.posix.normalize(hostPath);
 
   const normalized =
-    collapsed.length > 1 ? collapsed.replace(/\/+$/u, "") : collapsed;
+    collapsed.length > 1 ? collapsed.replace(/(?<!\/)\/+$/u, "") : collapsed;
 
   if (normalized === "~") {
     return "home";

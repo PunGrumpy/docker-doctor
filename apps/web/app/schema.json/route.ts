@@ -7,7 +7,7 @@ export const revalidate = false;
 
 const SEVERITY_ENUM = ["error", "warning", "info", "off"];
 
-export const GET = (): NextResponse => {
+const serveConfigSchema = (): NextResponse => {
   const ruleProperties = Object.fromEntries(
     allRules.map((rule) => [
       rule.key,
@@ -59,3 +59,5 @@ export const GET = (): NextResponse => {
 
   return NextResponse.json(schema);
 };
+
+export { serveConfigSchema as GET };

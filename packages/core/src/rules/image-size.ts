@@ -12,9 +12,12 @@ import type {
   Diagnostic,
   DockerfileInstruction,
   DockerfileRule,
+  RuleCategory,
 } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall } from "./package-managers";
+
+const IMAGE_SIZE = "Image Size" satisfies RuleCategory;
 
 interface StageRun {
   inst: DockerfileInstruction;
@@ -44,9 +47,9 @@ const NODE_ENV_REFERENCE_RE = /^\$(?:NODE_ENV|\{NODE_ENV\})$/u;
 
 interface NodeEnvState {
   // The default of `ARG NODE_ENV` in this stage, if declared.
-  arg: string | undefined;
+  arg?: string;
   // The value of `ENV NODE_ENV` in this stage, if set.
-  env: string | undefined;
+  env?: string;
 }
 
 // RUN sees both ENV and ARG values. ENV takes precedence over an ARG of the
@@ -83,7 +86,7 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   // A stage built FROM this one inherits its ENV and its ARGs.
   const nodeEnv: NodeEnvState[] = [];
   // An ARG before the first FROM is not visible inside a stage.
-  const globalScope: NodeEnvState = { arg: undefined, env: undefined };
+  const globalScope: NodeEnvState = {};
 
   for (const inst of instructions) {
     const state = nodeEnv.at(-1) ?? globalScope;
@@ -96,11 +99,7 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
         (s) => s.name !== null && s.name === baseKey
       );
 
-      nodeEnv.push(
-        parent === -1
-          ? { arg: undefined, env: undefined }
-          : { ...nodeEnv[parent] }
-      );
+      nodeEnv.push(parent === -1 ? {} : { ...nodeEnv[parent] });
       stages.push({
         base: baseKey,
         from: inst,
@@ -157,50 +156,61 @@ const MINIMAL_BASE_MARKERS = [
 // `ubi-micro` and `amazonlinux:2023-minimal`, but not `microsoft/dotnet`.
 const MINIMAL_BASE_SEGMENT_RE = /(?:^|[/_. -])(?:minimal|micro)(?:$|[/_. -])/u;
 
+// The base image of a shipped stage when it may be a full-OS distribution,
+// or null when it is exempt or already minimal.
+const fullOsBase = (
+  from: DockerfileInstruction,
+  instructions: DockerfileInstruction[]
+): string | null => {
+  const imagePart = parseFromArgs(from.args).base;
+
+  if (!hasText(imagePart) || isScratch(imagePart)) {
+    return null;
+  }
+
+  const ref = parseImageRef(imagePart);
+  const stageAliases = collectStageAliases(instructions, from.line);
+
+  if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+    return null;
+  }
+
+  // Docker Hardened Images are minimal by construction (dev variants
+  // included), whatever their name and tag say.
+  if (isHardenedImage(imagePart)) {
+    return null;
+  }
+
+  // Digest pins are already fully deterministic; not our concern here.
+  if (hasText(ref.digest)) {
+    return null;
+  }
+
+  // No tag: pin-image-version owns the untagged case, don't double-report.
+  if (!hasText(ref.tag)) {
+    return null;
+  }
+
+  const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
+
+  const isSlim =
+    MINIMAL_BASE_MARKERS.some((marker) => haystack.includes(marker)) ||
+    MINIMAL_BASE_SEGMENT_RE.test(haystack);
+
+  return isSlim ? null : imagePart;
+};
+
 export const preferSlimBase: DockerfileRule = {
-  category: "Image Size",
+  category: IMAGE_SIZE,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
     // A build stage that is discarded never reaches the image, so its base
     // has no effect on the image's size.
     for (const { from } of shippedStages(collectStages(instructions))) {
-      const imagePart = parseFromArgs(from.args).base;
+      const imagePart = fullOsBase(from, instructions);
 
-      if (!hasText(imagePart) || isScratch(imagePart)) {
-        continue;
-      }
-
-      const ref = parseImageRef(imagePart);
-      const stageAliases = collectStageAliases(instructions, from.line);
-
-      if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
-        continue;
-      }
-
-      // Docker Hardened Images are minimal by construction (dev variants
-      // included), whatever their name and tag say.
-      if (isHardenedImage(imagePart)) {
-        continue;
-      }
-
-      // Digest pins are already fully deterministic; not our concern here.
-      if (hasText(ref.digest)) {
-        continue;
-      }
-
-      // No tag: pin-image-version owns the untagged case, don't double-report.
-      if (!hasText(ref.tag)) {
-        continue;
-      }
-
-      const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
-
-      const isSlim =
-        MINIMAL_BASE_MARKERS.some((marker) => haystack.includes(marker)) ||
-        MINIMAL_BASE_SEGMENT_RE.test(haystack);
-
-      if (!isSlim) {
+      if (imagePart !== null) {
         diagnostics.push(
           createDiagnostic(
             file,
@@ -252,7 +262,7 @@ const cacheMountTargets = (args: string): string[] => {
 // `rm -rf`, `rm -fr`, `rm -r`, `rm -Rf` and `rm --recursive --force` all
 // count.
 const RECURSIVE_RM_RE =
-  /\brm\s+(?:--?[A-Za-z][A-Za-z-]*\s+)*?(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive)\s[^;&|]*/gu;
+  /\brm\s+(?:--?[A-Za-z][A-Za-z-]*\s+)*?(?:-[A-QS-Za-qs-z]*[rR][A-Za-z]*|--recursive)\s[^;&|]*/gu;
 
 // `rm -rf /tmp/* <dir>/*` removes <dir> as much as `rm -rf <dir>/*` does.
 // The match runs on the text with quoted spans blanked, so
@@ -273,7 +283,7 @@ const APK_ADD_NO_CACHE_RE = /\bapk\s+add\b[^;&|]*\s--no-cache(?=[\s;&|]|$)/u;
 const APT_LISTS_DIR = "/var/lib/apt/lists";
 const APK_CACHE_DIRS = ["/var/cache/apk", "/etc/apk/cache"];
 
-const TRAILING_SLASHES_RE = /\/+$/u;
+const TRAILING_SLASHES_RE = /(?<!\/)\/+$/u;
 
 const hasCacheMountFor = (args: string, cacheDirs: string[]): boolean =>
   cacheMountTargets(args).some((target) =>
@@ -289,7 +299,7 @@ const hasCacheMountOver = (args: string, dir: string): boolean =>
   });
 
 export const cleanPackageCache: DockerfileRule = {
-  category: "Image Size",
+  category: IMAGE_SIZE,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
@@ -344,9 +354,9 @@ export const cleanPackageCache: DockerfileRule = {
   message: "Clean up package manager cache in the same RUN layer",
 };
 
-const SHELL_SEPARATOR_RE = /\s*(?:&&|\|\||;|\|)\s*/u;
+const SHELL_SEPARATOR_RE = /(?:(?<!\s)|(?!\s))\s*(?:&&|\|\||;|\|)\s*/u;
 const WHITESPACE_RE = /\s+/u;
-const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
 const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
 
 // The managers that leave devDependencies out when NODE_ENV is
@@ -415,7 +425,7 @@ const installsDevDependencies = ({ inst, productionEnv }: StageRun): boolean =>
     .some((segment) => segmentInstallsDevDependencies(segment, productionEnv));
 
 export const avoidDevDependencies: DockerfileRule = {
-  category: "Image Size",
+  category: IMAGE_SIZE,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 

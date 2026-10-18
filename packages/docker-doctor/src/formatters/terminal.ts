@@ -55,96 +55,86 @@ const printDiscoveredFiles = (project: ProjectInfo): void => {
   );
 };
 
-const printDiagnostics = (
+const printMigrationWarning = (diagnostics: Diagnostic[]): void => {
+  // Migration-scale checks: the same rule firing many times.
+  const findingsByRule = new Map<
+    string,
+    { count: number; files: Set<string> }
+  >();
+
+  for (const d of diagnostics) {
+    const findings = findingsByRule.get(d.rule) ?? {
+      count: 0,
+      files: new Set<string>(),
+    };
+
+    findings.count += 1;
+    findings.files.add(d.file);
+    findingsByRule.set(d.rule, findings);
+  }
+
+  const migrationRules = [...findingsByRule].filter(
+    ([, { count }]) => count >= 5
+  );
+
+  if (migrationRules.length > 0) {
+    console.log();
+    console.log(
+      `  ${chalk.yellow("⚠ Migration-scale change: sample before you sweep")}`
+    );
+
+    for (const [rule, { count, files }] of migrationRules) {
+      const fileWord = files.size === 1 ? "file" : "files";
+      console.log(
+        `    ${chalk.cyan(rule)} ×${count} across ${files.size} ${fileWord}`
+      );
+    }
+
+    console.log(
+      `    Fixing all of them at once is hard to review and prone to`
+    );
+    console.log(
+      `    subtle mistakes across the whole repo. Fix a representative`
+    );
+    console.log(
+      `    few first and confirm the recipe holds. Then get the code`
+    );
+    console.log(`    owner's sign-off before changing the rest.`);
+    console.log(`    Scope it down one area at a time: docker-doctor <path>`);
+  }
+};
+
+const printCategorySummary = (
   diagnostics: Diagnostic[],
-  verbose: boolean,
-  fileContents: Record<string, string>,
-  categoryIssueCounts: Record<string, number>,
-  unanalyzedCount: number
+  categoryIssueCounts: Record<string, number>
 ): void => {
-  if (diagnostics.length === 0) {
-    // "Healthy" is a claim about every discovered file, so an incomplete
-    // scan does not make it.
-    console.log(
-      unanalyzedCount === 0
-        ? `\n${chalk.green.bold("✔ No issues found! Your Docker setup looks healthy.")}`
-        : `\n${chalk.yellow.bold("⚠ No issues found in the files that could be analyzed.")}`
-    );
+  console.log(`\n  All ${chalk.bold(diagnostics.length)} issues\n`);
 
-    return;
+  const categories = [
+    "Security",
+    "Performance",
+    "Best Practices",
+    "Compose",
+    "Image Size",
+  ];
+
+  for (const cat of categories) {
+    const count = categoryIssueCounts[cat];
+    const issueLabel = count === 1 ? "1 issue" : `${count} issues`;
+    console.log(`  ${cat} › ${chalk.dim(issueLabel)}`);
   }
 
-  if (!verbose) {
-    console.log(`\n  All ${chalk.bold(diagnostics.length)} issues\n`);
+  console.log(
+    `\n  Run ${chalk.cyan("docker-doctor --verbose")} to list every error and warning`
+  );
 
-    const categories = [
-      "Security",
-      "Performance",
-      "Best Practices",
-      "Compose",
-      "Image Size",
-    ];
+  printMigrationWarning(diagnostics);
+};
 
-    for (const cat of categories) {
-      const count = categoryIssueCounts[cat];
-      const issueLabel = count === 1 ? "1 issue" : `${count} issues`;
-      console.log(`  ${cat} › ${chalk.dim(issueLabel)}`);
-    }
-
-    console.log(
-      `\n  Run ${chalk.cyan("docker-doctor --verbose")} to list every error and warning`
-    );
-
-    // Migration-scale checks: the same rule firing many times.
-    const findingsByRule = new Map<
-      string,
-      { count: number; files: Set<string> }
-    >();
-
-    for (const d of diagnostics) {
-      const findings = findingsByRule.get(d.rule) ?? {
-        count: 0,
-        files: new Set<string>(),
-      };
-
-      findings.count += 1;
-      findings.files.add(d.file);
-      findingsByRule.set(d.rule, findings);
-    }
-
-    const migrationRules = [...findingsByRule].filter(
-      ([, { count }]) => count >= 5
-    );
-
-    if (migrationRules.length > 0) {
-      console.log();
-      console.log(
-        `  ${chalk.yellow("⚠ Migration-scale change: sample before you sweep")}`
-      );
-
-      for (const [rule, { count, files }] of migrationRules) {
-        const fileWord = files.size === 1 ? "file" : "files";
-        console.log(
-          `    ${chalk.cyan(rule)} ×${count} across ${files.size} ${fileWord}`
-        );
-      }
-
-      console.log(
-        `    Fixing all of them at once is hard to review and prone to`
-      );
-      console.log(
-        `    subtle mistakes across the whole repo. Fix a representative`
-      );
-      console.log(
-        `    few first and confirm the recipe holds. Then get the code`
-      );
-      console.log(`    owner's sign-off before changing the rest.`);
-      console.log(`    Scope it down one area at a time: docker-doctor <path>`);
-    }
-
-    return;
-  }
-
+const printDiagnosticsByFile = (
+  diagnostics: Diagnostic[],
+  fileContents: Record<string, string>
+): void => {
   console.log(`\nFound ${chalk.bold(diagnostics.length)} issue(s):`);
 
   // Group by file
@@ -189,6 +179,34 @@ const printDiagnostics = (
   }
 };
 
+const printDiagnostics = (
+  diagnostics: Diagnostic[],
+  verbose: boolean,
+  fileContents: Record<string, string>,
+  categoryIssueCounts: Record<string, number>,
+  unanalyzedCount: number
+): void => {
+  if (diagnostics.length === 0) {
+    // "Healthy" is a claim about every discovered file, so an incomplete
+    // scan does not make it.
+    console.log(
+      unanalyzedCount === 0
+        ? `\n${chalk.green.bold("✔ No issues found! Your Docker setup looks healthy.")}`
+        : `\n${chalk.yellow.bold("⚠ No issues found in the files that could be analyzed.")}`
+    );
+
+    return;
+  }
+
+  if (!verbose) {
+    printCategorySummary(diagnostics, categoryIssueCounts);
+
+    return;
+  }
+
+  printDiagnosticsByFile(diagnostics, fileContents);
+};
+
 const getWhaleMascot = (
   score: number,
   border: (text: string) => string
@@ -223,12 +241,13 @@ const printScoreBox = async (
 ): Promise<void> => {
   const { isTTY } = process.stdout;
 
-  const shouldAnimate =
-    isTTY &&
-    !hasText(process.env.CI) &&
-    !hasText(process.env.NO_ANIMATION) &&
-    process.env.TERM !== "dumb" &&
-    process.env.NODE_ENV !== "test";
+  const animationTurnedOff =
+    hasText(process.env.CI) || hasText(process.env.NO_ANIMATION);
+
+  const canAnimate =
+    process.env.TERM !== "dumb" && process.env.NODE_ENV !== "test";
+
+  const shouldAnimate = isTTY && !animationTurnedOff && canAnimate;
 
   let scoreColor = chalk.red.bold;
 
@@ -282,8 +301,10 @@ const printScoreBox = async (
           console.log();
         }
 
+        const scoreText = `${currentScore} / 100`;
+
         process.stdout.write(
-          `  ${whaleLines[0]}  ${scoreColor(`${currentScore} / 100`)} ${scoreColor(label)}\n` +
+          `  ${whaleLines[0]}  ${scoreColor(scoreText)} ${scoreColor(label)}\n` +
             `  ${whaleLines[1]}  ${bar}\n` +
             `  ${whaleLines[2]}  ${chalk.dim("Docker Doctor (https://docker-doctor.vercel.app)")}\n` +
             `  ${whaleLines[3]}\n`
@@ -306,8 +327,10 @@ const printScoreBox = async (
     const bar =
       scoreColor("█".repeat(filledBlocks)) + chalk.dim("░".repeat(emptyBlocks));
 
+    const scoreText = `${score} / 100`;
+
     console.log(
-      `\n  ${whaleLines[0]}  ${scoreColor(`${score} / 100`)} ${scoreColor(label)}`
+      `\n  ${whaleLines[0]}  ${scoreColor(scoreText)} ${scoreColor(label)}`
     );
     console.log(`  ${whaleLines[1]}  ${bar}`);
     console.log(
@@ -326,9 +349,9 @@ const printScoreBox = async (
   } else {
     // The score covers only part of the project, so it is not one to share.
     const fileWord = unanalyzedCount === 1 ? "file" : "files";
-    console.log(
-      `  ${chalk.yellow(`⚠ Incomplete scan: ${unanalyzedCount} ${fileWord} could not be analyzed.`)}`
-    );
+    const warning = `⚠ Incomplete scan: ${unanalyzedCount} ${fileWord} could not be analyzed.`;
+
+    console.log(`  ${chalk.yellow(warning)}`);
     console.log(`  The score covers only the analyzed files.\n`);
   }
 

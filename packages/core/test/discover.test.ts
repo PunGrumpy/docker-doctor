@@ -198,7 +198,7 @@ describe("discoverProject", () => {
         expect(project.dockerfiles).toEqual(["Dockerfile"]);
         expect(skipped).toEqual([]);
       } finally {
-        fs.chmodSync(locked, 0o755);
+        fs.chmodSync(locked, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }
@@ -227,7 +227,7 @@ describe("discoverProject", () => {
         expect(project.dockerfiles).toEqual(["a/Dockerfile"]);
         expect(skipped).toEqual([]);
       } finally {
-        fs.chmodSync(locked, 0o755);
+        fs.chmodSync(locked, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }
@@ -263,7 +263,7 @@ describe("discoverProject", () => {
         });
         expect(skipped).toEqual([]);
       } finally {
-        fs.chmodSync(locked, 0o755);
+        fs.chmodSync(locked, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }
@@ -288,7 +288,7 @@ describe("discoverProject", () => {
 
         expect(rejected).toBe(true);
       } finally {
-        fs.chmodSync(root, 0o755);
+        fs.chmodSync(root, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }
@@ -342,7 +342,7 @@ describe("discoverProject", () => {
         expect(project.dockerfiles).toEqual(["Dockerfile"]);
         expect(skipped).toEqual([]);
       } finally {
-        fs.chmodSync(locked, 0o755);
+        fs.chmodSync(locked, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }

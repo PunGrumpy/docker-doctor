@@ -8,7 +8,11 @@ import {
   parseImageRef,
 } from "../parsers/image-ref";
 import { hasText } from "../text";
-import type { Diagnostic, DockerfileRule } from "../types/index";
+import type {
+  Diagnostic,
+  DockerfileInstruction,
+  DockerfileRule,
+} from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 
@@ -81,6 +85,35 @@ export const noRootUser: DockerfileRule = {
   message: "Run the container as a non-root user",
 };
 
+// A literal value, not a `{...}` placeholder, under a key that names a
+// secret.
+const isLiteralSecret = (key: string, value: string): boolean =>
+  isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{");
+
+// The keys of an ENV or ARG instruction that hold a literal secret, in the
+// order they appear.
+const secretKeysIn = (instruction: string, rawArgs: string): string[] => {
+  const args = rawArgs.trim();
+
+  if (instruction === "ENV" && !args.includes("=")) {
+    // KEY VALUE format
+    const groups = /^(?<key>\S+)\s+(?<value>(?:\S.*)?)$/u.exec(args)?.groups;
+
+    return groups !== undefined && isLiteralSecret(groups.key, groups.value)
+      ? [groups.key]
+      : [];
+  }
+
+  // KEY=VALUE format, several per instruction
+  return args.split(/\s+/u).flatMap((part) => {
+    const eqIndex = part.indexOf("=");
+    const key = eqIndex > 0 ? part.slice(0, eqIndex) : part;
+    const value = eqIndex > 0 ? part.slice(eqIndex + 1) : "";
+
+    return isLiteralSecret(key, value) ? [key] : [];
+  });
+};
+
 export const noSecretsInEnv: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
@@ -88,68 +121,17 @@ export const noSecretsInEnv: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "ENV" || inst.instruction === "ARG") {
-        const args = inst.args.trim();
-
-        if (inst.instruction === "ENV" && !args.includes("=")) {
-          // KEY VALUE format
-          const match = /^(?<key>[^\s]+)\s+(?<value>.*)$/u.exec(args);
-
-          if (match?.groups) {
-            const { key, value } = match.groups;
-            const keyIsSecret = isSecretKey(key);
-
-            if (
-              keyIsSecret &&
-              isLiteralSecretValue(value) &&
-              !value.startsWith("{")
-            ) {
-              diagnostics.push(
-                createDiagnostic(
-                  file,
-                  this.key,
-                  this.defaultSeverity,
-                  `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
-                  this.help,
-                  inst.line
-                )
-              );
-            }
-          }
-        } else {
-          // Existing KEY=VALUE logic
-          const parts = args.split(/\s+/u);
-
-          for (const part of parts) {
-            const eqIndex = part.indexOf("=");
-            let key = "";
-            let value = "";
-
-            if (eqIndex > 0) {
-              key = part.slice(0, eqIndex);
-              value = part.slice(eqIndex + 1);
-            } else {
-              key = part;
-            }
-
-            const keyIsSecret = isSecretKey(key);
-
-            if (
-              keyIsSecret &&
-              isLiteralSecretValue(value) &&
-              !value.startsWith("{")
-            ) {
-              diagnostics.push(
-                createDiagnostic(
-                  file,
-                  this.key,
-                  this.defaultSeverity,
-                  `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
-                  this.help,
-                  inst.line
-                )
-              );
-            }
-          }
+        for (const key of secretKeysIn(inst.instruction, inst.args)) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Potential secret found in ${inst.instruction}: '${key}'. Secrets baked into images can be extracted easily by anyone with image access.`,
+              this.help,
+              inst.line
+            )
+          );
         }
       }
     }
@@ -160,6 +142,24 @@ export const noSecretsInEnv: DockerfileRule = {
   help: "Use Docker Secrets, build arguments passed at runtime, or environment variables at runtime instead of baking them into the image.",
   key: "docker-doctor/no-secrets-in-env",
   message: "Avoid storing secrets in ENV or ARG instructions",
+};
+
+// What is wrong with how a FROM pins its base image. Undefined when it is
+// pinned, scratch, a variable, or an earlier stage of the same file.
+const basePinIssue = (
+  imagePart: string,
+  instructions: DockerfileInstruction[],
+  line: number
+): ReturnType<typeof mutableRefIssue> => {
+  const ref = parseImageRef(imagePart);
+
+  const isStage = collectStageAliases(instructions, line).has(
+    imagePart.toLowerCase()
+  );
+
+  return isScratch(imagePart) || ref.isVariable || isStage
+    ? undefined
+    : mutableRefIssue(ref);
 };
 
 export const pinImageVersion: DockerfileRule = {
@@ -173,20 +173,11 @@ export const pinImageVersion: DockerfileRule = {
         // Also respect multi-stage builds (AS stageName)
         const imagePart = parseFromArgs(inst.args).base;
 
-        if (!hasText(imagePart) || isScratch(imagePart)) {
-          continue;
-        }
+        const issue = hasText(imagePart)
+          ? basePinIssue(imagePart, instructions, inst.line)
+          : undefined;
 
-        const ref = parseImageRef(imagePart);
-        const stageAliases = collectStageAliases(instructions, inst.line);
-
-        if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
-          continue;
-        }
-
-        const issue = mutableRefIssue(ref);
-
-        if (issue) {
+        if (issue !== undefined) {
           const detail =
             issue === "untagged"
               ? `Base image '${imagePart}' does not specify a tag.`

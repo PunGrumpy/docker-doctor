@@ -33,22 +33,24 @@ const SCORE_H = 96;
 
 type Severity = "error" | "warning";
 
+type TermLineKind =
+  | "cmd"
+  | "blank"
+  | "header"
+  | "summary"
+  | "category"
+  | "finding"
+  | "code"
+  | "fix"
+  | "hand"
+  | "banner"
+  | "prompt"
+  | "working"
+  | "ok"
+  | "score";
+
 interface TermLine extends BaseLine {
-  kind:
-    | "cmd"
-    | "blank"
-    | "header"
-    | "summary"
-    | "category"
-    | "finding"
-    | "code"
-    | "fix"
-    | "hand"
-    | "banner"
-    | "prompt"
-    | "working"
-    | "ok"
-    | "score";
+  kind: TermLineKind;
   /** header: the dim workspace tail; finding: the dim rule key. */
   meta?: string;
   /** code lines: the dim `file:line` that the finding points at. */
