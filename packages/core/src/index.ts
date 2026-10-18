@@ -4,6 +4,10 @@ export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 export { runComposeRules } from "./runners/compose-runner";
 export {
+  isAnalyzableCompose,
+  isAnalyzableDockerfile,
+} from "./runners/analyzable";
+export {
   allRules,
   allDockerfileRules,
   allComposeRules,
