@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -876,6 +877,14 @@ const writeScanOutput = async (
   );
 };
 
+const statOrNull = async (filePath: string): Promise<Stats | null> => {
+  try {
+    return await fs.stat(filePath);
+  } catch {
+    return null;
+  }
+};
+
 const pathExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
@@ -923,7 +932,7 @@ const resolveConfigPath = async (
 const findScanTargetProblem = async (
   rootDir: string
 ): Promise<string | null> => {
-  const rootStat = await fs.stat(rootDir).catch(() => null);
+  const rootStat = await statOrNull(rootDir);
 
   if (rootStat === null) {
     return `Directory not found: ${rootDir}`;

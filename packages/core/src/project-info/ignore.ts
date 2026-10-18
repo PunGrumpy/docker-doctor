@@ -65,7 +65,9 @@ export const createIgnoreMatcher = (
     return () => false;
   }
 
-  const regexps = patterns.map(normalizeIgnorePattern).map(globToRegExp);
+  const regexps = patterns.map((pattern) =>
+    globToRegExp(normalizeIgnorePattern(pattern))
+  );
 
   return (relativePath) => {
     const normalized = relativePath.replaceAll("\\", "/");

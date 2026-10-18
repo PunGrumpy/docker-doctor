@@ -25,6 +25,12 @@ const INK = "rgba(0,0,0,0.85)";
 const ACCENT = "#2563eb";
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 
+const CLAMP = {
+  easing: EASE,
+  extrapolateLeft: "clamp",
+  extrapolateRight: "clamp",
+} as const;
+
 const SCAN_COMMAND = "npx @docker-doctor/cli@latest";
 
 // Nudge a full-frame, self-centering component off-center without touching
@@ -76,14 +82,8 @@ const CTA_DURATION = 66;
 const CommandPill = () => {
   const frame = useCurrentFrame();
 
-  const clamp = {
-    easing: EASE,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  } as const;
-
-  const opacity = interpolate(frame, [0, 14], [0, 1], clamp);
-  const y = interpolate(frame, [0, 14], [14, 0], clamp);
+  const opacity = interpolate(frame, [0, 14], [0, 1], CLAMP);
+  const y = interpolate(frame, [0, 14], [14, 0], CLAMP);
 
   return (
     <AbsoluteFill

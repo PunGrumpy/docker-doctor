@@ -37,9 +37,9 @@ interface ThumbPosition {
   readonly height: number;
 }
 
-// Measures the active link now and on every resize. With no container or no
-// active heading the marker is hidden and nothing listens. Returns the
-// cleanup that stops listening.
+// Measures the active link now and whenever the container's size changes.
+// With no container or no active heading the marker is hidden and nothing is
+// observed. Returns the cleanup that stops observing.
 const followActiveLink = (
   container: HTMLElement | null,
   active: string | undefined,
@@ -55,14 +55,16 @@ const followActiveLink = (
     onMeasure(link ? { height: link.offsetHeight, top: link.offsetTop } : null);
   };
 
+  const observer = new ResizeObserver(measure);
+
   measure();
 
   if (canFollow) {
-    window.addEventListener("resize", measure);
+    observer.observe(container);
   }
 
   return () => {
-    window.removeEventListener("resize", measure);
+    observer.disconnect();
   };
 };
 
