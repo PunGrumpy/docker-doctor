@@ -5,7 +5,9 @@ import { source } from "@/lib/source";
 // cached forever
 export const revalidate = false;
 
-export const GET = () =>
+const serveLlmsIndex = () =>
   new Response(llms(source).index(), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
+
+export { serveLlmsIndex as GET };
