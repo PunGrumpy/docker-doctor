@@ -1,22 +1,24 @@
 import type { Diagnostic } from "./types/index";
 
-export const SCORE_BUCKETS = [
+export interface ScoreBucket {
+  readonly emoji: string;
+  readonly label: string;
+  readonly min: number;
+}
+
+// The lowest bucket, and the last one in SCORE_BUCKETS. A score below every
+// threshold, which only a negative or NaN score is, lands here too.
+const CRITICAL_BUCKET: ScoreBucket = { emoji: "🚨", label: "Critical", min: 0 };
+
+export const SCORE_BUCKETS: readonly ScoreBucket[] = [
   { emoji: "🏆", label: "Excellent", min: 90 },
   { emoji: "✅", label: "Good", min: 75 },
   { emoji: "⚠️", label: "Needs Work", min: 50 },
-  { emoji: "🚨", label: "Critical", min: 0 },
-] as const;
+  CRITICAL_BUCKET,
+];
 
-export const getScoreBucket = (
-  score: number
-): (typeof SCORE_BUCKETS)[number] => {
-  for (const bucket of SCORE_BUCKETS) {
-    if (score >= bucket.min) {
-      return bucket;
-    }
-  }
-  return SCORE_BUCKETS.at(-1) as (typeof SCORE_BUCKETS)[number];
-};
+export const getScoreBucket = (score: number): ScoreBucket =>
+  SCORE_BUCKETS.find((bucket) => score >= bucket.min) ?? CRITICAL_BUCKET;
 
 const SEVERITY_PENALTY = { error: 10, info: 1, warning: 4 } as const;
 

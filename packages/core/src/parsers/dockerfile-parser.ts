@@ -102,9 +102,9 @@ const matchInstructionKeyword = (
 // inside a quoted string — the masked copy has a space there instead.
 const findHeredocDelimiters = (lineContent: string): string[] => {
   const masked = maskQuotedText(lineContent);
-  return [...lineContent.matchAll(HEREDOC_OPENER_RE)]
-    .filter((match) => masked[match.index] === "<")
-    .map((match) => match.groups?.delim ?? "");
+  return [...lineContent.matchAll(HEREDOC_OPENER_RE)].flatMap((match) =>
+    masked[match.index] === "<" ? [match.groups?.delim ?? ""] : []
+  );
 };
 
 // Heredoc body lines are never treated as instructions (not even comment
