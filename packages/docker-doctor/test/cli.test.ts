@@ -3,10 +3,29 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import type { JsonReport } from "@docker-doctor/core";
 import { allRules } from "@docker-doctor/core";
 
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
+
+const isJsonReport = (value: unknown): value is JsonReport =>
+  typeof value === "object" &&
+  value !== null &&
+  "diagnostics" in value &&
+  Array.isArray(value.diagnostics);
+
+// Reads the CLI's --json output. A broken report fails here, by name,
+// rather than as an undefined field further down the test.
+const parseReport = (text: string): JsonReport => {
+  const value: unknown = JSON.parse(text);
+
+  if (!isJsonReport(value)) {
+    throw new Error(`Not a docker-doctor JSON report: ${text.slice(0, 200)}`);
+  }
+
+  return value;
+};
 
 const runCli = async (
   args: string[],
@@ -123,7 +142,7 @@ describe("unanalyzable files", () => {
     ]);
 
     expect(stderr).toContain("could not analyze");
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(() => parseReport(stdout)).not.toThrow();
   });
 
   test("--score prints nothing when no file was analyzed, and exits 2", async () => {
@@ -154,7 +173,7 @@ describe("unanalyzable files", () => {
 
     expect(exitCode).toBe(2);
     expect(stderr).toContain("Unterminated heredoc");
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(() => parseReport(stdout)).not.toThrow();
   });
 
   test("the JSON report lists the file that could not be analyzed", async () => {
@@ -164,7 +183,7 @@ describe("unanalyzable files", () => {
     ]);
 
     expect(exitCode).toBe(2);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.failures).toHaveLength(1);
     expect(report.failures[0].file).toBe("Dockerfile");
     expect(report.failures[0].message).toContain("Unterminated heredoc");
@@ -197,7 +216,7 @@ describe("unreadable directories", () => {
 
         expect(exitCode).toBe(0);
         expect(stderr).toContain("skipped unreadable directory locked");
-        expect(JSON.parse(stdout).project.dockerfiles).toEqual([
+        expect(parseReport(stdout).project.dockerfiles).toEqual([
           "ok/Dockerfile",
         ]);
       } finally {
@@ -216,7 +235,7 @@ describe("agent-stack fixture", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
 
     const findings = report.diagnostics.map(
       (d: { rule: string; line?: number }) => [d.rule, d.line]
@@ -232,12 +251,12 @@ describe("agent-stack fixture", () => {
 describe("--json contract", () => {
   test("with-error fixture produces parseable JSON", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(() => parseReport(stdout)).not.toThrow();
   });
 
   test("report has exactly the documented top-level keys", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(Object.keys(report).toSorted()).toEqual(
       [
         "analyzedFiles",
@@ -254,20 +273,20 @@ describe("--json contract", () => {
 
   test("schemaVersion is 6 and analyzedFiles counts the scanned files", async () => {
     const { stdout } = await runCli([fixture("multi-file"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.schemaVersion).toBe(6);
     expect(report.analyzedFiles).toBe(2);
   });
 
   test("a complete scan reports an empty failures list", async () => {
     const { stdout } = await runCli([fixture("clean"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.failures).toEqual([]);
   });
 
   test("score is a number in [0, 100]", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.score).toBeTypeOf("number");
     expect(report.score).toBeGreaterThanOrEqual(0);
     expect(report.score).toBeLessThanOrEqual(100);
@@ -275,7 +294,7 @@ describe("--json contract", () => {
 
   test("every diagnostic has the required shape", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(Array.isArray(report.diagnostics)).toBe(true);
 
     for (const d of report.diagnostics) {
@@ -296,7 +315,7 @@ describe("--json contract", () => {
 
   test("at least one diagnostic has severity error", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(
       report.diagnostics.some(
         (d: { severity: string }) => d.severity === "error"
@@ -385,7 +404,7 @@ describe("analyzed files", () => {
   test("no analyzed file gives a null score in --json and no --score output", async () => {
     const json = await runCli([fixture("all-broken"), "--json"]);
     expect(json.exitCode).toBe(2);
-    const report = JSON.parse(json.stdout);
+    const report = parseReport(json.stdout);
     expect(report.score).toBeNull();
     expect(report.label).toBeNull();
     expect(report.analyzedFiles).toBe(0);
@@ -406,7 +425,7 @@ describe("analyzed files", () => {
 
       const { exitCode, stderr, stdout } = await runCli([root, "--json"]);
       expect(exitCode).toBe(0);
-      const report = JSON.parse(stdout);
+      const report = parseReport(stdout);
       expect(report.score).toBeNull();
       expect(report.failures).toEqual([]);
       expect(stderr).toContain("checked none of the 2 discovered files");
@@ -439,7 +458,7 @@ describe("analyzed files", () => {
 
       const { exitCode, stdout } = await runCli([root, "--json"]);
       expect(exitCode).toBe(2);
-      const report = JSON.parse(stdout);
+      const report = parseReport(stdout);
       expect(report.project.composeFiles).toEqual(expected);
       expect(report.failures.map((f: { file: string }) => f.file)).toEqual(
         expected
@@ -454,7 +473,7 @@ describe("empty project", () => {
   test("scanning an empty directory with --json exits 0 with no diagnostics", async () => {
     const { exitCode, stdout } = await runCli([fixture("empty"), "--json"]);
     expect(exitCode).toBe(0);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.diagnostics).toEqual([]);
   });
 
@@ -462,7 +481,7 @@ describe("empty project", () => {
     const json = await runCli([fixture("empty"), "--json"]);
     expect(json.exitCode).toBe(0);
     expect(json.stderr).toContain("No Dockerfiles or Compose files found");
-    const report = JSON.parse(json.stdout);
+    const report = parseReport(json.stdout);
     expect(report.score).toBeNull();
     expect(report.label).toBeNull();
     expect(report.analyzedFiles).toBe(0);
@@ -484,7 +503,7 @@ describe("empty project", () => {
       "--json",
     ]);
 
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
     expect(report.project.dockerignores).toContain("Dockerfile.dockerignore");
     expect(
@@ -503,14 +522,14 @@ describe("categories config", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
 
     const rootUserDiag = report.diagnostics.find(
       (d: { rule: string }) => d.rule === "docker-doctor/no-root-user"
     );
 
     expect(rootUserDiag).toBeDefined();
-    expect(rootUserDiag.severity).toBe("error");
+    expect(rootUserDiag?.severity).toBe("error");
   });
 });
 
@@ -595,7 +614,7 @@ describe("ignore.files config", () => {
     ]);
 
     expect(exitCode).toBe(0);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
     expect(
       report.diagnostics.some((d: { file: string }) =>
@@ -615,7 +634,7 @@ describe("unknown config keys", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toContain('Unknown rule "docker-doctor/no-root-users"');
     expect(stderr).toContain('Unknown category "security"');
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(() => parseReport(stdout)).not.toThrow();
   });
 });
 
@@ -624,7 +643,7 @@ describe("TypeScript config", () => {
     const { exitCode, stdout } = await runCli([fixture("ts-config"), "--json"]);
 
     expect(exitCode).toBe(0);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(
       report.diagnostics.some(
         (d: { rule: string }) => d.rule === "docker-doctor/require-labels"
@@ -664,7 +683,7 @@ const scanWithConfig = async (
 };
 
 const reportsRequireLabels = (stdout: string): boolean =>
-  JSON.parse(stdout).diagnostics.some(
+  parseReport(stdout).diagnostics.some(
     (d: { rule: string }) => d.rule === "docker-doctor/require-labels"
   );
 
@@ -719,7 +738,7 @@ describe("piped --json output is not truncated", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(() => parseReport(stdout)).not.toThrow();
   });
 
   test("large --json output over a pipe is not truncated", async () => {
@@ -727,7 +746,7 @@ describe("piped --json output is not truncated", () => {
     expect(piped.exitCode).toBe(1);
     expect(piped.stdout.length).toBeGreaterThan(65_536);
 
-    const report = JSON.parse(piped.stdout);
+    const report = parseReport(piped.stdout);
     expect(Array.isArray(report.diagnostics)).toBe(true);
     expect(report.diagnostics.length).toBeGreaterThan(100);
 
@@ -745,7 +764,7 @@ describe("piped --json output is not truncated", () => {
     );
 
     await redirected.exited;
-    const fileReport = JSON.parse(await Bun.file(outFile).text());
+    const fileReport = parseReport(await Bun.file(outFile).text());
     await Bun.file(outFile).delete();
 
     expect(fileReport.diagnostics.length).toBe(report.diagnostics.length);
@@ -755,7 +774,7 @@ describe("piped --json output is not truncated", () => {
 describe("heredoc fixture", () => {
   test("heredoc fixture with --json yields at least one diagnostic", async () => {
     const { stdout } = await runCli([fixture("heredoc"), "--json"]);
-    const report = JSON.parse(stdout);
+    const report = parseReport(stdout);
     expect(report.diagnostics.length).toBeGreaterThanOrEqual(1);
   });
 });
