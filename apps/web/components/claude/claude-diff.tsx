@@ -53,6 +53,7 @@ export const ClaudeDiff = ({
     <pre className="border-border bg-muted/30 mt-1 min-w-0 overflow-x-auto rounded-md border py-1.5 pr-3 pl-2">
       {lines.map((l) => {
         let mark = " ";
+
         if (l.type === "add") {
           mark = "+";
         } else if (l.type === "del") {

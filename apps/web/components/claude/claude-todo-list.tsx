@@ -19,8 +19,10 @@ export interface Todo {
 
 // 38;5;114
 const DONE = "#87d787";
+
 // 38;5;174 — Claude terracotta
 const ACTIVE = "#d78787";
+
 // 38;5;246
 const DIM = "#949494";
 
@@ -34,9 +36,11 @@ const getStatusLabel = (status: Todo["status"]) => {
   if (status === "done") {
     return "completed";
   }
+
   if (status === "active") {
     return "in progress";
   }
+
   return "pending";
 };
 
@@ -50,6 +54,7 @@ export const ClaudeTodoList = ({
   <ol className={cn("font-mono text-[13px] leading-[1.6]", className)}>
     {todos.map((t, i) => {
       let iconColor;
+
       if (t.status === "done") {
         iconColor = DONE;
       } else if (t.status === "active") {

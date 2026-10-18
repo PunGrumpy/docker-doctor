@@ -13,6 +13,7 @@ describe("Dockerfile Parser", () => {
       RUN npm install
       CMD ["node", "index.js"]
     `;
+
     const insts = parseDockerfile(content);
     expect(insts).toHaveLength(5);
     expect(insts[0].instruction).toBe("FROM");
@@ -33,6 +34,7 @@ describe("Dockerfile Parser", () => {
           apt-get install -y curl && \\
           rm -rf /var/lib/apt/lists/*
     `;
+
     const insts = parseDockerfile(content);
     expect(insts).toHaveLength(1);
     expect(insts[0].instruction).toBe("RUN");
@@ -46,6 +48,7 @@ describe("Dockerfile Parser", () => {
       FROM node:22
       this is not an instruction
     `);
+
     expect(parsed).toHaveLength(1);
     expect(parsed[0].instruction).toBe("FROM");
   });
@@ -55,6 +58,7 @@ describe("Dockerfile Parser", () => {
       from node:22
       run echo hi
     `);
+
     expect(parsed).toHaveLength(2);
     expect(parsed[0].instruction).toBe("FROM");
     expect(parsed[1].instruction).toBe("RUN");
@@ -69,6 +73,7 @@ apt-get install -y curl
 EOF
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed[0].instruction).toBe("FROM");
     expect(parsed[1].instruction).toBe("RUN");
@@ -83,6 +88,7 @@ RUN <<EOF
 USER root
 EOF
     `);
+
     expect(parsed).toHaveLength(2);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(false);
   });
@@ -94,6 +100,7 @@ RUN <<-'EOT'
 echo hello
 EOT
     `);
+
     expect(parsed).toHaveLength(2);
     expect(parsed[1].args).toContain("echo hello");
   });
@@ -105,6 +112,7 @@ RUN <<EOF
 echo hello
 EOF
     `);
+
     expect(parsed[1].raw).toContain("echo hello");
   });
 
@@ -117,6 +125,7 @@ RUN apt-get update && apt-get install -y \\
   git \\
   tmux
     `);
+
     expect(parsed).toHaveLength(2);
     expect(parsed[1].args).toBe(
       "apt-get update && apt-get install -y curl git tmux"
@@ -132,6 +141,7 @@ RUN <<EOF
 echo hello
 EOF
     `);
+
     expect(parsed[1].raw).toContain("# this is shell content");
   });
 
@@ -149,6 +159,7 @@ USER node
 LABEL a=b
 CMD ["node"]
     `);
+
     expect(parsed).toHaveLength(5);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
   });
@@ -159,6 +170,7 @@ FROM node:22
 RUN echo $((1 << 3))
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
   });
@@ -169,6 +181,7 @@ FROM node:22
 RUN grep foo <<< "bar"
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
   });
@@ -183,6 +196,7 @@ body two
 F2
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed[1].instruction).toBe("COPY");
     expect(parsed[1].args).toContain("body one");
@@ -196,6 +210,7 @@ FROM node:22
 ENV DOC="a<<b"
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
   });
@@ -206,6 +221,7 @@ FROM node:22
 RUN echo "see <<EOF for details"
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed.some((i) => i.instruction === "USER")).toBe(true);
   });
@@ -218,6 +234,7 @@ echo hello
 EOT
 USER node
     `);
+
     expect(parsed).toHaveLength(3);
     expect(parsed[1].instruction).toBe("RUN");
     expect(parsed[1].args).toContain("echo hello");
@@ -236,6 +253,7 @@ USER node
       const insts = parseDockerfile(
         `FROM alpine:3.20\nRUN ${opener}\necho hi\nUSER root\n${terminator}\nUSER 1000\n`
       );
+
       // The body's USER line is shell text, not an instruction.
       expect(insts.map((inst) => inst.instruction)).toEqual([
         "FROM",
@@ -259,14 +277,17 @@ USER node
     expect(() => parseDockerfile(content, "svc/Dockerfile")).toThrow(
       ParseError
     );
+
     try {
       parseDockerfile(content, "svc/Dockerfile");
       throw new Error("expected parseDockerfile to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ParseError);
+
       if (!(error instanceof ParseError)) {
         throw error;
       }
+
       expect(error.file).toBe("svc/Dockerfile");
       expect(error.message).toContain("EOF");
     }
@@ -286,6 +307,7 @@ USER node
     const parsed = parseDockerfile(
       "FROM debian:bookworm-slim\nRUN apt-get update && \\\n\n    apt-get install -y --no-install-recommends curl && \\\n    rm -rf /var/lib/apt/lists/*\n"
     );
+
     expect(parsed).toHaveLength(2);
     expect(parsed[1].args).toBe(
       "apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*"
@@ -297,6 +319,7 @@ USER node
     const parsed = parseDockerfile(
       "RUN make && \\\n\n    env FOO=bar make install\n"
     );
+
     expect(parsed).toHaveLength(1);
     expect(parsed[0].instruction).toBe("RUN");
     expect(parsed[0].args).toBe("make && env FOO=bar make install");
@@ -312,14 +335,17 @@ describe("Compose Parser", () => {
   test("a YAML error names the position without quoting the source", () => {
     const content =
       "services:\n  app:\n    environment:\n      DB_PASSWORD: PLACEHOLDER_TOKEN_VALUE: x\n";
+
     try {
       parseCompose(content, "compose.yaml");
       throw new Error("expected parseCompose to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ParseError);
+
       if (!(error instanceof ParseError)) {
         throw error;
       }
+
       const { message } = error;
       expect(message).toBe(
         "Nested mappings are not allowed in compact mappings at line 4, column 20"
@@ -336,6 +362,7 @@ services:
     ports:
       - "3000:3000"
     `;
+
     const compose = parseCompose(content, "docker-compose.yml");
     expect(compose).toMatchObject({ services: { web: { image: "node:22" } } });
   });
@@ -353,6 +380,7 @@ services:
     <<: *base
     image: nginx
     `;
+
     const compose = parseCompose(content, "docker-compose.yml");
     expect(compose).toMatchObject({ services: { web: { restart: "always" } } });
     expect(compose).not.toHaveProperty(["services", "web", "<<"]);
@@ -367,6 +395,7 @@ services:
   b:
     environment: *env
     `;
+
     const compose = parseCompose(content, "docker-compose.yml");
     expect(compose).toMatchObject({
       services: { b: { environment: { FOO: "1" } } },

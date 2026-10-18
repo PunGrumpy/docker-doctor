@@ -22,6 +22,7 @@ const subtle = (hue: PillHue, klass: string) => ({
   contrast: SUBTLE,
   variant: hue,
 });
+
 const solid = (hue: PillHue, klass: string) => ({
   class: klass,
   contrast: SOLID,

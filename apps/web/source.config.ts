@@ -37,6 +37,7 @@ const normalizeCodeLang = (node: MarkdownNode): void => {
         : node.lang;
     node.lang = "text";
   }
+
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
       if (isMarkdownNode(child)) {

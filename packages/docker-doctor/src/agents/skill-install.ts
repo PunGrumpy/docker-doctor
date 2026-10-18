@@ -16,11 +16,13 @@ export const getSkillSourceDirectory = (): string | null => {
     // src/agents/*.ts in the monorepo → repo root/skills/docker-doctor
     path.resolve(moduleDir, "../../../../skills/docker-doctor"),
   ];
+
   for (const candidate of candidates) {
     if (fs.existsSync(path.join(candidate, SKILL_MANIFEST_FILE))) {
       return candidate;
     }
   }
+
   return null;
 };
 
@@ -35,9 +37,11 @@ export const installSkillForAgents = async (
   options: { projectRoot: string; global?: boolean }
 ): Promise<SkillInstallResult | null> => {
   const source = getSkillSourceDirectory();
+
   if (!source) {
     return null;
   }
+
   try {
     return await installSkillsFromSource({
       agents,

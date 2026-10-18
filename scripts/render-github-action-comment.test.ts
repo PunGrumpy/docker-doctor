@@ -63,9 +63,11 @@ const diagnostic = (
 // covers the parsing and normalization of the untrusted report file.
 const parseReport = (report: TestReport) => {
   const parsed = readReportText(JSON.stringify(report));
+
   if (parsed === null) {
     throw new Error("test report failed validation");
   }
+
   return parsed;
 };
 
@@ -85,6 +87,7 @@ const manyFiles = (count: number, directory: string): TestReport => {
     { length: count },
     (_, index) => `${directory}${index}/Dockerfile`
   );
+
   return makeReport({
     diagnostics: dockerfiles.map((file) => ({
       ...diagnostic("warning"),
@@ -112,6 +115,7 @@ describe("gate and commit status", () => {
       { DOCTOR_BLOCKING: "error" },
       makeReport({ diagnostics: [diagnostic("error")] })
     );
+
     expect(outputs["gate-status"]).toBe("1");
     expect(outputs["status-state"]).toBe("failure");
     expect(body).toContain("<details open>");
@@ -134,6 +138,7 @@ describe("incomplete scans", () => {
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "2" },
       makeReport({ failures: [HEREDOC_FAILURE] })
     );
+
     expect(body).toContain("Unanalyzed");
     expect(body).toContain("1 file could not be analyzed");
     expect(dockerfileRow(body)).not.toContain("Clean");
@@ -155,6 +160,7 @@ describe("incomplete scans", () => {
         },
       })
     );
+
     const rows = body.split("\n").filter((line) => line.startsWith("| [`"));
     expect(rows[0]).toContain("Unanalyzed");
     expect(rows[1]).toContain("Error");
@@ -164,10 +170,12 @@ describe("incomplete scans", () => {
     const { failures: _omitted, ...schema3 } = makeReport({
       schemaVersion: 3,
     });
+
     const { body, outputs } = render(
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "2" },
       schema3
     );
+
     expect(body).toContain("Some files could not be analyzed");
     expect(outputs["gate-status"]).toBe("1");
     expect(outputs["status-description"]).toContain("scan incomplete");
@@ -177,10 +185,12 @@ describe("incomplete scans", () => {
     const { failures: _omitted, ...schema3 } = makeReport({
       schemaVersion: 3,
     });
+
     const { body, outputs } = render(
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "0" },
       schema3
     );
+
     expect(body).not.toContain("could not be analyzed");
     expect(outputs["gate-status"]).toBe("0");
   });
@@ -190,6 +200,7 @@ describe("incomplete scans", () => {
       { DOCTOR_BLOCKING: "none", GITHUB_EVENT_NAME: "push" },
       makeReport({ failures: [HEREDOC_FAILURE] })
     );
+
     expect(outputs["gate-status"]).toBe("1");
     expect(outputs["status-state"]).toBe("success");
   });
@@ -216,6 +227,7 @@ describe("reports with no score", () => {
       { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "2" },
       unscored([HEREDOC_FAILURE, COMPOSE_FAILURE])
     );
+
     expect(body).toContain("**No score.**");
     expect(body).not.toContain("/ 100");
     expect(outputs.score).toBe("");
@@ -230,6 +242,7 @@ describe("reports with no score", () => {
       { DOCTOR_EXIT_STATUS: "2", GITHUB_EVENT_NAME: "push" },
       unscored([HEREDOC_FAILURE, COMPOSE_FAILURE])
     );
+
     expect(outputs["status-state"]).toBe("error");
   });
 
@@ -238,6 +251,7 @@ describe("reports with no score", () => {
       { DOCTOR_BLOCKING: "warning", DOCTOR_EXIT_STATUS: "0" },
       unscored([])
     );
+
     expect(body).toContain(
       "None of the discovered files has anything to check"
     );
@@ -257,6 +271,7 @@ describe("reports with no score", () => {
         score: null,
       })
     );
+
     expect(body).toContain("found no Dockerfiles or Compose files");
     expect(outputs.score).toBe("");
     expect(outputs.label).toBe("");
@@ -288,6 +303,7 @@ describe("untrusted report fields", () => {
         failures: [],
       }
     );
+
     expect(body).not.toContain("evil");
     expect(body).not.toContain("<img");
     expect(outputs.score).toBe("0");
@@ -360,6 +376,7 @@ describe("untrusted report fields", () => {
 
   test("a message cannot mention, reference or link from the comment", () => {
     const message = "Ping @octocat about #1 at https://phish.test.\u202E txet";
+
     const { body } = render(
       {},
       makeReport({
@@ -371,6 +388,7 @@ describe("untrusted report fields", () => {
         },
       })
     );
+
     expect(body).not.toContain("\u202E");
     expect(body).not.toMatch(/[^`]@octocat/u);
     expect(body).not.toMatch(/[^`]#1\b/u);
@@ -382,6 +400,7 @@ describe("untrusted report fields", () => {
 
   test("file links percent-encode #, ? and % in each path segment", () => {
     const file = "svc #1/a#b?c%20(x).dockerfile";
+
     const { body } = render(
       {},
       makeReport({
@@ -389,6 +408,7 @@ describe("untrusted report fields", () => {
         project: { composeFiles: [], dockerfiles: [file] },
       })
     );
+
     expect(body).toContain(
       "](https://github.com/o/r/blob/abcdef1234567/svc%20%231/a%23b%3Fc%2520%28x%29.dockerfile#L3)"
     );
@@ -403,6 +423,7 @@ describe("untrusted report fields", () => {
 describe("comment size", () => {
   // GitHub rejects an issue comment longer than this.
   const GITHUB_COMMENT_LIMIT = 65_536;
+
   const context = readContext({
     DOCTOR_HEAD_SHA: "abcdef1234567",
     GITHUB_EVENT_NAME: "pull_request",
@@ -436,6 +457,7 @@ describe("comment size", () => {
     const report = parseReport(
       manyFiles(300, "long-directory-name-".repeat(15))
     );
+
     const comment = renderComment(context, report);
 
     expect(comment.body.length).toBeLessThanOrEqual(GITHUB_COMMENT_LIMIT);
@@ -450,6 +472,7 @@ describe("renderFailure", () => {
     const { body, outputs } = renderFailure(
       readContext({ GITHUB_EVENT_NAME: "pull_request" })
     );
+
     expect(body).toContain("could not produce a scan report");
     expect(outputs["gate-status"]).toBe("1");
     expect(outputs["status-state"]).toBe("failure");

@@ -9,9 +9,11 @@ const getClipboardCommands = (): ClipboardCommand[] => {
   if (process.platform === "darwin") {
     return [{ args: [], command: "pbcopy" }];
   }
+
   if (process.platform === "win32") {
     return [{ args: [], command: "clip" }];
   }
+
   return [
     { args: [], command: "wl-copy" },
     { args: ["-selection", "clipboard"], command: "xclip" },
@@ -25,6 +27,7 @@ const tryCopy = ({ command, args }: ClipboardCommand, text: string) =>
     const child = spawn(command, args, {
       stdio: ["pipe", "ignore", "ignore"],
     });
+
     child.once("error", () => {
       resolve(false);
     });
@@ -40,12 +43,15 @@ const tryCommands = async (
   text: string
 ): Promise<boolean> => {
   const [first, ...rest] = commands;
+
   if (!first) {
     return false;
   }
+
   if (await tryCopy(first, text)) {
     return true;
   }
+
   return tryCommands(rest, text);
 };
 

@@ -25,12 +25,15 @@ export const composeServices = (
   if (!isComposeMapping(composeContent)) {
     return [];
   }
+
   const { services } = composeContent;
+
   if (!isComposeMapping(services)) {
     return [];
   }
 
   const entries: [string, ComposeMapping][] = [];
+
   for (const [name, config] of Object.entries(services)) {
     if (config === null || config === undefined) {
       entries.push([name, {}]);
@@ -38,5 +41,6 @@ export const composeServices = (
       entries.push([name, config]);
     }
   }
+
   return entries;
 };

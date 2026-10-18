@@ -77,15 +77,18 @@ const stopPrompt = (
   onKeypress: (str: string, key: KeypressKey) => void
 ): void => {
   process.stdin.removeListener("keypress", onKeypress);
+
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(false);
   }
+
   process.stdin.pause();
   process.stdout.write("\u001B[?25h");
 };
 
 const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
   const isRaw = process.stdin.isTTY;
+
   if (!isRaw) {
     return Promise.resolve(defaultYes);
   }
@@ -175,6 +178,7 @@ const askSelect = (
   defaultIndex = 0
 ): Promise<number> => {
   const isRaw = process.stdin.isTTY;
+
   if (!isRaw) {
     return Promise.resolve(defaultIndex);
   }
@@ -202,6 +206,7 @@ const askSelect = (
 
       // Print options
       let i = 0;
+
       for (const option of options) {
         const isSelected = i === index;
         const prefix = isSelected ? chalk.cyan("❯ ") : "  ";
@@ -232,9 +237,11 @@ const askSelect = (
         process.stdout.write(
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chalk.cyan(options[index])}\n`
         );
+
         for (const _ of options) {
           process.stdout.write("\r\u001B[K\n");
         }
+
         process.stdout.write(`\u001B[${options.length}A`);
         resolve(index);
       } else if (key.ctrl && key.name === "c") {
@@ -259,6 +266,7 @@ const askMultiSelect = (
   options: MultiSelectOption[]
 ): Promise<number[]> => {
   const isRaw = process.stdin.isTTY;
+
   if (!isRaw) {
     return Promise.resolve(
       options.flatMap((option, i) => (option.selected ? [i] : []))
@@ -288,19 +296,23 @@ const askMultiSelect = (
       );
 
       let i = 0;
+
       for (const option of options) {
         const isCursor = i === index;
         const cursor = isCursor ? chalk.cyan("❯ ") : "  ";
         const box = selected[i] ? chalk.cyan("[x]") : chalk.dim("[ ]");
         let text = chalk.dim(option.label);
+
         if (isCursor) {
           text = chalk.cyan.bold(option.label);
         } else if (selected[i]) {
           text = option.label;
         }
+
         process.stdout.write(`\r\u001B[K${cursor}${box} ${text}\n`);
         i += 1;
       }
+
       process.stdout.write(
         `\r\u001B[K  ${chalk.dim("space to toggle · enter to confirm")}\n`
       );
@@ -325,17 +337,21 @@ const askMultiSelect = (
         str === "\n"
       ) {
         stopPrompt(handleKeypress);
+
         const chosen = options.flatMap((option, i) =>
           selected[i] ? [option.label] : []
         );
+
         // Overwrite the prompt with a one-line summary
         process.stdout.write(`\u001B[${lineCount}A\r\u001B[K`);
         process.stdout.write(
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chosen.length > 0 ? chalk.cyan(chosen.join(", ")) : chalk.dim("none")}\n`
         );
+
         for (let i = 0; i < lineCount - 1; i += 1) {
           process.stdout.write("\r\u001B[K\n");
         }
+
         process.stdout.write(`\u001B[${lineCount - 1}A`);
         resolve(options.flatMap((_, i) => (selected[i] ? [i] : [])));
       } else if (key.ctrl && key.name === "c") {
@@ -371,15 +387,18 @@ const agentDisplayName = (agent: SkillAgentType): string =>
 // prompt for any other agent. Only reached when the scan found something.
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const launchable = detectLaunchableAgents();
+
   const options = [
     ...launchable.map((agentId) => agentDisplayName(agentId)),
     "Copy prompt to clipboard",
     "Skip",
   ];
+
   const skipIndex = options.length - 1;
   const clipboardIndex = options.length - 2;
 
   const choice = await askSelect("What would you like to do next?", options);
+
   if (choice === skipIndex) {
     return;
   }
@@ -399,6 +418,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   if (choice === clipboardIndex) {
     const copied = await copyToClipboard(payload);
+
     if (copied) {
       console.log(
         `\n  ${chalk.green("✔")} Prompt copied — paste it into any agent or chat.`
@@ -406,6 +426,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
     } else {
       printAgentPrompt(payload);
     }
+
     return;
   }
 
@@ -414,21 +435,26 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
   const confirmedLaunch = await askConfirm(
     `Launch ${AGENT_BINARIES[agentId]} with ${AGENT_AUTO_FLAGS[agentId].join(" ")} in ${context.rootDir}? It will edit files without asking for approval.`
   );
+
   if (!confirmedLaunch) {
     printAgentPrompt(payload);
+
     return;
   }
 
   const installResult = await installSkillForAgents([agentId], {
     projectRoot: context.rootDir,
   });
+
   if (installResult && installResult.installed.length > 0) {
     console.log(
       `\n  ${chalk.green("✔")} Installed the docker-doctor skill for ${agentDisplayName(agentId)}`
     );
   }
+
   console.log(`\n  Handing off to ${agentDisplayName(agentId)}...\n`);
   const launched = await launchAgent(agentId, payload, context.rootDir);
+
   if (!launched) {
     console.log(
       `  ${chalk.yellow("⚠")} Couldn't launch ${AGENT_BINARIES[agentId]}. Here's the prompt instead:`
@@ -446,6 +472,7 @@ const runInteractiveWizard = async (
     const addGhActions = await askConfirm(
       "Add Docker Doctor to GitHub Actions?"
     );
+
     if (addGhActions) {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
@@ -455,6 +482,7 @@ const runInteractiveWizard = async (
           ),
         rootDir: context.rootDir,
       });
+
       if (status === "kept") {
         console.log(
           `\n  ${chalk.yellow("⚠")} Kept your existing ${chalk.cyan(WORKFLOW_RELATIVE_PATH)}.`
@@ -475,7 +503,9 @@ const runInteractiveWizard = async (
     if (context.diagnostics.length === 0) {
       return true;
     }
+
     await runAgentHandoff(context);
+
     return true;
   } catch (error: unknown) {
     // The prompts never reject, so anything caught here is a failed write:
@@ -483,6 +513,7 @@ const runInteractiveWizard = async (
     // silent no-op after the user said "yes" is worse than the error.
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`\n  ${chalk.yellow("⚠")} Post-scan step failed: ${msg}`);
+
     return false;
   }
 };
@@ -515,15 +546,19 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
     diagnostics: [],
     failures: [],
   };
+
   for (const result of results) {
     summary.diagnostics.push(...result.diagnostics);
+
     if (result.failure) {
       summary.failures.push(result.failure);
     }
+
     if (result.analyzed) {
       summary.analyzedFileCount += 1;
     }
   }
+
   return summary;
 };
 
@@ -548,10 +583,12 @@ const runRulesEngine = async (
   const dockerfileResults = await Promise.all(
     project.dockerfiles.map(async (df): Promise<FileResult> => {
       const fullPath = path.join(rootDir, df);
+
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[df] = content;
         const instructions = parseDockerfile(content, df);
+
         return {
           analyzed: isAnalyzableDockerfile(instructions),
           diagnostics: runDockerfileRules(
@@ -567,6 +604,7 @@ const runRulesEngine = async (
         // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
+
         return {
           analyzed: false,
           diagnostics: [],
@@ -585,10 +623,12 @@ const runRulesEngine = async (
   const composeResults = await Promise.all(
     project.composeFiles.map(async (cf): Promise<FileResult> => {
       const fullPath = path.join(rootDir, cf);
+
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[cf] = content;
         const composeObj = parseCompose(content, cf);
+
         return {
           analyzed: isAnalyzableCompose(composeObj),
           diagnostics: runComposeRules(
@@ -602,6 +642,7 @@ const runRulesEngine = async (
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+
         return {
           analyzed: false,
           diagnostics: [],
@@ -635,6 +676,7 @@ const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
   if (scanIncomplete) {
     return SCAN_FAILURE_EXIT_CODE;
   }
+
   return failing ? 1 : 0;
 };
 
@@ -645,13 +687,17 @@ const reportScanFailures = (
   if (failures.length === 0) {
     return;
   }
+
   const fileWord = failures.length === 1 ? "file" : "files";
+
   const scoreNote = hasScore
     ? "; the score below covers only the files that were analyzed."
     : ".";
+
   console.error(
     `Docker Doctor could not analyze ${failures.length} ${fileWord}${scoreNote}`
   );
+
   for (const failure of failures) {
     console.error(`  - ${failure.file}: ${flattenMessage(failure.message)}`);
   }
@@ -662,6 +708,7 @@ const noFilesFoundMessage = (rootDir: string): string =>
 
 const noScoreMessage = (scannedFileCount: number): string => {
   const fileWord = scannedFileCount === 1 ? "file" : "files";
+
   return `Docker Doctor checked none of the ${scannedFileCount} discovered ${fileWord}, so there is no score`;
 };
 
@@ -675,6 +722,7 @@ const printNothingAnalyzed = (
   console.log(
     `  A Dockerfile needs at least one instruction. A Compose file needs a service, a top-level models entry or a version key.`
   );
+
   if (failureCount > 0) {
     console.log(
       `  The files that could not be read or parsed are listed above.`
@@ -731,6 +779,7 @@ const writeTerminalReport = async (
   );
 
   let wizardOk = true;
+
   if (process.stdout.isTTY && process.stdin.isTTY) {
     wizardOk = await runInteractiveWizard({
       diagnostics,
@@ -745,6 +794,7 @@ const writeTerminalReport = async (
       rootDir,
     });
   }
+
   return wizardOk ? exitCode : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
 };
 
@@ -760,8 +810,10 @@ const writeMachineReport = (
     if (score !== null) {
       console.log(score);
     }
+
     return;
   }
+
   const report = toJsonReport(
     scan.diagnostics,
     score,
@@ -770,6 +822,7 @@ const writeMachineReport = (
     scan.failures,
     scan.analyzedFileCount
   );
+
   console.log(JSON.stringify(report, null, 2));
 };
 
@@ -794,19 +847,25 @@ const writeScanOutput = async (
         scan.scannedFileCount === 0
           ? noFilesFoundMessage(rootDir)
           : noScoreMessage(scan.scannedFileCount);
+
       console.error(`Warning: ${message}`);
     }
+
     writeMachineReport(scan, scoreResult, options.score === true);
+
     return exitCode;
   }
+
   if (scoreResult.score === null) {
     if (scan.scannedFileCount === 0) {
       printNothingScanned(rootDir);
     } else {
       printNothingAnalyzed(scan.scannedFileCount, failures.length);
     }
+
     return exitCode;
   }
+
   return await writeTerminalReport(
     scan,
     scoreResult,
@@ -818,6 +877,7 @@ const writeScanOutput = async (
 const pathExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
+
     return true;
   } catch {
     return false;
@@ -834,17 +894,23 @@ const resolveConfigPath = async (
   if (!configOption) {
     return undefined;
   }
+
   const fromCwd = path.resolve(process.cwd(), configOption);
+
   if (await pathExists(fromCwd)) {
     return fromCwd;
   }
+
   const fromRoot = path.resolve(rootDir, configOption);
+
   if (fromRoot !== fromCwd && (await pathExists(fromRoot))) {
     console.error(
       `Warning: --config ${configOption} was found relative to the scanned directory, not the current directory. Pass a path relative to the current directory or an absolute path.`
     );
+
     return fromRoot;
   }
+
   // Found nowhere: loadConfig reports "Specified config file not found at"
   // with the cwd-relative path, which is where the user should look.
   return fromCwd;
@@ -856,12 +922,15 @@ const findScanTargetProblem = async (
   rootDir: string
 ): Promise<string | null> => {
   const rootStat = await fs.stat(rootDir).catch(() => null);
+
   if (rootStat === null) {
     return `Directory not found: ${rootDir}`;
   }
+
   if (!rootStat.isDirectory()) {
     return `${rootDir} is not a directory. Pass the directory that contains your Dockerfile or Compose file.`;
   }
+
   return null;
 };
 
@@ -908,11 +977,14 @@ program
       // Checked before the spinner starts, so the error path never hides
       // the cursor.
       const scanTargetProblem = await findScanTargetProblem(rootDir);
+
       if (scanTargetProblem !== null) {
         console.error(`Error: ${scanTargetProblem}`);
         process.exitCode = 1;
+
         return;
       }
+
       const startTime = Date.now();
 
       let statusText = "Discovering workspace...";
@@ -946,11 +1018,13 @@ program
         // Warnings go to stderr so the --json and --score stdout contracts
         // stay machine-readable.
         const configPath = await resolveConfigPath(options.config, rootDir);
+
         const config = await loadConfig(rootDir, configPath, (message) => {
           console.error(`Warning: ${message}`);
         });
 
         setStatus("Scanning workspace files...");
+
         // Project discovery, minus anything the config ignores
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
@@ -969,6 +1043,7 @@ program
           ...project.composeFiles,
           ...(project.dockerignores || []),
         ];
+
         // .dockerignore files are discovered for use-dockerignore, not scanned.
         const scannedFileCount =
           project.dockerfiles.length + project.composeFiles.length;
@@ -1042,6 +1117,7 @@ const resolveInstallAgents = async (
 ): Promise<SkillAgentType[] | null> => {
   if (requested && requested.length > 0) {
     const invalid = requested.filter((agent) => !isSkillAgentType(agent));
+
     if (invalid.length > 0) {
       console.error(`Unknown agent id(s): ${invalid.join(", ")}`);
       console.error(
@@ -1049,8 +1125,10 @@ const resolveInstallAgents = async (
           .filter((agent) => agent !== "universal")
           .join(", ")}`
       );
+
       return null;
     }
+
     return requested.filter((agent) => isSkillAgentType(agent));
   }
 
@@ -1058,6 +1136,7 @@ const resolveInstallAgents = async (
     console.error(
       "Non-interactive run: pass --agent <id...> (e.g. --agent claude-code cursor)."
     );
+
     return null;
   }
 
@@ -1065,6 +1144,7 @@ const resolveInstallAgents = async (
   const detected = installedAgents.filter((agent) => agent !== "universal");
   const choices = [...new Set([...detected, ...CURATED_INSTALL_AGENTS])];
   const detectedSet = new Set<SkillAgentType>(detected);
+
   const picked = await askMultiSelect(
     "Which coding agents should get the docker-doctor skill?",
     choices.map((agent) => ({
@@ -1072,6 +1152,7 @@ const resolveInstallAgents = async (
       selected: detectedSet.has(agent),
     }))
   );
+
   return picked.map((i) => choices[i]);
 };
 
@@ -1088,21 +1169,27 @@ program
   )
   .action(async (options: { agent?: string[]; global?: boolean }) => {
     const source = getSkillSourceDirectory();
+
     if (!source) {
       console.error(
         "Bundled skill not found — this looks like a broken installation."
       );
       process.exitCode = 1;
+
       return;
     }
 
     const agents = await resolveInstallAgents(options.agent);
+
     if (agents === null) {
       process.exitCode = 1;
+
       return;
     }
+
     if (agents.length === 0) {
       console.log("Nothing selected — skipped.");
+
       return;
     }
 
@@ -1110,27 +1197,33 @@ program
       global: options.global,
       projectRoot: process.cwd(),
     });
+
     if (!result) {
       console.error("Failed to install the skill.");
       process.exitCode = 1;
+
       return;
     }
+
     for (const installed of result.installed) {
       console.log(
         `  ${chalk.green("✔")} ${agentDisplayName(installed.agent)} → ${installed.path}`
       );
     }
+
     for (const failed of result.failed) {
       console.log(
         `  ${chalk.red("✖")} ${agentDisplayName(failed.agent)}: ${failed.error}`
       );
     }
+
     if (result.installed.length > 0) {
       const scope = options.global ? "any project" : "this project";
       console.log(
         `\n  The agent can now run ${chalk.cyan("/docker-doctor")} to scan and triage ${scope}.`
       );
     }
+
     process.exitCode = result.failed.length > 0 ? 1 : 0;
   });
 
@@ -1145,6 +1238,7 @@ rules
   .action(() => {
     console.log("\nAvailable Rules:");
     console.log("================\n");
+
     for (const rule of allRules) {
       console.log(`- ${rule.key} (${rule.category})`);
       console.log(`  Default Severity: ${rule.defaultSeverity}`);
@@ -1157,11 +1251,14 @@ rules
   .description("explain a specific rule in detail")
   .action((ruleKey) => {
     const rule = findRule(ruleKey) ?? findRule(`docker-doctor/${ruleKey}`);
+
     if (!rule) {
       console.error(`Rule '${ruleKey}' not found.`);
       process.exitCode = 1;
+
       return;
     }
+
     console.log(`\nRule:             ${rule.key}`);
     console.log(`Category:         ${rule.category}`);
     console.log(`Default Severity: ${rule.defaultSeverity}`);

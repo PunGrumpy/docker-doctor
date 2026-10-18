@@ -54,6 +54,7 @@ const createPrunedDirectoryMatcher = (
   createIgnoreMatcher(
     patterns.flatMap((raw) => {
       const pattern = normalizeIgnorePattern(raw);
+
       return pattern.endsWith(SUBTREE_SUFFIX)
         ? [pattern.slice(0, -SUBTREE_SUFFIX.length)]
         : [];
@@ -77,6 +78,7 @@ const walk = async (
   fileList: string[] = []
 ): Promise<string[]> => {
   let files: Dirent[];
+
   try {
     files = await fs.readdir(dir, { withFileTypes: true });
   } catch (error: unknown) {
@@ -85,19 +87,25 @@ const walk = async (
     // itself still fail the scan.
     if (dir !== options.rootDir && isPermissionError(error)) {
       options.onSkippedDirectory?.(toPosixRelative(options.rootDir, dir));
+
       return fileList;
     }
+
     throw error;
   }
+
   await Promise.all(
     files.map(async (file) => {
       const filePath = path.join(dir, file.name);
+
       if (file.isSymbolicLink()) {
         // Never traverse a symlinked directory (cycles, trees outside the
         // root). A symlinked file is listed and later read through the link.
         fileList.push(filePath);
+
         return;
       }
+
       if (file.isDirectory()) {
         if (
           PRUNED.has(file.name) ||
@@ -105,12 +113,14 @@ const walk = async (
         ) {
           return;
         }
+
         await walk(filePath, options, fileList);
       } else {
         fileList.push(filePath);
       }
     })
   );
+
   return fileList;
 };
 
@@ -128,6 +138,7 @@ export const discoverProject = async (
     onSkippedDirectory: options?.onSkippedDirectory,
     rootDir,
   });
+
   const dockerfiles: string[] = [];
   const composeFiles: string[] = [];
   const dockerignores: string[] = [];
@@ -137,9 +148,11 @@ export const discoverProject = async (
 
   for (const file of allFiles) {
     const relative = toPosixRelative(rootDir, file);
+
     if (isIgnored(relative)) {
       continue;
     }
+
     const base = path.basename(file).toLowerCase();
 
     if (base.endsWith(".dockerignore")) {

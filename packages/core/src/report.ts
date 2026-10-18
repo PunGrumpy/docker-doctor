@@ -43,11 +43,13 @@ export interface JsonReport {
 // The findRule fallback covers callers that build diagnostics by hand.
 const resolveCategory = (diagnostic: Diagnostic): RuleCategory => {
   const category = diagnostic.category ?? findRule(diagnostic.rule)?.category;
+
   if (!category) {
     throw new Error(
       `Diagnostic for unknown rule "${diagnostic.rule}" has no category`
     );
   }
+
   return category;
 };
 

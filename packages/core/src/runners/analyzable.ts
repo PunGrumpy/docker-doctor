@@ -18,6 +18,7 @@ export const isAnalyzableCompose = (composeContent: ComposeValue): boolean => {
   if (!isComposeMapping(composeContent)) {
     return false;
   }
+
   return (
     composeServices(composeContent).length > 0 ||
     Object.keys(topLevelModels(composeContent)).length > 0 ||

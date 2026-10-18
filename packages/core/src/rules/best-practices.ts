@@ -33,6 +33,7 @@ export const requireHealthcheck: DockerfileRule = {
         ),
       ];
     }
+
     return [];
   },
   defaultSeverity: "info",
@@ -71,6 +72,7 @@ export const preferCopyOverAdd: DockerfileRule = {
         // If it's not a remote url (handled by security/no-add-remote) and not a compressed file
         const isRemote =
           src.startsWith("http://") || src.startsWith("https://");
+
         const isArchive = AUTO_EXTRACT_SUFFIXES.some((suffix) =>
           src.toLowerCase().endsWith(suffix)
         );
@@ -106,6 +108,7 @@ export const useExecForm: DockerfileRule = {
     for (const inst of instructions) {
       const takesExecForm =
         inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
+
       // Bracket-wrapped args that are not a JSON string array still run under
       // /bin/sh -c, so they count as shell form.
       if (takesExecForm && parseExecForm(inst.args) === null) {
@@ -134,6 +137,7 @@ export const requireLabels: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const hasLabel = instructions.some((inst) => inst.instruction === "LABEL");
+
     if (!hasLabel) {
       return [
         createDiagnostic(
@@ -146,6 +150,7 @@ export const requireLabels: DockerfileRule = {
         ),
       ];
     }
+
     return [];
   },
   defaultSeverity: "info",
@@ -158,6 +163,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
         const hasUpdate = hasAptGetUpdate(inst.args);
@@ -188,6 +194,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
         }
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "warning",
@@ -218,6 +225,7 @@ const CD_COMMAND_RE = /(?:^|&&|\|\||;|\||\(|`|\$\()\s*cd(?=\s|$)/u;
 // rejected by Docker, so it cannot be enabling pipefail.
 const shellDirectiveEnablesPipefail = (args: string): boolean => {
   const argv = parseExecForm(args);
+
   return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
@@ -234,32 +242,42 @@ export const usePipefail: DockerfileRule = {
     const stagePipefail = new Map<string, boolean>();
     let shellHasPipefail = false;
     let currentStage: string | null = null;
+
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         const { base, stage } = parseFromArgs(inst.args);
+
         // Only a reference to an earlier stage carries state forward; a real
         // base image, scratch, or a variable we cannot resolve resets it.
         const parentStage = isScratch(base)
           ? null
           : (base?.toLowerCase() ?? null);
+
         shellHasPipefail =
           parentStage !== null && stagePipefail.get(parentStage) === true;
         currentStage = stage?.toLowerCase() ?? null;
+
         if (currentStage) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
+
         continue;
       }
+
       if (inst.instruction === "SHELL") {
         shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
+
         if (currentStage) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
+
         continue;
       }
+
       if (inst.instruction !== "RUN") {
         continue;
       }
+
       const { args } = inst;
       // SHELL only applies to shell-form RUN; exec-form RUN runs its own
       // argv directly, so check the argv for pipefail instead. Exec-form
@@ -267,15 +285,19 @@ export const usePipefail: DockerfileRule = {
       // real pipe; shell-form text is masked so a `|` inside a quoted
       // argument (grep -E "foo|bar") does not read as a pipeline.
       const execArgv = parseExecForm(args);
+
       const pipeText =
         execArgv === null ? maskQuotedText(args) : execArgv.join(" ");
+
       if (!HAS_PIPE_RE.test(pipeText)) {
         continue;
       }
+
       const pipefailConfigured =
         execArgv === null
           ? shellHasPipefail || PIPEFAIL_SETTING_RE.test(args)
           : PIPEFAIL_SETTING_RE.test(execArgv.join(" "));
+
       if (!pipefailConfigured) {
         diagnostics.push(
           createDiagnostic(
@@ -289,6 +311,7 @@ export const usePipefail: DockerfileRule = {
         );
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "warning",
@@ -305,11 +328,14 @@ export const absoluteWorkdir: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     for (const inst of instructions) {
       if (inst.instruction === "WORKDIR") {
         const trimmed = inst.args.trim();
+
         const path =
           trimmed.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? trimmed;
+
         const isAbsolute = /^(?:\/|\\|\$|[a-zA-Z]:)/u.test(path);
 
         if (!isAbsolute) {
@@ -326,6 +352,7 @@ export const absoluteWorkdir: DockerfileRule = {
         }
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "warning",
@@ -338,6 +365,7 @@ export const avoidRunCd: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     for (const inst of instructions) {
       // Exec-form RUN ["sh", "-c", "cd /app && make"] keeps its whole
       // command inside quotes and is intentionally not flagged: this rule is
@@ -358,6 +386,7 @@ export const avoidRunCd: DockerfileRule = {
         );
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "info",
@@ -368,8 +397,10 @@ export const avoidRunCd: DockerfileRule = {
 
 const PACKAGE_LIST_START_RE =
   /\b(?:apt-get(?:\s+-\S+)*\s+install|apk\s+add|yum\s+install|dnf\s+install)\b/u;
+
 const SHELL_SEPARATOR_RE = /[;|]|&&/u;
 const WHITESPACE_RE = /\s+/u;
+
 // A newline with no backslash before it. In a heredoc body it ends the
 // command. A `\`-continued RUN has none.
 const UNCONTINUED_NEWLINE_RE = /(?<!\\[ \t]*)\r?\n/u;
@@ -391,6 +422,7 @@ const APT_GET_VALUE_OPTIONS = new Set([
   "--default-release",
   "--with-source",
 ]);
+
 const APK_VALUE_OPTIONS = new Set([
   "--arch",
   "--cache-dir",
@@ -406,15 +438,18 @@ const APK_VALUE_OPTIONS = new Set([
   "-t",
   "--virtual",
 ]);
+
 const NO_VALUE_OPTIONS = new Set<string>();
 
 const valueOptionsFor = (command: string): Set<string> => {
   if (command.startsWith("apt-get")) {
     return APT_GET_VALUE_OPTIONS;
   }
+
   if (command.startsWith("apk")) {
     return APK_VALUE_OPTIONS;
   }
+
   return NO_VALUE_OPTIONS;
 };
 
@@ -424,23 +459,30 @@ const valueOptionsFor = (command: string): Set<string> => {
 // is not part of the list.
 const collectPackageList = (raw: string): string[] => {
   const start = PACKAGE_LIST_START_RE.exec(raw);
+
   if (!start) {
     return [];
   }
+
   const valueOptions = valueOptionsFor(start[0]);
   const packages: string[] = [];
+
   const [command] = raw
     .slice(start.index + start[0].length)
     .split(UNCONTINUED_NEWLINE_RE);
+
   const tokens = command.split(WHITESPACE_RE);
   let isOptionValue = false;
+
   for (const token of tokens) {
     if (SHELL_SEPARATOR_RE.test(token)) {
       break;
     }
+
     if (token === "" || token === "\\") {
       continue;
     }
+
     if (isOptionValue) {
       isOptionValue = false;
     } else if (token.startsWith("-")) {
@@ -449,6 +491,7 @@ const collectPackageList = (raw: string): string[] => {
       packages.push(token);
     }
   }
+
   return packages;
 };
 
@@ -456,9 +499,11 @@ export const sortMultilineArgs: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
         const { raw } = inst;
+
         const isPackageInstall =
           hasAptGetInstall(raw) ||
           raw.includes("apk add") ||
@@ -475,6 +520,7 @@ export const sortMultilineArgs: DockerfileRule = {
             // not depend on the machine's locale.
             const sorted = packages.toSorted();
             const isSorted = packages.every((val, idx) => val === sorted[idx]);
+
             if (!isSorted) {
               diagnostics.push(
                 createDiagnostic(
@@ -491,6 +537,7 @@ export const sortMultilineArgs: DockerfileRule = {
         }
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "info",
@@ -501,6 +548,7 @@ export const sortMultilineArgs: DockerfileRule = {
 
 const USERADD_COMMAND_RE = /\buseradd\b/u;
 const SHORT_OPTION_CLUSTER_RE = /^-[^-]/u;
+
 // useradd's short options that take a value, from the shadow-utils getopt
 // string `b:c:d:De:f:g:G:hk:K:lmMNop:rR:P:s:u:U` plus SELinux's `Z:`.
 const USERADD_VALUE_OPTIONS = new Set("bcdefgGkKpRPsuZ");
@@ -513,10 +561,12 @@ const clusterHasNoLogInit = (word: string): boolean => {
     if (option === "l") {
       return true;
     }
+
     if (USERADD_VALUE_OPTIONS.has(option)) {
       return false;
     }
   }
+
   return false;
 };
 
@@ -543,6 +593,7 @@ export const useraddNoLogInit: DockerfileRule = {
   category: "Best Practices",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     for (const inst of instructions) {
       if (inst.instruction === "RUN" && useraddWritesLoginLogs(inst.args)) {
         diagnostics.push(
@@ -557,6 +608,7 @@ export const useraddNoLogInit: DockerfileRule = {
         );
       }
     }
+
     return diagnostics;
   },
   defaultSeverity: "warning",

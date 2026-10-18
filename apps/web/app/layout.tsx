@@ -8,6 +8,7 @@ import { fonts } from "@/lib/fonts";
 import { url } from "@/lib/url";
 
 const title = "Docker Doctor";
+
 const description =
   "Let coding agents diagnose and fix issues with your Docker containers and infrastructure.";
 

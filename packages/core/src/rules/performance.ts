@@ -14,6 +14,7 @@ export const useMultiStage: DockerfileRule = {
     const fromCount = instructions.filter(
       (inst) => inst.instruction === "FROM"
     ).length;
+
     if (fromCount === 1) {
       // Check if it's not a trivial/short Dockerfile (e.g., has some build steps)
       const hasBuildSteps = instructions.some(
@@ -41,6 +42,7 @@ export const useMultiStage: DockerfileRule = {
         ];
       }
     }
+
     return [];
   },
   defaultSeverity: "info",
@@ -69,6 +71,7 @@ export const orderLayers: DockerfileRule = {
         }
 
         const normalized = src.replace(/^\.\//u, "");
+
         const isCopyAll =
           normalized === "." ||
           normalized === "" ||
@@ -83,6 +86,7 @@ export const orderLayers: DockerfileRule = {
 
       if (inst.instruction === "RUN" && copyAllLine !== -1) {
         const args = inst.args.toLowerCase();
+
         if (
           args.includes("npm install") ||
           args.includes("npm ci") ||
@@ -125,6 +129,7 @@ export const minimizeLayers: DockerfileRule = {
         if (consecutiveRunCount === 0) {
           firstRunLine = inst.line;
         }
+
         consecutiveRunCount += 1;
       } else {
         if (consecutiveRunCount > 2) {
@@ -139,6 +144,7 @@ export const minimizeLayers: DockerfileRule = {
             )
           );
         }
+
         consecutiveRunCount = 0;
       }
     }
@@ -178,6 +184,7 @@ const hasDockerignoreFor = (
   const dir = lastSlash === -1 ? "" : dockerfilePath.slice(0, lastSlash);
   const adjacent = dir === "" ? ".dockerignore" : `${dir}/.dockerignore`;
   const perDockerfile = `${dockerfilePath}.dockerignore`;
+
   return projectFiles.some(
     (f) => f === adjacent || f === perDockerfile || f === ".dockerignore"
   );
@@ -192,17 +199,21 @@ export const useDockerignore: DockerfileRule = {
         // COPY --from=<stage> reads from a previous build stage, not the
         // build context, so .dockerignore is irrelevant to it.
         const isStageCopy = /(?:^|\s)--from=/u.test(inst.args);
+
         if (isStageCopy) {
           return false;
         }
 
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
+
         if (!src) {
           return false;
         }
+
         return src === "." || src === "./" || src === "*";
       }
+
       return false;
     });
 
@@ -222,6 +233,7 @@ export const useDockerignore: DockerfileRule = {
         ),
       ];
     }
+
     return [];
   },
   defaultSeverity: "warning",

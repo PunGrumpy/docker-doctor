@@ -75,6 +75,7 @@ const closeInstruction = (state: ParserState): void => {
       raw: state.rawAccumulator.join("\n"),
     });
   }
+
   state.currentInstruction = "";
   state.currentArgs = "";
   state.rawAccumulator = [];
@@ -85,11 +86,13 @@ const matchInstructionKeyword = (
 ): { instruction: string; args: string } | null => {
   const match = lineContent.match(INSTRUCTION_LINE_RE);
   const matchedWord = match?.groups?.inst.toUpperCase();
+
   if (matchedWord && DOCKERFILE_KEYWORDS.has(matchedWord)) {
     return { args: match?.groups?.args ?? "", instruction: matchedWord };
   }
 
   const word = lineContent.trim().toUpperCase();
+
   if (DOCKERFILE_KEYWORDS.has(word)) {
     return { args: "", instruction: word };
   }
@@ -102,6 +105,7 @@ const matchInstructionKeyword = (
 // inside a quoted string — the masked copy has a space there instead.
 const findHeredocDelimiters = (lineContent: string): string[] => {
   const masked = maskQuotedText(lineContent);
+
   return [...lineContent.matchAll(HEREDOC_OPENER_RE)].flatMap((match) =>
     masked[match.index] === "<" ? [match.groups?.delim ?? ""] : []
   );
@@ -132,6 +136,7 @@ const processInstructionLine = (
   let lineContent = trimmed;
 
   const hasContinuation = lineContent.endsWith("\\");
+
   if (hasContinuation) {
     lineContent = lineContent.slice(0, -1).trim();
   }
@@ -142,6 +147,7 @@ const processInstructionLine = (
     state.startLine = lineNum;
     // Match the first instruction word (e.g. FROM, RUN, COPY)
     const matched = matchInstructionKeyword(lineContent);
+
     if (matched) {
       state.currentInstruction = matched.instruction;
       state.currentArgs = matched.args;

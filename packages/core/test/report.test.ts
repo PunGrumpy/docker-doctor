@@ -77,11 +77,13 @@ describe("JSON report contract", () => {
       [],
       1
     );
+
     expect(Object.keys(report).toSorted()).toEqual(TOP_LEVEL_KEYS);
   });
 
   test("carries failures and the analyzed file count", () => {
     const failures = [{ file: "Dockerfile", message: "boom" }];
+
     const report = toJsonReport(
       [],
       PERFECT_SCORE,
@@ -90,6 +92,7 @@ describe("JSON report contract", () => {
       failures,
       3
     );
+
     expect(report.failures).toEqual(failures);
     expect(report.analyzedFiles).toBe(3);
   });
@@ -109,7 +112,9 @@ describe("JSON report contract", () => {
       "Dockerfile",
       []
     );
+
     const { score, label } = calculateScore(diagnostics, 1);
+
     const report = toJsonReport(
       diagnostics,
       score,
@@ -120,6 +125,7 @@ describe("JSON report contract", () => {
     );
 
     expect(report.diagnostics.length).toBeGreaterThan(0);
+
     for (const d of report.diagnostics) {
       // `column` is present with value undefined; JSON.stringify drops it on
       // the wire, so this asserts on the object, not the serialized form.
@@ -137,6 +143,7 @@ describe("JSON report contract", () => {
       [],
       1
     );
+
     expect(report.diagnostics[0]?.category).toBe("Security");
   });
 

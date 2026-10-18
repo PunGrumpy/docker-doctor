@@ -19,6 +19,7 @@ import {
 
 const FONT_SIZE = 26;
 const LINE = 40;
+
 // Two buffer lines exactly, so the scroll never rests on a half-cut row.
 const SCORE_H = 80;
 const CARD_W = 940;
@@ -27,6 +28,7 @@ const CARD_H = 830;
 const SCAN_COMMAND = "npx @docker-doctor/cli@latest";
 
 type Tone = "good" | "warn";
+
 type Severity = "error" | "warning";
 
 interface LaunchLine extends BaseLine {
@@ -129,9 +131,11 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   error: ERROR,
   warning: WARNING,
 };
+
 const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
 
 const METER_CELLS = 40;
+
 // Two monospace columns at the buffer size — the indent every line shares.
 const INDENT = 31;
 
@@ -145,6 +149,7 @@ const ScoreBlock = ({
   const color = score.healthy ? GREEN : WARNING;
   const filled = Math.round((score.value / 100) * METER_CELLS);
   const meter = "█".repeat(filled) + "░".repeat(METER_CELLS - filled);
+
   return (
     <div style={{ height: SCORE_H, paddingTop: 4 }}>
       <div style={{ lineHeight: `${LINE}px` }}>
@@ -173,32 +178,40 @@ const LineBody = (line: LaunchLine) => {
     case "blank": {
       return null;
     }
+
     case "ok": {
       const color = line.tone === "warn" ? WARNING : GREEN;
       const glyph = line.tone === "warn" ? "!" : "✔";
+
       return (
         <span style={{ color, fontWeight: 600 }}>
           {`  ${glyph} ${line.text}`}
         </span>
       );
     }
+
     case "finding": {
       const severity = line.severity ?? "error";
+
       return (
         <span style={{ color: SEVERITY_COLOR[severity] }}>
           {`  ${GLYPH[severity]} ${line.text}`}
         </span>
       );
     }
+
     case "key": {
       return <span style={{ color: MUTED }}>{`    ${line.text}`}</span>;
     }
+
     case "hand": {
       return <span style={{ color: INK }}>{`  ${line.text}`}</span>;
     }
+
     case "score": {
       return line.score ? <ScoreBlock score={line.score} /> : null;
     }
+
     default: {
       return <span style={{ color: MUTED }}>{`  ${line.text}`}</span>;
     }

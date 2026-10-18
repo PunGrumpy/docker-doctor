@@ -45,6 +45,7 @@ const E4 = 329.63;
 const A4 = 440;
 
 const BPM = 96;
+
 // One beat is 0.625 s; one bar is 2.5 s.
 const BEAT = 60 / BPM;
 const BAR = 4 * BEAT;
@@ -75,9 +76,11 @@ const writeWav = (
   peakTarget: number
 ): void => {
   let peak = 0;
+
   for (const s of samples) {
     peak = Math.max(peak, Math.abs(s));
   }
+
   const scale = (peakTarget / (peak || 1)) * 32_767;
   const data = Buffer.alloc(44 + samples.length * 2);
   data.write("RIFF", 0);
@@ -94,9 +97,11 @@ const writeWav = (
   data.writeUInt16LE(16, 34);
   data.write("data", 36);
   data.writeUInt32LE(samples.length * 2, 40);
+
   for (const [i, s] of samples.entries()) {
     data.writeInt16LE(Math.round(s * scale), 44 + i * 2);
   }
+
   writeFileSync(path.join(OUT_DIR, name), data);
   console.log(`${name}: ${(samples.length / rate).toFixed(1)} s`);
 };
@@ -117,6 +122,7 @@ const music = (rate = 22_050): Float64Array => {
     const i0 = Math.floor(barStart * rate);
     const i1 = Math.min(n, Math.floor((barStart + BAR) * rate));
     const lastBar = barIndex === BARS.length - 1;
+
     for (let i = i0; i < i1; i += 1) {
       const t = i / rate - barStart;
 
@@ -128,22 +134,28 @@ const music = (rate = 22_050): Float64Array => {
       const edge = lastBar
         ? Math.min(1, t / 0.09)
         : Math.min(1, t / 0.09, (BAR - t) / 0.12);
+
       let pad = 0;
+
       for (const f of chord) {
         pad += warmVoice(f, i / rate);
       }
+
       out[i] += pad * 0.055 * edge * duck;
 
       // Sub bass: root with a soft octave touch on beat 4.
       let sub = Math.sin(TWO_PI * bass * (i / rate));
+
       if (t > 3 * BEAT && t < 3.5 * BEAT) {
         sub += 0.4 * Math.sin(TWO_PI * bass * 2 * (i / rate));
       }
+
       out[i] += sub * 0.3 * edge * duck;
 
       // Kick: beats 1 and 3, a small sine drop, quiet and round.
       for (const kickT of [0, 2 * BEAT]) {
         const dt = t - kickT;
+
         if (dt >= 0 && dt < 0.22) {
           const freq = 100 * Math.exp(-dt * 22) + 42;
           out[i] += Math.sin(TWO_PI * freq * dt) * Math.exp(-dt * 17) * 0.5;
@@ -154,11 +166,14 @@ const music = (rate = 22_050): Float64Array => {
       if (arp.length > 0) {
         const step = Math.floor(t / eighth);
         const dt = t - step * eighth;
+
         if (dt < 0.24) {
           const note = arp[step % arp.length];
+
           const pluck =
             Math.sin(TWO_PI * note * dt) +
             0.2 * Math.sin(TWO_PI * note * 2 * dt);
+
           out[i] += pluck * Math.exp(-dt * 16) * 0.075 * duck;
         }
       }
@@ -167,12 +182,15 @@ const music = (rate = 22_050): Float64Array => {
 
   // Gentle tail fade baked in; the composition fades the rest.
   const fadeN = Math.floor(rate * 1.5);
+
   for (let i = 0; i < fadeN; i += 1) {
     out[n - 1 - i] *= i / fadeN;
   }
+
   for (let i = 0; i < n; i += 1) {
     out[i] = Math.tanh(out[i] * 1.1);
   }
+
   return out;
 };
 
@@ -181,6 +199,7 @@ const thump = (rate = 44_100): Float64Array => {
   const out = new Float64Array(n);
   let phase = 0;
   let knockPhase = 0;
+
   for (let i = 0; i < n; i += 1) {
     const t = i / rate;
     const freq = 120 * Math.exp(-t * 14) + 45;
@@ -191,35 +210,44 @@ const thump = (rate = 44_100): Float64Array => {
     const attack = Math.min(1, i / (rate * 0.01));
     out[i] = Math.tanh((body + knock) * 1.3) * attack;
   }
+
   return out;
 };
 
 const blip = (rate = 44_100): Float64Array => {
   const n = Math.floor(rate * 0.22);
   const out = new Float64Array(n);
+
   for (let i = 0; i < n; i += 1) {
     const t = i / rate;
     const s = Math.sin(TWO_PI * D3 * t) + 0.3 * Math.sin(TWO_PI * D3 * 2 * t);
     const env = Math.min(1, i / (rate * 0.004)) * Math.exp(-t * 22);
     out[i] = s * env;
   }
+
   return out;
 };
 
 const tick = (rate = 44_100): Float64Array => {
   const n = Math.floor(rate * 0.035);
   const out = new Float64Array(n);
+
   for (let i = 0; i < n; i += 1) {
     const t = i / rate;
     const s = Math.sin(TWO_PI * 950 * t) + 0.3 * Math.sin(TWO_PI * 1900 * t);
     const env = Math.min(1, i / (rate * 0.0015)) * Math.exp(-t * 220);
     out[i] = s * env;
   }
+
   return out;
 };
 
 mkdirSync(OUT_DIR, { recursive: true });
+
 writeWav("music.wav", music(), 22_050, 0.55);
+
 writeWav("thump.wav", thump(), 44_100, 0.6);
+
 writeWav("blip.wav", blip(), 44_100, 0.45);
+
 writeWav("tick.wav", tick(), 44_100, 0.25);

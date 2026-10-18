@@ -119,6 +119,7 @@ const SceneFeatures = () => (
     </Sequence>
     {SNAPS.slice(1).map((snap, i) => {
       const isLast = i === SNAPS.length - 2;
+
       return (
         <Sequence
           durationInFrames={isLast ? 70 : 40}

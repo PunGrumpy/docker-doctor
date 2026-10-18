@@ -37,6 +37,7 @@ describe("sanitizeMessage and sanitizePath", () => {
         String.fromCodePoint(TAG_BLOCK_START + (c.codePointAt(0) ?? 0))
       )
       .join("");
+
     expect(sanitizeMessage(`before${hidden}after`)).toBe("before after");
   });
 

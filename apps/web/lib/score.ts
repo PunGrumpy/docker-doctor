@@ -75,8 +75,10 @@ export const parseScoreQuery = (
   if (value === null) {
     return clampScore(fallback);
   }
+
   const parsed = Number(value);
   const n = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+
   return clampScore(n);
 };
 
@@ -89,7 +91,9 @@ export const parseCountQuery = (value: string | null, fallback = 0): number => {
   if (value === null) {
     return Math.max(0, fallback);
   }
+
   const parsed = Number(value);
   const n = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+
   return Math.max(0, n);
 };

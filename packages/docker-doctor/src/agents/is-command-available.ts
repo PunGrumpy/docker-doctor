@@ -11,14 +11,17 @@ export const isCommandAvailable = (command: string): boolean => {
     if (dir === "") {
       continue;
     }
+
     for (const extension of extensions) {
       try {
         fs.accessSync(path.join(dir, command + extension), fs.constants.X_OK);
+
         return true;
       } catch {
         // Not in this directory — keep looking.
       }
     }
   }
+
   return false;
 };

@@ -20,11 +20,14 @@ import { isComposeTrue } from "./compose-services";
 // `?error` forms resolve to nothing.
 const INTERPOLATION_WITH_DEFAULT = /\$\{[^}:?-]+:?-(?<fallback>[^}]*)\}/gu;
 const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*/gu;
+
 // `$HOME` and `${HOME}` name the same directory `~` does; fold them before
 // the generic interpolation pass would erase them.
 const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?![A-Za-z0-9_])/gu;
+
 // Compose runs from the project directory, so `$PWD` and `${PWD}` name it.
 const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?![A-Za-z0-9_])/gu;
+
 // A source that starts with an unresolved variable, e.g. `${DATA_DIR}/pg`.
 const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*)/u;
 
@@ -51,20 +54,25 @@ const splitShortSyntax = (spec: string): string[] => {
   const parts: string[] = [];
   let depth = 0;
   let current = "";
+
   for (const char of spec) {
     if (char === "{") {
       depth += 1;
     } else if (char === "}") {
       depth = Math.max(0, depth - 1);
     }
+
     if (char === ":" && depth === 0) {
       parts.push(current);
       current = "";
       continue;
     }
+
     current += char;
   }
+
   parts.push(current);
+
   return parts;
 };
 
@@ -74,6 +82,7 @@ const DRIVE_LETTER = /^[A-Za-z]$/u;
 
 const joinDriveLetter = (parts: string[]): string[] => {
   const [first, second, ...rest] = parts;
+
   if (
     first !== undefined &&
     second !== undefined &&
@@ -82,6 +91,7 @@ const joinDriveLetter = (parts: string[]): string[] => {
   ) {
     return [`${first}:${second}`, ...rest];
   }
+
   return parts;
 };
 
@@ -106,10 +116,12 @@ export const volumeMount = (
 ): VolumeMount | undefined => {
   if (isComposeString(volume)) {
     const [source, target, mode] = joinDriveLetter(splitShortSyntax(volume));
+
     // A lone path is an anonymous volume at that target, not a bind mount.
     if (target === undefined) {
       return undefined;
     }
+
     return {
       readOnly: shortSyntaxReadOnly(mode),
       source,
@@ -117,6 +129,7 @@ export const volumeMount = (
       type: undefined,
     };
   }
+
   // A sequence here is invalid Compose. It has none of these keys.
   if (isComposeMapping(volume) || isComposeSequence(volume)) {
     return {
@@ -126,6 +139,7 @@ export const volumeMount = (
       type: stringOrUndefined(composeField(volume, "type")),
     };
   }
+
   return undefined;
 };
 
@@ -141,19 +155,25 @@ export const bindMountSource = (mount: VolumeMount): string | undefined => {
   if (mount.type !== undefined && mount.type !== "bind") {
     return undefined;
   }
+
   if (!mount.source) {
     return undefined;
   }
+
   const withDefaults = applyFoldsAndDefaults(mount.source);
+
   if (LEADING_INTERPOLATION_RE.test(withDefaults)) {
     return undefined;
   }
+
   const resolved = withDefaults
     .replace(INTERPOLATION_WITHOUT_DEFAULT, "")
     .replaceAll("\\", "/");
+
   if (resolved === "" || !PATH_LIKE.test(resolved)) {
     return undefined;
   }
+
   return resolved;
 };
 
@@ -169,16 +189,21 @@ const DOCKER_SOCKET_TARGET = "/var/run/docker.sock";
  */
 export const mountsDockerSocket = (mount: VolumeMount): boolean => {
   const source = bindMountSource(mount);
+
   if (source !== undefined) {
     return isDockerSocketPath(source);
   }
+
   if (mount.type !== undefined && mount.type !== "bind") {
     return false;
   }
+
   if (!mount.source) {
     return false;
   }
+
   const remainder = resolveInterpolationDefaults(mount.source);
+
   return (
     isDockerSocketPath(remainder) ||
     (remainder === "" &&
@@ -223,38 +248,48 @@ const startsWithDirectory = (hostPath: string, directory: string): boolean =>
  */
 export const classifyHostPath = (hostPath: string): HostPathScope => {
   const collapsed = path.posix.normalize(hostPath);
+
   const normalized =
     collapsed.length > 1 ? collapsed.replace(/\/+$/u, "") : collapsed;
 
   if (normalized === "~") {
     return "home";
   }
+
   if (normalized.startsWith("~/")) {
     return normalized.startsWith("~/.") ? "home-dotfile" : "host";
   }
+
   if (normalized === "." || normalized.startsWith("./")) {
     return "project";
   }
+
   if (normalized === ".." || normalized.startsWith("../")) {
     return "parent";
   }
+
   if (WINDOWS_DRIVE_ROOT.test(normalized)) {
     return "root";
   }
+
   if (WINDOWS_DRIVE_PREFIX.test(normalized)) {
     return "host";
   }
+
   if (normalized === "/") {
     return "root";
   }
+
   if (!normalized.startsWith("/")) {
     // `path.posix.normalize("./src")` yields `src`.
     return "project";
   }
+
   for (const directory of SYSTEM_DIRECTORIES) {
     if (startsWithDirectory(normalized, directory)) {
       return "system";
     }
   }
+
   return "host";
 };

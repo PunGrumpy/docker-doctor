@@ -53,20 +53,25 @@ export const getLeaderboard = async (): Promise<LeaderboardData> => {
   const res = await fetch(RESULTS_URL, {
     next: { revalidate: REVALIDATE_SECONDS },
   });
+
   if (!res.ok) {
     throw new Error(`Failed to fetch leaderboard results: ${res.status}`);
   }
+
   const body: unknown = await res.json();
   const schemaVersion = isResultsBody(body) ? body.schemaVersion : undefined;
+
   if (schemaVersion !== RESULTS_SCHEMA_VERSION) {
     throw new Error(
       `Leaderboard results schemaVersion ${String(schemaVersion)} does not match expected ${RESULTS_SCHEMA_VERSION}`
     );
   }
+
   if (!(isResultsBody(body) && isLeaderboardData(body))) {
     throw new Error(
       "Leaderboard results lack doctorVersion, entries or generatedAt"
     );
   }
+
   return body;
 };

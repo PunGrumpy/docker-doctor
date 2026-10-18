@@ -36,6 +36,7 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       if (currentVersion) {
         versions.push(currentVersion);
       }
+
       currentVersion = {
         minor: [],
         patch: [],
@@ -45,6 +46,7 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       currentChange = null;
     } else if (line.startsWith("### ")) {
       const section = line.slice(4).trim().toLowerCase();
+
       if (section === "minor changes") {
         currentSection = "minor";
       } else if (section === "patch changes") {
@@ -52,10 +54,12 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       } else {
         currentSection = null;
       }
+
       currentChange = null;
     } else if (line.startsWith("- ") && currentSection && currentVersion) {
       // oxlint-disable-next-line prefer-named-capture-group
       const shaMatch = line.match(/^-\s+([a-f0-9]+):\s+(.+)/u);
+
       if (shaMatch) {
         currentChange = {
           details: [],

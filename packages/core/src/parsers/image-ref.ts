@@ -20,6 +20,7 @@ export const parseImageRef = (ref: string): ImageRef => {
   let digest: string | undefined;
 
   const atIndex = remainder.indexOf("@");
+
   if (atIndex !== -1) {
     digest = remainder.slice(atIndex + 1);
     remainder = remainder.slice(0, atIndex);
@@ -36,8 +37,10 @@ export const parseImageRef = (ref: string): ImageRef => {
 
   let registry: string | undefined;
   const firstSlashIndex = remainder.indexOf("/");
+
   if (firstSlashIndex !== -1) {
     const firstSegment = remainder.slice(0, firstSlashIndex);
+
     if (
       firstSegment.includes(".") ||
       firstSegment.includes(":") ||
@@ -75,7 +78,9 @@ export const isHardenedRuntimeImage = (imagePart: string): boolean => {
   if (!isHardenedImage(imagePart)) {
     return false;
   }
+
   const { tag } = parseImageRef(imagePart);
+
   return !(tag === "dev" || tag?.endsWith("-dev"));
 };
 
@@ -87,6 +92,7 @@ const DISTROLESS_NONROOT_TAG_RE = /(?:^|-)nonroot(?:-|$)/u;
  */
 export const isDistrolessNonroot = (imagePart: string): boolean => {
   const { name, registry, tag } = parseImageRef(imagePart);
+
   return (
     registry === "gcr.io" &&
     name.startsWith("distroless/") &&
@@ -107,9 +113,11 @@ export const mutableRefIssue = (
   if (!(ref.tag || ref.digest)) {
     return "untagged";
   }
+
   if (ref.tag === "latest" && !ref.digest) {
     return "latest";
   }
+
   return undefined;
 };
 
@@ -123,6 +131,7 @@ export const parseFromArgs = (args: string): FromArgs => {
   const parts = args.split(/\s+/u).filter(Boolean);
   const asIndex = parts.findIndex((p) => p.toLowerCase() === "as");
   const imageParts = asIndex === -1 ? parts : parts.slice(0, asIndex);
+
   return {
     base: imageParts.find((p) => !p.startsWith("--")) ?? null,
     stage: asIndex === -1 ? null : (parts[asIndex + 1] ?? null),
@@ -151,6 +160,7 @@ export const collectStageAliases = (
     }
 
     const { stage } = parseFromArgs(inst.args);
+
     if (stage) {
       aliases.add(stage.toLowerCase());
     }

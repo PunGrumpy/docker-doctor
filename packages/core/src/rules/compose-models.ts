@@ -23,7 +23,9 @@ export const topLevelModels = (
   if (!isComposeMapping(composeContent)) {
     return {};
   }
+
   const { models } = composeContent;
+
   return isComposeMapping(models) ? models : {};
 };
 
@@ -52,6 +54,7 @@ export const undefinedModelReference: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { models } = config;
+
       if (isComposeSequence(models)) {
         // Short syntax: a list of model names.
         for (const [index, entry] of models.entries()) {
@@ -92,7 +95,9 @@ const collectModelBindings = (composeContent: ComposeValue): ModelBinding[] => {
     if (!isComposeMapping(config)) {
       continue;
     }
+
     const { model } = config;
+
     if (isComposeString(model)) {
       bindings.push({
         model,
@@ -104,14 +109,19 @@ const collectModelBindings = (composeContent: ComposeValue): ModelBinding[] => {
 
   for (const [name, config] of composeServices(composeContent)) {
     const { provider } = config;
+
     if (!isComposeMapping(provider)) {
       continue;
     }
+
     const { type, options } = provider;
+
     if (type !== "model" || !isComposeMapping(options)) {
       continue;
     }
+
     const { model } = options;
+
     if (isComposeString(model)) {
       bindings.push({
         model,
@@ -133,18 +143,22 @@ export const pinModelVersion: ComposeRule = {
       composeContent
     )) {
       const ref = parseImageRef(model);
+
       if (ref.isVariable) {
         continue;
       }
 
       const issue = mutableRefIssue(ref);
+
       if (!issue) {
         continue;
       }
+
       const detail =
         issue === "untagged"
           ? `${subject} '${model}' does not specify a tag.`
           : `${subject} '${model}' uses the mutable 'latest' tag.`;
+
       diagnostics.push(
         createDiagnostic(
           file,

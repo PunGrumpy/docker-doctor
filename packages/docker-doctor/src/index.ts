@@ -16,6 +16,7 @@ export {
   findRule,
   toJsonReport,
 } from "@docker-doctor/core";
+
 export type {
   ComposeMapping,
   ComposeValue,
@@ -25,4 +26,5 @@ export type {
   RuleSeverity,
   ScoreResult,
 } from "@docker-doctor/core";
+
 export const version: string = packageJson.version;

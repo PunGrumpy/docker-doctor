@@ -13,6 +13,7 @@ import { useState, useEffect, useSyncExternalStore } from "react";
  */
 // Captured cycle from claude/thinking frames: · ✢ ✳ ✶ ✻ ✽ ✻ ✶ ✳ ✢
 const GLYPHS = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+
 const VERBS = [
   "Thinking",
   "Levitating",
@@ -25,6 +26,7 @@ const VERBS = [
 
 // terracotta base
 const CLAUDE = "#cd694a";
+
 // the highlight the wave carries
 const HILITE = "#e79475";
 const DIM = "#7d7d7d";
@@ -34,6 +36,7 @@ const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const subscribeReducedMotion = (onChange: () => void) => {
   const mq = window.matchMedia(REDUCED_MOTION_QUERY);
   mq.addEventListener("change", onChange);
+
   return () => mq.removeEventListener("change", onChange);
 };
 
@@ -67,7 +70,9 @@ export const ClaudeThinking = ({
     if (!running || prefersReduced) {
       return;
     }
+
     const id = setInterval(() => setGlyph((g) => (g + 1) % GLYPHS.length), 110);
+
     return () => clearInterval(id);
   }, [running, prefersReduced]);
 
@@ -75,7 +80,9 @@ export const ClaudeThinking = ({
     if (!running) {
       return;
     }
+
     const id = setInterval(() => setSecs((s) => s + 1), 1000);
+
     return () => clearInterval(id);
   }, [running]);
 
@@ -83,11 +90,13 @@ export const ClaudeThinking = ({
     if (!running) {
       return;
     }
+
     // Verbs change slowly, like the real thing — not every second.
     const id = setInterval(
       () => setVerbIdx((v) => (v + 1) % verbs.length),
       5200
     );
+
     return () => clearInterval(id);
   }, [running, verbs.length]);
 

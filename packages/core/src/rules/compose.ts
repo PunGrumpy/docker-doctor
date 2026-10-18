@@ -24,6 +24,7 @@ export const noVersionKey: ComposeRule = {
         ),
       ];
     }
+
     return [];
   },
   defaultSeverity: "warning",
@@ -42,10 +43,12 @@ export const requireResourceLimits: ComposeRule = {
         composeField(config.deploy, "resources"),
         "limits"
       );
+
       const hasDeployLimits = [
         composeField(limits, "cpus"),
         composeField(limits, "memory"),
       ].some(Boolean);
+
       // Pre-`deploy` spelling of the same limits, still in the spec.
       const hasServiceLevelLimits = [
         config.mem_limit,
@@ -82,6 +85,7 @@ export const requireRestartPolicy: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const hasRestart = "restart" in config;
+
       const hasDeployRestart =
         composeField(config.deploy, "restart_policy") !== undefined;
 
@@ -143,6 +147,7 @@ export const pinServiceImage: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { image } = config;
+
       // With `build:` present, `image` only names the locally built
       // artifact — there is nothing to pin.
       if (!isComposeString(image) || "build" in config) {
@@ -150,18 +155,22 @@ export const pinServiceImage: ComposeRule = {
       }
 
       const ref = parseImageRef(image);
+
       if (ref.isVariable) {
         continue;
       }
 
       const issue = mutableRefIssue(ref);
+
       if (!issue) {
         continue;
       }
+
       const detail =
         issue === "untagged"
           ? `Service '${name}' image '${image}' does not specify a tag.`
           : `Service '${name}' image '${image}' uses the mutable 'latest' tag.`;
+
       diagnostics.push(
         createDiagnostic(
           file,

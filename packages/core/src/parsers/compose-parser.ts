@@ -19,6 +19,7 @@ import { isComposeValue } from "./compose-value";
 const describeYamlError = (cause: unknown): string => {
   const text = cause instanceof Error ? cause.message : String(cause);
   const firstLine = text.split("\n", 1)[0] ?? "";
+
   return firstLine.endsWith(":") ? firstLine.slice(0, -1) : firstLine;
 };
 
@@ -71,21 +72,26 @@ export const createComposeLocator = (content: string): ComposeLocator => {
       if (isAlias(node)) {
         node = node.resolve(doc);
       }
+
       if (isMap(node)) {
         const pair = node.items.find(
           (item) =>
             isScalar(item.key) && String(item.key.value) === String(segment)
         );
+
         if (!pair || !isScalar(pair.key)) {
           return;
         }
+
         offset = pair.key.range?.[0];
         node = pair.value;
       } else if (isSeq(node) && isSequenceIndex(segment)) {
         const item = node.items[segment];
+
         if (item === undefined || item === null) {
           return;
         }
+
         offset = isNode(item) ? item.range?.[0] : undefined;
         node = item;
       } else {

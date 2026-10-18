@@ -60,6 +60,7 @@ describe("Security Rules", () => {
       FROM node:22-alpine
       COPY . .
     `);
+
     const diags1 = noRootUser.check(withoutUser, "Dockerfile");
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/no-root-user");
@@ -68,6 +69,7 @@ describe("Security Rules", () => {
       FROM node:22-alpine
       USER node
     `);
+
     const diags2 = noRootUser.check(withUserNode, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
@@ -79,6 +81,7 @@ describe("Security Rules", () => {
       USER node
       CMD ["node", "dist/index.js"]
     `);
+
     expect(
       noRootUser.check(multiStageWithFinalUser, "Dockerfile")
     ).toHaveLength(0);
@@ -90,6 +93,7 @@ describe("Security Rules", () => {
         FROM node:22-alpine
         USER ${user}
       `);
+
       expect(noRootUser.check(instructions, "Dockerfile")).toHaveLength(1);
     }
 
@@ -97,6 +101,7 @@ describe("Security Rules", () => {
       FROM node:22-alpine
       USER node:node
     `);
+
     expect(noRootUser.check(nonRoot, "Dockerfile")).toHaveLength(0);
   });
 
@@ -109,6 +114,7 @@ describe("Security Rules", () => {
       FROM base AS final
       CMD ["node", "x.js"]
     `);
+
     expect(noRootUser.check(inherited, "Dockerfile")).toHaveLength(0);
 
     const twoHop = parseDockerfile(`
@@ -118,6 +124,7 @@ describe("Security Rules", () => {
       FROM b AS c
       CMD ["node", "x.js"]
     `);
+
     expect(noRootUser.check(twoHop, "Dockerfile")).toHaveLength(0);
 
     // A fresh base image resets to root even if an earlier stage set USER.
@@ -127,6 +134,7 @@ describe("Security Rules", () => {
       FROM debian:bookworm-slim AS final
       CMD ["node", "x.js"]
     `);
+
     expect(noRootUser.check(freshBase, "Dockerfile")).toHaveLength(1);
 
     // Inheriting a non-root USER and then switching back to root reports.
@@ -136,6 +144,7 @@ describe("Security Rules", () => {
       FROM base AS final
       USER root
     `);
+
     expect(noRootUser.check(resetToRoot, "Dockerfile")).toHaveLength(1);
   });
 
@@ -148,6 +157,7 @@ describe("Security Rules", () => {
       COPY --from=build /app/dist ./dist
       CMD ["node", "dist/index.js"]
     `);
+
     const diags3 = noRootUser.check(multiStageRootRuntime, "Dockerfile");
     expect(diags3).toHaveLength(1);
   });
@@ -157,6 +167,7 @@ describe("Security Rules", () => {
       FROM dhi.io/python:3.13
       COPY . .
     `);
+
     expect(noRootUser.check(dhiRuntime, "Dockerfile")).toHaveLength(0);
 
     // -dev variants keep a shell and are not assumed nonroot.
@@ -164,6 +175,7 @@ describe("Security Rules", () => {
       FROM dhi.io/python:3.13-dev
       COPY . .
     `);
+
     expect(noRootUser.check(dhiDev, "Dockerfile")).toHaveLength(1);
 
     // An explicit USER root on a DHI base still reports.
@@ -171,6 +183,7 @@ describe("Security Rules", () => {
       FROM dhi.io/python:3.13
       USER root
     `);
+
     expect(noRootUser.check(dhiRoot, "Dockerfile")).toHaveLength(1);
 
     // Build in a -dev stage, run in the runtime variant.
@@ -180,6 +193,7 @@ describe("Security Rules", () => {
       FROM dhi.io/python:3.13
       COPY --from=build /app /app
     `);
+
     expect(noRootUser.check(multiStage, "Dockerfile")).toHaveLength(0);
   });
 
@@ -189,6 +203,7 @@ describe("Security Rules", () => {
         pinImageVersion.check(parseDockerfile(`FROM ${base}`), "Dockerfile")
           .length
     );
+
     expect(counts).toEqual([0, 0, 0]);
   });
 
@@ -209,6 +224,7 @@ describe("Security Rules", () => {
         parseDockerfile(dockerfile),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -217,24 +233,28 @@ describe("Security Rules", () => {
     const unpinned = parseDockerfile(`
       FROM node
     `);
+
     const diags1 = pinImageVersion.check(unpinned, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
     const latest = parseDockerfile(`
       FROM node:latest
     `);
+
     const diags2 = pinImageVersion.check(latest, "Dockerfile");
     expect(diags2).toHaveLength(1);
 
     const pinned = parseDockerfile(`
       FROM node:22.2.0-alpine
     `);
+
     const diags3 = pinImageVersion.check(pinned, "Dockerfile");
     expect(diags3).toHaveLength(0);
 
     const registryPortUntagged = parseDockerfile(`
       FROM myregistry.example.com:5000/team/app
     `);
+
     expect(
       pinImageVersion.check(registryPortUntagged, "Dockerfile")
     ).toHaveLength(1);
@@ -243,17 +263,20 @@ describe("Security Rules", () => {
       FROM node:22-alpine AS build
       FROM build
     `);
+
     expect(pinImageVersion.check(stageAlias, "Dockerfile")).toHaveLength(0);
 
     const argDriven = parseDockerfile(`
       ARG NODE_IMAGE=node:22-alpine
       FROM \${NODE_IMAGE}
     `);
+
     expect(pinImageVersion.check(argDriven, "Dockerfile")).toHaveLength(0);
 
     const digestPinned = parseDockerfile(`
       FROM node@sha256:aaaabbbbccccdddd
     `);
+
     expect(pinImageVersion.check(digestPinned, "Dockerfile")).toHaveLength(0);
   });
 
@@ -273,6 +296,7 @@ describe("Security Rules", () => {
         parseDockerfile(`FROM ${base}\nENTRYPOINT ["/app"]`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -282,6 +306,7 @@ describe("Security Rules", () => {
       FROM gcr.io/distroless/static-debian12:nonroot
       USER root
     `);
+
     expect(noRootUser.check(overridden, "Dockerfile")).toHaveLength(1);
   });
 
@@ -289,33 +314,39 @@ describe("Security Rules", () => {
     const withSecret = parseDockerfile(`
       ENV DB_PASSWORD=my-secret-pass
     `);
+
     const diags = noSecretsInEnv.check(withSecret, "Dockerfile");
     expect(diags).toHaveLength(1);
 
     const withSpaceSecret = parseDockerfile(`
       ENV DB_PASSWORD my-secret-pass
     `);
+
     const diagsSpace = noSecretsInEnv.check(withSpaceSecret, "Dockerfile");
     expect(diagsSpace).toHaveLength(1);
 
     const withSpaceNormal = parseDockerfile(`
       ENV NORMAL_VAR my-value
     `);
+
     const diagsSpaceNormal = noSecretsInEnv.check(
       withSpaceNormal,
       "Dockerfile"
     );
+
     expect(diagsSpaceNormal).toHaveLength(0);
 
     const argPassthrough = parseDockerfile(`
       ARG API_KEY
       ENV API_KEY=\${API_KEY}
     `);
+
     expect(noSecretsInEnv.check(argPassthrough, "Dockerfile")).toHaveLength(0);
 
     const multipleNormalVars = parseDockerfile(`
       ENV NODE_ENV=production PORT=3000
     `);
+
     expect(noSecretsInEnv.check(multipleNormalVars, "Dockerfile")).toHaveLength(
       0
     );
@@ -323,11 +354,13 @@ describe("Security Rules", () => {
     const awsSecretKey = parseDockerfile(`
       ENV AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
     `);
+
     expect(noSecretsInEnv.check(awsSecretKey, "Dockerfile")).toHaveLength(1);
 
     const apiKey = parseDockerfile(`
       ENV API_KEY=not-a-real-secret
     `);
+
     expect(noSecretsInEnv.check(apiKey, "Dockerfile")).toHaveLength(1);
   });
 
@@ -335,6 +368,7 @@ describe("Security Rules", () => {
     const authorNotSecret = parseDockerfile(`
       ENV AUTHOR=grumpy
     `);
+
     expect(noSecretsInEnv.check(authorNotSecret, "Dockerfile")).toHaveLength(0);
   });
 
@@ -342,6 +376,7 @@ describe("Security Rules", () => {
     const oauthUrlNotSecret = parseDockerfile(`
       ENV OAUTH_ISSUER_URL=https://example.com
     `);
+
     expect(noSecretsInEnv.check(oauthUrlNotSecret, "Dockerfile")).toHaveLength(
       0
     );
@@ -352,11 +387,13 @@ describe("Security Rules", () => {
       ENV AUTH_URL=http://auth:8080
       ENV TOKEN_ENDPOINT=https://id.example.com/oauth/token
     `);
+
     expect(noSecretsInEnv.check(authUrl, "Dockerfile")).toHaveLength(0);
 
     const urlWithUserinfo = parseDockerfile(`
       ENV DB_PASSWORD_URL=postgres://app:hunter2@db/app
     `);
+
     expect(noSecretsInEnv.check(urlWithUserinfo, "Dockerfile")).toHaveLength(1);
   });
 
@@ -368,6 +405,7 @@ describe("Security Rules", () => {
       ENV PATH=/usr/local/bin:/usr/bin
       ENV LOG_PATTERN=json
     `);
+
     const diags = noSecretsInEnv.check(spellings, "Dockerfile");
     expect(diags.map((d) => d.message)).toEqual([
       expect.stringContaining("'PGPASSWORD'"),
@@ -400,6 +438,7 @@ describe("Security Rules", () => {
         parseDockerfile(line),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -408,12 +447,14 @@ describe("Security Rules", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
       `);
+
     const diags1 = noAddRemote.check(remoteAdd, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
     const localArchiveWithChown = parseDockerfile(`
       ADD --chown=node:node local-archive.tar.gz /app/
     `);
+
     expect(noAddRemote.check(localArchiveWithChown, "Dockerfile")).toHaveLength(
       0
     );
@@ -423,11 +464,13 @@ describe("Security Rules", () => {
     const verified = parseDockerfile(`
       ADD --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool.tar.gz /tmp/
     `);
+
     expect(noAddRemote.check(verified, "Dockerfile")).toHaveLength(0);
 
     const verifiedWithChown = parseDockerfile(`
       ADD --chown=node:node --checksum=sha256:24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d https://example.com/tool /usr/local/bin/tool
     `);
+
     expect(noAddRemote.check(verifiedWithChown, "Dockerfile")).toHaveLength(0);
   });
 
@@ -435,6 +478,7 @@ describe("Security Rules", () => {
     const remoteAddWithChown = parseDockerfile(`
       ADD --chown=node:node https://example.com/file.txt /app/
     `);
+
     expect(noAddRemote.check(remoteAddWithChown, "Dockerfile")).toHaveLength(1);
   });
 });
@@ -446,6 +490,7 @@ describe("Performance Rules", () => {
       COPY . .
       RUN npm install
     `);
+
     const diags = orderLayers.check(badOrder, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].rule).toBe("docker-doctor/order-layers");
@@ -456,6 +501,7 @@ describe("Performance Rules", () => {
       RUN npm install
       COPY . .
     `);
+
     expect(orderLayers.check(goodOrder, "Dockerfile")).toHaveLength(0);
   });
 
@@ -468,6 +514,7 @@ describe("Performance Rules", () => {
       COPY package.json ./
       RUN npm ci --omit=dev
     `);
+
     expect(orderLayers.check(correctMultiStage, "Dockerfile")).toHaveLength(0);
   });
 
@@ -477,6 +524,7 @@ describe("Performance Rules", () => {
       COPY /usr/src/lib /lib
       RUN npm ci
     `);
+
     expect(orderLayers.check(usrSrcPath, "Dockerfile")).toHaveLength(0);
   });
 
@@ -485,6 +533,7 @@ describe("Performance Rules", () => {
         FROM node:22
         RUN npm run build
       `);
+
     const diags1 = useMultiStage.check(singleStage, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
@@ -494,6 +543,7 @@ describe("Performance Rules", () => {
       FROM node:22-alpine
       COPY --from=build /app/dist ./dist
     `);
+
     expect(useMultiStage.check(realisticMultiStage, "Dockerfile")).toHaveLength(
       0
     );
@@ -514,6 +564,7 @@ describe("Performance Rules", () => {
         parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -524,6 +575,7 @@ describe("Performance Rules", () => {
         RUN step2
         RUN step3
       `);
+
     const diags1 = minimizeLayers.check(consecutive, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
@@ -531,6 +583,7 @@ describe("Performance Rules", () => {
       FROM node:22-alpine
       RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     `);
+
     expect(minimizeLayers.check(combinedRun, "Dockerfile")).toHaveLength(0);
   });
 
@@ -539,23 +592,28 @@ describe("Performance Rules", () => {
       FROM node:22-alpine
       COPY . .
     `);
+
     const diags1 = useDockerignore.check(copyAll, "Dockerfile", {
       projectFiles: ["Dockerfile"],
     });
+
     expect(diags1).toHaveLength(1);
 
     const diags2 = useDockerignore.check(copyAll, "Dockerfile", {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
+
     expect(diags2).toHaveLength(0);
 
     const copyAllWithChown = parseDockerfile(`
       FROM node:22-alpine
       COPY --chown=node:node . .
     `);
+
     const diags3 = useDockerignore.check(copyAllWithChown, "Dockerfile", {
       projectFiles: ["Dockerfile", ".dockerignore"],
     });
+
     expect(diags3).toHaveLength(0);
   });
 
@@ -565,6 +623,7 @@ describe("Performance Rules", () => {
       FROM node:22-alpine
       COPY --from=build . ./
     `);
+
     expect(
       useDockerignore.check(stageCopy, "Dockerfile", { projectFiles: [] })
     ).toHaveLength(0);
@@ -596,6 +655,7 @@ describe("Performance Rules", () => {
       })
     ).toHaveLength(0);
   });
+
   const perDockerfileIgnoreCases = [
     {
       expected: 0,
@@ -621,6 +681,7 @@ describe("Performance Rules", () => {
       FROM node:22-alpine
       COPY . .
     `);
+
       expect(
         useDockerignore.check(instructions, file, { projectFiles })
       ).toHaveLength(expected);
@@ -636,6 +697,7 @@ describe("Compose Rules", () => {
       },
       version: "3.8",
     };
+
     const diags = noVersionKey.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
 
@@ -645,6 +707,7 @@ describe("Compose Rules", () => {
         web: { image: "node:22-alpine" },
       },
     };
+
     expect(noVersionKey.check(realisticCompliant, "compose.yml")).toHaveLength(
       0
     );
@@ -661,6 +724,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
     const locate = createComposeLocator(source);
     const context = { locate };
@@ -670,6 +734,7 @@ services:
       "compose.yml",
       context
     );
+
     expect(versionDiags).toHaveLength(1);
     expect(versionDiags[0].line).toBe(1);
 
@@ -678,6 +743,7 @@ services:
       "compose.yml",
       context
     );
+
     expect(restartDiags).toHaveLength(1);
     expect(restartDiags[0].line).toBe(3);
 
@@ -686,6 +752,7 @@ services:
       "compose.yml",
       context
     );
+
     expect(dependsDiags).toHaveLength(1);
     expect(dependsDiags[0].line).toBe(5);
   });
@@ -705,6 +772,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
     const locate = createComposeLocator(source);
 
@@ -713,6 +781,7 @@ services:
       "compose.yml",
       { locate }
     );
+
     expect(dependsDiags).toHaveLength(1);
     expect(dependsDiags[0].line).toBe(5);
   });
@@ -722,6 +791,7 @@ services:
       "services:\n  web:\n    image: node:22-alpine\n",
       "compose.yml"
     );
+
     const diags = requireRestartPolicy.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
     expect(diags[0].line).toBeUndefined();
@@ -732,6 +802,7 @@ services:
       "services:\n  - web\n  - db\n",
       "compose.yaml"
     );
+
     expect(
       requireRestartPolicy.check(composeContent, "compose.yaml")
     ).toHaveLength(0);
@@ -743,6 +814,7 @@ services:
         web: { image: "node:22" },
       },
     };
+
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
 
@@ -756,6 +828,7 @@ services:
         },
       },
     };
+
     expect(requireResourceLimits.check(withLimits, "compose.yml")).toHaveLength(
       0
     );
@@ -767,6 +840,7 @@ services:
         web: { image: "node:22" },
       },
     };
+
     const diags1 = requireRestartPolicy.check(withoutRestart, "compose.yml");
     expect(diags1).toHaveLength(1);
 
@@ -775,6 +849,7 @@ services:
         web: { image: "node:22", restart: "always" },
       },
     };
+
     const diags2 = requireRestartPolicy.check(withRestart, "compose.yml");
     expect(diags2).toHaveLength(0);
 
@@ -786,6 +861,7 @@ services:
         },
       },
     };
+
     expect(
       requireRestartPolicy.check(withDeployRestartPolicy, "compose.yml")
     ).toHaveLength(0);
@@ -800,6 +876,7 @@ services:
     <<: *base
     image: nginx
     `;
+
     const composeContent = parseCompose(content, "compose.yml");
     const diags = requireRestartPolicy.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(0);
@@ -808,10 +885,13 @@ services:
   test("a service with a null body is still checked", () => {
     const source =
       "services:\n  web:\n  db:\n    image: postgres:16-alpine\n    restart: unless-stopped\n";
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = requireRestartPolicy.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain("'web'");
     expect(diags[0].line).toBe(2);
@@ -827,6 +907,7 @@ services:
         web: { depends_on: ["db"], image: "node:22" },
       },
     };
+
     const diags1 = useDependsOnCondition.check(shortForm, "compose.yml");
     expect(diags1).toHaveLength(1);
 
@@ -838,6 +919,7 @@ services:
         },
       },
     };
+
     expect(useDependsOnCondition.check(longForm, "compose.yml")).toHaveLength(
       0
     );
@@ -853,6 +935,7 @@ describe("Compose Rules — require-resource-limits", () => {
         unlimited: { image: "acme/web:1.4.2", mem_reservation: "256m" },
       },
     };
+
     const diags = requireResourceLimits.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain("'unlimited'");
@@ -876,10 +959,13 @@ describe("Compose Rules — pin-service-image", () => {
   templated:
     image: \${REGISTRY}/app:\${TAG}
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = pinServiceImage.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(2);
     expect(diags[0].message).toContain("'web'");
     expect(diags[0].message).toContain("does not specify a tag");
@@ -894,6 +980,7 @@ describe("Compose Rules — pin-service-image", () => {
       { services: { web: { image: "nginx" } } },
       "compose.yml"
     );
+
     expect(diags).toHaveLength(1);
     expect(diags[0].line).toBeUndefined();
   });
@@ -908,10 +995,13 @@ describe("Compose Security Rules", () => {
   web:
     image: nginx:1.27-alpine
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = noPrivilegedService.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain("'agent'");
     expect(diags[0].line).toBe(4);
@@ -938,11 +1028,13 @@ describe("Compose Security Rules", () => {
     image: nginx:1.27-alpine
     privileged: ${value}
 `;
+
       const diagnostics = noPrivilegedService.check(
         parseCompose(source, "compose.yaml"),
         "compose.yaml",
         { locate: createComposeLocator(source) }
       );
+
       expect(diagnostics).toHaveLength(expected);
       expect(diagnostics.map((d) => d.line)).toEqual(expected === 1 ? [4] : []);
     }
@@ -968,10 +1060,12 @@ describe("Compose Security Rules", () => {
         target: /data
         read_only: ${value}
 `;
+
       const diagnostics = preferReadOnlyBindMount.check(
         parseCompose(source, "compose.yaml"),
         "compose.yaml"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -982,6 +1076,7 @@ describe("Compose Security Rules", () => {
         web: { image: "nginx:1.27-alpine", privileged: false },
       },
     };
+
     expect(
       noPrivilegedService.check(composeContent, "compose.yml")
     ).toHaveLength(0);
@@ -1004,10 +1099,13 @@ describe("Compose Security Rules", () => {
     volumes:
       - ./html:/usr/share/nginx/html
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = noDockerSocketMount.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(2);
     expect(diags[0].message).toContain("'gateway'");
     expect(diags[0].line).toBe(5);
@@ -1030,10 +1128,13 @@ describe("Compose Security Rules", () => {
         source: \${XDG_RUNTIME_DIR:-/run/user/1000}/docker.sock
         target: /var/run/docker.sock
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = noDockerSocketMount.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags.map((d) => d.line)).toEqual([5, 6, 7, 8, 9, 10, 11]);
   });
 
@@ -1058,6 +1159,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     expect(
       noDockerSocketMount.check(composeContent, "compose.yml")
     ).toHaveLength(0);
@@ -1080,10 +1182,13 @@ describe("Compose Security Rules", () => {
         read_only: true
       - C:\\:/mnt/c
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = noBroadBindMount.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags.map((d) => d.line)).toEqual([5, 6, 7, 8, 9, 10, 11, 15]);
     expect(diags[0].message).toContain("the host's root filesystem");
     expect(diags[1].message).toContain("the whole home directory");
@@ -1116,6 +1221,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     expect(noBroadBindMount.check(composeContent, "compose.yml")).toHaveLength(
       0
     );
@@ -1139,10 +1245,13 @@ describe("Compose Security Rules", () => {
         target: /models
         read_only: true
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = preferReadOnlyBindMount.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags.map((d) => d.line)).toEqual([5, 8, 10]);
     expect(diags[0].message).toContain("'/opt/certs'");
     expect(diags[0].severity).toBe("info");
@@ -1164,6 +1273,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     expect(
       preferReadOnlyBindMount.check(composeContent, "compose.yml")
     ).toHaveLength(0);
@@ -1203,6 +1313,7 @@ describe("Compose Security Rules", () => {
     volumes:
       - ${volume}
 `;
+
       const composeContent = parseCompose(source, "compose.yaml");
       const context = { locate: createComposeLocator(source) };
       expect(
@@ -1232,10 +1343,13 @@ describe("Compose Security Rules", () => {
       - REDIS_URL=redis://cache:6379
       - ANTHROPIC_API_KEY
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = noPlaintextSecrets.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(2);
     expect(diags[0].message).toContain("'OPENAI_API_KEY'");
     expect(diags[0].line).toBe(5);
@@ -1257,6 +1371,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
     expect(diags.map((d) => d.message)).toEqual([
       expect.stringContaining("'GITHUB_PAT'"),
@@ -1289,6 +1404,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
     expect(diags.map((d) => d.message)).toEqual([
       expect.stringContaining("'POSTGRES_PASSWORD'"),
@@ -1304,11 +1420,13 @@ describe("Compose Security Rules", () => {
     environment:
       ${entry}
 `;
+
       const diagnostics = noPlaintextSecrets.check(
         parseCompose(source, "compose.yaml"),
         "compose.yaml",
         { locate: createComposeLocator(source) }
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1323,6 +1441,7 @@ describe("Compose Security Rules", () => {
         },
       },
     };
+
     const rules = [
       noPrivilegedService,
       noDockerSocketMount,
@@ -1330,6 +1449,7 @@ describe("Compose Security Rules", () => {
       preferReadOnlyBindMount,
       noPlaintextSecrets,
     ];
+
     for (const rule of rules) {
       const diags = rule.check(composeContent, "compose.yml");
       expect(diags).toHaveLength(1);
@@ -1355,10 +1475,13 @@ models:
   llama:
     model: ai/llama3.2:1B-Q8_0
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = undefinedModelReference.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(2);
     expect(diags[0].message).toContain("'gemma3'");
     expect(diags[0].line).toBe(5);
@@ -1372,6 +1495,7 @@ models:
         agent: { image: "my-agent:1.0.0", models: ["gemma3"] },
       },
     };
+
     const diags = undefinedModelReference.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(1);
     expect(diags[0].line).toBeUndefined();
@@ -1390,10 +1514,13 @@ models:
   qwen:
     model: ai/qwen3:8B-Q4_0
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = pinModelVersion.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(2);
     expect(diags[0].message).toContain("'gemma3'");
     expect(diags[0].message).toContain("does not specify a tag");
@@ -1406,6 +1533,7 @@ models:
       composeContent,
       "compose.yml"
     );
+
     expect(references).toHaveLength(0);
   });
 
@@ -1427,10 +1555,13 @@ models:
       options:
         model: whatever
 `;
+
     const composeContent = parseCompose(source, "compose.yml");
+
     const diags = pinModelVersion.check(composeContent, "compose.yml", {
       locate: createComposeLocator(source),
     });
+
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain("Service 'llm' model provider");
     expect(diags[0].message).toContain("does not specify a tag");
@@ -1463,29 +1594,34 @@ describe("Image Size Rules", () => {
     const heavyBase = parseDockerfile(`
       FROM node:22
     `);
+
     const diags = preferSlimBase.check(heavyBase, "Dockerfile");
     expect(diags).toHaveLength(1);
 
     const slimBase = parseDockerfile(`
       FROM node:22-alpine
     `);
+
     const diags2 = preferSlimBase.check(slimBase, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const digestPinned = parseDockerfile(`
       FROM node@sha256:aaaabbbbccccdddd
     `);
+
     expect(preferSlimBase.check(digestPinned, "Dockerfile")).toHaveLength(0);
 
     const registryPort = parseDockerfile(`
       FROM myregistry.example.com:5000/team/app
     `);
+
     expect(preferSlimBase.check(registryPort, "Dockerfile")).toHaveLength(0);
 
     const stageAlias = parseDockerfile(`
       FROM node:22-alpine AS build
       FROM build
     `);
+
     expect(preferSlimBase.check(stageAlias, "Dockerfile")).toHaveLength(0);
   });
 
@@ -1494,6 +1630,7 @@ describe("Image Size Rules", () => {
       ARG NODE_VERSION=22-alpine
       FROM node:$NODE_VERSION
     `);
+
     expect(preferSlimBase.check(variableTag, "Dockerfile")).toHaveLength(0);
   });
 
@@ -1524,6 +1661,7 @@ describe("Image Size Rules", () => {
         parseDockerfile(`FROM ${base}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1537,6 +1675,7 @@ describe("Image Size Rules", () => {
       FROM node:22-slim
       COPY --from=build /app/dist ./dist
     `);
+
     expect(preferSlimBase.check(discardedBuilder, "Dockerfile")).toHaveLength(
       0
     );
@@ -1548,6 +1687,7 @@ describe("Image Size Rules", () => {
       RUN npm ci
       FROM base
     `);
+
     const inherited = preferSlimBase.check(inheritedBase, "Dockerfile");
     expect(inherited).toHaveLength(1);
     expect(inherited[0].line).toBe(2);
@@ -1556,6 +1696,7 @@ describe("Image Size Rules", () => {
       FROM node:22-slim AS build
       FROM node:22
     `);
+
     const final = preferSlimBase.check(fullFinal, "Dockerfile");
     expect(final).toHaveLength(1);
     expect(final[0].line).toBe(3);
@@ -1573,18 +1714,21 @@ describe("Image Size Rules", () => {
     const noCleanup = parseDockerfile(`
       RUN apt-get update && apt-get install -y git
     `);
+
     const diags = cleanPackageCache.check(noCleanup, "Dockerfile");
     expect(diags).toHaveLength(1);
 
     const withCleanup = parseDockerfile(`
       RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     `);
+
     const diags2 = cleanPackageCache.check(withCleanup, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const apkNoCache = parseDockerfile(`
       RUN apk add --no-cache curl
     `);
+
     expect(cleanPackageCache.check(apkNoCache, "Dockerfile")).toHaveLength(0);
   });
 
@@ -1596,6 +1740,7 @@ describe("Image Size Rules", () => {
           --mount=type=cache,target=/var/lib/apt,sharing=locked \\
           apt-get update && apt-get install -y git
     `);
+
     expect(cleanPackageCache.check(aptCacheMount, "Dockerfile")).toHaveLength(
       0
     );
@@ -1604,6 +1749,7 @@ describe("Image Size Rules", () => {
       RUN --mount=type=cache,target=/var/cache/apk \\
           apk add curl
     `);
+
     expect(cleanPackageCache.check(apkCacheMount, "Dockerfile")).toHaveLength(
       0
     );
@@ -1613,6 +1759,7 @@ describe("Image Size Rules", () => {
       RUN --mount=type=cache,target=/root/.npm \\
           apt-get update && apt-get install -y git
     `);
+
     expect(cleanPackageCache.check(unrelatedMount, "Dockerfile")).toHaveLength(
       1
     );
@@ -1622,6 +1769,7 @@ describe("Image Size Rules", () => {
       RUN --mount=type=bind,target=/var/lib/apt \\
           apt-get update && apt-get install -y git
     `);
+
     expect(cleanPackageCache.check(bindMount, "Dockerfile")).toHaveLength(1);
   });
 
@@ -1632,11 +1780,13 @@ describe("Image Size Rules", () => {
         parseDockerfile(`RUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(clean);
     }
   );
 
   const APT_INSTALL = "apt-get update && apt-get install -y curl";
+
   const cacheCleanupCases = [
     {
       expected: 0,
@@ -1689,6 +1839,7 @@ describe("Image Size Rules", () => {
         parseDockerfile(`RUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1710,10 +1861,12 @@ describe("Image Size Rules", () => {
       const flags = mounts
         .map((target) => `--mount=type=cache,target=${target}`)
         .join(" ");
+
       const diagnostics = cleanPackageCache.check(
         parseDockerfile(`RUN ${flags} ${APT_INSTALL}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1722,6 +1875,7 @@ describe("Image Size Rules", () => {
     const dockerfile = parseDockerfile(
       `RUN --mount=type=cache,target=/var/cache/apt ${APT_INSTALL} && rm -rf /var/lib/apt/lists/*`
     );
+
     expect(cleanPackageCache.check(dockerfile, "Dockerfile")).toHaveLength(0);
   });
 
@@ -1731,6 +1885,7 @@ describe("Image Size Rules", () => {
         FROM node:22 AS runner
         RUN npm install
       `);
+
     const diags1 = avoidDevDependencies.check(withDev, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
@@ -1739,6 +1894,7 @@ describe("Image Size Rules", () => {
         FROM node:22 AS runner
         RUN npm ci --omit=dev
       `);
+
     const diags2 = avoidDevDependencies.check(withoutDev, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
@@ -1771,6 +1927,7 @@ describe("Image Size Rules", () => {
         parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1813,6 +1970,7 @@ describe("Image Size Rules", () => {
         parseDockerfile(`FROM node:22-alpine\n${dockerfile}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1824,6 +1982,7 @@ describe("Image Size Rules", () => {
       FROM base
       RUN npm ci
     `);
+
     expect(avoidDevDependencies.check(inherited, "Dockerfile")).toHaveLength(0);
 
     // A fresh base image does not inherit the build stage's ENV.
@@ -1833,6 +1992,7 @@ describe("Image Size Rules", () => {
       FROM node:22-alpine
       RUN npm ci
     `);
+
     expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
   });
 
@@ -1895,6 +2055,7 @@ describe("Image Size Rules", () => {
         parseDockerfile(dockerfile),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -1908,6 +2069,7 @@ describe("Image Size Rules", () => {
       FROM deps AS final
       CMD ["node", "x.js"]
     `);
+
     const diags = avoidDevDependencies.check(inheritedDev, "Dockerfile");
     expect(diags).toHaveLength(1);
     expect(diags[0].line).toBe(3);
@@ -1918,6 +2080,7 @@ describe("Image Size Rules", () => {
       FROM deps AS final
       CMD ["node", "x.js"]
     `);
+
     expect(
       avoidDevDependencies.check(inheritedClean, "Dockerfile")
     ).toHaveLength(0);
@@ -1931,6 +2094,7 @@ describe("Image Size Rules", () => {
       COPY --from=builder /app/dist ./dist
       RUN npm ci --omit=dev
     `);
+
     expect(
       avoidDevDependencies.check(discardedBuilder, "Dockerfile")
     ).toHaveLength(0);
@@ -1945,10 +2109,12 @@ describe("Image Size Rules", () => {
       FROM final AS test
       RUN npm install
     `);
+
     const trailing = avoidDevDependencies.check(
       trailingTestStage,
       "Dockerfile"
     );
+
     expect(trailing).toHaveLength(1);
     expect(trailing[0].line).toBe(7);
   });
@@ -1962,6 +2128,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(`RUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(combine);
     }
   );
@@ -1970,25 +2137,30 @@ describe("Best Practices Rules", () => {
     const uncombinedUpdate = parseDockerfile(`
       RUN apt-get update
     `);
+
     const diags1 = combineAptUpdateInstall.check(
       uncombinedUpdate,
       "Dockerfile"
     );
+
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/combine-apt-update-install");
 
     const uncombinedInstall = parseDockerfile(`
       RUN apt-get install -y git
     `);
+
     const diags2 = combineAptUpdateInstall.check(
       uncombinedInstall,
       "Dockerfile"
     );
+
     expect(diags2).toHaveLength(1);
 
     const combined = parseDockerfile(`
       RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
     `);
+
     const diags3 = combineAptUpdateInstall.check(combined, "Dockerfile");
     expect(diags3).toHaveLength(0);
   });
@@ -2142,6 +2314,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(dockerfile),
         "Dockerfile"
       );
+
       expect(diagnostics.map((diagnostic) => diagnostic.rule)).toEqual(
         expectedRules
       );
@@ -2174,6 +2347,7 @@ describe("Best Practices Rules", () => {
       FROM node:22-alpine
       RUN grep -E "foo|bar" /etc/passwd
     `);
+
     expect(usePipefail.check(quotedPipe, "Dockerfile")).toHaveLength(0);
   });
 
@@ -2191,6 +2365,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(`WORKDIR ${workdir}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -2199,6 +2374,7 @@ describe("Best Practices Rules", () => {
     const relative = parseDockerfile(`
       WORKDIR app/src
     `);
+
     const diags1 = absoluteWorkdir.check(relative, "Dockerfile");
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/absolute-workdir");
@@ -2206,12 +2382,14 @@ describe("Best Practices Rules", () => {
     const absolute = parseDockerfile(`
       WORKDIR /usr/src/app
     `);
+
     const diags2 = absoluteWorkdir.check(absolute, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const variableWorkdir = parseDockerfile(`
       WORKDIR \${APP_HOME}
     `);
+
     expect(absoluteWorkdir.check(variableWorkdir, "Dockerfile")).toHaveLength(
       0
     );
@@ -2221,6 +2399,7 @@ describe("Best Practices Rules", () => {
     const withCd = parseDockerfile(`
       RUN cd /app && npm run build
     `);
+
     const diags1 = avoidRunCd.check(withCd, "Dockerfile");
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/avoid-run-cd");
@@ -2229,6 +2408,7 @@ describe("Best Practices Rules", () => {
       WORKDIR /app
       RUN npm run build
     `);
+
     const diags2 = avoidRunCd.check(withoutCd, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
@@ -2238,18 +2418,21 @@ describe("Best Practices Rules", () => {
       FROM node:22-alpine
       RUN mkdir -p /opt/cd && echo abcd
     `);
+
     expect(avoidRunCd.check(pathWithCd, "Dockerfile")).toHaveLength(0);
 
     const urlWithCd = parseDockerfile(`
       FROM node:22-alpine
       RUN wget https://example.com/cd.tar.gz
     `);
+
     expect(avoidRunCd.check(urlWithCd, "Dockerfile")).toHaveLength(0);
 
     const scriptNamedCd = parseDockerfile(`
       FROM node:22-alpine
       RUN ./scripts/cd-deploy.sh
     `);
+
     expect(avoidRunCd.check(scriptNamedCd, "Dockerfile")).toHaveLength(0);
   });
 
@@ -2258,12 +2441,14 @@ describe("Best Practices Rules", () => {
       FROM node:22-alpine
       RUN cd /app && npm ci
     `);
+
     expect(avoidRunCd.check(leading, "Dockerfile")).toHaveLength(1);
 
     const afterSemicolon = parseDockerfile(`
       FROM node:22-alpine
       RUN npm ci; cd /app
     `);
+
     expect(avoidRunCd.check(afterSemicolon, "Dockerfile")).toHaveLength(1);
   });
 
@@ -2274,6 +2459,7 @@ describe("Best Practices Rules", () => {
         curl \\
         tmux
     `);
+
     const diags1 = sortMultilineArgs.check(unsorted, "Dockerfile");
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/sort-multiline-args");
@@ -2284,6 +2470,7 @@ describe("Best Practices Rules", () => {
         git \\
         tmux
     `);
+
     const diags2 = sortMultilineArgs.check(sorted, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
@@ -2300,6 +2487,7 @@ describe("Best Practices Rules", () => {
         "EOF",
       ].join("\n")
     );
+
     expect(sortMultilineArgs.check(sortedHeredoc, "Dockerfile")).toHaveLength(
       0
     );
@@ -2313,6 +2501,7 @@ describe("Best Practices Rules", () => {
         "EOF",
       ].join("\n")
     );
+
     expect(sortMultilineArgs.check(unsortedHeredoc, "Dockerfile")).toHaveLength(
       1
     );
@@ -2326,6 +2515,7 @@ describe("Best Practices Rules", () => {
         git \\
         tmux
     `);
+
     expect(
       sortMultilineArgs.check(sortedWithComment, "Dockerfile")
     ).toHaveLength(0);
@@ -2427,6 +2617,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(dockerfile),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -2455,6 +2646,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(`RUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -2463,6 +2655,7 @@ describe("Best Practices Rules", () => {
     const withoutFlag = parseDockerfile(`
       RUN useradd -r -g mygroup myuser
     `);
+
     const diags1 = useraddNoLogInit.check(withoutFlag, "Dockerfile");
     expect(diags1).toHaveLength(1);
     expect(diags1[0].rule).toBe("docker-doctor/useradd-no-log-init");
@@ -2470,6 +2663,7 @@ describe("Best Practices Rules", () => {
     const withFlag = parseDockerfile(`
       RUN useradd --no-log-init -r -g mygroup myuser
     `);
+
     const diags2 = useraddNoLogInit.check(withFlag, "Dockerfile");
     expect(diags2).toHaveLength(0);
   });
@@ -2479,6 +2673,7 @@ describe("Best Practices Rules", () => {
         FROM node:22-alpine
         EXPOSE 3000
       `);
+
     const diags1 = requireHealthcheck.check(withoutHealth, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
@@ -2486,6 +2681,7 @@ describe("Best Practices Rules", () => {
         FROM node:22-alpine
         HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost/ || exit 1
       `);
+
     const diags2 = requireHealthcheck.check(withHealth, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
@@ -2498,6 +2694,7 @@ describe("Best Practices Rules", () => {
       HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/health || exit 1
       CMD ["node", "dist/index.js"]
     `);
+
     expect(
       requireHealthcheck.check(multiStageWithHealth, "Dockerfile")
     ).toHaveLength(0);
@@ -2507,18 +2704,21 @@ describe("Best Practices Rules", () => {
     const addFile = parseDockerfile(`
         ADD file.txt /app/file.txt
       `);
+
     const diags1 = preferCopyOverAdd.check(addFile, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
     const addArchive = parseDockerfile(`
         ADD archive.tar.gz /app/
       `);
+
     const diags2 = preferCopyOverAdd.check(addArchive, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const addArchiveWithChown = parseDockerfile(`
       ADD --chown=node:node archive.tar.gz /app/
     `);
+
     expect(
       preferCopyOverAdd.check(addArchiveWithChown, "Dockerfile")
     ).toHaveLength(0);
@@ -2539,6 +2739,7 @@ describe("Best Practices Rules", () => {
         parseDockerfile(`ADD ${args}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -2547,18 +2748,21 @@ describe("Best Practices Rules", () => {
     const shellForm = parseDockerfile(`
         CMD node index.js
       `);
+
     const diags1 = useExecForm.check(shellForm, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
     const execForm = parseDockerfile(`
         CMD ["node", "index.js"]
       `);
+
     const diags2 = useExecForm.check(execForm, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const entrypointExecForm = parseDockerfile(`
       ENTRYPOINT ["docker-entrypoint.sh"]
     `);
+
     expect(useExecForm.check(entrypointExecForm, "Dockerfile")).toHaveLength(0);
 
     // Bracket-wrapped but not a JSON array: Docker runs these through
@@ -2566,16 +2770,19 @@ describe("Best Practices Rules", () => {
     const unquotedTokens = parseDockerfile(`
       CMD [node, index.js]
     `);
+
     expect(useExecForm.check(unquotedTokens, "Dockerfile")).toHaveLength(1);
 
     const singleQuoted = parseDockerfile(`
       ENTRYPOINT ['docker-entrypoint.sh']
     `);
+
     expect(useExecForm.check(singleQuoted, "Dockerfile")).toHaveLength(1);
 
     const trailingComma = parseDockerfile(`
       CMD ["node", "index.js",]
     `);
+
     expect(useExecForm.check(trailingComma, "Dockerfile")).toHaveLength(1);
   });
 
@@ -2583,18 +2790,21 @@ describe("Best Practices Rules", () => {
     const withoutLabels = parseDockerfile(`
         FROM node:22-alpine
       `);
+
     const diags1 = requireLabels.check(withoutLabels, "Dockerfile");
     expect(diags1).toHaveLength(1);
 
     const withLabels = parseDockerfile(`
         LABEL maintainer="me"
       `);
+
     const diags2 = requireLabels.check(withLabels, "Dockerfile");
     expect(diags2).toHaveLength(0);
 
     const withOciLabels = parseDockerfile(`
       LABEL org.opencontainers.image.authors="team@example.com" org.opencontainers.image.version="1.0.0"
     `);
+
     expect(requireLabels.check(withOciLabels, "Dockerfile")).toHaveLength(0);
   });
 });
@@ -2618,6 +2828,7 @@ describe("BuildKit RUN flags", () => {
         parseDockerfile(`FROM node:22-alpine\nRUN ${run}`),
         "Dockerfile"
       );
+
       expect(diagnostics).toHaveLength(expected);
     }
   );
@@ -2635,6 +2846,7 @@ describe("BuildKit RUN flags", () => {
       FROM gcc:14
       RUN --mount=type=cache,target=/ccache make all
     `);
+
     expect(useMultiStage.check(withMount, "Dockerfile")).toHaveLength(1);
 
     // Installing the tool is still not a build step.
@@ -2642,6 +2854,7 @@ describe("BuildKit RUN flags", () => {
       FROM alpine:3.20
       RUN --mount=type=cache,target=/var/cache/apk apk add make
     `);
+
     expect(useMultiStage.check(installsMake, "Dockerfile")).toHaveLength(0);
   });
 });

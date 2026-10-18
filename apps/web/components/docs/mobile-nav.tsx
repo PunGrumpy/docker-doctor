@@ -24,6 +24,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
     if (lastPathnameRef.current === pathname) {
       return;
     }
+
     lastPathnameRef.current = pathname;
     dialogRef.current?.close();
   }, [pathname]);
@@ -32,6 +33,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
   // clicked. Attached natively so it stays off a non-interactive JSX handler.
   useEffect(() => {
     const dialog = dialogRef.current;
+
     if (!dialog) {
       return;
     }
@@ -43,6 +45,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
     };
 
     dialog.addEventListener("click", onBackdropClick);
+
     return () => {
       dialog.removeEventListener("click", onBackdropClick);
       document.body.style.overflow = "";

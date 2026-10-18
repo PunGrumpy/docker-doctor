@@ -10,8 +10,10 @@ const GLOB_SPECIALS_RE = /[.+^${}()|[\]\\]/gu;
 const globToRegExp = (pattern: string): RegExp => {
   let source = "^";
   let index = 0;
+
   while (index < pattern.length) {
     const char = pattern[index];
+
     if (char === "*") {
       if (pattern[index + 1] === "*") {
         if (pattern[index + 2] === "/") {
@@ -33,6 +35,7 @@ const globToRegExp = (pattern: string): RegExp => {
       index += 1;
     }
   }
+
   return new RegExp(`${source}$`, "u");
 };
 
@@ -46,6 +49,7 @@ const LEADING_DOT_SLASH_RE = /^(?:\.\/)+/u;
  */
 export const normalizeIgnorePattern = (pattern: string): string => {
   const rootRelative = pattern.replace(LEADING_DOT_SLASH_RE, "");
+
   return rootRelative.endsWith("/") ? `${rootRelative}**` : rootRelative;
 };
 
@@ -60,9 +64,12 @@ export const createIgnoreMatcher = (
   if (!patterns || patterns.length === 0) {
     return () => false;
   }
+
   const regexps = patterns.map(normalizeIgnorePattern).map(globToRegExp);
+
   return (relativePath) => {
     const normalized = relativePath.replaceAll("\\", "/");
+
     return regexps.some((regexp) => regexp.test(normalized));
   };
 };

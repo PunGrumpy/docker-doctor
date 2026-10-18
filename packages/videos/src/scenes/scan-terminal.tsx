@@ -24,6 +24,7 @@ import {
 const CARD_W = 960;
 const CARD_H = 564;
 const VIEW_H = viewportHeight(CARD_H);
+
 // Block heights for the fixed-size inserts — the scroll math and the layout
 // must agree exactly (the wrappers are sized to these).
 const BANNER_H = 104;
@@ -175,12 +176,15 @@ const heightOf = (line: TermLine): number => {
   if (line.kind === "banner") {
     return BANNER_H;
   }
+
   if (line.kind === "prompt") {
     return PROMPT_H;
   }
+
   if (line.kind === "score") {
     return SCORE_H;
   }
+
   return LINE_H;
 };
 
@@ -189,6 +193,7 @@ const REPORT_SCRIPT = makeScript(REPORT_LINES, {
   tailHold: 70,
   viewHeight: VIEW_H,
 });
+
 const AGENT_SCRIPT = makeScript(AGENT_LINES, {
   heightOf,
   tailHold: 56,
@@ -202,6 +207,7 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   error: ERROR,
   warning: WARNING,
 };
+
 const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
 
 // The Claude Code startup banner — a bordered box, like the real CLI draws.
@@ -286,6 +292,7 @@ const ScoreBlock = ({
   const face = score.healthy ? "( ◠ ◠ )>" : "( x x )>";
   const filled = Math.round(score.value / 5);
   const meter = "█".repeat(filled) + "░".repeat(20 - filled);
+
   return (
     <div style={{ height: SCORE_H, paddingTop: 6 }}>
       <div style={{ display: "flex", gap: 18 }}>
@@ -327,6 +334,7 @@ const LineBody = (line: TermLine) => {
     case "blank": {
       return null;
     }
+
     case "header": {
       return (
         <>
@@ -337,16 +345,20 @@ const LineBody = (line: TermLine) => {
         </>
       );
     }
+
     case "summary": {
       return <span style={{ color: MUTED }}>{`  ${line.text}`}</span>;
     }
+
     case "category": {
       return (
         <span style={{ color: INK, fontWeight: 600 }}>{`  ${line.text}`}</span>
       );
     }
+
     case "finding": {
       const color = SEVERITY_COLOR[line.severity ?? "error"];
+
       return (
         <>
           <span style={{ color }}>
@@ -356,6 +368,7 @@ const LineBody = (line: TermLine) => {
         </>
       );
     }
+
     case "code": {
       return (
         <>
@@ -366,18 +379,23 @@ const LineBody = (line: TermLine) => {
         </>
       );
     }
+
     case "fix": {
       return <span style={{ color: ACCENT }}>{`      ${line.text}`}</span>;
     }
+
     case "hand": {
       return <span style={{ color: INK }}>{`  ${line.text}`}</span>;
     }
+
     case "banner": {
       return <ClaudeBanner />;
     }
+
     case "prompt": {
       return <ClaudePrompt />;
     }
+
     case "ok": {
       return (
         <span style={{ color: GREEN, fontWeight: 600 }}>
@@ -385,9 +403,11 @@ const LineBody = (line: TermLine) => {
         </span>
       );
     }
+
     case "score": {
       return line.score ? <ScoreBlock score={line.score} /> : null;
     }
+
     default: {
       return null;
     }

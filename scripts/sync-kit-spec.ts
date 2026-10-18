@@ -61,6 +61,7 @@ if (!cliVersion || !EXACT_VERSION.test(cliVersion)) {
     `kits/docker-doctor/package.json must pin ${CLI_PACKAGE} to an exact version (got ${cliVersion ?? "nothing"}); the pin is what makes Changesets bump the kit on every CLI release.`
   );
 }
+
 if (!EXACT_VERSION.test(manifest.version)) {
   throw new Error(
     `kits/docker-doctor/package.json has an invalid version: ${manifest.version}`
@@ -68,9 +69,11 @@ if (!EXACT_VERSION.test(manifest.version)) {
 }
 
 const before = await readFile(SPEC_PATH, "utf-8");
+
 if (!VERSION_LINE.test(before)) {
   throw new Error(`No \`version: "…"\` line found in ${SPEC_PATH}`);
 }
+
 if (!CLI_PIN.test(before)) {
   throw new Error(`No ${CLI_PACKAGE}@<version> pin found in ${SPEC_PATH}`);
 }

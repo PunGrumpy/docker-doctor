@@ -15,29 +15,36 @@ export const maskQuotedText = (text: string): string => {
   let out = "";
   let quote: '"' | "'" | null = null;
   let index = 0;
+
   while (index < text.length) {
     const char = text[index];
+
     if (quote === null) {
       if (char === '"' || char === "'") {
         quote = char;
       }
+
       out += char;
       index += 1;
       continue;
     }
+
     if (char === quote) {
       quote = null;
       out += char;
       index += 1;
       continue;
     }
+
     if (quote === '"' && char === "\\" && index + 1 < text.length) {
       out += "  ";
       index += 2;
       continue;
     }
+
     out += " ";
     index += 1;
   }
+
   return out;
 };

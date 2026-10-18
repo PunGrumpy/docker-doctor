@@ -42,6 +42,7 @@ const problems: string[] = [];
 for (const { file, pattern } of SURFACES) {
   const text = readFileSync(path.join(ROOT, file), "utf-8");
   const stated = pattern.exec(text)?.groups?.count;
+
   if (stated === undefined) {
     problems.push(
       `${file}: no text matches ${pattern}; update the pattern or the page`

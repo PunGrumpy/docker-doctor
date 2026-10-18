@@ -15,6 +15,7 @@ import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 // decides whether the container runs as root; the group half is irrelevant.
 const isRootUser = (value: string): boolean => {
   const [user] = value.split(":");
+
   return user === "root" || user === "0";
 };
 
@@ -31,6 +32,7 @@ export const noRootUser: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         const { base, stage } = parseFromArgs(inst.args);
+
         // DHI runtime bases and distroless `:nonroot` tags default to a
         // nonroot user. "nonroot" is a sentinel that isRootUser treats as
         // safe until a USER overrides it.
@@ -38,15 +40,18 @@ export const noRootUser: DockerfileRule = {
           base && (isHardenedRuntimeImage(base) || isDistrolessNonroot(base))
             ? "nonroot"
             : "root";
+
         lastUser = stageUser.get(base?.toLowerCase() ?? "") ?? baseDefaultUser;
         lastUserLine = inst.line;
         currentStage = stage?.toLowerCase() ?? null;
+
         if (currentStage) {
           stageUser.set(currentStage, lastUser);
         }
       } else if (inst.instruction === "USER") {
         lastUser = inst.args.trim().toLowerCase();
         lastUserLine = inst.line;
+
         if (currentStage) {
           stageUser.set(currentStage, lastUser);
         }
@@ -82,12 +87,15 @@ export const noSecretsInEnv: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "ENV" || inst.instruction === "ARG") {
         const args = inst.args.trim();
+
         if (inst.instruction === "ENV" && !args.includes("=")) {
           // KEY VALUE format
           const match = args.match(/^(?<key>[^\s]+)\s+(?<value>.*)$/u);
+
           if (match?.groups) {
             const { key, value } = match.groups;
             const keyIsSecret = isSecretKey(key);
+
             if (
               keyIsSecret &&
               isLiteralSecretValue(value) &&
@@ -108,6 +116,7 @@ export const noSecretsInEnv: DockerfileRule = {
         } else {
           // Existing KEY=VALUE logic
           const parts = args.split(/\s+/u);
+
           for (const part of parts) {
             const eqIndex = part.indexOf("=");
             let key = "";
@@ -121,6 +130,7 @@ export const noSecretsInEnv: DockerfileRule = {
             }
 
             const keyIsSecret = isSecretKey(key);
+
             if (
               keyIsSecret &&
               isLiteralSecretValue(value) &&
@@ -173,11 +183,13 @@ export const pinImageVersion: DockerfileRule = {
         }
 
         const issue = mutableRefIssue(ref);
+
         if (issue) {
           const detail =
             issue === "untagged"
               ? `Base image '${imagePart}' does not specify a tag.`
               : `Base image '${imagePart}' uses the mutable 'latest' tag.`;
+
           diagnostics.push(
             createDiagnostic(
               file,

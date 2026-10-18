@@ -21,6 +21,7 @@ export const launchAgent = (
       [...AGENT_AUTO_FLAGS[agentId], prompt],
       { cwd, stdio: "inherit" }
     );
+
     child.once("error", () => {
       resolve(false);
     });

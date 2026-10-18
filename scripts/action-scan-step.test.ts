@@ -14,21 +14,26 @@ const scanStepScript = (): string => {
   const lines = fs.readFileSync(ACTION_FILE, "utf-8").split("\n");
   const start = lines.indexOf("      run: |", lines.indexOf("      id: scan"));
   const body: string[] = [];
+
   for (const line of lines.slice(start + 1)) {
     if (line !== "" && !line.startsWith(RUN_INDENT)) {
       break;
     }
+
     body.push(line.slice(RUN_INDENT.length));
   }
+
   return body.join("\n");
 };
 
 const runScanStep = async (fakeNpx: string) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "dd-action-"));
+
   try {
     fs.writeFileSync(path.join(temp, "npx"), fakeNpx, { mode: 0o755 });
     const outputFile = path.join(temp, "github-output");
     fs.writeFileSync(outputFile, "");
+
     const proc = Bun.spawn(["bash", "-c", scanStepScript()], {
       env: {
         ...process.env,
@@ -42,8 +47,10 @@ const runScanStep = async (fakeNpx: string) => {
       stderr: "pipe",
       stdout: "pipe",
     });
+
     const stdout = await new Response(proc.stdout).text();
     const exitCode = await proc.exited;
+
     return {
       exitCode,
       outputs: fs.readFileSync(outputFile, "utf-8"),
@@ -72,10 +79,13 @@ describe.skipIf(process.platform === "win32")("action.yml scan step", () => {
     const { stdout } = await runScanStep(
       '#!/bin/sh\necho "{}"\necho "::error::forged by a scanned file" >&2\n'
     );
+
     const lines = stdout.split("\n");
+
     const stop = lines.findIndex((line) =>
       line.startsWith("::stop-commands::")
     );
+
     const forged = lines.indexOf("::error::forged by a scanned file");
     const token = lines[stop].slice("::stop-commands::".length);
     const resume = lines.indexOf(`::${token}::`);
