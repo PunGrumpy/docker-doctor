@@ -5,6 +5,10 @@ import {
   parseCompose,
 } from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
+import {
+  isAnalyzableCompose,
+  isAnalyzableDockerfile,
+} from "../src/runners/analyzable";
 import { runComposeRules } from "../src/runners/compose-runner";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 import type { Diagnostic } from "../src/types/index";
@@ -210,5 +214,107 @@ describe("runComposeRules", () => {
     const versionDiag = findByRule(diagnostics, "docker-doctor/no-version-key");
     expect(restartDiag?.severity).toBe("info");
     expect(versionDiag?.severity).toBe("error");
+  });
+});
+
+describe("analyzable files", () => {
+  const dockerfileCases = [
+    { analyzable: false, content: "", name: "an empty Dockerfile" },
+    {
+      analyzable: false,
+      content: "# syntax=docker/dockerfile:1\n# a comment\n",
+      name: "a comment-only Dockerfile",
+    },
+    {
+      analyzable: false,
+      content: "This is prose about a Dockerfile.\n",
+      name: "a file with no instruction lines",
+    },
+    {
+      analyzable: true,
+      content: "FROM node:22-slim\nUSER node\n",
+      name: "a Dockerfile with instructions",
+    },
+  ];
+
+  test.each(dockerfileCases)(
+    "$name: $analyzable",
+    ({ analyzable, content }) => {
+      expect(isAnalyzableDockerfile(parseDockerfile(content))).toBe(analyzable);
+    }
+  );
+
+  const composeCases = [
+    { analyzable: false, content: "", name: "an empty file" },
+    { analyzable: false, content: "{}\n", name: "an empty mapping" },
+    { analyzable: false, content: "- web\n- db\n", name: "a list" },
+    { analyzable: false, content: "just text\n", name: "a scalar" },
+    {
+      analyzable: false,
+      content: "services: {}\nnetworks:\n  default: {}\n",
+      name: "a mapping with no services",
+    },
+    {
+      analyzable: false,
+      content: "services:\n  - web\n",
+      name: "services written as a list",
+    },
+    {
+      analyzable: true,
+      content: "services:\n  web:\n    image: nginx:1.27\n",
+      name: "a file with a service",
+    },
+    {
+      analyzable: true,
+      content: "services:\n  web:\n",
+      name: "a service with an empty body",
+    },
+    {
+      analyzable: true,
+      content: "models:\n  llm:\n    model: ai/smollm2\n",
+      name: "a file with only top-level models",
+    },
+    {
+      analyzable: true,
+      content: 'version: "3.8"\n',
+      name: "a file with only the version key",
+    },
+  ];
+
+  test.each(composeCases)("$name: $analyzable", ({ analyzable, content }) => {
+    expect(isAnalyzableCompose(parseCompose(content, "compose.yaml"))).toBe(
+      analyzable
+    );
+  });
+
+  // The score divides by the number of analyzable files, so a file that
+  // is not analyzable must never contribute a finding.
+  test("runComposeRules reports nothing for a file that is not analyzable", () => {
+    for (const { analyzable, content } of composeCases) {
+      if (!analyzable) {
+        expect(
+          runComposeRules(parseCompose(content, "compose.yaml"), "compose.yaml")
+        ).toEqual([]);
+      }
+    }
+  });
+
+  test("a Dockerfile stays analyzable when config turns every rule off", () => {
+    const instructions = parseDockerfile("FROM node\n");
+    const diagnostics = runDockerfileRules(
+      instructions,
+      "Dockerfile",
+      [],
+      {},
+      {
+        "Best Practices": "off",
+        Compose: "off",
+        "Image Size": "off",
+        Performance: "off",
+        Security: "off",
+      }
+    );
+    expect(diagnostics).toEqual([]);
+    expect(isAnalyzableDockerfile(instructions)).toBe(true);
   });
 });

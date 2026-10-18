@@ -34,10 +34,10 @@ inputs:
 
 outputs:
   score:
-    description: "Overall health score (0-100)"
+    description: "Overall health score (0-100). Empty when no file was analyzed."
     value: ${{ steps.render.outputs.score }}
   label:
-    description: "Score label, e.g. 'Excellent 🏆'"
+    description: "Score label, e.g. 'Excellent 🏆'. Empty when there is no score."
     value: ${{ steps.render.outputs.label }}
   error-count:
     description: "Number of error-severity diagnostics"

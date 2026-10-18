@@ -17,6 +17,7 @@ const ALL_CATEGORIES: RuleCategory[] = [
 ];
 
 const TOP_LEVEL_KEYS = [
+  "analyzedFiles",
   "diagnostics",
   "failures",
   "label",
@@ -59,12 +60,12 @@ const diagnostic = (
 // commit, because external consumers (the GitHub Action renderer, the
 // benchmarks scanner, the improve-docker skill) key off that number.
 describe("JSON report contract", () => {
-  test("schemaVersion is 5", () => {
-    expect(REPORT_SCHEMA_VERSION).toBe(5);
+  test("schemaVersion is 6", () => {
+    expect(REPORT_SCHEMA_VERSION).toBe(6);
     expect(
-      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT)
+      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT, [], 1)
         .schemaVersion
-    ).toBe(5);
+    ).toBe(6);
   });
 
   test("top-level keys are exactly the documented set", () => {
@@ -72,20 +73,34 @@ describe("JSON report contract", () => {
       [],
       PERFECT_SCORE,
       "Excellent 🏆",
-      EMPTY_PROJECT
+      EMPTY_PROJECT,
+      [],
+      1
     );
     expect(Object.keys(report).toSorted()).toEqual(TOP_LEVEL_KEYS);
   });
 
-  test("carries failures and defaults to an empty list", () => {
-    expect(
-      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT).failures
-    ).toEqual([]);
+  test("carries failures and the analyzed file count", () => {
     const failures = [{ file: "Dockerfile", message: "boom" }];
-    expect(
-      toJsonReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT, failures)
-        .failures
-    ).toEqual(failures);
+    const report = toJsonReport(
+      [],
+      PERFECT_SCORE,
+      "Excellent 🏆",
+      EMPTY_PROJECT,
+      failures,
+      3
+    );
+    expect(report.failures).toEqual(failures);
+    expect(report.analyzedFiles).toBe(3);
+  });
+
+  test("no analyzed file gives a null score and label", () => {
+    const failures = [{ file: "Dockerfile", message: "boom" }];
+    const { score, label } = calculateScore([], 0);
+    const report = toJsonReport([], score, label, EMPTY_PROJECT, failures, 0);
+    expect(report.score).toBeNull();
+    expect(report.label).toBeNull();
+    expect(report.analyzedFiles).toBe(0);
   });
 
   test("every diagnostic carries exactly the documented keys", () => {
@@ -94,8 +109,15 @@ describe("JSON report contract", () => {
       "Dockerfile",
       []
     );
-    const { score, label } = calculateScore(diagnostics);
-    const report = toJsonReport(diagnostics, score, label, EMPTY_PROJECT);
+    const { score, label } = calculateScore(diagnostics, 1);
+    const report = toJsonReport(
+      diagnostics,
+      score,
+      label,
+      EMPTY_PROJECT,
+      [],
+      1
+    );
 
     expect(report.diagnostics.length).toBeGreaterThan(0);
     for (const d of report.diagnostics) {
@@ -111,7 +133,9 @@ describe("JSON report contract", () => {
       [diagnostic("docker-doctor/no-root-user", "warning")],
       0,
       "Critical 🚨",
-      EMPTY_PROJECT
+      EMPTY_PROJECT,
+      [],
+      1
     );
     expect(report.diagnostics[0]?.category).toBe("Security");
   });
@@ -122,26 +146,30 @@ describe("JSON report contract", () => {
         [diagnostic("docker-doctor/does-not-exist", "warning")],
         0,
         "Critical 🚨",
-        EMPTY_PROJECT
+        EMPTY_PROJECT,
+        [],
+        1
       )
     ).toThrow(/no category/u);
   });
 
   test("score constants are pinned", () => {
-    expect(calculateScore([])).toEqual({
+    expect(calculateScore([], 1)).toEqual({
       label: "Excellent 🏆",
       score: PERFECT_SCORE,
     });
-    expect(calculateScore([diagnostic("docker-doctor/test", "error")])).toEqual(
-      {
-        label: "Good ✅",
-        score: ONE_ERROR_SCORE,
-      }
-    );
     expect(
-      calculateScore([diagnostic("docker-doctor/test", "warning")])
+      calculateScore([diagnostic("docker-doctor/test", "error")], 1)
+    ).toEqual({
+      label: "Good ✅",
+      score: ONE_ERROR_SCORE,
+    });
+    expect(
+      calculateScore([diagnostic("docker-doctor/test", "warning")], 1)
     ).toEqual({ label: "Excellent 🏆", score: ONE_WARNING_SCORE });
-    expect(calculateScore([diagnostic("docker-doctor/test", "info")])).toEqual({
+    expect(
+      calculateScore([diagnostic("docker-doctor/test", "info")], 1)
+    ).toEqual({
       label: "Excellent 🏆",
       score: ONE_INFO_SCORE,
     });

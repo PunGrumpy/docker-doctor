@@ -1,5 +1,6 @@
 import { allComposeRules } from "../rules/index";
 import type { ComposeLocator, Diagnostic, RuleSeverity } from "../types/index";
+import { isAnalyzableCompose } from "./analyzable";
 import { resolveSeverity } from "./resolve-severity";
 
 export const runComposeRules = (
@@ -9,6 +10,12 @@ export const runComposeRules = (
   categoriesConfig?: Record<string, RuleSeverity>,
   locate?: ComposeLocator
 ): Diagnostic[] => {
+  // Only analyzable files count toward the score, so only they may
+  // produce findings.
+  if (!isAnalyzableCompose(composeContent)) {
+    return [];
+  }
+
   const diagnostics: Diagnostic[] = [];
 
   for (const rule of allComposeRules) {

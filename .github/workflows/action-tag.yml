@@ -4,12 +4,18 @@
 #
 #   - immutable vX.Y.Z per release, bumped from the merged PR's conventional
 #     title: feat → minor, everything else → patch
-#   - floating major (v1) moved to every release, so
-#     `uses: PunGrumpy/docker-doctor@v1` always resolves to the latest
+#   - floating major (v1, or v2 after a manual v2.0.0) moved forward to
+#     each release in that major, so `uses: PunGrumpy/docker-doctor@v1`
+#     resolves to the latest v1 release
 #
-# Breaking changes (feat!: / BREAKING CHANGE) fail this workflow on purpose:
-# a new major tag is cut manually, and this workflow's floating tag is
-# updated to match.
+# Breaking changes (feat!: / BREAKING CHANGE) fail this workflow on purpose.
+# Cut the new major tag (v2.0.0) by hand. The next release after it moves
+# the v2 floating tag.
+#
+# The floating major is read from the new tag (v2.0.1 moves v2). It only
+# moves forward. When it cannot, the tag job fails instead of warning, so a
+# stale @v1 is never hidden behind a green run. Re-running a failed run
+# reuses the tag that run already pushed and retries the floating major.
 
 name: Action Tag
 
@@ -90,7 +96,7 @@ jobs:
           [ -n "$subject" ] || subject="$(printf '%s' "$HEAD_COMMIT_MESSAGE" | head -n1)"
           echo "Classifying: $subject"
           if printf '%s' "$subject" | grep -qiE '^[a-z]+(\([^)]*\))?!:' || printf '%s' "$subject" | grep -q 'BREAKING[ -]CHANGE'; then
-            echo "::error::'$subject' is a breaking change — cut the new major tag manually and update this workflow's floating tag."
+            echo "::error::'$subject' is a breaking change. Cut the new major tag (for example v2.0.0) by hand. The next release after it moves the floating major."
             exit 1
           fi
           if printf '%s' "$subject" | grep -qiE '^feat(\([^)]*\))?:'; then
@@ -104,7 +110,22 @@ jobs:
         env:
           LEVEL: ${{ steps.bump.outputs.level }}
         run: |
+          # A re-run of a run that already pushed its tag reuses that tag.
+          existing="$(git tag --points-at "$GITHUB_SHA" --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)"
+          if [ -n "$existing" ]; then
+            echo "$existing already points at $GITHUB_SHA. Reusing it."
+            echo "next=$existing" >> "$GITHUB_OUTPUT"
+            echo "action=reuse" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)"
+          # A re-run of an old run must not give an older commit a newer
+          # version than a release that already contains it.
+          if [ -n "$latest" ] && git merge-base --is-ancestor "$GITHUB_SHA" "$latest^{commit}"; then
+            echo "::notice::$latest already contains $GITHUB_SHA. Nothing to tag."
+            echo "action=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -z "$latest" ]; then
             next="v1.0.0"
           else
@@ -120,26 +141,42 @@ jobs:
             fi
           fi
           if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
-            echo "::error::$next already exists — tags are immutable, refusing to overwrite."
+            echo "::error::$next already exists. Tags are immutable, so this run does not overwrite it."
             exit 1
           fi
           echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "action=create" >> "$GITHUB_OUTPUT"
 
       - name: Tag the release and move the floating major
+        if: ${{ steps.next.outputs.action != 'skip' }}
         env:
           NEXT_TAG: ${{ steps.next.outputs.next }}
+          ACTION: ${{ steps.next.outputs.action }}
           LEVEL: ${{ steps.bump.outputs.level }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -c tag.gpgsign=false tag -a "$NEXT_TAG" -m "docker-doctor action $NEXT_TAG ($LEVEL)"
-          git push origin "$NEXT_TAG"
-          # Queued runs are not guaranteed to execute in commit order — never
-          # move the floating major backwards.
-          if git rev-parse -q --verify "refs/tags/v1^{commit}" >/dev/null \
-            && ! git merge-base --is-ancestor v1^{commit} "$GITHUB_SHA"; then
-            echo "::warning::v1 points at a commit that is not an ancestor of ${GITHUB_SHA}; tagged $NEXT_TAG without moving v1."
-            exit 0
+          if [ "$ACTION" = "create" ]; then
+            git -c tag.gpgsign=false tag -a "$NEXT_TAG" -m "docker-doctor action $NEXT_TAG ($LEVEL)"
+            git push origin "$NEXT_TAG"
           fi
-          git -c tag.gpgsign=false tag -fa v1 -m "docker-doctor action v1 (floating major -> $NEXT_TAG)"
-          git push -f origin v1
+          major="${NEXT_TAG%%.*}"
+          if git rev-parse -q --verify "refs/tags/$major^{commit}" >/dev/null; then
+            current="$(git rev-parse "refs/tags/$major^{commit}")"
+            if [ "$current" = "$GITHUB_SHA" ]; then
+              echo "$major already points at $NEXT_TAG."
+              exit 0
+            fi
+            # Never move the floating major backwards. A re-run of an older
+            # run finds it already ahead, and that is not an error.
+            if git merge-base --is-ancestor "$GITHUB_SHA" "$current"; then
+              echo "::notice::$major already points at a newer commit ($current). Left it there."
+              exit 0
+            fi
+            if ! git merge-base --is-ancestor "$current" "$GITHUB_SHA"; then
+              echo "::error::$major points at $current, which is not in the history of $GITHUB_SHA. $NEXT_TAG is tagged but $major did not move, so @$major still runs the old commit. Move it by hand to $NEXT_TAG, then re-run this job."
+              exit 1
+            fi
+          fi
+          git -c tag.gpgsign=false tag -fa "$major" -m "docker-doctor action $major (floating major -> $NEXT_TAG)" "$GITHUB_SHA"
+          git push -f origin "$major"

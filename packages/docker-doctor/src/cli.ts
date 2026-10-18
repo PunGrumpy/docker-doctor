@@ -4,7 +4,13 @@ import path from "node:path";
 import readline from "node:readline";
 import { setTimeout } from "node:timers/promises";
 
-import type { Diagnostic, JsonReport, RuleSeverity } from "@docker-doctor/core";
+import type {
+  Diagnostic,
+  JsonReport,
+  ProjectInfo,
+  RuleSeverity,
+  ScoreResult,
+} from "@docker-doctor/core";
 import {
   discoverProject,
   parseDockerfile,
@@ -16,6 +22,8 @@ import {
   loadConfig,
   allRules,
   findRule,
+  isAnalyzableCompose,
+  isAnalyzableDockerfile,
   toJsonReport,
 } from "@docker-doctor/core";
 import type { SkillAgentType } from "agent-install";
@@ -499,10 +507,40 @@ interface ScanFailure {
   message: string;
 }
 
+interface FileResult {
+  // The file had content the rules could check. See isAnalyzableDockerfile
+  // and isAnalyzableCompose.
+  analyzed: boolean;
+  diagnostics: Diagnostic[];
+  failure?: ScanFailure;
+}
+
 interface RulesEngineResult {
+  analyzedFileCount: number;
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
 }
+
+// The files are read in parallel and finish in any order. Collecting the
+// results afterwards keeps diagnostics and failures in discovery order, so
+// two scans of the same project print the same report.
+const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
+  const summary: RulesEngineResult = {
+    analyzedFileCount: 0,
+    diagnostics: [],
+    failures: [],
+  };
+  for (const result of results) {
+    summary.diagnostics.push(...result.diagnostics);
+    if (result.failure) {
+      summary.failures.push(result.failure);
+    }
+    if (result.analyzed) {
+      summary.analyzedFileCount += 1;
+    }
+  }
+  return summary;
+};
 
 const runRulesEngine = async (
   rootDir: string,
@@ -514,11 +552,6 @@ const runRulesEngine = async (
   options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void
 ): Promise<RulesEngineResult> => {
-  const diagnostics: Diagnostic[] = [];
-  // A file we could not read or parse has not been checked. Collect those so
-  // the caller can refuse to report the run as clean.
-  const failures: ScanFailure[] = [];
-
   const isSilent = options.score || options.json;
 
   if (process.stdout.isTTY && !isSilent) {
@@ -528,30 +561,35 @@ const runRulesEngine = async (
 
   // 1. Scan Dockerfiles in parallel
   const dockerfileResults = await Promise.all(
-    project.dockerfiles.map(async (df) => {
+    project.dockerfiles.map(async (df): Promise<FileResult> => {
       const fullPath = path.join(rootDir, df);
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[df] = content;
         const instructions = parseDockerfile(content, df);
-        return runDockerfileRules(
-          instructions,
-          df,
-          projectFilesList,
-          rulesConfig,
-          categoriesConfig
-        );
+        return {
+          analyzed: isAnalyzableDockerfile(instructions),
+          diagnostics: runDockerfileRules(
+            instructions,
+            df,
+            projectFilesList,
+            rulesConfig,
+            categoriesConfig
+          ),
+        };
       } catch (error: unknown) {
+        // A file we could not read or parse has not been checked. The
+        // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
-        failures.push({ file: df, message: msg });
-        return [];
+        return {
+          analyzed: false,
+          diagnostics: [],
+          failure: { file: df, message: msg },
+        };
       }
     })
   );
-  for (const diags of dockerfileResults) {
-    diagnostics.push(...diags);
-  }
 
   if (process.stdout.isTTY && !isSilent) {
     setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
@@ -560,32 +598,35 @@ const runRulesEngine = async (
 
   // 2. Scan Compose files in parallel
   const composeResults = await Promise.all(
-    project.composeFiles.map(async (cf) => {
+    project.composeFiles.map(async (cf): Promise<FileResult> => {
       const fullPath = path.join(rootDir, cf);
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[cf] = content;
         const composeObj = parseCompose(content, cf);
-        return runComposeRules(
-          composeObj,
-          cf,
-          rulesConfig,
-          categoriesConfig,
-          createComposeLocator(content)
-        );
+        return {
+          analyzed: isAnalyzableCompose(composeObj),
+          diagnostics: runComposeRules(
+            composeObj,
+            cf,
+            rulesConfig,
+            categoriesConfig,
+            createComposeLocator(content)
+          ),
+        };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
-        failures.push({ file: cf, message: msg });
-        return [];
+        return {
+          analyzed: false,
+          diagnostics: [],
+          failure: { file: cf, message: msg },
+        };
       }
     })
   );
-  for (const diags of composeResults) {
-    diagnostics.push(...diags);
-  }
 
-  return { diagnostics, failures };
+  return summarizeFileResults([...dockerfileResults, ...composeResults]);
 };
 
 // Exit 2 ("scan incomplete") outranks exit 1 ("findings"): a file we could not
@@ -612,13 +653,19 @@ const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
   return failing ? 1 : 0;
 };
 
-const reportScanFailures = (failures: ScanFailure[]): void => {
+const reportScanFailures = (
+  failures: ScanFailure[],
+  hasScore: boolean
+): void => {
   if (failures.length === 0) {
     return;
   }
   const fileWord = failures.length === 1 ? "file" : "files";
+  const scoreNote = hasScore
+    ? "; the score below covers only the files that were analyzed."
+    : ".";
   console.error(
-    `Docker Doctor could not analyze ${failures.length} ${fileWord}; the score below covers only the files that were analyzed.`
+    `Docker Doctor could not analyze ${failures.length} ${fileWord}${scoreNote}`
   );
   for (const failure of failures) {
     console.error(`  - ${failure.file}: ${flattenMessage(failure.message)}`);
@@ -628,9 +675,30 @@ const reportScanFailures = (failures: ScanFailure[]): void => {
 const noFilesFoundMessage = (rootDir: string): string =>
   `No Dockerfiles or Compose files found in ${rootDir}`;
 
-// A scan with no files has no findings and scores 100. The usual report
-// would call that project healthy, so the terminal prints this notice
-// instead.
+const noScoreMessage = (scannedFileCount: number): string => {
+  const fileWord = scannedFileCount === 1 ? "file" : "files";
+  return `Docker Doctor checked none of the ${scannedFileCount} discovered ${fileWord}, so there is no score`;
+};
+
+// Every discovered file failed or had nothing to check. A score here would
+// describe no file at all.
+const printNothingAnalyzed = (
+  scannedFileCount: number,
+  failureCount: number
+): void => {
+  console.log(`\n${chalk.yellow("⚠")} ${noScoreMessage(scannedFileCount)}.`);
+  console.log(
+    `  A Dockerfile needs at least one instruction. A Compose file needs a service, a top-level models entry or a version key.`
+  );
+  if (failureCount > 0) {
+    console.log(
+      `  The files that could not be read or parsed are listed above.`
+    );
+  }
+};
+
+// A scan with no files has no score. The terminal says why instead of
+// printing an empty report.
 const printNothingScanned = (rootDir: string): void => {
   console.log(`\n${chalk.yellow("⚠")} ${noFilesFoundMessage(rootDir)}.`);
   console.log(
@@ -641,6 +709,124 @@ const printNothingScanned = (rootDir: string): void => {
   );
   console.log(
     `  (.yaml or .yml). Check the directory and your ignore.files patterns.`
+  );
+};
+
+interface ScanOutcome {
+  analyzedFileCount: number;
+  diagnostics: Diagnostic[];
+  failures: ScanFailure[];
+  fileContents: Record<string, string>;
+  project: ProjectInfo;
+  rootDir: string;
+  scannedFileCount: number;
+}
+
+interface OutputOptions {
+  json?: boolean;
+  score?: boolean;
+  verbose?: boolean;
+}
+
+const writeTerminalReport = async (
+  scan: ScanOutcome,
+  { label, score }: { label: string; score: number },
+  verbose: boolean | undefined,
+  exitCode: number
+): Promise<number> => {
+  const { diagnostics, failures, fileContents, project, rootDir } = scan;
+  await formatTerminal(
+    diagnostics,
+    score,
+    label,
+    project,
+    verbose,
+    fileContents,
+    failures.length
+  );
+
+  let wizardOk = true;
+  if (process.stdout.isTTY && process.stdin.isTTY) {
+    wizardOk = await runInteractiveWizard({
+      diagnostics,
+      report: toJsonReport(
+        diagnostics,
+        score,
+        label,
+        project,
+        failures,
+        scan.analyzedFileCount
+      ),
+      rootDir,
+    });
+  }
+  return wizardOk ? exitCode : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
+};
+
+// --score prints the bare number, and nothing at all when there is no
+// score, so a script can tell "no score" from any number. --json prints
+// the full report.
+const writeMachineReport = (
+  scan: ScanOutcome,
+  { label, score }: ScoreResult,
+  scoreOnly: boolean
+): void => {
+  if (scoreOnly) {
+    if (score !== null) {
+      console.log(score);
+    }
+    return;
+  }
+  const report = toJsonReport(
+    scan.diagnostics,
+    score,
+    label,
+    scan.project,
+    scan.failures,
+    scan.analyzedFileCount
+  );
+  console.log(JSON.stringify(report, null, 2));
+};
+
+// Prints the result in the requested output mode and returns the exit code.
+const writeScanOutput = async (
+  scan: ScanOutcome,
+  options: OutputOptions
+): Promise<number> => {
+  const { analyzedFileCount, diagnostics, failures, rootDir } = scan;
+  const scoreResult = calculateScore(diagnostics, analyzedFileCount);
+
+  reportScanFailures(failures, scoreResult.score !== null);
+
+  // Every output mode gates on the same condition, so the same
+  // project cannot pass in one mode and fail in another.
+  const hasErrors = diagnostics.some((d) => d.severity === "error");
+  const exitCode = scanExitCode(failures.length > 0, hasErrors);
+
+  if (options.score || options.json) {
+    if (scoreResult.score === null) {
+      const message =
+        scan.scannedFileCount === 0
+          ? noFilesFoundMessage(rootDir)
+          : noScoreMessage(scan.scannedFileCount);
+      console.error(`Warning: ${message}`);
+    }
+    writeMachineReport(scan, scoreResult, options.score === true);
+    return exitCode;
+  }
+  if (scoreResult.score === null) {
+    if (scan.scannedFileCount === 0) {
+      printNothingScanned(rootDir);
+    } else {
+      printNothingAnalyzed(scan.scannedFileCount, failures.length);
+    }
+    return exitCode;
+  }
+  return await writeTerminalReport(
+    scan,
+    scoreResult,
+    options.verbose,
+    exitCode
   );
 };
 
@@ -802,22 +988,17 @@ program
         const scannedFileCount =
           project.dockerfiles.length + project.composeFiles.length;
 
-        const { diagnostics, failures } = await runRulesEngine(
-          rootDir,
-          project,
-          config.rules,
-          config.categories,
-          projectFilesList,
-          fileContents,
-          options,
-          setStatus
-        );
-
-        // Calculate score
-        const { score, label } = calculateScore(
-          diagnostics,
-          scannedFileCount - failures.length
-        );
+        const { analyzedFileCount, diagnostics, failures } =
+          await runRulesEngine(
+            rootDir,
+            project,
+            config.rules,
+            config.categories,
+            projectFilesList,
+            fileContents,
+            options,
+            setStatus
+          );
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
@@ -835,63 +1016,18 @@ program
           );
         }
 
-        reportScanFailures(failures);
-        const scanIncomplete = failures.length > 0;
-
-        if (scannedFileCount === 0) {
-          // --json and --score keep their stdout contract (an empty report,
-          // score 100), so they only get a warning on stderr.
-          if (isSilent) {
-            console.error(`Warning: ${noFilesFoundMessage(rootDir)}`);
-          } else {
-            printNothingScanned(rootDir);
-            process.exitCode = 0;
-            return;
-          }
-        }
-
-        // Every output mode gates on the same condition, so the same
-        // project cannot pass in one mode and fail in another.
-        const hasErrors = diagnostics.some((d) => d.severity === "error");
-
-        if (options.score) {
-          console.log(score);
-          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
-          return;
-        } else if (options.json) {
-          const report = toJsonReport(
+        process.exitCode = await writeScanOutput(
+          {
+            analyzedFileCount,
             diagnostics,
-            score,
-            label,
+            failures,
+            fileContents,
             project,
-            failures
-          );
-          console.log(JSON.stringify(report, null, 2));
-          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
-          return;
-        }
-        await formatTerminal(
-          diagnostics,
-          score,
-          label,
-          project,
-          options.verbose,
-          fileContents,
-          failures.length
-        );
-
-        let wizardOk = true;
-        if (process.stdout.isTTY && process.stdin.isTTY) {
-          wizardOk = await runInteractiveWizard({
-            diagnostics,
-            report: toJsonReport(diagnostics, score, label, project, failures),
             rootDir,
-          });
-        }
-        const exitCode = scanExitCode(scanIncomplete, hasErrors);
-        process.exitCode = wizardOk
-          ? exitCode
-          : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
+            scannedFileCount,
+          },
+          options
+        );
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
