@@ -1680,6 +1680,10 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "npm ci && npm run build && npm prune --production" },
     { expected: 0, run: "yarn install --production=true" },
     { expected: 1, run: "yarn install --production=false" },
+    // Bun installs devDependencies whatever NODE_ENV says.
+    { expected: 1, run: "NODE_ENV=production bun install" },
+    { expected: 0, run: "NODE_ENV=production bun install --production" },
+    { expected: 0, run: "NODE_ENV=production yarn install" },
   ];
 
   test.each(devDependencyCases)(
@@ -1711,6 +1715,11 @@ describe("Image Size Rules", () => {
       expected: 1,
     },
     { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
+    { dockerfile: "ENV NODE_ENV=production\nRUN bun install", expected: 1 },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN bun install --production",
+      expected: 0,
+    },
   ];
 
   test.each(nodeEnvCases)(

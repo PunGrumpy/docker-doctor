@@ -15,12 +15,17 @@ import type {
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall } from "./package-managers";
 
+interface StageRun {
+  inst: DockerfileInstruction;
+  // True when the RUN executes with NODE_ENV=production.
+  productionEnv: boolean;
+}
+
 interface BuildStage {
   base: string;
   from: DockerfileInstruction;
   name: string | null;
-  // The RUN instructions that do not run under `ENV NODE_ENV=production`.
-  runs: DockerfileInstruction[];
+  runs: StageRun[];
 }
 
 // `ENV NODE_ENV=production` and the legacy `ENV NODE_ENV production`, quoted
@@ -30,8 +35,7 @@ const NODE_ENV_ASSIGNMENT_RE =
 
 const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   const stages: BuildStage[] = [];
-  // npm, pnpm and Yarn 1 skip devDependencies when NODE_ENV is
-  // "production". A stage built FROM this one inherits the ENV.
+  // A stage built FROM this one inherits the ENV.
   const productionEnv: boolean[] = [];
   for (const inst of instructions) {
     if (inst.instruction === "FROM") {
@@ -52,12 +56,11 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       if (value !== undefined) {
         productionEnv[stages.length - 1] = value === "production";
       }
-    } else if (
-      inst.instruction === "RUN" &&
-      stages.length > 0 &&
-      !productionEnv[stages.length - 1]
-    ) {
-      stages.at(-1)?.runs.push(inst);
+    } else if (inst.instruction === "RUN" && stages.length > 0) {
+      stages.at(-1)?.runs.push({
+        inst,
+        productionEnv: productionEnv[stages.length - 1],
+      });
     }
   }
   return stages;
@@ -258,6 +261,11 @@ const SHELL_SEPARATOR_RE = /\s*(?:&&|\|\||;|\|)\s*/u;
 const WHITESPACE_RE = /\s+/u;
 const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
+// The managers that leave devDependencies out when NODE_ENV is
+// "production". Bun ignores it. Yarn 2 and later ignore it too, but a
+// Dockerfile rarely says which Yarn it runs, so `yarn` keeps the Yarn 1
+// behavior.
+const MANAGERS_HONORING_NODE_ENV = new Set(["npm", "yarn", "pnpm"]);
 const INSTALL_VERBS = new Set(["install", "ci", "i"]);
 // Flags that mean the install leaves devDependencies out of the image.
 // `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
@@ -278,7 +286,10 @@ const NON_DEV_INSTALL_FLAGS = new Set([
 // One shell command, e.g. `NODE_ENV=production npm ci --omit=dev`. Only a
 // bare project install counts: a positional word after the verb
 // (`npm install express`) installs named packages, not devDependencies.
-const segmentInstallsDevDependencies = (segment: string): boolean => {
+const segmentInstallsDevDependencies = (
+  segment: string,
+  productionEnv: boolean
+): boolean => {
   const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
   const commandStart = tokens.findIndex(
     (token) => !ENV_ASSIGNMENT_RE.test(token)
@@ -290,22 +301,23 @@ const segmentInstallsDevDependencies = (segment: string): boolean => {
   if (!(NODE_PACKAGE_MANAGERS.has(manager) && INSTALL_VERBS.has(verb))) {
     return false;
   }
-  const setsProductionEnv = tokens
-    .slice(0, commandStart)
-    .includes("NODE_ENV=production");
+  const skipsDevDependencies =
+    MANAGERS_HONORING_NODE_ENV.has(manager) &&
+    (productionEnv ||
+      tokens.slice(0, commandStart).includes("NODE_ENV=production"));
   return (
-    !setsProductionEnv &&
+    !skipsDevDependencies &&
     options.every(
       (option) => option.startsWith("-") && !NON_DEV_INSTALL_FLAGS.has(option)
     )
   );
 };
 
-const installsDevDependencies = (args: string): boolean =>
-  !args.includes("prune") &&
-  maskQuotedText(stripRunFlags(args))
+const installsDevDependencies = ({ inst, productionEnv }: StageRun): boolean =>
+  !inst.args.includes("prune") &&
+  maskQuotedText(stripRunFlags(inst.args))
     .split(SHELL_SEPARATOR_RE)
-    .some(segmentInstallsDevDependencies);
+    .some((segment) => segmentInstallsDevDependencies(segment, productionEnv));
 
 export const avoidDevDependencies: DockerfileRule = {
   category: "Image Size",
@@ -318,10 +330,11 @@ export const avoidDevDependencies: DockerfileRule = {
     // A dev install in an inherited stage ships just like one in the final
     // stage itself.
     for (const stage of shippedStages(stages)) {
-      for (const inst of stage.runs) {
-        if (!installsDevDependencies(inst.args)) {
+      for (const run of stage.runs) {
+        if (!installsDevDependencies(run)) {
           continue;
         }
+        const { inst } = run;
         const where =
           stage === finalStage
             ? "in the final stage"
