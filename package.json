@@ -26,12 +26,12 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.2",
+    "@changesets/cli": "^3.0.3",
     "husky": "^9.1.7",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
-    "react-doctor": "^0.9.13",
-    "turbo": "^2.10.12",
+    "react-doctor": "^0.9.18",
+    "turbo": "^2.11.9",
     "typescript": "^7.0.2",
     "ultracite": "7.11.1"
   },
