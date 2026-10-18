@@ -18,6 +18,7 @@ export const TocLink = ({
   readonly item: TOCItemType;
 }) => {
   const active = useActiveAnchor();
+
   return (
     <TOCItem
       aria-current={item.url.slice(1) === active ? "location" : undefined}
@@ -47,8 +48,10 @@ const TocThumb = ({
 
   useEffect(() => {
     const container = containerRef.current;
+
     if (!(container && active)) {
       setPosition(null);
+
       return;
     }
 
@@ -56,6 +59,7 @@ const TocThumb = ({
       const link = container.querySelector<HTMLElement>(
         `a[href="#${CSS.escape(active)}"]`
       );
+
       setPosition(
         link ? { height: link.offsetHeight, top: link.offsetTop } : null
       );
@@ -63,6 +67,7 @@ const TocThumb = ({
 
     measure();
     window.addEventListener("resize", measure);
+
     return () => window.removeEventListener("resize", measure);
   }, [active, containerRef]);
 

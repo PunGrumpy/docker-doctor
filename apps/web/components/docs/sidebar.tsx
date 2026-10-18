@@ -22,13 +22,16 @@ const containsPath = (node: PageTreeFolder, pathname: string): boolean => {
   if (node.index?.url === pathname) {
     return true;
   }
+
   return node.children.some((child) => {
     if (child.type === "page") {
       return child.url === pathname;
     }
+
     if (child.type === "folder") {
       return containsPath(child, pathname);
     }
+
     return false;
   });
 };

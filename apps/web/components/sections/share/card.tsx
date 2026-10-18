@@ -63,6 +63,7 @@ const ShareButton = ({
       </a>
     );
   }
+
   return (
     <button
       data-channel={channel}
@@ -103,6 +104,7 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
   const handleCopyBadge = useCallback(async () => {
     const badgeUrl = shareUrl.replace("/share?", "/share/badge?");
     const badge = `[![Docker Doctor](${badgeUrl})](${shareUrl})`;
+
     try {
       await navigator.clipboard.writeText(badge);
       toast.success("Badge copied");

@@ -38,6 +38,7 @@ export type RuleCategory =
   | "Best Practices"
   | "Compose"
   | "Image Size";
+
 export type RuleSeverity = DiagnosticSeverity | "off";
 
 export interface RuleDefinition {

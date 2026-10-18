@@ -36,6 +36,7 @@ const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/su;
 
 export const isLiteralSecretValue = (value: string): boolean => {
   const unquoted = value.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? value;
+
   return (
     unquoted.length > 0 &&
     !unquoted.startsWith("$") &&

@@ -75,11 +75,13 @@ const CTA_DURATION = 66;
 
 const CommandPill = () => {
   const frame = useCurrentFrame();
+
   const clamp = {
     easing: EASE,
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   } as const;
+
   const opacity = interpolate(frame, [0, 14], [0, 1], clamp);
   const y = interpolate(frame, [0, 14], [14, 0], clamp);
 

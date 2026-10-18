@@ -39,6 +39,7 @@ describe("runDockerfileRules", () => {
     const diagnostics = runDockerfileRules(rootDockerfile, "Dockerfile", [], {
       "docker-doctor/no-root-user": "off",
     });
+
     expect(
       diagnostics.some((d) => d.rule === "docker-doctor/no-root-user")
     ).toBe(false);
@@ -52,6 +53,7 @@ describe("runDockerfileRules", () => {
     const diagnostics = runDockerfileRules(rootDockerfile, "Dockerfile", [], {
       "docker-doctor/no-root-user": "error",
     });
+
     const rootUserDiag = findByRule(diagnostics, "docker-doctor/no-root-user");
     expect(rootUserDiag?.severity).toBe("error");
   });
@@ -64,6 +66,7 @@ describe("runDockerfileRules", () => {
       undefined,
       { Security: "off" }
     );
+
     expect(diagnostics.some((d) => d.rule.startsWith("docker-doctor/"))).toBe(
       true
     );
@@ -85,6 +88,7 @@ describe("runDockerfileRules", () => {
       undefined,
       { Security: "error" }
     );
+
     const rootUserDiag = findByRule(diagnostics, "docker-doctor/no-root-user");
     expect(rootUserDiag?.severity).toBe("error");
   });
@@ -97,11 +101,14 @@ describe("runDockerfileRules", () => {
       { "docker-doctor/no-root-user": "info" },
       { Security: "error" }
     );
+
     const rootUserDiag = findByRule(diagnostics, "docker-doctor/no-root-user");
+
     const pinVersionDiag = findByRule(
       diagnostics,
       "docker-doctor/pin-image-version"
     );
+
     expect(rootUserDiag?.severity).toBe("info");
     expect(pinVersionDiag?.severity).toBe("error");
   });
@@ -127,16 +134,19 @@ describe("runComposeRules", () => {
 
   test("no config: reports require-restart-policy at its default severity", () => {
     const diagnostics = runComposeRules(composeMissingRestart, "compose.yml");
+
     const restartDiag = findByRule(
       diagnostics,
       "docker-doctor/require-restart-policy"
     );
+
     expect(restartDiag).toBeDefined();
     expect(restartDiag?.severity).toBe("warning");
   });
 
   test("forwards a locator so diagnostics carry line numbers", () => {
     const source = 'version: "3.8"\nservices:\n  web:\n    image: node:22\n';
+
     const diagnostics = runComposeRules(
       parseCompose(source, "compose.yml"),
       "compose.yml",
@@ -144,11 +154,14 @@ describe("runComposeRules", () => {
       undefined,
       createComposeLocator(source)
     );
+
     const versionDiag = findByRule(diagnostics, "docker-doctor/no-version-key");
+
     const restartDiag = findByRule(
       diagnostics,
       "docker-doctor/require-restart-policy"
     );
+
     expect(versionDiag?.line).toBe(1);
     expect(restartDiag?.line).toBe(3);
   });
@@ -157,6 +170,7 @@ describe("runComposeRules", () => {
     const diagnostics = runComposeRules(composeMissingRestart, "compose.yml", {
       "docker-doctor/require-restart-policy": "off",
     });
+
     expect(
       diagnostics.some((d) => d.rule === "docker-doctor/require-restart-policy")
     ).toBe(false);
@@ -169,10 +183,12 @@ describe("runComposeRules", () => {
     const diagnostics = runComposeRules(composeMissingRestart, "compose.yml", {
       "docker-doctor/require-restart-policy": "error",
     });
+
     const restartDiag = findByRule(
       diagnostics,
       "docker-doctor/require-restart-policy"
     );
+
     expect(restartDiag?.severity).toBe("error");
   });
 
@@ -183,6 +199,7 @@ describe("runComposeRules", () => {
       undefined,
       { Compose: "off" }
     );
+
     expect(diagnostics).toHaveLength(0);
   });
 
@@ -193,10 +210,12 @@ describe("runComposeRules", () => {
       undefined,
       { Compose: "error" }
     );
+
     const restartDiag = findByRule(
       diagnostics,
       "docker-doctor/require-restart-policy"
     );
+
     expect(restartDiag?.severity).toBe("error");
   });
 
@@ -207,10 +226,12 @@ describe("runComposeRules", () => {
       { "docker-doctor/require-restart-policy": "info" },
       { Compose: "error" }
     );
+
     const restartDiag = findByRule(
       diagnostics,
       "docker-doctor/require-restart-policy"
     );
+
     const versionDiag = findByRule(diagnostics, "docker-doctor/no-version-key");
     expect(restartDiag?.severity).toBe("info");
     expect(versionDiag?.severity).toBe("error");
@@ -301,6 +322,7 @@ describe("analyzable files", () => {
 
   test("a Dockerfile stays analyzable when config turns every rule off", () => {
     const instructions = parseDockerfile("FROM node\n");
+
     const diagnostics = runDockerfileRules(
       instructions,
       "Dockerfile",
@@ -314,6 +336,7 @@ describe("analyzable files", () => {
         Security: "off",
       }
     );
+
     expect(diagnostics).toEqual([]);
     expect(isAnalyzableDockerfile(instructions)).toBe(true);
   });

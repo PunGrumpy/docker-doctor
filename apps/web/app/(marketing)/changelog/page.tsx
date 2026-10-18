@@ -23,6 +23,7 @@ const ChangelogPage = () => {
     "docker-doctor",
     "CHANGELOG.md"
   );
+
   const changelog = parseChangelog(changelogPath);
 
   return (

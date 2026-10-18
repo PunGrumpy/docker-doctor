@@ -8,16 +8,20 @@ const LABEL = "Docker Doctor";
 // isn't unified via an `@docker-doctor/core` import).
 const getScoreColor = (score: number): string => {
   const { label } = getScoreData(score);
+
   switch (label) {
     case "Excellent": {
       return "#4c1";
     }
+
     case "Good": {
       return "#dfb317";
     }
+
     case "Needs Work": {
       return "#fe7d37";
     }
+
     default: {
       // Critical
       return "#e05d44";

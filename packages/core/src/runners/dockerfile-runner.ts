@@ -25,6 +25,7 @@ export const runDockerfileRules = (
 
   for (const rule of allDockerfileRules) {
     const severity = resolveSeverity(rule, rulesConfig, categoriesConfig);
+
     if (severity === "off") {
       continue;
     }
@@ -33,6 +34,7 @@ export const runDockerfileRules = (
 
     for (const diag of ruleDiagnostics) {
       diag.category = rule.category;
+
       if (severity !== rule.defaultSeverity) {
         diag.severity = severity;
       }

@@ -12,6 +12,7 @@ import { Config } from "@remotion/cli/config";
 import { enableTailwind } from "@remotion/tailwind-v4";
 
 Config.setVideoImageFormat("jpeg");
+
 Config.setOverwriteOutput(true);
 
 interface LoaderOptions {
@@ -46,9 +47,11 @@ Config.overrideWebpackConfig((currentConfig) => {
   // no longer exports. Pre-supplying `tsconfigRaw` makes the loader skip
   // that lookup entirely — esbuild parses the raw JSON itself.
   const tsconfigRaw = fs.readFileSync(path.resolve("tsconfig.json"), "utf-8");
+
   for (const rule of withTailwind.module?.rules ?? []) {
     const use = isWebpackRule(rule) ? rule.use : undefined;
     const entries = Array.isArray(use) ? use.filter(isLoaderEntry) : [];
+
     for (const entry of entries) {
       if (entry.loader?.includes("esbuild-loader")) {
         entry.options = { ...entry.options, tsconfigRaw };

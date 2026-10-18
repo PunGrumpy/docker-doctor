@@ -90,6 +90,7 @@ describe("no Dockerfile rule repeats a credential", () => {
 
   test("the fixture reaches every rule that quotes Dockerfile text", () => {
     const rules = new Set(diagnostics.map((d) => d.rule));
+
     for (const rule of [
       "docker-doctor/no-secrets-in-env",
       "docker-doctor/no-add-remote",
@@ -112,6 +113,7 @@ describe("no Dockerfile rule repeats a credential", () => {
     const keys = diagnostics
       .filter((d) => d.rule === "docker-doctor/no-secrets-in-env")
       .map((d) => d.message);
+
     expect(keys.some((m) => m.includes("'GITHUB_PAT'"))).toBe(true);
     expect(keys.some((m) => m.includes("'API_TOKEN'"))).toBe(true);
   });

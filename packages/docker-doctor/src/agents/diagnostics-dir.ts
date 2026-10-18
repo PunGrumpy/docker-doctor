@@ -18,6 +18,7 @@ const UNSAFE_FILE_CHARS = /[^a-z0-9-]+/giu;
 
 const ruleFileName = (rule: string): string => {
   const shortKey = rule.split("/").at(-1) ?? rule;
+
   return `${shortKey.replace(UNSAFE_FILE_CHARS, "-")}.txt`;
 };
 
@@ -25,14 +26,17 @@ export const groupDiagnosticsByRule = (
   diagnostics: Diagnostic[]
 ): Map<string, Diagnostic[]> => {
   const groups = new Map<string, Diagnostic[]>();
+
   for (const diagnostic of diagnostics) {
     const group = groups.get(diagnostic.rule);
+
     if (group) {
       group.push(diagnostic);
     } else {
       groups.set(diagnostic.rule, [diagnostic]);
     }
   }
+
   return groups;
 };
 
@@ -77,8 +81,10 @@ export const writeDiagnosticsDirectory = async (
   );
 
   const writes: Promise<void>[] = [];
+
   for (const [rule, ruleDiagnostics] of groupDiagnosticsByRule(diagnostics)) {
     const [first] = ruleDiagnostics;
+
     const lines = [
       TRUST_BOUNDARY_NOTE,
       `${rule} (${first.severity})`,
@@ -91,6 +97,7 @@ export const writeDiagnosticsDirectory = async (
       ),
       "",
     ];
+
     writes.push(
       fs.writeFile(
         path.join(dir, ruleFileName(rule)),
@@ -99,6 +106,7 @@ export const writeDiagnosticsDirectory = async (
       )
     );
   }
+
   await Promise.all(writes);
 };
 
@@ -109,6 +117,7 @@ export const ensureGitignoreEntry = async (rootDir: string): Promise<void> => {
   const gitignorePath = path.join(rootDir, ".gitignore");
 
   let existing: string | null = null;
+
   try {
     existing = await fs.readFile(gitignorePath, "utf-8");
   } catch {
@@ -126,15 +135,18 @@ export const ensureGitignoreEntry = async (rootDir: string): Promise<void> => {
           `/${DIAGNOSTICS_DIR_NAME}/`,
         ].includes(line.trim())
       );
+
     if (isIgnored) {
       return;
     }
+
     const separator = existing.endsWith("\n") || existing === "" ? "" : "\n";
     await fs.writeFile(
       gitignorePath,
       `${existing}${separator}${DIAGNOSTICS_DIR_NAME}/\n`,
       "utf-8"
     );
+
     return;
   }
 
@@ -143,5 +155,6 @@ export const ensureGitignoreEntry = async (rootDir: string): Promise<void> => {
   } catch {
     return;
   }
+
   await fs.writeFile(gitignorePath, `${DIAGNOSTICS_DIR_NAME}/\n`, "utf-8");
 };

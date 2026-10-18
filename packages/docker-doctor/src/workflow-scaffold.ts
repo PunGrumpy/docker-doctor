@@ -8,6 +8,7 @@ export type ScaffoldStatus = "created" | "kept" | "updated";
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
+
     return true;
   } catch {
     return false;
@@ -18,10 +19,12 @@ const fileExists = async (filePath: string): Promise<boolean> => {
 const selfAndAncestors = (dir: string): string[] => {
   const dirs = [dir];
   let parent = path.dirname(dir);
+
   while (parent !== dirs.at(-1)) {
     dirs.push(parent);
     parent = path.dirname(parent);
   }
+
   return dirs;
 };
 
@@ -31,10 +34,13 @@ const selfAndAncestors = (dir: string): string[] => {
 // repository.
 const findRepositoryRoot = async (dir: string): Promise<string | null> => {
   const candidates = selfAndAncestors(dir);
+
   const hasGit = await Promise.all(
     candidates.map((candidate) => fileExists(path.join(candidate, ".git")))
   );
+
   const nearest = hasGit.indexOf(true);
+
   return nearest === -1 ? null : candidates[nearest];
 };
 
@@ -52,16 +58,19 @@ export const scaffoldActionWorkflow = async (options: {
 }): Promise<ScaffoldStatus> => {
   const repositoryRoot =
     (await findRepositoryRoot(options.rootDir)) ?? options.rootDir;
+
   const scanDirectory = path
     .relative(repositoryRoot, options.rootDir)
     .split(path.sep)
     .join("/");
+
   // A JSON string is a valid YAML double-quoted scalar, whatever the path
   // contains.
   const directoryInput =
     scanDirectory === ""
       ? ""
       : `        with:\n          directory: ${JSON.stringify(scanDirectory)}\n`;
+
   const workflowDir = path.join(repositoryRoot, ".github", "workflows");
   const workflowPath = path.join(workflowDir, "docker-doctor.yml");
   const existing = await fileExists(workflowPath);
@@ -88,5 +97,6 @@ ${directoryInput}`;
 
   await fs.mkdir(workflowDir, { recursive: true });
   await fs.writeFile(workflowPath, workflowYaml, "utf-8");
+
   return existing ? "updated" : "created";
 };

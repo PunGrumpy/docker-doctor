@@ -16,14 +16,17 @@ const runPlain = async (args: string[]) => {
     stderr: "pipe",
     stdout: "pipe",
   });
+
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
+
   return { exitCode, stderr, stdout };
 };
 
 beforeAll(async () => {
   const exists = await Bun.file(CLI).exists();
+
   if (!exists) {
     throw new Error(
       `Built CLI not found at ${CLI}. Run: bun run build --filter @docker-doctor/cli`
@@ -73,6 +76,7 @@ describe("terminal report", () => {
     const { exitCode, stdout } = await runPlain([
       fixture("unterminated-heredoc"),
     ]);
+
     expect(exitCode).toBe(2);
     expect(stdout).toContain(
       "Docker Doctor checked none of the 1 discovered file, so there is no score."
@@ -94,6 +98,7 @@ describe("terminal report", () => {
       runPlain([fixture("with-error")]),
       runPlain([fixture("with-error"), "--verbose"]),
     ]);
+
     expect(plain.stdout).not.toContain("\u001B");
     expect(verbose.stdout).not.toContain("\u001B");
   });

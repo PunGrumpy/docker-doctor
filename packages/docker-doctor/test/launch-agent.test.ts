@@ -15,16 +15,20 @@ const withFakeAgentOnPath = async (
   options: { installAgent: boolean }
 ): Promise<void> => {
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), "dd-agent-bin-"));
+
   // On macOS the temp directory is a symlink and `pwd` prints the resolved
   // path, so the test compares against the real path.
   const project = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), "dd-agent-project-"))
   );
+
   const originalPath = process.env.PATH;
+
   try {
     if (options.installAgent) {
       fs.writeFileSync(path.join(bin, "claude"), FAKE_AGENT, { mode: 0o755 });
     }
+
     process.env.PATH = options.installAgent
       ? `${bin}${path.delimiter}${originalPath ?? ""}`
       : bin;
@@ -45,10 +49,12 @@ describe.skipIf(process.platform === "win32")("launchAgent", () => {
         const launched = await launchAgent("claude-code", "fix it", project);
 
         expect(launched).toBe(true);
+
         const [cwd, ...args] = fs
           .readFileSync(path.join(project, "launched.txt"), "utf-8")
           .trim()
           .split("\n");
+
         expect(cwd).toBe(project);
         expect(args).toEqual(["--dangerously-skip-permissions", "fix it"]);
       },

@@ -34,6 +34,7 @@ export const detectLaunchableAgents = (): LaunchableAgentId[] => {
   if (process.platform === "win32") {
     return [];
   }
+
   return LAUNCHABLE_AGENT_IDS.filter((agentId) =>
     isCommandAvailable(AGENT_BINARIES[agentId])
   );

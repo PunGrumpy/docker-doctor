@@ -62,11 +62,13 @@ const applyNodeEnv = (
 ): void => {
   if (inst.instruction === "ARG") {
     const match = NODE_ENV_ARG_RE.exec(inst.args);
+
     if (match) {
       state.arg = match.groups?.value ?? globalArg;
     }
   } else if (inst.instruction === "ENV") {
     const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
+
     if (value !== undefined) {
       state.env = NODE_ENV_REFERENCE_RE.test(value)
         ? currentNodeEnv(state)
@@ -81,14 +83,18 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   const nodeEnv: NodeEnvState[] = [];
   // An ARG before the first FROM is not visible inside a stage.
   const globalScope: NodeEnvState = { arg: undefined, env: undefined };
+
   for (const inst of instructions) {
     const state = nodeEnv.at(-1) ?? globalScope;
+
     if (inst.instruction === "FROM") {
       const { base, stage } = parseFromArgs(inst.args);
       const baseKey = base?.toLowerCase() ?? "";
+
       const parent = stages.findIndex(
         (s) => s.name !== null && s.name === baseKey
       );
+
       nodeEnv.push(
         parent === -1
           ? { arg: undefined, env: undefined }
@@ -109,6 +115,7 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       applyNodeEnv(inst, state, globalScope.arg);
     }
   }
+
   return stages;
 };
 
@@ -117,6 +124,7 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
 const shippedStages = (stages: BuildStage[]): BuildStage[] => {
   const shipped: BuildStage[] = [];
   let index = stages.length - 1;
+
   while (index >= 0) {
     shipped.unshift(stages[index]);
     const { base } = stages[index];
@@ -124,6 +132,7 @@ const shippedStages = (stages: BuildStage[]): BuildStage[] => {
       .slice(0, index)
       .findIndex((s) => s.name !== null && s.name === base);
   }
+
   return shipped;
 };
 
@@ -156,6 +165,7 @@ export const preferSlimBase: DockerfileRule = {
     // has no effect on the image's size.
     for (const { from } of shippedStages(collectStages(instructions))) {
       const imagePart = parseFromArgs(from.args).base;
+
       if (!imagePart || isScratch(imagePart)) {
         continue;
       }
@@ -184,6 +194,7 @@ export const preferSlimBase: DockerfileRule = {
       }
 
       const haystack = `${ref.name} ${ref.tag}`.toLowerCase();
+
       const isSlim =
         MINIMAL_BASE_MARKERS.some((marker) => haystack.includes(marker)) ||
         MINIMAL_BASE_SEGMENT_RE.test(haystack);
@@ -272,6 +283,7 @@ const hasCacheMountFor = (args: string, cacheDirs: string[]): boolean =>
 const hasCacheMountOver = (args: string, dir: string): boolean =>
   cacheMountTargets(args).some((target) => {
     const mount = target.replace(TRAILING_SLASHES_RE, "");
+
     return dir === mount || dir.startsWith(`${mount}/`);
   });
 
@@ -335,12 +347,14 @@ const SHELL_SEPARATOR_RE = /\s*(?:&&|\|\||;|\|)\s*/u;
 const WHITESPACE_RE = /\s+/u;
 const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
+
 // The managers that leave devDependencies out when NODE_ENV is
 // "production". Bun and pnpm 10 and later ignore it. Yarn 2 and later
 // ignore it too, but a Dockerfile rarely says which Yarn it runs, so
 // `yarn` keeps the Yarn 1 behavior.
 const MANAGERS_HONORING_NODE_ENV = new Set(["npm", "yarn"]);
 const INSTALL_VERBS = new Set(["install", "ci", "i"]);
+
 // Flags that mean the install leaves devDependencies out of the image.
 // `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
 // production flag and `-p` is bun's.
@@ -365,20 +379,26 @@ const segmentInstallsDevDependencies = (
   productionEnv: boolean
 ): boolean => {
   const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
+
   const commandStart = tokens.findIndex(
     (token) => !ENV_ASSIGNMENT_RE.test(token)
   );
+
   if (commandStart === -1) {
     return false;
   }
+
   const [manager, verb, ...options] = tokens.slice(commandStart);
+
   if (!(NODE_PACKAGE_MANAGERS.has(manager) && INSTALL_VERBS.has(verb))) {
     return false;
   }
+
   const skipsDevDependencies =
     MANAGERS_HONORING_NODE_ENV.has(manager) &&
     (productionEnv ||
       tokens.slice(0, commandStart).includes("NODE_ENV=production"));
+
   return (
     !skipsDevDependencies &&
     options.every(
@@ -408,11 +428,14 @@ export const avoidDevDependencies: DockerfileRule = {
         if (!installsDevDependencies(run)) {
           continue;
         }
+
         const { inst } = run;
+
         const where =
           stage === finalStage
             ? "in the final stage"
             : `in stage '${stage.name}', whose layers the final stage inherits,`;
+
         diagnostics.push(
           createDiagnostic(
             file,

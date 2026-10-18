@@ -19,6 +19,7 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
   // Escape no meaning, so add it here.
   useEffect(() => {
     const details = detailsRef.current;
+
     if (!details) {
       return;
     }
@@ -31,6 +32,7 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
     };
 
     details.addEventListener("keydown", onKeyDown);
+
     return () => details.removeEventListener("keydown", onKeyDown);
   }, []);
 

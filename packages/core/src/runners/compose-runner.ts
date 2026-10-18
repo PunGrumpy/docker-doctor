@@ -25,6 +25,7 @@ export const runComposeRules = (
 
   for (const rule of allComposeRules) {
     const severity = resolveSeverity(rule, rulesConfig, categoriesConfig);
+
     if (severity === "off") {
       continue;
     }
@@ -33,6 +34,7 @@ export const runComposeRules = (
 
     for (const diag of ruleDiagnostics) {
       diag.category = rule.category;
+
       if (severity !== rule.defaultSeverity) {
         diag.severity = severity;
       }

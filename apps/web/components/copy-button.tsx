@@ -30,9 +30,11 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
     if (!copied) {
       return;
     }
+
     const timer = setTimeout(() => {
       setCopied(false);
     }, 2000);
+
     return () => clearTimeout(timer);
   }, [copied]);
 

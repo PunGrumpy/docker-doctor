@@ -8,6 +8,7 @@
 // either way and a shell-form diagnostic still points at the offending line.
 export const parseExecForm = (args: string): string[] | null => {
   const trimmed = args.trim();
+
   // Cheap reject first: most instructions are shell form, and reaching them
   // through a thrown JSON.parse would be far more expensive.
   if (!trimmed.startsWith("[")) {
@@ -15,6 +16,7 @@ export const parseExecForm = (args: string): string[] | null => {
   }
 
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(trimmed);
   } catch {
@@ -24,6 +26,7 @@ export const parseExecForm = (args: string): string[] | null => {
   if (!Array.isArray(parsed)) {
     return null;
   }
+
   if (!parsed.every((el): el is string => typeof el === "string")) {
     return null;
   }

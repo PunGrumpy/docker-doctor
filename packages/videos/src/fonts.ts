@@ -10,10 +10,12 @@ const { fontFamily: GEIST_SANS } = loadGeistSans("normal", {
   subsets: ["latin"],
   weights: ["400", "500", "600", "700"],
 });
+
 const { fontFamily: GEIST_MONO } = loadGeistMono("normal", {
   subsets: ["latin"],
   weights: ["400", "500", "600", "700"],
 });
+
 const { fontFamily: INSTRUMENT_SERIF } = loadInstrumentSerif("normal", {
   subsets: ["latin"],
   weights: ["400"],

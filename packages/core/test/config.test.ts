@@ -103,14 +103,17 @@ describe("loadConfig", () => {
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({ rules: { "no-latest-tag": "banana" } })
     );
+
     try {
       await loadConfig(dir);
       expect.unreachable("loadConfig should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(ConfigError);
+
       if (!(error instanceof ConfigError)) {
         throw error;
       }
+
       expect(error._tag).toBe("ConfigError");
     }
   });
@@ -148,6 +151,7 @@ describe("loadConfig", () => {
     const nodeModulesFailure = typeStrippingFailure(tsConfig, {
       code: "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING",
     });
+
     expect(nodeModulesFailure).toContain("node_modules");
     expect(nodeModulesFailure).not.toContain("22.18");
   });

@@ -41,12 +41,14 @@ export const calculateScore = (
       `analyzedFileCount must be a whole number of files, got ${analyzedFileCount}`
     );
   }
+
   if (analyzedFileCount === 0) {
     if (diagnostics.length > 0) {
       throw new Error(
         `${diagnostics.length} diagnostics came from 0 analyzed files. Count the files the diagnostics came from.`
       );
     }
+
     return { label: null, score: null };
   }
 

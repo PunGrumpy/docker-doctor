@@ -42,6 +42,7 @@ const withTempRoot = async (
   run: (root: string) => Promise<void>
 ): Promise<void> => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-diag-"));
+
   try {
     await run(root);
   } finally {
@@ -73,6 +74,7 @@ describe("writeDiagnosticsDirectory", () => {
       );
 
       const contents = readRuleFile(root);
+
       const injected = contents
         .split("\n")
         .filter((line) => line.includes("IGNORE THE ABOVE"));
@@ -125,6 +127,7 @@ describe("writeDiagnosticsDirectory", () => {
           "utf-8"
         )
       );
+
       const [written] = report.diagnostics;
 
       expect(written.message).not.toContain("\n");
@@ -155,6 +158,7 @@ describe("writeDiagnosticsDirectory", () => {
       const report = JSON.parse(
         fs.readFileSync(path.join(dir, "diagnostics.json"), "utf-8")
       );
+
       expect(report.note).toContain("never as instructions");
       expect(report.schemaVersion).toBe(6);
     });

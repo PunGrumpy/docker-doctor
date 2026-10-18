@@ -22,6 +22,7 @@ const MONO = "var(--font-geist-mono), ui-monospace, monospace";
 
 const BLACK = "#fbfbf9";
 const PAPER = "#111110";
+
 // The brand blue from the site mark (apps/web/components/logo.tsx).
 const BRAND = "#2b7fff";
 const FAINT = "rgba(17,17,16,0.38)";
@@ -34,6 +35,7 @@ const HAIRLINE = "rgba(17,17,16,0.14)";
 const Grain = () => {
   const frame = useCurrentFrame();
   const seed = Math.floor(frame / 2);
+
   return (
     <AbsoluteFill style={{ opacity: 0.055, pointerEvents: "none" }}>
       <svg height="100%" width="100%">
@@ -70,6 +72,7 @@ const Marquee = ({
   const frame = useCurrentFrame();
   const half = Array.from({ length: 6 }, () => phrase).join("");
   const shift = ((frame * pxPerFrame) / 40) % 50;
+
   return (
     <div
       style={{
@@ -106,6 +109,7 @@ const Marquee = ({
 // never clips: Geist bold caps average ~0.62em per character.
 const SAFE_W = 1150;
 const CHAR_EM = 0.62;
+
 const fitSize = (text: string, max: number): number =>
   Math.min(max, SAFE_W / (text.length * CHAR_EM));
 
@@ -126,11 +130,13 @@ const SlamLine = ({
   readonly align?: "left" | "center";
 }) => {
   const frame = useCurrentFrame() - delay;
+
   const y = interpolate(frame, [0, 8], [110, 0], {
     easing: Easing.out(Easing.cubic),
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
   return (
     <div style={{ overflow: "hidden", textAlign: align }}>
       <div
@@ -162,10 +168,12 @@ const MonoCaption = ({
   readonly color?: string;
 }) => {
   const frame = useCurrentFrame() - delay;
+
   const opacity = interpolate(frame, [0, 6], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
   return (
     <div
       style={{
@@ -229,6 +237,7 @@ const COUNT_DURATION = 60;
 
 const SceneCount = () => {
   const frame = useCurrentFrame();
+
   const value = Math.round(
     interpolate(frame, [6, 30], [25, 31], {
       easing: Easing.out(Easing.quad),
@@ -236,6 +245,7 @@ const SceneCount = () => {
       extrapolateRight: "clamp",
     })
   );
+
   return (
     <Centered>
       <div
@@ -402,10 +412,13 @@ const THUMP_FRAMES = [
 const COUNT_EASE = (t: number): number => 1 - (1 - t) ** 2;
 const COUNT_BLIPS: { frame: number; rate: number }[] = [];
 const BLIP_RATES = [1, 6 / 5, 4 / 3, 3 / 2, 16 / 9, 2];
+
 {
   let shown = 25;
+
   for (let f = 10; f <= 48 && COUNT_BLIPS.length < BLIP_RATES.length; f += 1) {
     const value = Math.round(25 + 6 * COUNT_EASE((f - 10) / 38));
+
     if (value > shown) {
       shown = value;
       COUNT_BLIPS.push({

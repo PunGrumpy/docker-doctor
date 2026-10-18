@@ -1,6 +1,10 @@
 import { setTimeout } from "node:timers/promises";
 
-import type { Diagnostic, ProjectInfo } from "@docker-doctor/core";
+import type {
+  Diagnostic,
+  ProjectInfo,
+  RuleCategory,
+} from "@docker-doctor/core";
 import { findRule } from "@docker-doctor/core";
 import chalk from "chalk";
 
@@ -12,6 +16,7 @@ const printCodeFrame = (
   if (!content || !line) {
     return;
   }
+
   const lines = content.split(/\r?\n/u);
   const start = Math.max(1, line - 1);
   const end = Math.min(lines.length, line + 1);
@@ -20,6 +25,7 @@ const printCodeFrame = (
     const rawLine = lines[i - 1];
     const isTarget = i === line;
     const lineNumberStr = String(i).padStart(5, " ");
+
     if (isTarget) {
       console.log(
         `  ${severityColor(">")} ${chalk.bold(lineNumberStr)} │ ${chalk.white(rawLine)}`
@@ -28,6 +34,7 @@ const printCodeFrame = (
       console.log(`    ${chalk.dim(lineNumberStr)} │ ${chalk.dim(rawLine)}`);
     }
   }
+
   console.log();
 };
 
@@ -56,6 +63,7 @@ const printDiagnostics = (
         ? `\n${chalk.green.bold("✔ No issues found! Your Docker setup looks healthy.")}`
         : `\n${chalk.yellow.bold("⚠ No issues found in the files that could be analyzed.")}`
     );
+
     return;
   }
 
@@ -85,29 +93,35 @@ const printDiagnostics = (
       string,
       { count: number; files: Set<string> }
     >();
+
     for (const d of diagnostics) {
       const findings = findingsByRule.get(d.rule) ?? {
         count: 0,
         files: new Set<string>(),
       };
+
       findings.count += 1;
       findings.files.add(d.file);
       findingsByRule.set(d.rule, findings);
     }
+
     const migrationRules = [...findingsByRule].filter(
       ([, { count }]) => count >= 5
     );
+
     if (migrationRules.length > 0) {
       console.log();
       console.log(
         `  ${chalk.yellow("⚠ Migration-scale change: sample before you sweep")}`
       );
+
       for (const [rule, { count, files }] of migrationRules) {
         const fileWord = files.size === 1 ? "file" : "files";
         console.log(
           `    ${chalk.cyan(rule)} ×${count} across ${files.size} ${fileWord}`
         );
       }
+
       console.log(
         `    Fixing all of them at once is hard to review and prone to`
       );
@@ -120,6 +134,7 @@ const printDiagnostics = (
       console.log(`    owner's sign-off before changing the rest.`);
       console.log(`    Scope it down one area at a time: docker-doctor <path>`);
     }
+
     return;
   }
 
@@ -127,18 +142,22 @@ const printDiagnostics = (
 
   // Group by file
   const filesGrouped: Record<string, Diagnostic[]> = {};
+
   for (const d of diagnostics) {
     if (!filesGrouped[d.file]) {
       filesGrouped[d.file] = [];
     }
+
     filesGrouped[d.file].push(d);
   }
 
   for (const [file, fileDiags] of Object.entries(filesGrouped)) {
     console.log(`\n${chalk.underline.bold(file)}`);
+
     for (const d of fileDiags) {
       let sevColor = chalk.cyan;
       let prefix = "ℹ INFO";
+
       if (d.severity === "error") {
         sevColor = chalk.red.bold;
         prefix = "✖ ERROR";
@@ -167,6 +186,7 @@ const getWhaleMascot = (
 ): string[] => {
   let eyes = "x x";
   let spout = "        ";
+
   if (score >= 75) {
     eyes = "◠ ◠";
     spout = chalk.cyan('  ":"   ');
@@ -193,6 +213,7 @@ const printScoreBox = async (
   unanalyzedCount: number
 ): Promise<void> => {
   const { isTTY } = process.stdout;
+
   const shouldAnimate =
     isTTY &&
     !process.env.CI &&
@@ -201,6 +222,7 @@ const printScoreBox = async (
     process.env.NODE_ENV !== "test";
 
   let scoreColor = chalk.red.bold;
+
   if (score >= 90) {
     scoreColor = chalk.green.bold;
   } else if (score >= 75) {
@@ -208,6 +230,7 @@ const printScoreBox = async (
   } else if (score >= 50) {
     scoreColor = chalk.magenta.bold;
   }
+
   const border = scoreColor;
   const whaleLines = getWhaleMascot(score, border);
 
@@ -221,6 +244,7 @@ const printScoreBox = async (
     utm_source: "cli",
     w: String(warningsCount),
   });
+
   const shareUrl = `https://docker-doctor.vercel.app/share?${shareQuery.toString()}`;
 
   if (shouldAnimate) {
@@ -229,6 +253,7 @@ const printScoreBox = async (
 
     // Hide cursor
     process.stdout.write("\u001B[?25l");
+
     try {
       for (let frame = 0; frame <= frameCount; frame += 1) {
         const progress = easeOutCubic(frame / frameCount);
@@ -268,6 +293,7 @@ const printScoreBox = async (
     // Non-TTY fall back to static print
     const filledBlocks = Math.round(score / 2);
     const emptyBlocks = 50 - filledBlocks;
+
     const bar =
       scoreColor("█".repeat(filledBlocks)) + chalk.dim("░".repeat(emptyBlocks));
 
@@ -284,6 +310,7 @@ const printScoreBox = async (
   console.log(
     `\n  ${chalk.dim("────────────────────────────────────────────────────────────")}\n`
   );
+
   if (unanalyzedCount === 0) {
     console.log(`  Share: ${chalk.cyan(shareUrl)}`);
     console.log(`  Tell others how you did on socials\n`);
@@ -295,6 +322,7 @@ const printScoreBox = async (
     );
     console.log(`  The score covers only the analyzed files.\n`);
   }
+
   console.log(`  Docs: ${chalk.cyan("https://docker-doctor.vercel.app")}`);
   console.log(`  Learn more about fixing issues, setting up CI/CD, and`);
   console.log(`  configuring rules with a config file\n`);
@@ -321,13 +349,13 @@ export const formatTerminal = async (
   }
 
   // Calculate scores per category once
-  const categoryIssueCounts: Record<string, number> = {
+  const categoryIssueCounts = {
     "Best Practices": 0,
     Compose: 0,
     "Image Size": 0,
     Performance: 0,
     Security: 0,
-  };
+  } satisfies Record<RuleCategory, number>;
 
   let warningsCount = 0;
   let errorsCount = 0;
@@ -335,6 +363,7 @@ export const formatTerminal = async (
   for (const d of diagnostics) {
     const category =
       d.category ?? findRule(d.rule)?.category ?? "Best Practices";
+
     categoryIssueCounts[category] = (categoryIssueCounts[category] || 0) + 1;
 
     if (d.severity === "warning") {

@@ -35,6 +35,7 @@ describe("parseImageRef", () => {
     ]) {
       expect(parseImageRef(ref).isVariable).toBe(true);
     }
+
     expect(parseImageRef("node:22").isVariable).toBe(false);
   });
 
@@ -81,6 +82,7 @@ describe("collectStageAliases", () => {
       FROM node:22-alpine AS build
       FROM build
     `);
+
     expect(collectStageAliases(instructions)).toEqual(new Set(["build"]));
   });
 
@@ -88,6 +90,7 @@ describe("collectStageAliases", () => {
     const instructions = parseDockerfile(`
       FROM node:22-alpine
     `);
+
     expect(collectStageAliases(instructions)).toEqual(new Set());
   });
 
@@ -95,6 +98,7 @@ describe("collectStageAliases", () => {
     const instructions = parseDockerfile(
       "FROM node:22-alpine AS build\nFROM golang AS golang\nFROM build AS final"
     );
+
     expect(collectStageAliases(instructions, 2)).toEqual(new Set(["build"]));
     expect(collectStageAliases(instructions, 3)).toEqual(
       new Set(["build", "golang"])
@@ -106,6 +110,7 @@ describe("collectStageAliases", () => {
       FROM node:22-alpine as build
       FROM build
     `);
+
     expect(collectStageAliases(instructions)).toEqual(new Set(["build"]));
   });
 });

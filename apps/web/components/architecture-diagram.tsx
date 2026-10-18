@@ -47,6 +47,7 @@ interface Layout {
 
 const across = (canvas: Canvas, value: number) =>
   `${(value / canvas.width) * 100}%`;
+
 const down = (canvas: Canvas, value: number) =>
   `${(value / canvas.height) * 100}%`;
 

@@ -12,11 +12,13 @@ const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 // renders it 1:1, so the URL needs sizing up there to stay readable.
 export const Logo = ({ urlSize = 17 }: { readonly urlSize?: number }) => {
   const frame = useCurrentFrame();
+
   const clamp = {
     easing: EASE,
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   } as const;
+
   const rise = (delay: number) => ({
     opacity: interpolate(frame - delay, [0, 18], [0, 1], clamp),
     transform: `translateY(${interpolate(frame - delay, [0, 18], [14, 0], clamp)}px)`,

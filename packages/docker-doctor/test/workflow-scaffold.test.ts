@@ -11,10 +11,12 @@ const EXISTING_CONTENT = "# my customized workflow\n";
 
 const makeProject = (options: { withWorkflow: boolean }) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-scaffold-"));
+
   if (options.withWorkflow) {
     fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
     fs.writeFileSync(path.join(root, WORKFLOW_PATH), EXISTING_CONTENT);
   }
+
   return {
     cleanup: () => fs.rmSync(root, { force: true, recursive: true }),
     read: () => fs.readFileSync(path.join(root, WORKFLOW_PATH), "utf-8"),
@@ -32,9 +34,11 @@ describe("scaffoldActionWorkflow", () => {
     // Snapshot, don't assert absence — the repo root legitimately owns
     // .github/workflows/docker-doctor.yml when the runner starts there.
     const cwdWorkflow = path.join(process.cwd(), WORKFLOW_PATH);
+
     const cwdWorkflowBefore = fs.existsSync(cwdWorkflow)
       ? fs.readFileSync(cwdWorkflow, "utf-8")
       : null;
+
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
@@ -47,9 +51,11 @@ describe("scaffoldActionWorkflow", () => {
       expect(read()).toContain(`uses: ${ACTION_REF}`);
       expect(read()).toContain("statuses: write");
       expect(read()).toContain("uses: actions/checkout@v7");
+
       const cwdWorkflowAfter = fs.existsSync(cwdWorkflow)
         ? fs.readFileSync(cwdWorkflow, "utf-8")
         : null;
+
       expect(cwdWorkflowAfter).toBe(cwdWorkflowBefore);
     } finally {
       cleanup();
@@ -59,6 +65,7 @@ describe("scaffoldActionWorkflow", () => {
   test("a scan of a repository subdirectory writes the workflow at the repository root", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: false });
     const scanned = path.join(root, "services", "api");
+
     try {
       fs.mkdirSync(path.join(root, ".git"));
       fs.mkdirSync(scanned, { recursive: true });
@@ -81,6 +88,7 @@ describe("scaffoldActionWorkflow", () => {
 
   test("a scan of the repository root passes no directory input", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: false });
+
     try {
       fs.mkdirSync(path.join(root, ".git"));
 
@@ -99,6 +107,7 @@ describe("scaffoldActionWorkflow", () => {
 
   test("keeps an existing workflow when the overwrite is declined", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: true });
+
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
@@ -115,6 +124,7 @@ describe("scaffoldActionWorkflow", () => {
 
   test("replaces an existing workflow only when the overwrite is confirmed", async () => {
     const { root, read, cleanup } = makeProject({ withWorkflow: true });
+
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,

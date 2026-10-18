@@ -17,6 +17,7 @@ export const generateMetadata = async ({
 }: DocPageProps): Promise<Metadata> => {
   const { slug } = await params;
   const page = source.getPage(slug);
+
   if (!page) {
     notFound();
   }
@@ -35,6 +36,7 @@ export const generateMetadata = async ({
 const Page = async ({ params }: DocPageProps) => {
   const { slug } = await params;
   const page = source.getPage(slug);
+
   if (!page) {
     notFound();
   }

@@ -27,6 +27,7 @@ const CARD_W = 940;
 const CARD_H = 830;
 
 type Tone = "good" | "warn";
+
 type Severity = "error" | "warning";
 
 interface SandboxLine extends BaseLine {
@@ -140,6 +141,7 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   error: ERROR,
   warning: WARNING,
 };
+
 const GLYPH: Record<Severity, string> = { error: "✖", warning: "⚠" };
 
 // The instruction the human actually gave — the only thing in the whole run
@@ -164,9 +166,11 @@ const LineBody = (line: SandboxLine) => {
     case "blank": {
       return null;
     }
+
     case "ask": {
       return <Ask text={line.text ?? ""} />;
     }
+
     case "note": {
       return (
         <>
@@ -175,26 +179,32 @@ const LineBody = (line: SandboxLine) => {
         </>
       );
     }
+
     case "ok": {
       const color = line.tone === "warn" ? WARNING : GREEN;
       const glyph = line.tone === "warn" ? "!" : "✔";
+
       return (
         <span style={{ color, fontWeight: 600 }}>
           {`  ${glyph} ${line.text}`}
         </span>
       );
     }
+
     case "finding": {
       const severity = line.severity ?? "error";
+
       return (
         <span style={{ color: SEVERITY_COLOR[severity] }}>
           {`      ${GLYPH[severity]} ${line.text}`}
         </span>
       );
     }
+
     case "key": {
       return <span style={{ color: MUTED }}>{`        ${line.text}`}</span>;
     }
+
     default: {
       return <span style={{ color: MUTED }}>{`  ${line.text}`}</span>;
     }

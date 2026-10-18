@@ -38,12 +38,14 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
   ].toSorted(([, a], [, b]) => {
     const rankDelta =
       SEVERITY_RANK[a[0].severity] - SEVERITY_RANK[b[0].severity];
+
     return rankDelta === 0 ? b.length - a.length : rankDelta;
   });
 
   const issueCount = input.diagnostics.length;
   const issueWord = issueCount === 1 ? "issue" : "issues";
   const ruleWord = groups.length === 1 ? "rule" : "rules";
+
   const lines: string[] = [
     `Fix the ${issueCount} Docker Doctor ${issueWord} (${groups.length} ${ruleWord}) in ${sanitizePath(input.projectName)}.`,
     `Every path below is relative to ${sanitizePath(input.projectDir)}. Work from that directory.`,
@@ -54,22 +56,28 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
   for (const [index, [rule, ruleDiagnostics]] of groups.entries()) {
     const [first] = ruleDiagnostics;
     const category = first.category ?? findRule(rule)?.category ?? "General";
+
     const countBadge =
       ruleDiagnostics.length > 1 ? ` (×${ruleDiagnostics.length})` : "";
+
     lines.push(
       `${index + 1}. ${SEVERITY_LABEL[first.severity]} ${category}: ${sanitizeMessage(first.message)} [${rule}]${countBadge}`,
       `   Fix: ${first.help}`
     );
     const files = [...new Set(ruleDiagnostics.map((d) => d.file))];
+
     for (const file of files.slice(0, MAX_FILES_PER_RULE)) {
       const firstSite = ruleDiagnostics.find(
         (d) => d.file === file && d.line !== undefined
       );
+
       lines.push(
         `   - ${sanitizePath(file)}${firstSite ? `:${firstSite.line}` : ""}`
       );
     }
+
     const remaining = files.length - MAX_FILES_PER_RULE;
+
     if (remaining > 0) {
       lines.push(`   - +${remaining} more files`);
     }

@@ -9,5 +9,6 @@ export const getLLMText = async (
   page: InferPageType<typeof source>
 ): Promise<string> => {
   const processed = await page.data.getText("processed");
+
   return `# ${page.data.title}\nURL: ${page.url}\n\n${processed}`;
 };

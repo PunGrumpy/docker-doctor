@@ -18,6 +18,7 @@ const MAX_PATH_LENGTH = 200;
 
 const flatten = (value: string, maxLength: number): string => {
   const flat = value.replaceAll(INVISIBLE_CHARS_RE, " ").trim();
+
   return flat.length > maxLength ? `${flat.slice(0, maxLength)}…` : flat;
 };
 

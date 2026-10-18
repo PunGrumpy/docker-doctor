@@ -24,16 +24,19 @@ const formatFiles = (entry: LeaderboardEntry): string =>
 
 const formatFilesDetail = (entry: LeaderboardEntry): string => {
   const parts: string[] = [];
+
   if (entry.dockerfileCount > 0) {
     parts.push(
       `${entry.dockerfileCount} Dockerfile${entry.dockerfileCount === 1 ? "" : "s"}`
     );
   }
+
   if (entry.composeFileCount > 0) {
     parts.push(
       `${entry.composeFileCount} compose file${entry.composeFileCount === 1 ? "" : "s"}`
     );
   }
+
   return parts.join(" · ");
 };
 
@@ -185,6 +188,7 @@ export const Leaderboard = ({
     setActive(entry);
     setVisible(true);
   };
+
   // Keep the last entry so the label fades out in place instead of
   // snapping to 0 while it disappears.
   const deactivate = () => setVisible(false);

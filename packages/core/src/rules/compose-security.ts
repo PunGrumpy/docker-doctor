@@ -51,11 +51,14 @@ export const noDockerSocketMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
+
       if (!isComposeSequence(volumes)) {
         continue;
       }
+
       for (const [index, volume] of volumes.entries()) {
         const mount = volumeMount(volume);
+
         if (mount && mountsDockerSocket(mount)) {
           diagnostics.push(
             createDiagnostic(
@@ -95,22 +98,30 @@ export const noBroadBindMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
+
       if (!isComposeSequence(volumes)) {
         continue;
       }
+
       for (const [index, volume] of volumes.entries()) {
         const mount = volumeMount(volume);
+
         if (!mount || mountsDockerSocket(mount)) {
           continue;
         }
+
         const source = bindMountSource(mount);
+
         if (source === undefined) {
           continue;
         }
+
         const reason = BROAD_SCOPE_REASONS[classifyHostPath(source)];
+
         if (reason === undefined) {
           continue;
         }
+
         diagnostics.push(
           createDiagnostic(
             file,
@@ -139,18 +150,24 @@ export const preferReadOnlyBindMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
+
       if (!isComposeSequence(volumes)) {
         continue;
       }
+
       for (const [index, volume] of volumes.entries()) {
         const mount = volumeMount(volume);
+
         if (!mount || mount.readOnly || mountsDockerSocket(mount)) {
           continue;
         }
+
         const source = bindMountSource(mount);
+
         if (source === undefined || classifyHostPath(source) === "project") {
           continue;
         }
+
         diagnostics.push(
           createDiagnostic(
             file,
@@ -179,9 +196,11 @@ const literalValue = (value: ComposeValue | undefined): string | undefined => {
   if (isComposeString(value)) {
     return value;
   }
+
   if (isComposeNumber(value)) {
     return String(value);
   }
+
   return undefined;
 };
 
@@ -213,12 +232,16 @@ export const noPlaintextSecrets: ComposeRule = {
           if (!isComposeString(entry)) {
             continue;
           }
+
           const eqIndex = entry.indexOf("=");
+
           if (eqIndex <= 0) {
             continue;
           }
+
           const key = entry.slice(0, eqIndex);
           const value = entry.slice(eqIndex + 1);
+
           if (isSecretKey(key) && isLiteralSecretValue(value)) {
             flag(
               name,
@@ -230,6 +253,7 @@ export const noPlaintextSecrets: ComposeRule = {
       } else if (isComposeMapping(environment)) {
         for (const [key, value] of Object.entries(environment)) {
           const literal = literalValue(value);
+
           if (
             literal !== undefined &&
             isSecretKey(key) &&

@@ -8,6 +8,7 @@ export const GET = async () => {
   const pages = source
     .getPages()
     .toSorted((a, b) => a.url.localeCompare(b.url));
+
   const rendered = await Promise.all(pages.map(getLLMText));
   const text = rendered.join("\n\n");
 

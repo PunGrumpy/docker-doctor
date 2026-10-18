@@ -20,6 +20,7 @@ const Cursor = ({ visible }: { readonly visible: boolean }) => {
   if (!visible) {
     return null;
   }
+
   return (
     <span className="bg-foreground inline-block h-4 w-2 shrink-0 animate-pulse" />
   );
@@ -69,20 +70,25 @@ const getCommandSlice = (
   if (ticks < start) {
     return "";
   }
+
   if (ticks >= start + duration) {
     return command;
   }
+
   const factor = (ticks - start) / duration;
+
   return command.slice(0, Math.floor(factor * command.length));
 };
 
 const getProgressBar = (score: number): React.ReactNode => {
   const filledBlocks = Math.round(score / 2);
   const emptyBlocks = 50 - filledBlocks;
+
   const filledColor =
     score === 100
       ? "text-emerald-500 dark:text-emerald-400"
       : "text-amber-500 dark:text-amber-400";
+
   const emptyColor = "text-muted-foreground/20 dark:text-muted-foreground/10";
 
   return (
@@ -396,17 +402,22 @@ export const TerminalDemo = () => {
 
   useEffect(() => {
     const el = terminalBodyRef.current;
+
     if (!el) {
       return;
     }
+
     // Tick 0 is the loop restarting: the body empties and grows again.
     if (ticks === 0) {
       lastScrollHeightRef.current = 0;
     }
+
     if (el.scrollHeight <= lastScrollHeightRef.current) {
       lastScrollHeightRef.current = el.scrollHeight;
+
       return;
     }
+
     lastScrollHeightRef.current = el.scrollHeight;
     el.scrollTo({ top: el.scrollHeight });
   }, [ticks]);
@@ -421,6 +432,7 @@ export const TerminalDemo = () => {
         if (prev >= TOTAL_TICKS) {
           return 0;
         }
+
         return prev + 1;
       });
     }, TICK_MS);
