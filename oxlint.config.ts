@@ -17,4 +17,5 @@ export default defineConfig({
     "packages/videos/src/components",
     "packages/videos/src/lib/remocn-ui",
   ],
+  options: { typeAware: true },
 });
