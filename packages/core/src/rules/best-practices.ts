@@ -500,10 +500,34 @@ export const sortMultilineArgs: DockerfileRule = {
 };
 
 const USERADD_COMMAND_RE = /\buseradd\b/u;
+const SHORT_OPTION_CLUSTER_RE = /^-[^-]/u;
+// useradd's short options that take a value, from the shadow-utils getopt
+// string `b:c:d:De:f:g:G:hk:K:lmMNop:rR:P:s:u:U` plus SELinux's `Z:`.
+const USERADD_VALUE_OPTIONS = new Set("bcdefgGkKpRPsuZ");
+
 // `-l` is the short spelling of `--no-log-init`, and short options cluster
-// (`useradd -rl app`).
-const NO_LOG_INIT_FLAG_RE =
-  /(?:^|\s)(?:--no-log-init|-[A-Za-z]*l[A-Za-z]*)(?=\s|$)/u;
+// (`useradd -rl app`). In `-lu1000` the `l` is a flag, but in `-u1000l` or
+// `-gwheel` it is part of the value.
+const clusterHasNoLogInit = (word: string): boolean => {
+  for (const option of word.slice(1)) {
+    if (option === "l") {
+      return true;
+    }
+    if (USERADD_VALUE_OPTIONS.has(option)) {
+      return false;
+    }
+  }
+  return false;
+};
+
+const hasNoLogInit = (command: string): boolean =>
+  command
+    .split(WHITESPACE_RE)
+    .some(
+      (word) =>
+        word === "--no-log-init" ||
+        (SHORT_OPTION_CLUSTER_RE.test(word) && clusterHasNoLogInit(word))
+    );
 
 // True when a `useradd` command in this RUN writes the login logs. The flag
 // must belong to the same command as `useradd`, so `useradd app && ls -l`
@@ -512,8 +536,7 @@ const useraddWritesLoginLogs = (args: string): boolean =>
   args
     .split(SHELL_SEPARATOR_RE)
     .some(
-      (command) =>
-        USERADD_COMMAND_RE.test(command) && !NO_LOG_INIT_FLAG_RE.test(command)
+      (command) => USERADD_COMMAND_RE.test(command) && !hasNoLogInit(command)
     );
 
 export const useraddNoLogInit: DockerfileRule = {

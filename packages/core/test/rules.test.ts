@@ -2440,6 +2440,12 @@ describe("Best Practices Rules", () => {
     },
     { expected: 1, run: "useradd app && ls -l /home" },
     { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
+    { expected: 0, run: "useradd -lu1000 app" },
+    { expected: 0, run: "useradd -rlu1000 app" },
+    { expected: 0, run: "useradd -lu 1000 app" },
+    { expected: 1, run: "useradd -u1000 app" },
+    { expected: 1, run: "useradd -gwheel app" },
+    { expected: 1, run: "useradd -cl app" },
   ];
 
   test.each(useraddCases)(
