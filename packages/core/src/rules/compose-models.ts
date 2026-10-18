@@ -5,7 +5,7 @@ import { createDiagnostic } from "./create-diagnostic";
 
 /**
  * Narrows an unknown compose document to its top-level `models:` entries
- * (Docker Model Runner, Compose ≥ 2.35).
+ * (Docker Model Runner, Compose ≥ 2.38).
  */
 export const topLevelModels = (
   composeContent: unknown

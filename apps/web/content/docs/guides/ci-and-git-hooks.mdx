@@ -53,8 +53,10 @@ npx --yes @docker-doctor/cli@latest . --verbose
 Pin the version instead of `latest` when you want a new rule to arrive in a change you review, not in the middle of someone else's merge request.
 
 ```bash
-npx --yes @docker-doctor/cli@0.6.1 . --verbose
+npx --yes @docker-doctor/cli@0.7.0 . --verbose
 ```
+
+The [changelog](/changelog) lists every release. Read it before you raise the pin, because a release can add rules or change how the score is computed.
 
 ## Gate on the score
 
@@ -68,6 +70,8 @@ echo "Docker Doctor score: $score"
 ```
 
 The scan still exits `1` on an `error`-severity finding and `2` on an incomplete scan. `set -e` stops the script there, before the comparison runs.
+
+The score averages the penalty over the files docker-doctor analyzed. One bad file in a large project barely moves it, so keep the exit code as the gate for errors and use the floor for overall quality. [Scoring](/docs/reference/scoring) explains the formula.
 
 A directory with no Dockerfile or Compose file scores `100` and exits `0`, with a warning on stderr. A mistyped path therefore passes this gate. Scan a path you know holds Docker files.
 
