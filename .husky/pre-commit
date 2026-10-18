@@ -2,23 +2,35 @@
 set -e
 
 # ultracite
-# Check if there are any staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
-if [ -z "$STAGED_FILES" ]; then
+# Format only the staged files and stage only them again. Paths are read
+# NUL-separated so a name with spaces or non-ASCII characters is not skipped.
+STAGED_LIST="$(mktemp)"
+trap 'rm -f "$STAGED_LIST"' EXIT
+git diff -z --cached --name-only --diff-filter=ACMR >"$STAGED_LIST"
+if [ ! -s "$STAGED_LIST" ]; then
   echo "No staged files to format"
   exit 0
 fi
 
-# Run formatter, capturing the exit code so we can still re-stage and report
-FORMAT_EXIT_CODE=0
-bun x ultracite fix || FORMAT_EXIT_CODE=$?
+# Adding a file again after formatting stages all of it, which would
+# commit its unstaged changes too. Putting them back after formatting
+# conflicts whenever the formatter touched the staged lines.
+PARTIAL="$(xargs -0 git --literal-pathspecs diff --name-only -- <"$STAGED_LIST")"
+if [ -n "$PARTIAL" ]; then
+  echo "These staged files also have unstaged changes:"
+  echo "$PARTIAL"
+  echo "Stage them fully with git add. To commit only the staged part, run"
+  echo "bun run fix, stage the hunks again, and commit with"
+  echo "  git stash push --keep-index && git commit && git stash pop"
+  exit 1
+fi
 
-# Re-stage files that were already staged
-echo "$STAGED_FILES" | while IFS= read -r file; do
-  if [ -f "$file" ]; then
-    git add -- "$file"
-  fi
-done
+# The same two tools ultracite fix runs. ultracite fix itself fails when no
+# staged file is one they handle, such as bun.lock alone.
+FORMAT_EXIT_CODE=0
+xargs -0 bun x oxlint --fix --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
+xargs -0 bun x oxfmt --write --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
+xargs -0 git --literal-pathspecs add -- <"$STAGED_LIST"
 
 if [ $FORMAT_EXIT_CODE -ne 0 ]; then
   echo "Ultracite found issues that could not be auto-fixed."
@@ -28,6 +40,11 @@ fi
 echo "✨ Files formatted by Ultracite"
 # ultracite end
 
+# CI builds the website with this set. Without it, a worktree that has no
+# apps/web/.env fails the build. Turbo passes it to build tasks only, and
+# bun run test builds again, so it is exported rather than set on one line.
+# Set it to an empty value to run the validation.
+export SKIP_ENV_VALIDATION="${SKIP_ENV_VALIDATION-1}"
 bun run build
 bun run test
 bun run typecheck
