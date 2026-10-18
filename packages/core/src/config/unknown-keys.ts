@@ -1,4 +1,6 @@
 import { allRules } from "../rules/index";
+import type { ConfigInput } from "../schemas/config";
+import { isPlainObject } from "../schemas/config";
 import type { RuleCategory } from "../types/index";
 
 const KNOWN_CATEGORIES: readonly RuleCategory[] = [
@@ -14,10 +16,14 @@ export interface UnknownConfigKeys {
   rules: string[];
 }
 
-const keysOf = (value: unknown): string[] =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? Object.keys(value)
-    : [];
+const sectionKeys = (
+  raw: ConfigInput,
+  section: "categories" | "rules"
+): string[] => {
+  const value = raw[section];
+
+  return isPlainObject(value) ? Object.keys(value) : [];
+};
 
 // Config keys are matched exactly, so a typo'd rule key -- or a category
 // written as "security" instead of "Security" -- passes validation and then
@@ -26,20 +32,16 @@ const keysOf = (value: unknown): string[] =>
 // because a config naming a rule that a later release removed should still
 // scan. Takes the raw config because validation drops unknown category keys
 // before they reach the typed result.
-export const collectUnknownConfigKeys = (raw: unknown): UnknownConfigKeys => {
-  if (typeof raw !== "object" || raw === null) {
-    return { categories: [], rules: [] };
-  }
-
+export const collectUnknownConfigKeys = (
+  raw: ConfigInput
+): UnknownConfigKeys => {
   const knownRuleKeys = new Set(allRules.map((rule) => rule.key));
   const knownCategories = new Set<string>(KNOWN_CATEGORIES);
-  const { categories, rules } = raw as {
-    categories?: unknown;
-    rules?: unknown;
-  };
 
   return {
-    categories: keysOf(categories).filter((key) => !knownCategories.has(key)),
-    rules: keysOf(rules).filter((key) => !knownRuleKeys.has(key)),
+    categories: sectionKeys(raw, "categories").filter(
+      (key) => !knownCategories.has(key)
+    ),
+    rules: sectionKeys(raw, "rules").filter((key) => !knownRuleKeys.has(key)),
   };
 };
