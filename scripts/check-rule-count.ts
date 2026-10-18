@@ -32,7 +32,7 @@ const SURFACES: readonly Surface[] = [
   },
   {
     file: "apps/web/components/architecture-diagram.tsx",
-    pattern: /(?<count>\d+) rules across five categories/u,
+    pattern: /(?<!\d)(?<count>\d+) rules across five categories/u,
   },
 ];
 

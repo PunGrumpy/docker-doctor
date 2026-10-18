@@ -38,6 +38,13 @@ interface RulePages {
   readonly [ruleKey: string]: RulePageContent;
 }
 
+// Examples that more than one rule page shows.
+const APT_CLEAN_LAYER =
+  "FROM debian:12-slim\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends curl \\\n  && rm -rf /var/lib/apt/lists/*";
+
+const NODE_APP_AS_ROOT =
+  'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]';
+
 export const rulePageContent: RulePages = {
   "docker-doctor/absolute-workdir": {
     bad: {
@@ -108,7 +115,7 @@ export const rulePageContent: RulePages = {
     description:
       "apt, apk and yum caches bloat Docker images unless removed in the same RUN layer. The cleanup pattern for each package manager.",
     good: {
-      code: "FROM debian:12-slim\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends curl \\\n  && rm -rf /var/lib/apt/lists/*",
+      code: APT_CLEAN_LAYER,
       lang: "dockerfile",
       title: "Dockerfile — layer committed already clean",
     },
@@ -128,7 +135,7 @@ export const rulePageContent: RulePages = {
     description:
       "apt-get update and install in separate Docker RUN layers cause stale package caches and 404 errors. Why they must share one RUN.",
     good: {
-      code: "FROM debian:12-slim\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends curl \\\n  && rm -rf /var/lib/apt/lists/*",
+      code: APT_CLEAN_LAYER,
       lang: "dockerfile",
       title: "Dockerfile — index fetched, used, and removed in one layer",
     },
@@ -148,7 +155,7 @@ export const rulePageContent: RulePages = {
     description:
       "Too many RUN instructions bloat Docker images. When and how to combine consecutive RUN commands with && to reduce layers.",
     good: {
-      code: "FROM debian:12-slim\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends curl \\\n  && rm -rf /var/lib/apt/lists/*",
+      code: APT_CLEAN_LAYER,
       lang: "dockerfile",
       title: "Dockerfile — install and cleanup share one layer",
     },
@@ -266,7 +273,7 @@ export const rulePageContent: RulePages = {
 
   "docker-doctor/no-root-user": {
     bad: {
-      code: 'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]',
+      code: NODE_APP_AS_ROOT,
       lang: "dockerfile",
       title: "Dockerfile — runs as root",
     },
@@ -286,7 +293,11 @@ export const rulePageContent: RulePages = {
 
   "docker-doctor/no-secrets-in-env": {
     bad: {
-      code: "FROM node:22-slim\nENV DATABASE_PASSWORD=sup3rs3cret\nARG NPM_TOKEN=npm_abc123",
+      code: [
+        "FROM node:22-slim",
+        "ENV DATABASE_PASSWORD=sup3rs3cret",
+        "ARG NPM_TOKEN=npm_abc123",
+      ].join("\n"),
       lang: "dockerfile",
       title: "Dockerfile — secret baked into the image",
     },
@@ -326,7 +337,7 @@ export const rulePageContent: RulePages = {
 
   "docker-doctor/order-layers": {
     bad: {
-      code: 'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]',
+      code: NODE_APP_AS_ROOT,
       lang: "dockerfile",
       title: "Dockerfile — every code edit reruns npm ci",
     },
@@ -468,7 +479,7 @@ export const rulePageContent: RulePages = {
 
   "docker-doctor/require-healthcheck": {
     bad: {
-      code: 'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]',
+      code: NODE_APP_AS_ROOT,
       lang: "dockerfile",
       title: "Dockerfile — 'running' is the only signal",
     },

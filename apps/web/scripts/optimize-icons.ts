@@ -4,8 +4,7 @@ import path from "node:path";
 import { optimize } from "svgo";
 import type { Config } from "svgo";
 
-const __dirname = import.meta.dirname;
-const ICONS_DIR = path.resolve(__dirname, "../components/icons");
+const ICONS_DIR = path.resolve(import.meta.dirname, "../components/icons");
 
 // React camelCase SVG attributes → standard SVG hyphenated names
 // Only those that differ and could reference IDs are important.
@@ -139,11 +138,14 @@ const processFile = async (filePath: string) => {
   const spreads: string[] = [];
 
   if (hasSpread) {
-    preprocessed = preprocessed.replaceAll(/\s*\{\.\.\.\w+\}/gu, (match) => {
-      spreads.push(match);
+    preprocessed = preprocessed.replaceAll(
+      /(?<!\s)\s*\{\.\.\.\w+\}/gu,
+      (match) => {
+        spreads.push(match);
 
-      return "";
-    });
+        return "";
+      }
+    );
   }
 
   const result = optimize(preprocessed, {
