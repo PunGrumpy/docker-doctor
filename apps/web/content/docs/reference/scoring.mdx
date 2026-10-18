@@ -44,7 +44,7 @@ The score is an asymptotic decay curve over that penalty, not a simple subtracti
 score = round(100 * e^(-penalty / K))   // K = 70
 ```
 
-A project with no diagnostics always scores exactly 100. As the penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings.
+A project with no diagnostics always scores exactly 100. As the penalty grows, the score falls toward 0 without a hard floor. Rounding gives 0 once the average penalty reaches about 371 per file, which is roughly 37 errors in every file. Below that, the score keeps responding to fixes, though one small finding in a large project can round away.
 
 `K = 70` was chosen so a single warning (penalty 4) still lands around 94 — comfortably inside the `Excellent` bucket — while errors and repeated warnings continue to meaningfully erode the score. The previous `K = 40` pushed a single warning down to ~90, right on the Excellent/Good boundary — too harsh a penalty for one warning.
 

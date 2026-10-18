@@ -193,7 +193,7 @@ const Command1Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
                   45 / 100
                 </span>
                 <span className="text-muted-foreground text-xs font-medium">
-                  Needs work
+                  Critical
                 </span>
               </div>
               <div className="w-full overflow-hidden text-left text-[11px] select-none">
@@ -319,8 +319,8 @@ const Command3Outputs = ({ ticks, currentSpinner }: CommandOutputsProps) => {
                 ✔ No issues found! Your Docker setup looks healthy.
               </div>
               <div className="text-muted-foreground text-wrap-pretty text-xs">
-                Verified building with Docker engine. All safety, performance,
-                and best practices rules passed successfully.
+                Static analysis only. docker-doctor reads your Dockerfiles and
+                Compose files and never builds or runs them.
               </div>
             </div>
           </div>

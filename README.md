@@ -123,13 +123,15 @@ Each diagnostic adds a penalty based on severity:
 | `warning` | 4       |
 | `info`    | 1       |
 
-The penalties are summed, then the score is computed as an asymptotic decay curve rather than a simple subtraction:
+The penalties are added up and divided by the number of Dockerfiles and Compose files docker-doctor analyzed, so the score describes a typical file. The score is then computed as an asymptotic decay curve rather than a simple subtraction:
 
 ```
 score = round(100 * e^(-penalty / K))   // K = 70
 ```
 
-A perfect project (no diagnostics) always scores exactly 100. As penalty increases, the score keeps decreasing — it approaches 0 but never gets stuck there, so the score stays meaningful (and can still register improvement) even on projects with a lot of findings. `K = 70` was chosen so a single warning (penalty 4) still lands around 94 — comfortably inside the `Excellent` bucket — while errors and repeated warnings continue to meaningfully erode the score.
+A project with no diagnostics always scores exactly 100. As the average penalty grows, the score falls toward 0 without a hard floor. Rounding gives 0 once the average penalty reaches about 371 per file, which is roughly 37 errors in every file. Below that, the score keeps responding to fixes, though one small finding in a large project can round away. `K = 70` was chosen so a single warning (penalty 4) still lands around 94, inside the `Excellent` bucket, while errors and repeated warnings continue to erode the score.
+
+The average can hide one bad file among many good ones. The exit code does not depend on the score, so an `error`-severity finding in any file still fails the scan.
 
 The label thresholds are unchanged: `>= 90` Excellent, `>= 75` Good, `>= 50` Needs Work, otherwise Critical.
 

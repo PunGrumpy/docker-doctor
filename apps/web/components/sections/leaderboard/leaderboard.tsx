@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Section } from "@/components/section";
@@ -15,10 +16,11 @@ const BAR_STAGGER_MS = 40;
 const ROW_GRID =
   "grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_2.5rem]";
 
-const formatFiles = (entry: LeaderboardEntry): string => {
-  const total = entry.dockerfileCount + entry.composeFileCount;
-  return `${total} Docker file${total === 1 ? "" : "s"}`;
-};
+const plural = (count: number, noun: string): string =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+const formatFiles = (entry: LeaderboardEntry): string =>
+  plural(entry.dockerfileCount + entry.composeFileCount, "Docker file");
 
 const formatFilesDetail = (entry: LeaderboardEntry): string => {
   const parts: string[] = [];
@@ -99,6 +101,17 @@ const Row = ({
               title={formatFilesDetail(entry)}
             >
               {formatFiles(entry)}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs tabular-nums">
+              <span
+                className={cn(
+                  entry.errorCount > 0 && "text-red-600 dark:text-red-400"
+                )}
+              >
+                {plural(entry.errorCount, "error")}
+              </span>
+              {" · "}
+              {plural(entry.warningCount, "warning")}
             </span>
           </span>
         </div>
@@ -199,8 +212,16 @@ export const Leaderboard = ({
 
         <p className="text-muted-foreground mx-auto mt-8 max-w-md text-center text-xs leading-relaxed">
           Lint scores from the Docker Doctor CLI v{doctorVersion} on{" "}
-          {generatedAt.slice(0, 10)} — not a vulnerability audit; every
-          Dockerfile and Compose file in the repo counts.
+          {generatedAt.slice(0, 10)}. They are not a vulnerability audit. Each
+          score averages the findings over the Dockerfiles and Compose files the
+          CLI analyzed, so read it next to the error and warning counts.{" "}
+          <Link
+            className="underline underline-offset-2"
+            data-track="leaderboard_scoring_docs_clicked"
+            href="/docs/reference/scoring"
+          >
+            How scoring works <span aria-hidden="true">→</span>
+          </Link>
         </p>
       </div>
     </Section>

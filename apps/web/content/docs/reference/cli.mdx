@@ -81,7 +81,7 @@ List every built-in rule, its category, default severity, and description:
 npx @docker-doctor/cli@latest rules list
 ```
 
-Explain a single rule and its fix in detail (the full key or the short name after `docker-doctor/` both work):
+Print one rule's category, default severity, description and fix hint. The fix hint is the same text as the `Help:` line in a scan. The full key or the short name after `docker-doctor/` both work:
 
 ```bash
 npx @docker-doctor/cli@latest rules explain docker-doctor/no-root-user

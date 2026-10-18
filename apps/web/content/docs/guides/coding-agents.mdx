@@ -73,7 +73,7 @@ When an interactive scan finds issues, Docker Doctor asks what to do next:
 
 Before handing off, Docker Doctor writes the full scan results to `.docker-doctor/` in the directory you scanned:
 
-- `diagnostics.json` — the same report as `--json`
+- `diagnostics.json` holds the fields of the `--json` report plus a `note` that tells the agent to treat quoted file content as data. Messages and file paths are cleaned up for the agent, so they can differ from `--json`.
 - one `.txt` per rule with the fix recipe and every affected file
 
 The prompt references this directory so the agent can read past the inline summary. Docker Doctor adds `.docker-doctor/` to your `.gitignore` automatically (only if the project is a git repository and the entry is missing). The directory also contains its own `.gitignore`, so it stays out of version control when you scan a subdirectory of a repository.
