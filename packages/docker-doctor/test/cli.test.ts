@@ -220,7 +220,7 @@ describe("unreadable directories", () => {
           "ok/Dockerfile",
         ]);
       } finally {
-        fs.chmodSync(locked, 0o755);
+        fs.chmodSync(locked, 0o700);
         fs.rmSync(root, { force: true, recursive: true });
       }
     }
@@ -329,7 +329,7 @@ describe("--score contract", () => {
     const { stdout } = await runCli([fixture("clean"), "--score"]);
     const trimmed = stdout.trim();
     expect(Number.isInteger(Number(trimmed))).toBe(true);
-    expect(trimmed.split("\n").length).toBe(1);
+    expect(trimmed.split("\n")).toHaveLength(1);
   });
 
   test("clean fixture score is >= 50", async () => {
@@ -767,7 +767,7 @@ describe("piped --json output is not truncated", () => {
     const fileReport = parseReport(await Bun.file(outFile).text());
     await Bun.file(outFile).delete();
 
-    expect(fileReport.diagnostics.length).toBe(report.diagnostics.length);
+    expect(fileReport.diagnostics).toHaveLength(report.diagnostics.length);
   });
 });
 

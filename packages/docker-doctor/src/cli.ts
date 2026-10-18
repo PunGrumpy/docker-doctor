@@ -88,6 +88,18 @@ const stopPrompt = (
   process.stdout.write("\u001B[?25h");
 };
 
+// Arrow keys and their vim equivalents flip a yes/no prompt.
+const TOGGLE_KEYS = new Set([
+  "left",
+  "right",
+  "up",
+  "down",
+  "h",
+  "l",
+  "j",
+  "k",
+]);
+
 const askConfirm = async (
   question: string,
   defaultYes = false
@@ -131,16 +143,7 @@ const askConfirm = async (
     render(true);
 
     const handleKeypress = (str: string, key: KeypressKey) => {
-      if (
-        key.name === "left" ||
-        key.name === "right" ||
-        key.name === "up" ||
-        key.name === "down" ||
-        key.name === "h" ||
-        key.name === "l" ||
-        key.name === "j" ||
-        key.name === "k"
-      ) {
+      if (key.name !== undefined && TOGGLE_KEYS.has(key.name)) {
         value = !value;
         render();
       } else if (str === "y" || str === "Y") {
@@ -243,9 +246,7 @@ const askSelect = async (
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chalk.cyan(options[index])}\n`
         );
 
-        for (const _ of options) {
-          process.stdout.write("\r\u001B[K\n");
-        }
+        process.stdout.write("\r\u001B[K\n".repeat(options.length));
 
         process.stdout.write(`\u001B[${options.length}A`);
         resolve(index);
@@ -767,7 +768,7 @@ interface OutputOptions {
 const writeTerminalReport = async (
   scan: ScanOutcome,
   { label, score }: { label: string; score: number },
-  verbose: boolean | undefined,
+  verbose: boolean,
   exitCode: number
 ): Promise<number> => {
   const { diagnostics, failures, fileContents, project, rootDir } = scan;
@@ -872,7 +873,7 @@ const writeScanOutput = async (
   return await writeTerminalReport(
     scan,
     scoreResult,
-    options.verbose,
+    options.verbose === true,
     exitCode
   );
 };

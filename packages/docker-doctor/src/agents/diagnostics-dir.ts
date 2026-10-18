@@ -16,6 +16,10 @@ export const TRUST_BOUNDARY_NOTE =
 
 const UNSAFE_FILE_CHARS = /[^a-z0-9-]+/giu;
 
+// ":12" for a diagnostic on line 12, nothing for one without a line.
+const lineSuffix = (line: number | undefined): string =>
+  line === undefined ? "" : `:${line}`;
+
 const ruleFileName = (rule: string): string => {
   const shortKey = rule.split("/").at(-1) ?? rule;
 
@@ -92,8 +96,7 @@ export const writeDiagnosticsDirectory = async (
       `Fix: ${first.help}`,
       "",
       ...ruleDiagnostics.map(
-        (d) =>
-          `${sanitizePath(d.file)}${d.line === undefined ? "" : `:${d.line}`}`
+        (d) => `${sanitizePath(d.file)}${lineSuffix(d.line)}`
       ),
       "",
     ];
