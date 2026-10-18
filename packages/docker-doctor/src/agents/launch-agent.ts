@@ -9,13 +9,13 @@ import { AGENT_AUTO_FLAGS, AGENT_BINARIES } from "./launchable-agents";
 // different project. Resolves true when the agent process exits normally,
 // false when it could not be started (caller falls back to the clipboard
 // path).
-export const launchAgent = (
+export const launchAgent = async (
   agentId: LaunchableAgentId,
   prompt: string,
   cwd: string
 ): Promise<boolean> =>
   /* eslint-disable promise/avoid-new */
-  new Promise((resolve) => {
+  await new Promise((resolve) => {
     const child = spawn(
       AGENT_BINARIES[agentId],
       [...AGENT_AUTO_FLAGS[agentId], prompt],

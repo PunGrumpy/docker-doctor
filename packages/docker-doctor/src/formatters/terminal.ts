@@ -8,12 +8,19 @@ import type {
 import { findRule } from "@docker-doctor/core";
 import chalk from "chalk";
 
+import { hasText } from "../text";
+
+// True for a line number a code frame can point at. A missing, zero or NaN
+// line gets no frame, as the truthiness test before it decided.
+const isLineNumber = (line: number | undefined): line is number =>
+  line !== undefined && line !== 0 && !Number.isNaN(line);
+
 const printCodeFrame = (
   content: string | undefined,
   line: number | undefined,
   severityColor: (msg: string) => string
 ): void => {
-  if (!content || !line) {
+  if (!hasText(content) || !isLineNumber(line)) {
     return;
   }
 
@@ -141,17 +148,19 @@ const printDiagnostics = (
   console.log(`\nFound ${chalk.bold(diagnostics.length)} issue(s):`);
 
   // Group by file
-  const filesGrouped: Record<string, Diagnostic[]> = {};
+  const filesGrouped = new Map<string, Diagnostic[]>();
 
   for (const d of diagnostics) {
-    if (!filesGrouped[d.file]) {
-      filesGrouped[d.file] = [];
-    }
+    const group = filesGrouped.get(d.file);
 
-    filesGrouped[d.file].push(d);
+    if (group === undefined) {
+      filesGrouped.set(d.file, [d]);
+    } else {
+      group.push(d);
+    }
   }
 
-  for (const [file, fileDiags] of Object.entries(filesGrouped)) {
+  for (const [file, fileDiags] of filesGrouped) {
     console.log(`\n${chalk.underline.bold(file)}`);
 
     for (const d of fileDiags) {
@@ -166,7 +175,7 @@ const printDiagnostics = (
         prefix = "⚠ WARN";
       }
 
-      const lineInfo = d.line ? `:${d.line}` : "";
+      const lineInfo = isLineNumber(d.line) ? `:${d.line}` : "";
       console.log(`  ${sevColor(prefix)} [${chalk.dim(d.rule)}]${lineInfo}`);
 
       // Print Code Frame
@@ -216,8 +225,8 @@ const printScoreBox = async (
 
   const shouldAnimate =
     isTTY &&
-    !process.env.CI &&
-    !process.env.NO_ANIMATION &&
+    !hasText(process.env.CI) &&
+    !hasText(process.env.NO_ANIMATION) &&
     process.env.TERM !== "dumb" &&
     process.env.NODE_ENV !== "test";
 

@@ -38,7 +38,7 @@ export const installSkillForAgents = async (
 ): Promise<SkillInstallResult | null> => {
   const source = getSkillSourceDirectory();
 
-  if (!source) {
+  if (source === null) {
     return null;
   }
 
