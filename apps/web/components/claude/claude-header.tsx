@@ -36,14 +36,18 @@ const ClaudeLogo = ({
   const PH = 2.4;
   const rects: React.ReactElement[] = [];
   let y = 0;
+
   for (const row of LOGO_BITS) {
     let x = 0;
+
     while (x < w) {
       if (row[x] === "1") {
         let end = x;
+
         while (end < w && row[end] === "1") {
           end += 1;
         }
+
         rects.push(
           <rect
             key={`${x}-${y}`}
@@ -58,15 +62,16 @@ const ClaudeLogo = ({
         x += 1;
       }
     }
+
     y += 1;
   }
+
   return (
     <svg
       aria-hidden
-      className={className}
+      className={cn("[shape-rendering:crispEdges]", className)}
       fill={color}
       height={h * PH * scale}
-      shapeRendering="crispEdges"
       viewBox={`0 0 ${w} ${h * PH}`}
       width={w * scale}
     >
@@ -76,6 +81,7 @@ const ClaudeLogo = ({
 };
 
 const DEFAULT_TIPS = ["Ask Claude to create a new app or clone a repo"];
+
 const DEFAULT_WHATS_NEW = [
   "Added directory path suggestions to /cd",
   "Added a /doctor check that proposes trims",

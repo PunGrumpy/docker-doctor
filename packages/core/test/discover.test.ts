@@ -29,8 +29,9 @@ const writeDockerfiles = (root: string, files: readonly string[]): void => {
   }
 };
 
-const makeProject = (): { root: string; cleanup: () => void } => {
+const makeProject = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
   for (const dir of DIRS) {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
     fs.writeFileSync(
@@ -43,6 +44,7 @@ const makeProject = (): { root: string; cleanup: () => void } => {
     );
     fs.writeFileSync(path.join(root, dir, ".dockerignore"), "node_modules\n");
   }
+
   return {
     cleanup: () => fs.rmSync(root, { force: true, recursive: true }),
     root,
@@ -52,6 +54,7 @@ const makeProject = (): { root: string; cleanup: () => void } => {
 describe("discoverProject", () => {
   test("returns each file list in sorted order", async () => {
     const { root, cleanup } = makeProject();
+
     try {
       const project = await discoverProject(root);
 
@@ -68,6 +71,7 @@ describe("discoverProject", () => {
 
   test("repeated scans of an unchanged project are identical", async () => {
     const { root, cleanup } = makeProject();
+
     try {
       const first = await discoverProject(root);
       const second = await discoverProject(root);
@@ -80,6 +84,7 @@ describe("discoverProject", () => {
 
   test("ignoreFiles excludes matches from every file list", async () => {
     const { root, cleanup } = makeProject();
+
     try {
       const project = await discoverProject(root, {
         ignoreFiles: ["alpha/**", "**/compose.yaml"],
@@ -103,6 +108,7 @@ describe("discoverProject", () => {
 
   test("classifies <name>.dockerignore as an ignore file, not a Dockerfile", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
     try {
       fs.writeFileSync(path.join(root, "Dockerfile"), "FROM node:22-alpine\n");
       fs.writeFileSync(
@@ -121,6 +127,7 @@ describe("discoverProject", () => {
 
   test("returns POSIX-separated relative paths", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
     try {
       fs.mkdirSync(path.join(root, "svc", "api"), { recursive: true });
       fs.writeFileSync(
@@ -139,6 +146,7 @@ describe("discoverProject", () => {
 
   test("never enters pruned directories", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
     try {
       for (const dir of [
         "node_modules/pkg",
@@ -170,6 +178,7 @@ describe("discoverProject", () => {
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
       const locked = path.join(root, "examples", "locked");
+
       try {
         writeDockerfiles(root, ["Dockerfile", "examples/sub/Dockerfile"]);
         fs.mkdirSync(locked);
@@ -196,6 +205,7 @@ describe("discoverProject", () => {
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
       const locked = path.join(root, "a", "vendor", "locked");
+
       try {
         writeDockerfiles(root, ["a/Dockerfile", "a/vendor/Dockerfile"]);
         fs.mkdirSync(locked);
@@ -222,6 +232,7 @@ describe("discoverProject", () => {
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
       const locked = path.join(root, "locked");
+
       try {
         writeDockerfiles(root, ["ok/Dockerfile", "locked/Dockerfile"]);
         fs.chmodSync(locked, 0o000);
@@ -252,6 +263,7 @@ describe("discoverProject", () => {
     "an unreadable scan root still throws",
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
       try {
         writeDockerfiles(root, ["Dockerfile"]);
         fs.chmodSync(root, 0o000);
@@ -273,6 +285,7 @@ describe("discoverProject", () => {
     "$patterns ignores the whole directories",
     async ({ patterns }) => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
       try {
         writeDockerfiles(root, [
           "app/Dockerfile",
@@ -294,6 +307,7 @@ describe("discoverProject", () => {
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
       const locked = path.join(root, "vendor", "locked");
+
       try {
         writeDockerfiles(root, ["Dockerfile", "vendor/Dockerfile"]);
         fs.mkdirSync(locked);
@@ -316,6 +330,7 @@ describe("discoverProject", () => {
 
   test("examples/* ignores direct children only and does not prune", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
     try {
       writeDockerfiles(root, [
         "examples/Dockerfile",
@@ -336,6 +351,7 @@ describe("discoverProject", () => {
     "does not traverse symlinked directories and does not hang on a symlink cycle",
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
       try {
         fs.writeFileSync(
           path.join(root, "Dockerfile"),
@@ -356,6 +372,7 @@ describe("discoverProject", () => {
     "reads a symlinked Dockerfile through the link",
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-discover-"));
+
       try {
         fs.mkdirSync(path.join(root, "ok"));
         fs.writeFileSync(

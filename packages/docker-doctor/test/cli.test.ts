@@ -18,14 +18,17 @@ const runCli = async (
     stderr: "pipe",
     stdout: "pipe",
   });
+
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
+
   return { exitCode, stderr, stdout };
 };
 
 beforeAll(async () => {
   const exists = await Bun.file(CLI).exists();
+
   if (!exists) {
     throw new Error(
       `Built CLI not found at ${CLI}. Run: bun run build --filter @docker-doctor/cli`
@@ -63,6 +66,7 @@ describe("exit codes", () => {
       "explain",
       "docker-doctor/nope",
     ]);
+
     expect(exitCode).toBe(1);
     expect(stderr).toContain("not found");
   });
@@ -75,6 +79,7 @@ describe("rules subcommands", () => {
       "explain",
       "no-root-user",
     ]);
+
     expect(exitCode).toBe(0);
     expect(stdout).toContain("docker-doctor/no-root-user");
     expect(stdout).toContain("Help / Fix");
@@ -86,6 +91,7 @@ describe("rules subcommands", () => {
       "explain",
       "docker-doctor/no-root-user",
     ]);
+
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Help / Fix");
   });
@@ -93,6 +99,7 @@ describe("rules subcommands", () => {
   test("rules list prints every rule", async () => {
     const { exitCode, stdout } = await runCli(["rules", "list"]);
     expect(exitCode).toBe(0);
+
     for (const rule of allRules) {
       expect(stdout).toContain(`- ${rule.key}`);
     }
@@ -105,6 +112,7 @@ describe("unanalyzable files", () => {
       fixture("unparseable-compose"),
       "--json",
     ]);
+
     expect(exitCode).toBe(2);
   });
 
@@ -113,6 +121,7 @@ describe("unanalyzable files", () => {
       fixture("unparseable-compose"),
       "--json",
     ]);
+
     expect(stderr).toContain("could not analyze");
     expect(() => JSON.parse(stdout)).not.toThrow();
   });
@@ -122,6 +131,7 @@ describe("unanalyzable files", () => {
       fixture("unparseable-compose"),
       "--score",
     ]);
+
     expect(exitCode).toBe(2);
     expect(stdout).toBe("");
   });
@@ -131,6 +141,7 @@ describe("unanalyzable files", () => {
       fixture("partly-broken"),
       "--score",
     ]);
+
     expect(exitCode).toBe(2);
     expect(stdout).toMatch(/^\d+\n$/u);
   });
@@ -140,6 +151,7 @@ describe("unanalyzable files", () => {
       fixture("unterminated-heredoc"),
       "--json",
     ]);
+
     expect(exitCode).toBe(2);
     expect(stderr).toContain("Unterminated heredoc");
     expect(() => JSON.parse(stdout)).not.toThrow();
@@ -150,6 +162,7 @@ describe("unanalyzable files", () => {
       fixture("unterminated-heredoc"),
       "--json",
     ]);
+
     expect(exitCode).toBe(2);
     const report = JSON.parse(stdout);
     expect(report.failures).toHaveLength(1);
@@ -168,6 +181,7 @@ describe("unreadable directories", () => {
     async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-unreadable-"));
       const locked = path.join(root, "locked");
+
       try {
         for (const dir of ["ok", "locked"]) {
           fs.mkdirSync(path.join(root, dir));
@@ -176,6 +190,7 @@ describe("unreadable directories", () => {
             'FROM node:22-alpine\nUSER node\nCMD ["node"]\n'
           );
         }
+
         fs.chmodSync(locked, 0o000);
 
         const { exitCode, stderr, stdout } = await runCli([root, "--json"]);
@@ -199,11 +214,14 @@ describe("agent-stack fixture", () => {
       fixture("agent-stack"),
       "--json",
     ]);
+
     expect(exitCode).toBe(1);
     const report = JSON.parse(stdout);
+
     const findings = report.diagnostics.map(
       (d: { rule: string; line?: number }) => [d.rule, d.line]
     );
+
     expect(findings).toEqual([
       ["docker-doctor/no-docker-socket-mount", 11],
       ["docker-doctor/pin-model-version", 27],
@@ -250,7 +268,7 @@ describe("--json contract", () => {
   test("score is a number in [0, 100]", async () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
     const report = JSON.parse(stdout);
-    expect(typeof report.score).toBe("number");
+    expect(report.score).toBeTypeOf("number");
     expect(report.score).toBeGreaterThanOrEqual(0);
     expect(report.score).toBeLessThanOrEqual(100);
   });
@@ -259,11 +277,12 @@ describe("--json contract", () => {
     const { stdout } = await runCli([fixture("with-error"), "--json"]);
     const report = JSON.parse(stdout);
     expect(Array.isArray(report.diagnostics)).toBe(true);
+
     for (const d of report.diagnostics) {
-      expect(typeof d.file).toBe("string");
-      expect(typeof d.help).toBe("string");
-      expect(typeof d.message).toBe("string");
-      expect(typeof d.rule).toBe("string");
+      expect(d.file).toBeTypeOf("string");
+      expect(d.help).toBeTypeOf("string");
+      expect(d.message).toBeTypeOf("string");
+      expect(d.rule).toBeTypeOf("string");
       expect(["error", "warning", "info"]).toContain(d.severity);
       expect([
         "Security",
@@ -304,6 +323,7 @@ describe("--score contract", () => {
       fixture("with-error"),
       "--score",
     ]);
+
     expect(exitCode).toBe(1);
     expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
   });
@@ -315,6 +335,7 @@ describe("--score contract", () => {
       fixture("low-score-no-errors"),
       "--score",
     ]);
+
     expect(Number(stdout.trim())).toBeLessThan(50);
     expect(exitCode).toBe(0);
   });
@@ -330,14 +351,17 @@ describe("analyzed files", () => {
       fixture("multi-file"),
       "--score",
     ]);
+
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(MULTI_FILE_SCORE);
   });
 
   test("files with nothing to check do not raise the score", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-stubs-"));
+
     try {
       fs.cpSync(fixture("multi-file"), root, { recursive: true });
+
       const stubs = {
         "Dockerfile.empty": "",
         "Dockerfile.notes": "# notes only\n",
@@ -345,6 +369,7 @@ describe("analyzed files", () => {
         "compose.empty.yaml": "",
         "compose.list.yaml": "- web\n",
       };
+
       for (const [name, content] of Object.entries(stubs)) {
         fs.writeFileSync(path.join(root, name), content);
       }
@@ -374,6 +399,7 @@ describe("analyzed files", () => {
 
   test("files with nothing to check give no score and exit 0", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-stub-only-"));
+
     try {
       fs.writeFileSync(path.join(root, "Dockerfile"), "# TODO\n");
       fs.writeFileSync(path.join(root, "compose.yaml"), "{}\n");
@@ -397,8 +423,10 @@ describe("analyzed files", () => {
     const fileCount = 12;
     const paddingLine = `# ${"x".repeat(78)}\n`;
     const broken = 'services:\n  web:\n    ports: [ "80:80"\n';
+
     try {
       const expected: string[] = [];
+
       for (let index = 1; index <= fileCount; index += 1) {
         const dir = `s${String(index).padStart(2, "0")}`;
         fs.mkdirSync(path.join(root, dir));
@@ -455,6 +483,7 @@ describe("empty project", () => {
       fixture("dockerignore-sibling"),
       "--json",
     ]);
+
     const report = JSON.parse(stdout);
     expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
     expect(report.project.dockerignores).toContain("Dockerfile.dockerignore");
@@ -472,11 +501,14 @@ describe("categories config", () => {
       fixture("with-category-config"),
       "--json",
     ]);
+
     expect(exitCode).toBe(1);
     const report = JSON.parse(stdout);
+
     const rootUserDiag = report.diagnostics.find(
       (d: { rule: string }) => d.rule === "docker-doctor/no-root-user"
     );
+
     expect(rootUserDiag).toBeDefined();
     expect(rootUserDiag.severity).toBe("error");
   });
@@ -495,6 +527,7 @@ describe("--config resolution", () => {
       ],
       { cwd: packageDir }
     );
+
     expect(stderr).not.toContain("not found");
     expect(exitCode).toBe(0);
   });
@@ -509,6 +542,7 @@ describe("--config resolution", () => {
       ],
       { cwd: packageDir }
     );
+
     expect(stderr).toContain("found relative to the scanned directory");
     // The fixture's config escalates no-root-user to error.
     expect(exitCode).toBe(1);
@@ -519,6 +553,7 @@ describe("--config resolution", () => {
       [fixture("clean"), "--json", "--config", "does-not-exist.yaml"],
       { cwd: packageDir }
     );
+
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
       `Specified config file not found at ${path.join(packageDir, "does-not-exist.yaml")}`
@@ -532,6 +567,7 @@ describe("scan target validation", () => {
       fixture("does-not-exist"),
       "--json",
     ]);
+
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Directory not found");
     expect(stdout).toBe("");
@@ -542,6 +578,7 @@ describe("scan target validation", () => {
       path.join(fixture("clean"), "Dockerfile"),
       "--json",
     ]);
+
     expect(exitCode).toBe(1);
     expect(stderr).toContain("is not a directory");
     expect(stdout).toBe("");
@@ -556,6 +593,7 @@ describe("ignore.files config", () => {
       fixture("with-ignore-config"),
       "--json",
     ]);
+
     expect(exitCode).toBe(0);
     const report = JSON.parse(stdout);
     expect(report.project.dockerfiles).toEqual(["Dockerfile"]);
@@ -614,9 +652,11 @@ const scanWithConfig = async (
   configSource: string
 ) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), dirPrefix));
+
   try {
     fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
     fs.writeFileSync(path.join(root, configFile), configSource);
+
     return await runCli([root, "--json"]);
   } finally {
     fs.rmSync(root, { force: true, recursive: true });
@@ -650,6 +690,7 @@ describe("JavaScript config", () => {
       file,
       source
     );
+
     expect(stderr).toBe("");
     expect(exitCode).toBe(0);
     expect(reportsRequireLabels(stdout)).toBe(false);
@@ -663,6 +704,7 @@ describe("JavaScript config", () => {
       "docker-doctor.config.mjs",
       `export default ${RULES_OFF};`
     );
+
     expect(stderr).toBe("");
     expect(exitCode).toBe(0);
     expect(reportsRequireLabels(stdout)).toBe(false);
@@ -675,6 +717,7 @@ describe("piped --json output is not truncated", () => {
       fixture("with-error"),
       "--json",
     ]);
+
     expect(exitCode).toBe(1);
     expect(() => JSON.parse(stdout)).not.toThrow();
   });
@@ -692,6 +735,7 @@ describe("piped --json output is not truncated", () => {
     // diagnostics count must match exactly -- a truncated pipe write
     // would either fail JSON.parse or yield a shorter diagnostics array.
     const outFile = path.join(import.meta.dir, ".large-out.json");
+
     const redirected = Bun.spawn(
       ["node", CLI, fixture("many-diagnostics"), "--json"],
       {
@@ -699,6 +743,7 @@ describe("piped --json output is not truncated", () => {
         stdout: Bun.file(outFile),
       }
     );
+
     await redirected.exited;
     const fileReport = JSON.parse(await Bun.file(outFile).text());
     await Bun.file(outFile).delete();
@@ -718,6 +763,7 @@ describe("heredoc fixture", () => {
 const makeTempDirs = () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "dd-home-"));
   const project = fs.mkdtempSync(path.join(os.tmpdir(), "dd-project-"));
+
   return {
     cleanup: () => {
       fs.rmSync(home, { force: true, recursive: true });
@@ -741,11 +787,13 @@ const makeTempDirs = () => {
 describe("install", () => {
   test("--global installs into HOME and leaves the project untouched", async () => {
     const { home, project, env, cleanup } = makeTempDirs();
+
     try {
       const { exitCode } = await runCli(
         ["install", "--global", "--agent", "claude-code", "opencode"],
         { cwd: project, env }
       );
+
       expect(exitCode).toBe(0);
       expect(
         fs.existsSync(
@@ -765,11 +813,13 @@ describe("install", () => {
 
   test("without --global installs into the project and leaves HOME untouched", async () => {
     const { home, project, env, cleanup } = makeTempDirs();
+
     try {
       const { exitCode } = await runCli(
         ["install", "--agent", "claude-code", "opencode"],
         { cwd: project, env }
       );
+
       expect(exitCode).toBe(0);
       expect(
         fs.existsSync(
@@ -789,11 +839,13 @@ describe("install", () => {
 
   test("non-interactive run without --agent exits 1 with guidance", async () => {
     const { project, env, cleanup } = makeTempDirs();
+
     try {
       const { exitCode, stderr } = await runCli(["install", "--global"], {
         cwd: project,
         env,
       });
+
       expect(exitCode).toBe(1);
       expect(stderr).toContain("--agent");
     } finally {

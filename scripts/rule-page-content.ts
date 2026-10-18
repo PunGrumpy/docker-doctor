@@ -34,7 +34,11 @@ interface RulePageContent {
   notes?: string;
 }
 
-export const rulePageContent: Record<string, RulePageContent> = {
+interface RulePages {
+  readonly [ruleKey: string]: RulePageContent;
+}
+
+export const rulePageContent: RulePages = {
   "docker-doctor/absolute-workdir": {
     bad: {
       code: "FROM node:22-slim\nWORKDIR app\nCOPY . .",

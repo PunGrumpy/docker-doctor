@@ -6,16 +6,22 @@ import { CopyButton } from "@/components/copy-button";
 import { Pill } from "@/components/pill";
 import { cn } from "@/lib/utils";
 
+const isTextNode = (node: ReactNode): node is string | number =>
+  typeof node === "string" || typeof node === "number";
+
 const getNodeText = (node: ReactNode): string => {
-  if (typeof node === "string" || typeof node === "number") {
+  if (isTextNode(node)) {
     return String(node);
   }
+
   if (Array.isArray(node)) {
     return node.map(getNodeText).join("");
   }
+
   if (isValidElement<{ children?: ReactNode }>(node)) {
     return getNodeText(node.props.children);
   }
+
   return "";
 };
 
@@ -27,6 +33,7 @@ const SNIPPET_LABEL_MAX_LENGTH = 64;
 const getSnippetLabel = (code: string): string => {
   const [firstLine = ""] = code.split("\n");
   const trimmed = firstLine.trim();
+
   return trimmed.length > SNIPPET_LABEL_MAX_LENGTH
     ? `${trimmed.slice(0, SNIPPET_LABEL_MAX_LENGTH)}…`
     : trimmed;

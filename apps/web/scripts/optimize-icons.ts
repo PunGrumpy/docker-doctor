@@ -9,60 +9,61 @@ const ICONS_DIR = path.resolve(__dirname, "../components/icons");
 
 // React camelCase SVG attributes → standard SVG hyphenated names
 // Only those that differ and could reference IDs are important.
-const REACT_SVG_ATTR_MAP = {
-  clipPath: "clip-path",
-  clipRule: "clip-rule",
-  fillOpacity: "fill-opacity",
-  fillRule: "fill-rule",
-  floodColor: "flood-color",
-  floodOpacity: "flood-opacity",
-  fontFamily: "font-family",
-  fontSize: "font-size",
-  fontStretch: "font-stretch",
-  fontStyle: "font-style",
-  fontVariant: "font-variant",
-  fontWeight: "font-weight",
-  letterSpacing: "letter-spacing",
-  lightingColor: "lighting-color",
-  markerEnd: "marker-end",
-  markerMid: "marker-mid",
-  markerStart: "marker-start",
-  overlinePosition: "overline-position",
-  overlineThickness: "overline-thickness",
-  paintOrder: "paint-order",
-  pointerEvents: "pointer-events",
-  shapeRendering: "shape-rendering",
-  stopColor: "stop-color",
-  stopOpacity: "stop-opacity",
-  strikethroughPosition: "strikethrough-position",
-  strikethroughThickness: "strikethrough-thickness",
-  strokeDasharray: "stroke-dasharray",
-  strokeDashoffset: "stroke-dashoffset",
-  strokeLinecap: "stroke-linecap",
-  strokeLinejoin: "stroke-linejoin",
-  strokeMiterlimit: "stroke-miterlimit",
-  strokeOpacity: "stroke-opacity",
-  strokeWidth: "stroke-width",
-  textAnchor: "text-anchor",
-  textDecoration: "text-decoration",
-  textRendering: "text-rendering",
-  underlinePosition: "underline-position",
-  underlineThickness: "underline-thickness",
-  unicodeBidi: "unicode-bidi",
-  vectorEffect: "vector-effect",
-};
+const REACT_SVG_ATTR_MAP = new Map([
+  ["clipPath", "clip-path"],
+  ["clipRule", "clip-rule"],
+  ["fillOpacity", "fill-opacity"],
+  ["fillRule", "fill-rule"],
+  ["floodColor", "flood-color"],
+  ["floodOpacity", "flood-opacity"],
+  ["fontFamily", "font-family"],
+  ["fontSize", "font-size"],
+  ["fontStretch", "font-stretch"],
+  ["fontStyle", "font-style"],
+  ["fontVariant", "font-variant"],
+  ["fontWeight", "font-weight"],
+  ["letterSpacing", "letter-spacing"],
+  ["lightingColor", "lighting-color"],
+  ["markerEnd", "marker-end"],
+  ["markerMid", "marker-mid"],
+  ["markerStart", "marker-start"],
+  ["overlinePosition", "overline-position"],
+  ["overlineThickness", "overline-thickness"],
+  ["paintOrder", "paint-order"],
+  ["pointerEvents", "pointer-events"],
+  ["shapeRendering", "shape-rendering"],
+  ["stopColor", "stop-color"],
+  ["stopOpacity", "stop-opacity"],
+  ["strikethroughPosition", "strikethrough-position"],
+  ["strikethroughThickness", "strikethrough-thickness"],
+  ["strokeDasharray", "stroke-dasharray"],
+  ["strokeDashoffset", "stroke-dashoffset"],
+  ["strokeLinecap", "stroke-linecap"],
+  ["strokeLinejoin", "stroke-linejoin"],
+  ["strokeMiterlimit", "stroke-miterlimit"],
+  ["strokeOpacity", "stroke-opacity"],
+  ["strokeWidth", "stroke-width"],
+  ["textAnchor", "text-anchor"],
+  ["textDecoration", "text-decoration"],
+  ["textRendering", "text-rendering"],
+  ["underlinePosition", "underline-position"],
+  ["underlineThickness", "underline-thickness"],
+  ["unicodeBidi", "unicode-bidi"],
+  ["vectorEffect", "vector-effect"],
+]);
 
 const REACT_ATTR_RE = new RegExp(
-  `\\b(${Object.keys(REACT_SVG_ATTR_MAP).join("|")})\\s*=`,
+  `\\b(${[...REACT_SVG_ATTR_MAP.keys()].join("|")})\\s*=`,
   "gu"
 );
 
 // Reverse map for restoration: hyphenated → React camelCase
-const SVG_ATTR_REVERSE = Object.fromEntries(
-  Object.entries(REACT_SVG_ATTR_MAP).map(([k, v]) => [v, k])
+const SVG_ATTR_REVERSE = new Map(
+  [...REACT_SVG_ATTR_MAP].map(([k, v]) => [v, k])
 );
+
 const SVG_ATTR_RE = new RegExp(
-  `\\b(${Object.values(REACT_SVG_ATTR_MAP).join("|")})\\s*=`,
+  `\\b(${[...REACT_SVG_ATTR_MAP.values()].join("|")})\\s*=`,
   "gu"
 );
 
@@ -93,11 +94,14 @@ const formatBytes = (bytes: number) => {
   if (bytes === 0) {
     return "0 B";
   }
+
   const abs = Math.abs(bytes);
   const sign = bytes < 0 ? "+" : "-";
+
   if (abs < 1024) {
     return `${sign}${abs} B`;
   }
+
   return `${sign}${(abs / 1024).toFixed(1)} KB`;
 };
 
@@ -106,8 +110,10 @@ const processFile = async (filePath: string) => {
   const original = content;
 
   const originalSvg = SVG_ELEMENT_RE.exec(content)?.groups?.svg;
+
   if (originalSvg === undefined) {
     console.log(`  ⏭  no SVG found in ${path.basename(filePath)}`);
+
     return;
   }
 
@@ -121,10 +127,8 @@ const processFile = async (filePath: string) => {
 
   // Convert React camelCase attributes to SVG hyphenated form
   if (hasReactAttrs) {
-    preprocessed = preprocessed.replace(
-      REACT_ATTR_RE,
-      (match, attr: keyof typeof REACT_SVG_ATTR_MAP) =>
-        match.replace(attr, REACT_SVG_ATTR_MAP[attr])
+    preprocessed = preprocessed.replace(REACT_ATTR_RE, (match, attr: string) =>
+      match.replace(attr, REACT_SVG_ATTR_MAP.get(attr) ?? attr)
     );
   }
 
@@ -133,9 +137,11 @@ const processFile = async (filePath: string) => {
   }
 
   const spreads: string[] = [];
+
   if (hasSpread) {
     preprocessed = preprocessed.replaceAll(/\s*\{\.\.\.\w+\}/gu, (match) => {
       spreads.push(match);
+
       return "";
     });
   }
@@ -153,8 +159,8 @@ const processFile = async (filePath: string) => {
 
   // Restore React camelCase SVG attributes
   if (hasReactAttrs) {
-    optimizedSvg = optimizedSvg.replace(SVG_ATTR_RE, (match, attr) =>
-      match.replace(attr, SVG_ATTR_REVERSE[attr])
+    optimizedSvg = optimizedSvg.replace(SVG_ATTR_RE, (match, attr: string) =>
+      match.replace(attr, SVG_ATTR_REVERSE.get(attr) ?? attr)
     );
   }
 
@@ -168,6 +174,7 @@ const processFile = async (filePath: string) => {
 
   if (optimizedSvg === originalSvg) {
     console.log(`  - ${path.basename(filePath)} (no change)`);
+
     return;
   }
 
@@ -181,6 +188,7 @@ const processFile = async (filePath: string) => {
 const main = async () => {
   const entries = await fs.readdir(ICONS_DIR, { withFileTypes: true });
   const files = [];
+
   for (const entry of entries) {
     if (entry.isFile() && entry.name.endsWith(".tsx")) {
       files.push(path.join(ICONS_DIR, entry.name));
@@ -189,6 +197,7 @@ const main = async () => {
 
   if (files.length === 0) {
     console.log("No TSX icon files found.");
+
     return;
   }
 
