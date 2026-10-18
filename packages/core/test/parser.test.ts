@@ -306,6 +306,22 @@ USER node
 });
 
 describe("Compose Parser", () => {
+  test("a YAML error names the position without quoting the source", () => {
+    const content =
+      "services:\n  app:\n    environment:\n      DB_PASSWORD: PLACEHOLDER_TOKEN_VALUE: x\n";
+    try {
+      parseCompose(content, "compose.yaml");
+      throw new Error("expected parseCompose to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ParseError);
+      const { message } = error as ParseError;
+      expect(message).toBe(
+        "Nested mappings are not allowed in compact mappings at line 4, column 20"
+      );
+      expect(message).not.toContain("PLACEHOLDER_TOKEN_VALUE");
+    }
+  });
+
   test("should parse compose yml content", () => {
     const content = `
 services:

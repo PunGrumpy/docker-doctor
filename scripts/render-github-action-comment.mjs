@@ -47,31 +47,61 @@ export const readContext = (env = process.env) => ({
   stepSummary: env.GITHUB_STEP_SUMMARY ?? "",
 });
 
-// Diagnostic messages and file paths embed content from the scanned repo
-// (rule messages quote Dockerfile lines verbatim). Everything interpolated
-// into the comment body or step outputs must pass through one of these.
-export const sanitizeText = (value) =>
-  String(value)
-    // control chars (incl. newlines and ANSI escapes) -> single space
-    // Intentional: strips control chars from untrusted content.
-    // oxlint-disable-next-line no-control-regex
-    .replaceAll(/[\u0000-\u001F\u007F]+/gu, " ")
-    // neutralize markdown/HTML structure
+// Diagnostic messages and file paths embed content from the scanned repo.
+// Rule messages quote Dockerfile lines. Everything interpolated into the
+// comment body or step outputs must pass through one of these.
+//
+// Characters a reader cannot see become a space. These are C0 and C1
+// controls (Cc, including newlines, ANSI escapes and NEL), format
+// characters (Cf), and the line and paragraph separators. Cf covers
+// zero-width characters, bidi embeddings, overrides and isolates, the BOM
+// and the assigned tag characters. The CLI sanitizer in
+// packages/docker-doctor/src/agents/sanitize.ts uses the same class. The
+// renderer test checks that both strip the same samples.
+const INVISIBLE_CHARS_RE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u{E0000}-\u{E007F}]+/gu;
+
+const stripInvisible = (value) =>
+  String(value).replaceAll(INVISIBLE_CHARS_RE, " ");
+
+// Neutralizes markdown and HTML structure.
+const escapeMarkdown = (text) =>
+  text
     .replaceAll("`", "'")
     .replaceAll("|", "\\|")
     .replaceAll("<", "&lt;")
     .replaceAll("[", "\\[")
     .replaceAll("]", "\\]");
 
-// encodeURIComponent leaves "(" and ")" unescaped (they're in its
-// unreserved set), which defeats the point here — an unmatched ")" in a
-// filename can still close a markdown link early. Map those two explicitly.
-const URL_ESCAPES = { "(": "%28", ")": "%29" };
-export const sanitizeUrlPart = (value) =>
-  String(value).replaceAll(
-    /[\s()<>`]/gu,
-    (c) => URL_ESCAPES[c] ?? encodeURIComponent(c)
-  );
+export const sanitizeText = (value) => escapeMarkdown(stripInvisible(value));
+
+// GitHub turns @user, @org/team, #123, GH-123 and bare URLs into mentions,
+// references and links everywhere except inside code. HTML entities and
+// backslash escapes do not stop it. GitHub's markdown API confirmed this.
+// So a message word that could become one is shown as inline code. Inside
+// code only a backtick and a table pipe still need escaping.
+const WORD_SPLIT_RE = /(?<space>\s+)/u;
+const LINKABLE_WORD_RE = /[@#]|:\/\/|www\.|\bgh-\d/iu;
+
+const inlineCode = (word) =>
+  `\`${word.replaceAll("`", "'").replaceAll("|", "\\|")}\``;
+
+export const sanitizeProse = (value) =>
+  stripInvisible(value)
+    .split(WORD_SPLIT_RE)
+    .map((part) =>
+      LINKABLE_WORD_RE.test(part) ? inlineCode(part) : escapeMarkdown(part)
+    )
+    .join("");
+
+// Each path segment is percent-encoded, so `#`, `?` and `%` in a file name
+// stay part of the path instead of starting a fragment or a query.
+// encodeURIComponent leaves "(" and ")" alone. An unmatched ")" would still
+// close the markdown link early, so those two are mapped as well.
+const encodePathSegment = (segment) =>
+  encodeURIComponent(segment).replaceAll("(", "%28").replaceAll(")", "%29");
+
+export const encodeUrlPath = (value) =>
+  String(value).split("/").map(encodePathSegment).join("/");
 
 // The report JSON is untrusted (fork PR content), so `label` is allowlisted
 // rather than passed through — anything outside this set (including
@@ -203,7 +233,7 @@ const blobUrl = (ctx, file, line) => {
     )
     .replace(/^(?:\.\/)+/u, "");
   const fragment = line ? `#L${line}` : "";
-  return `${ctx.serverUrl}/${ctx.repository}/blob/${ctx.headSha}/${sanitizeUrlPart(joined)}${fragment}`;
+  return `${ctx.serverUrl}/${ctx.repository}/blob/${ctx.headSha}/${encodeUrlPath(joined)}${fragment}`;
 };
 
 // GitHub-flavored markdown renders <relative-time> natively ("3 hours ago",
@@ -251,7 +281,7 @@ const fileRow = (ctx, { diagnostics, failureMessage, file, updated }) => {
   // make it look clean.
   if (failureMessage !== undefined) {
     return {
-      markdown: `| ${link} | ${UNANALYZED_STATUS} | ${sanitizeText(shortMessage(failureMessage))} | ${updated} |`,
+      markdown: `| ${link} | ${UNANALYZED_STATUS} | ${sanitizeProse(shortMessage(failureMessage))} | ${updated} |`,
       worst: UNANALYZED_RANK,
     };
   }
@@ -329,7 +359,7 @@ const findingLine = (ctx, diagnostic) => {
     ? `${diagnostic.file}:${diagnostic.line}`
     : diagnostic.file;
   const rule = diagnostic.rule.replace(/^docker-doctor\//u, "");
-  return `- ${ICON_BY_SEVERITY[diagnostic.severity] ?? "•"} [\`${sanitizeText(location)}\`](${blobUrl(ctx, diagnostic.file, diagnostic.line)}) ${sanitizeText(shortMessage(diagnostic.message))} \`${sanitizeText(rule)}\``;
+  return `- ${ICON_BY_SEVERITY[diagnostic.severity] ?? "•"} [\`${sanitizeText(location)}\`](${blobUrl(ctx, diagnostic.file, diagnostic.line)}) ${sanitizeProse(shortMessage(diagnostic.message))} \`${sanitizeText(rule)}\``;
 };
 
 const findingsSection = (ctx, report, hasErrors) => {

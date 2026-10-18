@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { sanitizeMessage as sanitizeCliMessage } from "../packages/docker-doctor/src/agents/sanitize";
 import {
   readContext,
   readReportText,
@@ -7,6 +8,7 @@ import {
   renderFailure,
   renderReport,
   safeLabel,
+  sanitizeProse,
   sanitizeText,
 } from "./render-github-action-comment.mjs";
 
@@ -312,6 +314,80 @@ describe("untrusted report fields", () => {
   test("sanitizeText neutralizes markdown, HTML and control characters", () => {
     const sanitized = sanitizeText("a`b|c<d[e]f\ng\u001B[2Kh");
     expect(sanitized).toBe("a'b\\|c&lt;d\\[e\\]f g \\[2Kh");
+  });
+
+  // Written as escapes because the characters are invisible in an editor.
+  const invisibleSamples = [
+    "\u0085",
+    "\u2028",
+    "\u2029",
+    "\u200B",
+    "\u200F",
+    "\u202A",
+    "\u202E",
+    "\u2066",
+    "\u2069",
+    "\uFEFF",
+    "\u{E0000}",
+    "\u{E0041}",
+  ];
+
+  test.each(invisibleSamples)(
+    "sanitizeText and the CLI sanitizer both turn %p into a space",
+    (char) => {
+      expect(sanitizeText(`a${char}b`)).toBe("a b");
+      expect(sanitizeCliMessage(`a${char}b`)).toBe("a b");
+    }
+  );
+
+  test("sanitizeProse shows mentions, references and URLs as code", () => {
+    expect(
+      sanitizeProse(
+        "ping @octocat and @org/team about #12, o/r#3 and GH-4 at https://x.test/a|b or www.x.test"
+      )
+    ).toBe(
+      "ping `@octocat` and `@org/team` about `#12,` `o/r#3` and `GH-4` at `https://x.test/a\\|b` or `www.x.test`"
+    );
+  });
+
+  test("sanitizeProse escapes markdown outside the code spans", () => {
+    expect(sanitizeProse("a`b [c] <d> @e`f")).toBe("a'b \\[c\\] &lt;d> `@e'f`");
+  });
+
+  test("a message cannot mention, reference or link from the comment", () => {
+    const message = "Ping @octocat about #1 at https://phish.test.\u202E txet";
+    const { body } = render(
+      {},
+      makeReport({
+        diagnostics: [{ ...diagnostic("warning"), message }],
+        failures: [{ file: "compose.yaml", message }],
+        project: {
+          composeFiles: ["compose.yaml"],
+          dockerfiles: ["Dockerfile"],
+        },
+      })
+    );
+    expect(body).not.toContain("\u202E");
+    expect(body).not.toMatch(/[^`]@octocat/u);
+    expect(body).not.toMatch(/[^`]#1\b/u);
+    expect(body).not.toMatch(/[^`]https:\/\/phish/u);
+    expect(body).toContain(
+      "Ping `@octocat` about `#1` at `https://phish.test.`"
+    );
+  });
+
+  test("file links percent-encode #, ? and % in each path segment", () => {
+    const file = "svc #1/a#b?c%20(x).dockerfile";
+    const { body } = render(
+      {},
+      makeReport({
+        diagnostics: [{ ...diagnostic("warning"), file, line: 3 }],
+        project: { composeFiles: [], dockerfiles: [file] },
+      })
+    );
+    expect(body).toContain(
+      "](https://github.com/o/r/blob/abcdef1234567/svc%20%231/a%23b%3Fc%2520%28x%29.dockerfile#L3)"
+    );
   });
 
   test("safeLabel keeps only the known score buckets", () => {
