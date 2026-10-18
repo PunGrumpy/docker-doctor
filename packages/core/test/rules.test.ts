@@ -1648,6 +1648,38 @@ describe("Image Size Rules", () => {
     }
   );
 
+  // The package lists live in /var/lib/apt/lists. A cache mount must cover
+  // that directory. /var/cache/apt holds only the downloaded packages.
+  const aptCacheMountCases = [
+    { expected: 1, mounts: ["/var/cache/apt"] },
+    { expected: 1, mounts: ["/var/cache/apt", "/var/lib/apt/lists/partial"] },
+    { expected: 0, mounts: ["/var/lib/apt"] },
+    { expected: 0, mounts: ["/var/lib/apt/"] },
+    { expected: 0, mounts: ["/var/lib/apt/lists"] },
+    { expected: 0, mounts: ["/var/cache/apt", "/var/lib/apt"] },
+  ];
+
+  test.each(aptCacheMountCases)(
+    "clean-package-cache: apt cache mounts on $mounts report $expected",
+    ({ expected, mounts }) => {
+      const flags = mounts
+        .map((target) => `--mount=type=cache,target=${target}`)
+        .join(" ");
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${flags} ${APT_INSTALL}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("clean-package-cache: a cache mount on /var/cache/apt plus rm of the lists is clean", () => {
+    const dockerfile = parseDockerfile(
+      `RUN --mount=type=cache,target=/var/cache/apt ${APT_INSTALL} && rm -rf /var/lib/apt/lists/*`
+    );
+    expect(cleanPackageCache.check(dockerfile, "Dockerfile")).toHaveLength(0);
+  });
+
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
         FROM node:22 AS builder

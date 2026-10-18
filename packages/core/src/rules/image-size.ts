@@ -239,13 +239,25 @@ const removesRecursively = (args: string, dir: string): boolean =>
     (match.groups?.operands ?? "").includes(dir)
   );
 
-const APT_CACHE_DIRS = ["/var/lib/apt", "/var/cache/apt"];
+// apt-get keeps the package lists here. A cache mount on `/var/cache/apt`
+// alone leaves them in the layer, so Docker's apt example mounts
+// `/var/lib/apt` too.
+const APT_LISTS_DIR = "/var/lib/apt/lists";
 const APK_CACHE_DIRS = ["/var/cache/apk", "/etc/apk/cache"];
+
+const TRAILING_SLASHES_RE = /\/+$/u;
 
 const hasCacheMountFor = (args: string, cacheDirs: string[]): boolean =>
   cacheMountTargets(args).some((target) =>
     cacheDirs.some((dir) => target === dir || target.startsWith(`${dir}/`))
   );
+
+// True when a cache mount sits on `dir` or on a directory above it.
+const hasCacheMountOver = (args: string, dir: string): boolean =>
+  cacheMountTargets(args).some((target) => {
+    const mount = target.replace(TRAILING_SLASHES_RE, "");
+    return dir === mount || dir.startsWith(`${mount}/`);
+  });
 
 export const cleanPackageCache: DockerfileRule = {
   category: "Image Size",
@@ -259,8 +271,8 @@ export const cleanPackageCache: DockerfileRule = {
         // check apt-get install without cleanup
         if (
           hasAptGetInstall(args) &&
-          !removesRecursively(args, "/var/lib/apt/lists") &&
-          !hasCacheMountFor(args, APT_CACHE_DIRS)
+          !removesRecursively(args, APT_LISTS_DIR) &&
+          !hasCacheMountOver(args, APT_LISTS_DIR)
         ) {
           diagnostics.push(
             createDiagnostic(
