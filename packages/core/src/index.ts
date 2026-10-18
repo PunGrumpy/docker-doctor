@@ -38,6 +38,21 @@ export {
 
 export * from "./errors";
 
-export * from "./types/index";
+export type {
+  ComposeLocator,
+  ComposeMapping,
+  ComposeRule,
+  ComposeValue,
+  DiagnoseResult,
+  Diagnostic,
+  DiagnosticSeverity,
+  DockerDoctorConfig,
+  DockerfileInstruction,
+  DockerfileRule,
+  ProjectInfo,
+  RuleCategory,
+  RuleDefinition,
+  RuleSeverity,
+} from "./types/index";
 
 export { toJsonReport, type JsonReport } from "./report";

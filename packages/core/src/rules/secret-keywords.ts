@@ -35,7 +35,7 @@ const SWITCH_VALUE = /^(?:true|false|yes|no|on|off)$/iu;
 const SURROUNDING_QUOTES_RE = /^(?<quote>["'])(?<inner>.*)\k<quote>$/su;
 
 export const isLiteralSecretValue = (value: string): boolean => {
-  const unquoted = value.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? value;
+  const unquoted = SURROUNDING_QUOTES_RE.exec(value)?.groups?.inner ?? value;
 
   return (
     unquoted.length > 0 &&

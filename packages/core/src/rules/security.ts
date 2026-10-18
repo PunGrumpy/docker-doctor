@@ -7,6 +7,7 @@ import {
   parseFromArgs,
   parseImageRef,
 } from "../parsers/image-ref";
+import { hasText } from "../text";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
@@ -37,7 +38,8 @@ export const noRootUser: DockerfileRule = {
         // nonroot user. "nonroot" is a sentinel that isRootUser treats as
         // safe until a USER overrides it.
         const baseDefaultUser =
-          base && (isHardenedRuntimeImage(base) || isDistrolessNonroot(base))
+          hasText(base) &&
+          (isHardenedRuntimeImage(base) || isDistrolessNonroot(base))
             ? "nonroot"
             : "root";
 
@@ -45,14 +47,14 @@ export const noRootUser: DockerfileRule = {
         lastUserLine = inst.line;
         currentStage = stage?.toLowerCase() ?? null;
 
-        if (currentStage) {
+        if (hasText(currentStage)) {
           stageUser.set(currentStage, lastUser);
         }
       } else if (inst.instruction === "USER") {
         lastUser = inst.args.trim().toLowerCase();
         lastUserLine = inst.line;
 
-        if (currentStage) {
+        if (hasText(currentStage)) {
           stageUser.set(currentStage, lastUser);
         }
       }
@@ -90,7 +92,7 @@ export const noSecretsInEnv: DockerfileRule = {
 
         if (inst.instruction === "ENV" && !args.includes("=")) {
           // KEY VALUE format
-          const match = args.match(/^(?<key>[^\s]+)\s+(?<value>.*)$/u);
+          const match = /^(?<key>[^\s]+)\s+(?<value>.*)$/u.exec(args);
 
           if (match?.groups) {
             const { key, value } = match.groups;
@@ -171,7 +173,7 @@ export const pinImageVersion: DockerfileRule = {
         // Also respect multi-stage builds (AS stageName)
         const imagePart = parseFromArgs(inst.args).base;
 
-        if (!imagePart || isScratch(imagePart)) {
+        if (!hasText(imagePart) || isScratch(imagePart)) {
           continue;
         }
 
@@ -225,7 +227,7 @@ export const noAddRemote: DockerfileRule = {
         // Docker's guidance recommends for remote artifacts.
         const isVerified = parts.some((p) => p.startsWith("--checksum="));
 
-        if (!src || isVerified) {
+        if (!hasText(src) || isVerified) {
           continue;
         }
 

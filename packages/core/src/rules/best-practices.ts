@@ -2,6 +2,7 @@ import { parseExecForm } from "../parsers/exec-form";
 import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
+import { hasText } from "../text";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
@@ -65,7 +66,7 @@ export const preferCopyOverAdd: DockerfileRule = {
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
 
-        if (!src) {
+        if (!hasText(src)) {
           continue;
         }
 
@@ -257,7 +258,7 @@ export const usePipefail: DockerfileRule = {
           parentStage !== null && stagePipefail.get(parentStage) === true;
         currentStage = stage?.toLowerCase() ?? null;
 
-        if (currentStage) {
+        if (hasText(currentStage)) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
 
@@ -267,7 +268,7 @@ export const usePipefail: DockerfileRule = {
       if (inst.instruction === "SHELL") {
         shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
 
-        if (currentStage) {
+        if (hasText(currentStage)) {
           stagePipefail.set(currentStage, shellHasPipefail);
         }
 
@@ -334,7 +335,7 @@ export const absoluteWorkdir: DockerfileRule = {
         const trimmed = inst.args.trim();
 
         const path =
-          trimmed.match(SURROUNDING_QUOTES_RE)?.groups?.inner ?? trimmed;
+          SURROUNDING_QUOTES_RE.exec(trimmed)?.groups?.inner ?? trimmed;
 
         const isAbsolute = /^(?:\/|\\|\$|[a-zA-Z]:)/u.test(path);
 

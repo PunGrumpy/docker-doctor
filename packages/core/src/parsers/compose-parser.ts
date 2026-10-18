@@ -64,9 +64,11 @@ export const createComposeLocator = (content: string): ComposeLocator => {
   const lineCounter = new LineCounter();
   const doc = parseDocument(content, { lineCounter, merge: true });
 
-  return (path) => {
+  // The offset of the last key or item on the path, or null when the path
+  // leaves the document or that node has no position.
+  const findOffset = (path: readonly (string | number)[]): number | null => {
     let node: unknown = doc.contents;
-    let offset: number | undefined;
+    let offset: number | null = null;
 
     for (const segment of path) {
       if (isAlias(node)) {
@@ -80,25 +82,31 @@ export const createComposeLocator = (content: string): ComposeLocator => {
         );
 
         if (!pair || !isScalar(pair.key)) {
-          return;
+          return null;
         }
 
-        offset = pair.key.range?.[0];
+        offset = pair.key.range?.[0] ?? null;
         node = pair.value;
       } else if (isSeq(node) && isSequenceIndex(segment)) {
         const item = node.items[segment];
 
         if (item === undefined || item === null) {
-          return;
+          return null;
         }
 
-        offset = isNode(item) ? item.range?.[0] : undefined;
+        offset = isNode(item) ? (item.range?.[0] ?? null) : null;
         node = item;
       } else {
-        return;
+        return null;
       }
     }
 
-    return offset === undefined ? undefined : lineCounter.linePos(offset).line;
+    return offset;
+  };
+
+  return (path) => {
+    const offset = findOffset(path);
+
+    return offset === null ? undefined : lineCounter.linePos(offset).line;
   };
 };

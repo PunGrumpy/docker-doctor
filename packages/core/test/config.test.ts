@@ -35,7 +35,9 @@ describe("loadConfig", () => {
     );
 
     const warnings: string[] = [];
-    await loadConfig(dir, undefined, (message) => warnings.push(message));
+    await loadConfig(dir, undefined, (message) => {
+      warnings.push(message);
+    });
 
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toContain("docker-doctor/no-root-users");
@@ -58,7 +60,9 @@ describe("loadConfig", () => {
     );
 
     const warnings: string[] = [];
-    await loadConfig(dir, undefined, (message) => warnings.push(message));
+    await loadConfig(dir, undefined, (message) => {
+      warnings.push(message);
+    });
 
     expect(warnings).toEqual([]);
   });
@@ -95,7 +99,15 @@ describe("loadConfig", () => {
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({ rules: { "no-latest-tag": "banana" } })
     );
-    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+    let caught: unknown;
+
+    try {
+      await loadConfig(dir);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ConfigError);
   });
 
   test("throws ConfigError with correct _tag on invalid severity value", async () => {
@@ -123,7 +135,15 @@ describe("loadConfig", () => {
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({ rules: "not-an-object" })
     );
-    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+    let caught: unknown;
+
+    try {
+      await loadConfig(dir);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ConfigError);
   });
 
   test("prefers .ts config over .json when both exist", async () => {
@@ -285,7 +305,15 @@ describe("loadConfig", () => {
       path.join(dir, "docker-doctor.config.yaml"),
       "rules:\n  bad: [unclosed\n"
     );
-    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+    let caught: unknown;
+
+    try {
+      await loadConfig(dir);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ConfigError);
   });
 
   test("throws ConfigError on invalid severity in YAML", async () => {
@@ -293,7 +321,15 @@ describe("loadConfig", () => {
       path.join(dir, "docker-doctor.config.yaml"),
       'rules:\n  "no-latest-tag": banana\n'
     );
-    await expect(loadConfig(dir)).rejects.toThrow(ConfigError);
+    let caught: unknown;
+
+    try {
+      await loadConfig(dir);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ConfigError);
   });
 
   test("loads a .yaml config via --config custom path", async () => {

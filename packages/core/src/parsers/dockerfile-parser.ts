@@ -1,4 +1,5 @@
 import { ParseError } from "../errors";
+import { hasText } from "../text";
 import type { DockerfileInstruction } from "../types/index";
 import { maskQuotedText } from "./shell-quotes";
 
@@ -84,10 +85,10 @@ const closeInstruction = (state: ParserState): void => {
 const matchInstructionKeyword = (
   lineContent: string
 ): { instruction: string; args: string } | null => {
-  const match = lineContent.match(INSTRUCTION_LINE_RE);
+  const match = INSTRUCTION_LINE_RE.exec(lineContent);
   const matchedWord = match?.groups?.inst.toUpperCase();
 
-  if (matchedWord && DOCKERFILE_KEYWORDS.has(matchedWord)) {
+  if (hasText(matchedWord) && DOCKERFILE_KEYWORDS.has(matchedWord)) {
     return { args: match?.groups?.args ?? "", instruction: matchedWord };
   }
 
