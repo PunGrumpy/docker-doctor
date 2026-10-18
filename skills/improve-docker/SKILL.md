@@ -21,6 +21,7 @@ npx @docker-doctor/cli@latest . --json > docker-doctor-report.json   # diagnosti
 - The JSON `project` field lists every Dockerfile / Compose / .dockerignore discovered.
 - The JSON `diagnostics[]` carry `rule`, `category`, `severity`, `file`, `line`, `message`, `help` (report `schemaVersion` 3+). Group by `category` directly — no second command is needed.
 - The JSON `failures[]` (schema 4+) lists files that were discovered but could not be parsed. Treat them as unknown, not clean.
+- `analyzedFiles` (schema 6+) is how many files the score covers. When it is `0`, `score` and `label` are `null` and there is no baseline score.
 - Note the exit code, the count of diagnostics per rule, and the `score` and `label` as the baseline.
 
 ## Phase 2 — Audit
