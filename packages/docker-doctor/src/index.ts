@@ -7,6 +7,8 @@ export {
   parseCompose,
   runDockerfileRules,
   runComposeRules,
+  isAnalyzableDockerfile,
+  isAnalyzableCompose,
   calculateScore,
   defineConfig,
   loadConfig,
@@ -19,5 +21,6 @@ export type {
   DockerDoctorConfig,
   RuleCategory,
   RuleSeverity,
+  ScoreResult,
 } from "@docker-doctor/core";
 export const version: string = packageJson.version;

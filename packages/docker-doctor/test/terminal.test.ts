@@ -62,11 +62,22 @@ describe("terminal report", () => {
   });
 
   test("an incomplete scan claims no healthy project and offers no share link", async () => {
+    const { exitCode, stdout } = await runPlain([fixture("partly-broken")]);
+    expect(exitCode).toBe(2);
+    expect(stdout).toContain("Incomplete scan: 1 file could not be analyzed");
+    expect(stdout).not.toContain("looks healthy");
+    expect(stdout).not.toContain("Share:");
+  });
+
+  test("a scan that analyzed no file prints no score", async () => {
     const { exitCode, stdout } = await runPlain([
       fixture("unterminated-heredoc"),
     ]);
     expect(exitCode).toBe(2);
-    expect(stdout).toContain("Incomplete scan: 1 file could not be analyzed");
+    expect(stdout).toContain(
+      "Docker Doctor checked none of the 1 discovered file, so there is no score."
+    );
+    expect(stdout).not.toContain("/ 100");
     expect(stdout).not.toContain("looks healthy");
     expect(stdout).not.toContain("Share:");
   });

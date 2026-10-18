@@ -19,7 +19,12 @@ export {
   collectUnknownConfigKeys,
   type UnknownConfigKeys,
 } from "./config/unknown-keys";
-export { calculateScore, getScoreBucket, SCORE_BUCKETS } from "./scoring";
+export {
+  calculateScore,
+  getScoreBucket,
+  SCORE_BUCKETS,
+  type ScoreResult,
+} from "./scoring";
 export * from "./errors";
 export * from "./types/index";
 export { toJsonReport, type JsonReport } from "./report";

@@ -9,6 +9,7 @@ import type {
   JsonReport,
   ProjectInfo,
   RuleSeverity,
+  ScoreResult,
 } from "@docker-doctor/core";
 import {
   discoverProject,
@@ -652,13 +653,19 @@ const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
   return failing ? 1 : 0;
 };
 
-const reportScanFailures = (failures: ScanFailure[]): void => {
+const reportScanFailures = (
+  failures: ScanFailure[],
+  hasScore: boolean
+): void => {
   if (failures.length === 0) {
     return;
   }
   const fileWord = failures.length === 1 ? "file" : "files";
+  const scoreNote = hasScore
+    ? "; the score below covers only the files that were analyzed."
+    : ".";
   console.error(
-    `Docker Doctor could not analyze ${failures.length} ${fileWord}; the score below covers only the files that were analyzed.`
+    `Docker Doctor could not analyze ${failures.length} ${fileWord}${scoreNote}`
   );
   for (const failure of failures) {
     console.error(`  - ${failure.file}: ${flattenMessage(failure.message)}`);
@@ -668,9 +675,30 @@ const reportScanFailures = (failures: ScanFailure[]): void => {
 const noFilesFoundMessage = (rootDir: string): string =>
   `No Dockerfiles or Compose files found in ${rootDir}`;
 
-// A scan with no files has no findings and scores 100. The usual report
-// would call that project healthy, so the terminal prints this notice
-// instead.
+const noScoreMessage = (scannedFileCount: number): string => {
+  const fileWord = scannedFileCount === 1 ? "file" : "files";
+  return `Docker Doctor checked none of the ${scannedFileCount} discovered ${fileWord}, so there is no score`;
+};
+
+// Every discovered file failed or had nothing to check. A score here would
+// describe no file at all.
+const printNothingAnalyzed = (
+  scannedFileCount: number,
+  failureCount: number
+): void => {
+  console.log(`\n${chalk.yellow("⚠")} ${noScoreMessage(scannedFileCount)}.`);
+  console.log(
+    `  A Dockerfile needs at least one instruction. A Compose file needs a service, a top-level models entry or a version key.`
+  );
+  if (failureCount > 0) {
+    console.log(
+      `  The files that could not be read or parsed are listed above.`
+    );
+  }
+};
+
+// A scan with no files has no score. The terminal says why instead of
+// printing an empty report.
 const printNothingScanned = (rootDir: string): void => {
   console.log(`\n${chalk.yellow("⚠")} ${noFilesFoundMessage(rootDir)}.`);
   console.log(
@@ -721,11 +749,43 @@ const writeTerminalReport = async (
   if (process.stdout.isTTY && process.stdin.isTTY) {
     wizardOk = await runInteractiveWizard({
       diagnostics,
-      report: toJsonReport(diagnostics, score, label, project, failures),
+      report: toJsonReport(
+        diagnostics,
+        score,
+        label,
+        project,
+        failures,
+        scan.analyzedFileCount
+      ),
       rootDir,
     });
   }
   return wizardOk ? exitCode : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
+};
+
+// --score prints the bare number, and nothing at all when there is no
+// score, so a script can tell "no score" from any number. --json prints
+// the full report.
+const writeMachineReport = (
+  scan: ScanOutcome,
+  { label, score }: ScoreResult,
+  scoreOnly: boolean
+): void => {
+  if (scoreOnly) {
+    if (score !== null) {
+      console.log(score);
+    }
+    return;
+  }
+  const report = toJsonReport(
+    scan.diagnostics,
+    score,
+    label,
+    scan.project,
+    scan.failures,
+    scan.analyzedFileCount
+  );
+  console.log(JSON.stringify(report, null, 2));
 };
 
 // Prints the result in the requested output mode and returns the exit code.
@@ -733,39 +793,38 @@ const writeScanOutput = async (
   scan: ScanOutcome,
   options: OutputOptions
 ): Promise<number> => {
-  const { diagnostics, failures, project, rootDir, scannedFileCount } = scan;
-  const { score, label } = calculateScore(diagnostics, scan.analyzedFileCount);
+  const { analyzedFileCount, diagnostics, failures, rootDir } = scan;
+  const scoreResult = calculateScore(diagnostics, analyzedFileCount);
 
-  reportScanFailures(failures);
-
-  if (scannedFileCount === 0) {
-    // --json and --score keep their stdout contract (an empty report,
-    // score 100), so they only get a warning on stderr.
-    if (options.score || options.json) {
-      console.error(`Warning: ${noFilesFoundMessage(rootDir)}`);
-    } else {
-      printNothingScanned(rootDir);
-      return 0;
-    }
-  }
+  reportScanFailures(failures, scoreResult.score !== null);
 
   // Every output mode gates on the same condition, so the same
   // project cannot pass in one mode and fail in another.
   const hasErrors = diagnostics.some((d) => d.severity === "error");
   const exitCode = scanExitCode(failures.length > 0, hasErrors);
 
-  if (options.score) {
-    console.log(score);
+  if (options.score || options.json) {
+    if (scoreResult.score === null) {
+      const message =
+        scan.scannedFileCount === 0
+          ? noFilesFoundMessage(rootDir)
+          : noScoreMessage(scan.scannedFileCount);
+      console.error(`Warning: ${message}`);
+    }
+    writeMachineReport(scan, scoreResult, options.score === true);
     return exitCode;
   }
-  if (options.json) {
-    const report = toJsonReport(diagnostics, score, label, project, failures);
-    console.log(JSON.stringify(report, null, 2));
+  if (scoreResult.score === null) {
+    if (scan.scannedFileCount === 0) {
+      printNothingScanned(rootDir);
+    } else {
+      printNothingAnalyzed(scan.scannedFileCount, failures.length);
+    }
     return exitCode;
   }
   return await writeTerminalReport(
     scan,
-    { label, score },
+    scoreResult,
     options.verbose,
     exitCode
   );

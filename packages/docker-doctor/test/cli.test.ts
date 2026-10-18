@@ -117,14 +117,22 @@ describe("unanalyzable files", () => {
     expect(() => JSON.parse(stdout)).not.toThrow();
   });
 
-  test("--score still prints only an integer, but exits 2", async () => {
+  test("--score prints nothing when no file was analyzed, and exits 2", async () => {
     const { exitCode, stdout } = await runCli([
       fixture("unparseable-compose"),
       "--score",
     ]);
     expect(exitCode).toBe(2);
-    expect(Number.isInteger(Number(stdout.trim()))).toBe(true);
-    expect(stdout.trim().split("\n").length).toBe(1);
+    expect(stdout).toBe("");
+  });
+
+  test("--score still prints only an integer when some files were analyzed", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("partly-broken"),
+      "--score",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stdout).toMatch(/^\d+\n$/u);
   });
 
   test("an unterminated heredoc makes the scan incomplete (exit 2) instead of silently clean", async () => {
@@ -214,6 +222,7 @@ describe("--json contract", () => {
     const report = JSON.parse(stdout);
     expect(Object.keys(report).toSorted()).toEqual(
       [
+        "analyzedFiles",
         "diagnostics",
         "failures",
         "label",
@@ -223,6 +232,13 @@ describe("--json contract", () => {
         "timestamp",
       ].toSorted()
     );
+  });
+
+  test("schemaVersion is 6 and analyzedFiles counts the scanned files", async () => {
+    const { stdout } = await runCli([fixture("multi-file"), "--json"]);
+    const report = JSON.parse(stdout);
+    expect(report.schemaVersion).toBe(6);
+    expect(report.analyzedFiles).toBe(2);
   });
 
   test("a complete scan reports an empty failures list", async () => {
@@ -341,6 +357,38 @@ describe("analyzed files", () => {
     }
   });
 
+  test("no analyzed file gives a null score in --json and no --score output", async () => {
+    const json = await runCli([fixture("all-broken"), "--json"]);
+    expect(json.exitCode).toBe(2);
+    const report = JSON.parse(json.stdout);
+    expect(report.score).toBeNull();
+    expect(report.label).toBeNull();
+    expect(report.analyzedFiles).toBe(0);
+    expect(report.failures).toHaveLength(2);
+
+    const score = await runCli([fixture("all-broken"), "--score"]);
+    expect(score.exitCode).toBe(2);
+    expect(score.stdout).toBe("");
+    expect(score.stderr).toContain("checked none of the 2 discovered files");
+  });
+
+  test("files with nothing to check give no score and exit 0", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-stub-only-"));
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "# TODO\n");
+      fs.writeFileSync(path.join(root, "compose.yaml"), "{}\n");
+
+      const { exitCode, stderr, stdout } = await runCli([root, "--json"]);
+      expect(exitCode).toBe(0);
+      const report = JSON.parse(stdout);
+      expect(report.score).toBeNull();
+      expect(report.failures).toEqual([]);
+      expect(stderr).toContain("checked none of the 2 discovered files");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   test("failures are listed in discovery order", async () => {
     // The files are read in parallel. Larger files finish reading later, so
     // with the largest file first a scan that kept completion order would
@@ -382,16 +430,19 @@ describe("empty project", () => {
     expect(report.diagnostics).toEqual([]);
   });
 
-  test("--json and --score warn on stderr and keep their stdout contract", async () => {
+  test("--json and --score warn on stderr and report no score", async () => {
     const json = await runCli([fixture("empty"), "--json"]);
     expect(json.exitCode).toBe(0);
     expect(json.stderr).toContain("No Dockerfiles or Compose files found");
-    expect(JSON.parse(json.stdout).score).toBe(100);
+    const report = JSON.parse(json.stdout);
+    expect(report.score).toBeNull();
+    expect(report.label).toBeNull();
+    expect(report.analyzedFiles).toBe(0);
 
     const score = await runCli([fixture("empty"), "--score"]);
     expect(score.exitCode).toBe(0);
     expect(score.stderr).toContain("No Dockerfiles or Compose files found");
-    expect(score.stdout.trim()).toBe("100");
+    expect(score.stdout).toBe("");
   });
 
   test("a project with files gets no such warning", async () => {
