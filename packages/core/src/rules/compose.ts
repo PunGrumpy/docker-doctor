@@ -1,3 +1,9 @@
+import {
+  composeField,
+  isComposeMapping,
+  isComposeSequence,
+  isComposeString,
+} from "../parsers/compose-value";
 import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
 import type { ComposeRule, Diagnostic } from "../types/index";
 import { composeServices } from "./compose-services";
@@ -6,11 +12,7 @@ import { createDiagnostic } from "./create-diagnostic";
 export const noVersionKey: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
-    if (
-      composeContent &&
-      typeof composeContent === "object" &&
-      "version" in composeContent
-    ) {
+    if (isComposeMapping(composeContent) && "version" in composeContent) {
       return [
         createDiagnostic(
           file,
@@ -36,16 +38,20 @@ export const requireResourceLimits: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
-      const deploy = config.deploy as Record<string, unknown> | undefined;
-      const resources = deploy?.resources as
-        | Record<string, unknown>
-        | undefined;
-      const limits = resources?.limits as Record<string, unknown> | undefined;
-      const hasDeployLimits = Boolean(limits?.cpus || limits?.memory);
-      // Pre-`deploy` spelling of the same limits, still in the spec.
-      const hasServiceLevelLimits = Boolean(
-        config.mem_limit || config.cpus || config.cpu_quota
+      const limits = composeField(
+        composeField(config.deploy, "resources"),
+        "limits"
       );
+      const hasDeployLimits = [
+        composeField(limits, "cpus"),
+        composeField(limits, "memory"),
+      ].some(Boolean);
+      // Pre-`deploy` spelling of the same limits, still in the spec.
+      const hasServiceLevelLimits = [
+        config.mem_limit,
+        config.cpus,
+        config.cpu_quota,
+      ].some(Boolean);
 
       if (!(hasDeployLimits || hasServiceLevelLimits)) {
         diagnostics.push(
@@ -76,8 +82,8 @@ export const requireRestartPolicy: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const hasRestart = "restart" in config;
-      const deploy = config.deploy as Record<string, unknown> | undefined;
-      const hasDeployRestart = deploy?.restart_policy !== undefined;
+      const hasDeployRestart =
+        composeField(config.deploy, "restart_policy") !== undefined;
 
       if (!hasRestart && !hasDeployRestart) {
         diagnostics.push(
@@ -107,8 +113,7 @@ export const useDependsOnCondition: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
-      const dependsOn = config.depends_on;
-      if (dependsOn && Array.isArray(dependsOn)) {
+      if (isComposeSequence(config.depends_on)) {
         diagnostics.push(
           createDiagnostic(
             file,
@@ -140,7 +145,7 @@ export const pinServiceImage: ComposeRule = {
       const { image } = config;
       // With `build:` present, `image` only names the locally built
       // artifact — there is nothing to pin.
-      if (typeof image !== "string" || "build" in config) {
+      if (!isComposeString(image) || "build" in config) {
         continue;
       }
 

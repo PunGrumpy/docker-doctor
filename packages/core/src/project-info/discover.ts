@@ -52,10 +52,12 @@ const createPrunedDirectoryMatcher = (
   patterns: readonly string[] = []
 ): ((relativeDir: string) => boolean) =>
   createIgnoreMatcher(
-    patterns
-      .map(normalizeIgnorePattern)
-      .filter((pattern) => pattern.endsWith(SUBTREE_SUFFIX))
-      .map((pattern) => pattern.slice(0, -SUBTREE_SUFFIX.length))
+    patterns.flatMap((raw) => {
+      const pattern = normalizeIgnorePattern(raw);
+      return pattern.endsWith(SUBTREE_SUFFIX)
+        ? [pattern.slice(0, -SUBTREE_SUFFIX.length)]
+        : [];
+    })
   );
 
 interface WalkOptions {
@@ -64,10 +66,10 @@ interface WalkOptions {
   rootDir: string;
 }
 
-const isPermissionError = (error: unknown): boolean =>
-  error instanceof Error &&
-  "code" in error &&
-  (error.code === "EACCES" || error.code === "EPERM");
+const isPermissionError = (cause: unknown): boolean =>
+  cause instanceof Error &&
+  "code" in cause &&
+  (cause.code === "EACCES" || cause.code === "EPERM");
 
 const walk = async (
   dir: string,

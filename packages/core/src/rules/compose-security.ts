@@ -1,4 +1,10 @@
-import type { ComposeRule, Diagnostic } from "../types/index";
+import {
+  isComposeMapping,
+  isComposeNumber,
+  isComposeSequence,
+  isComposeString,
+} from "../parsers/compose-value";
+import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
 import type { HostPathScope } from "./compose-mounts";
 import {
   bindMountSource,
@@ -45,7 +51,7 @@ export const noDockerSocketMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
-      if (!Array.isArray(volumes)) {
+      if (!isComposeSequence(volumes)) {
         continue;
       }
       for (const [index, volume] of volumes.entries()) {
@@ -89,7 +95,7 @@ export const noBroadBindMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
-      if (!Array.isArray(volumes)) {
+      if (!isComposeSequence(volumes)) {
         continue;
       }
       for (const [index, volume] of volumes.entries()) {
@@ -133,7 +139,7 @@ export const preferReadOnlyBindMount: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { volumes } = config;
-      if (!Array.isArray(volumes)) {
+      if (!isComposeSequence(volumes)) {
         continue;
       }
       for (const [index, volume] of volumes.entries()) {
@@ -169,11 +175,11 @@ export const preferReadOnlyBindMount: ComposeRule = {
 // YAML reads an unquoted `123456` as a number, and it is still a literal
 // value in the file. Booleans are left out: `AUTH_ENABLED: true` matches the
 // `auth` key pattern but holds no secret.
-const literalValue = (value: unknown): string | undefined => {
-  if (typeof value === "string") {
+const literalValue = (value: ComposeValue | undefined): string | undefined => {
+  if (isComposeString(value)) {
     return value;
   }
-  if (typeof value === "number") {
+  if (isComposeNumber(value)) {
     return String(value);
   }
   return undefined;
@@ -200,11 +206,11 @@ export const noPlaintextSecrets: ComposeRule = {
     for (const [name, config] of composeServices(composeContent)) {
       const { environment } = config;
 
-      if (Array.isArray(environment)) {
+      if (isComposeSequence(environment)) {
         // List syntax: "KEY=value" entries; a bare "KEY" passes the host
         // value through and holds no literal.
         for (const [index, entry] of environment.entries()) {
-          if (typeof entry !== "string") {
+          if (!isComposeString(entry)) {
             continue;
           }
           const eqIndex = entry.indexOf("=");
@@ -221,7 +227,7 @@ export const noPlaintextSecrets: ComposeRule = {
             );
           }
         }
-      } else if (environment && typeof environment === "object") {
+      } else if (isComposeMapping(environment)) {
         for (const [key, value] of Object.entries(environment)) {
           const literal = literalValue(value);
           if (

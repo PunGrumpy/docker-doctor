@@ -6,36 +6,75 @@ import type {
 
 export type { DockerDoctorConfig } from "../types/index";
 
-const RULE_SEVERITIES: readonly RuleSeverity[] = [
+const RULE_SEVERITIES: ReadonlySet<string> = new Set<RuleSeverity>([
   "error",
   "warning",
   "info",
   "off",
-];
+]);
 
-const RULE_CATEGORIES: readonly RuleCategory[] = [
+const RULE_CATEGORIES: ReadonlySet<string> = new Set<RuleCategory>([
   "Best Practices",
   "Compose",
   "Image Size",
   "Performance",
   "Security",
-];
+]);
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+// A config file's export and its sections, before their values are
+// checked. Any object fits these, since every key is optional.
+export interface ConfigInput {
+  readonly categories?: unknown;
+  readonly ignore?: unknown;
+  readonly rules?: unknown;
+}
+
+interface CategorySection {
+  readonly "Best Practices"?: unknown;
+  readonly Compose?: unknown;
+  readonly "Image Size"?: unknown;
+  readonly Performance?: unknown;
+  readonly Security?: unknown;
+}
+
+interface IgnoreSection {
+  readonly files?: unknown;
+}
+
+export const isPlainObject = (value: unknown): value is object =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const isRuleSeverity = (value: unknown): value is RuleSeverity =>
-  typeof value === "string" &&
-  (RULE_SEVERITIES as readonly string[]).includes(value);
+const isString = (value: unknown): value is string => typeof value === "string";
 
-const validateRules = (value: unknown): Record<string, RuleSeverity> => {
-  if (!isPlainObject(value)) {
-    throw new Error(
-      `Invalid config: "rules" must be an object, got ${typeof value}`
-    );
+const isRuleSeverity = (value: unknown): value is RuleSeverity =>
+  typeof value === "string" && RULE_SEVERITIES.has(value);
+
+const isRuleCategory = (key: string): key is RuleCategory =>
+  RULE_CATEGORIES.has(key);
+
+// Each section check is a type predicate that returns true or throws. The
+// typeof that names a bad value's type in the message stays inside it.
+const isSectionObject = (
+  value: unknown,
+  section: string
+): value is CategorySection & IgnoreSection => {
+  if (isPlainObject(value)) {
+    return true;
   }
 
-  for (const [key, severity] of Object.entries(value)) {
+  throw new Error(
+    `Invalid config: "${section}" must be an object, got ${typeof value}`
+  );
+};
+
+const isRuleSeverityMap = (
+  rules: unknown
+): rules is Readonly<Record<string, RuleSeverity>> => {
+  if (!isSectionObject(rules, "rules")) {
+    return false;
+  }
+
+  for (const [key, severity] of Object.entries(rules)) {
     if (!isRuleSeverity(severity)) {
       throw new Error(
         `Invalid severity ${JSON.stringify(severity)} for rule "${key}"`
@@ -43,67 +82,67 @@ const validateRules = (value: unknown): Record<string, RuleSeverity> => {
     }
   }
 
-  return value as Record<string, RuleSeverity>;
+  return true;
 };
 
 const validateCategories = (
-  value: unknown
+  categories: CategorySection
 ): Partial<Record<RuleCategory, RuleSeverity>> => {
-  if (!isPlainObject(value)) {
-    throw new Error(
-      `Invalid config: "categories" must be an object, got ${typeof value}`
-    );
-  }
-
   const result: Partial<Record<RuleCategory, RuleSeverity>> = {};
-  for (const [key, severity] of Object.entries(value)) {
-    if (!(RULE_CATEGORIES as readonly string[]).includes(key)) {
+
+  for (const [key, severity] of Object.entries(categories)) {
+    if (!isRuleCategory(key)) {
       // Unknown category keys are silently dropped (matches the
       // legacy schema's excess-property behavior).
       continue;
     }
+
     if (!isRuleSeverity(severity)) {
       throw new Error(
         `Invalid severity ${JSON.stringify(severity)} for category "${key}"`
       );
     }
-    result[key as RuleCategory] = severity;
+
+    result[key] = severity;
   }
 
   return result;
 };
 
-const validateIgnore = (value: unknown): { files?: string[] } => {
-  if (!isPlainObject(value)) {
+const isFileList = (files: unknown): files is string[] =>
+  Array.isArray(files) && files.every(isString);
+
+const validateIgnore = (
+  ignore: IgnoreSection
+): DockerDoctorConfig["ignore"] => {
+  if (ignore.files === undefined) {
+    return {};
+  }
+
+  if (!isFileList(ignore.files)) {
     throw new Error(
-      `Invalid config: "ignore" must be an object, got ${typeof value}`
+      'Invalid config: "ignore.files" must be an array of strings'
     );
   }
 
-  const result: { files?: string[] } = {};
-  if ("files" in value && value.files !== undefined) {
-    if (
-      !Array.isArray(value.files) ||
-      !value.files.every((item) => typeof item === "string")
-    ) {
-      throw new Error(
-        'Invalid config: "ignore.files" must be an array of strings'
-      );
-    }
-    result.files = value.files;
-  }
-
-  return result;
+  return { files: ignore.files };
 };
 
-const describeInvalidTopLevel = (input: unknown): string => {
+// Returns true or throws, like the section checks.
+export const isConfigObject = (input: unknown): input is ConfigInput => {
+  if (isPlainObject(input)) {
+    return true;
+  }
+
+  let received: string = typeof input;
+
   if (input === null) {
-    return "null";
+    received = "null";
+  } else if (Array.isArray(input)) {
+    received = "array";
   }
-  if (Array.isArray(input)) {
-    return "array";
-  }
-  return typeof input;
+
+  throw new Error(`Invalid config: expected an object, got ${received}`);
 };
 
 /**
@@ -113,24 +152,21 @@ const describeInvalidTopLevel = (input: unknown): string => {
  * dropping unknown top-level (and nested) keys rather than throwing
  * or preserving them.
  */
-export const validateConfig = (input: unknown): DockerDoctorConfig => {
-  if (!isPlainObject(input)) {
-    throw new Error(
-      `Invalid config: expected an object, got ${describeInvalidTopLevel(input)}`
-    );
-  }
-
+export const validateConfig = (input: ConfigInput): DockerDoctorConfig => {
   const result: DockerDoctorConfig = {};
 
-  if ("rules" in input && input.rules !== undefined) {
-    result.rules = validateRules(input.rules);
+  if (input.rules !== undefined && isRuleSeverityMap(input.rules)) {
+    result.rules = input.rules;
   }
 
-  if ("categories" in input && input.categories !== undefined) {
+  if (
+    input.categories !== undefined &&
+    isSectionObject(input.categories, "categories")
+  ) {
     result.categories = validateCategories(input.categories);
   }
 
-  if ("ignore" in input && input.ignore !== undefined) {
+  if (input.ignore !== undefined && isSectionObject(input.ignore, "ignore")) {
     result.ignore = validateIgnore(input.ignore);
   }
 

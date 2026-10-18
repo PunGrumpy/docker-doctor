@@ -1,27 +1,30 @@
+import {
+  isComposeMapping,
+  isComposeSequence,
+  isComposeString,
+} from "../parsers/compose-value";
 import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
-import type { ComposeRule, Diagnostic } from "../types/index";
+import type {
+  ComposeMapping,
+  ComposeRule,
+  ComposeValue,
+  Diagnostic,
+} from "../types/index";
 import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
 /**
- * Narrows an unknown compose document to its top-level `models:` entries
+ * Narrows a compose document to its top-level `models:` entries
  * (Docker Model Runner, Compose ≥ 2.38).
  */
 export const topLevelModels = (
-  composeContent: unknown
-): Record<string, unknown> => {
-  if (
-    !composeContent ||
-    typeof composeContent !== "object" ||
-    !("models" in composeContent)
-  ) {
+  composeContent: ComposeValue
+): ComposeMapping => {
+  if (!isComposeMapping(composeContent)) {
     return {};
   }
-  const { models } = composeContent as { models?: unknown };
-  if (!models || typeof models !== "object" || Array.isArray(models)) {
-    return {};
-  }
-  return models as Record<string, unknown>;
+  const { models } = composeContent;
+  return isComposeMapping(models) ? models : {};
 };
 
 export const undefinedModelReference: ComposeRule = {
@@ -49,14 +52,14 @@ export const undefinedModelReference: ComposeRule = {
 
     for (const [name, config] of composeServices(composeContent)) {
       const { models } = config;
-      if (Array.isArray(models)) {
+      if (isComposeSequence(models)) {
         // Short syntax: a list of model names.
         for (const [index, entry] of models.entries()) {
-          if (typeof entry === "string" && !defined.has(entry)) {
+          if (isComposeString(entry) && !defined.has(entry)) {
             flag(name, entry, index);
           }
         }
-      } else if (models && typeof models === "object") {
+      } else if (isComposeMapping(models)) {
         // Long syntax: a map of model name → binding config.
         for (const modelName of Object.keys(models)) {
           if (!defined.has(modelName)) {
@@ -82,15 +85,15 @@ interface ModelBinding {
 
 // Top-level `models:` (Compose ≥ 2.38) plus the older service-level
 // `provider: { type: model }` form (Compose ≥ 2.35).
-const collectModelBindings = (composeContent: unknown): ModelBinding[] => {
+const collectModelBindings = (composeContent: ComposeValue): ModelBinding[] => {
   const bindings: ModelBinding[] = [];
 
   for (const [name, config] of Object.entries(topLevelModels(composeContent))) {
-    if (!config || typeof config !== "object") {
+    if (!isComposeMapping(config)) {
       continue;
     }
-    const { model } = config as Record<string, unknown>;
-    if (typeof model === "string") {
+    const { model } = config;
+    if (isComposeString(model)) {
       bindings.push({
         model,
         path: ["models", name, "model"],
@@ -101,15 +104,15 @@ const collectModelBindings = (composeContent: unknown): ModelBinding[] => {
 
   for (const [name, config] of composeServices(composeContent)) {
     const { provider } = config;
-    if (!provider || typeof provider !== "object") {
+    if (!isComposeMapping(provider)) {
       continue;
     }
-    const { type, options } = provider as Record<string, unknown>;
-    if (type !== "model" || !options || typeof options !== "object") {
+    const { type, options } = provider;
+    if (type !== "model" || !isComposeMapping(options)) {
       continue;
     }
-    const { model } = options as Record<string, unknown>;
-    if (typeof model === "string") {
+    const { model } = options;
+    if (isComposeString(model)) {
       bindings.push({
         model,
         path: ["services", name, "provider", "options", "model"],

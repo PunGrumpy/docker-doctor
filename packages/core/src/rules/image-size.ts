@@ -218,15 +218,23 @@ const CACHE_TARGET_KEY_RE = /^(?:target|dst|destination)=/u;
 // A `RUN --mount=type=cache,target=<dir>` keeps <dir> in the cache mount, not
 // in the image layer — cleanup commands for that dir are unnecessary (and the
 // Docker-documented apt pattern deliberately omits them).
-const cacheMountTargets = (args: string): string[] =>
-  [...args.matchAll(BUILDKIT_MOUNT_FLAG_RE)]
-    .map((match) => (match.groups?.spec ?? "").split(","))
-    .filter((options) => options.includes("type=cache"))
-    .flatMap((options) =>
-      options
-        .filter((option) => CACHE_TARGET_KEY_RE.test(option))
-        .map((option) => option.slice(option.indexOf("=") + 1))
-    );
+const cacheMountTargets = (args: string): string[] => {
+  const targets: string[] = [];
+
+  for (const match of args.matchAll(BUILDKIT_MOUNT_FLAG_RE)) {
+    const options = (match.groups?.spec ?? "").split(",");
+
+    if (options.includes("type=cache")) {
+      for (const option of options) {
+        if (CACHE_TARGET_KEY_RE.test(option)) {
+          targets.push(option.slice(option.indexOf("=") + 1));
+        }
+      }
+    }
+  }
+
+  return targets;
+};
 
 // A recursive `rm` and its operands, which end at the next shell separator.
 // `rm -rf`, `rm -fr`, `rm -r`, `rm -Rf` and `rm --recursive --force` all

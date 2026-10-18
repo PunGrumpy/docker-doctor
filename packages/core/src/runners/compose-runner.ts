@@ -1,10 +1,15 @@
 import { allComposeRules } from "../rules/index";
-import type { ComposeLocator, Diagnostic, RuleSeverity } from "../types/index";
+import type {
+  ComposeLocator,
+  ComposeValue,
+  Diagnostic,
+  RuleSeverity,
+} from "../types/index";
 import { isAnalyzableCompose } from "./analyzable";
 import { resolveSeverity } from "./resolve-severity";
 
 export const runComposeRules = (
-  composeContent: unknown,
+  composeContent: ComposeValue,
   file: string,
   rulesConfig?: Record<string, RuleSeverity>,
   categoriesConfig?: Record<string, RuleSeverity>,

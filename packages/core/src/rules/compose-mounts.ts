@@ -1,5 +1,12 @@
 import path from "node:path";
 
+import {
+  composeField,
+  isComposeMapping,
+  isComposeSequence,
+  isComposeString,
+} from "../parsers/compose-value";
+import type { ComposeValue } from "../types/index";
 import { isComposeTrue } from "./compose-services";
 
 /**
@@ -37,7 +44,7 @@ export const resolveInterpolationDefaults = (value: string): string =>
 
 // Named volumes cannot start with a path prefix, so only path-shaped
 // sources are bind mounts.
-export const PATH_SHAPED = /^(?:[/.~]|[A-Za-z]:)/u;
+export const PATH_LIKE = /^(?:[/.~]|[A-Za-z]:)/u;
 
 // `[SOURCE:]TARGET[:MODE]`, where a `${VAR:-default}` source has its own colon.
 const splitShortSyntax = (spec: string): string[] => {
@@ -90,8 +97,14 @@ export interface VolumeMount {
 const shortSyntaxReadOnly = (mode: string | undefined): boolean =>
   mode !== undefined && mode.split(",").includes("ro");
 
-export const volumeMount = (volume: unknown): VolumeMount | undefined => {
-  if (typeof volume === "string") {
+const stringOrUndefined = (
+  value: ComposeValue | undefined
+): string | undefined => (isComposeString(value) ? value : undefined);
+
+export const volumeMount = (
+  volume: ComposeValue | undefined
+): VolumeMount | undefined => {
+  if (isComposeString(volume)) {
     const [source, target, mode] = joinDriveLetter(splitShortSyntax(volume));
     // A lone path is an anonymous volume at that target, not a bind mount.
     if (target === undefined) {
@@ -104,18 +117,13 @@ export const volumeMount = (volume: unknown): VolumeMount | undefined => {
       type: undefined,
     };
   }
-  if (volume && typeof volume === "object") {
-    const {
-      read_only: readOnly,
-      source,
-      target,
-      type,
-    } = volume as Record<string, unknown>;
+  // A sequence here is invalid Compose. It has none of these keys.
+  if (isComposeMapping(volume) || isComposeSequence(volume)) {
     return {
-      readOnly: isComposeTrue(readOnly),
-      source: typeof source === "string" ? source : undefined,
-      target: typeof target === "string" ? target : undefined,
-      type: typeof type === "string" ? type : undefined,
+      readOnly: isComposeTrue(composeField(volume, "read_only")),
+      source: stringOrUndefined(composeField(volume, "source")),
+      target: stringOrUndefined(composeField(volume, "target")),
+      type: stringOrUndefined(composeField(volume, "type")),
     };
   }
   return undefined;
@@ -143,7 +151,7 @@ export const bindMountSource = (mount: VolumeMount): string | undefined => {
   const resolved = withDefaults
     .replace(INTERPOLATION_WITHOUT_DEFAULT, "")
     .replaceAll("\\", "/");
-  if (resolved === "" || !PATH_SHAPED.test(resolved)) {
+  if (resolved === "" || !PATH_LIKE.test(resolved)) {
     return undefined;
   }
   return resolved;
