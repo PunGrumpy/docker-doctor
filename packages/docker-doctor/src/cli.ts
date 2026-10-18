@@ -4,7 +4,12 @@ import path from "node:path";
 import readline from "node:readline";
 import { setTimeout } from "node:timers/promises";
 
-import type { Diagnostic, JsonReport, RuleSeverity } from "@docker-doctor/core";
+import type {
+  Diagnostic,
+  JsonReport,
+  ProjectInfo,
+  RuleSeverity,
+} from "@docker-doctor/core";
 import {
   discoverProject,
   parseDockerfile,
@@ -644,6 +649,95 @@ const printNothingScanned = (rootDir: string): void => {
   );
 };
 
+interface ScanOutcome {
+  diagnostics: Diagnostic[];
+  failures: ScanFailure[];
+  fileContents: Record<string, string>;
+  project: ProjectInfo;
+  rootDir: string;
+  scannedFileCount: number;
+}
+
+interface OutputOptions {
+  json?: boolean;
+  score?: boolean;
+  verbose?: boolean;
+}
+
+const writeTerminalReport = async (
+  scan: ScanOutcome,
+  { label, score }: { label: string; score: number },
+  verbose: boolean | undefined,
+  exitCode: number
+): Promise<number> => {
+  const { diagnostics, failures, fileContents, project, rootDir } = scan;
+  await formatTerminal(
+    diagnostics,
+    score,
+    label,
+    project,
+    verbose,
+    fileContents,
+    failures.length
+  );
+
+  let wizardOk = true;
+  if (process.stdout.isTTY && process.stdin.isTTY) {
+    wizardOk = await runInteractiveWizard({
+      diagnostics,
+      report: toJsonReport(diagnostics, score, label, project, failures),
+      rootDir,
+    });
+  }
+  return wizardOk ? exitCode : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
+};
+
+// Prints the result in the requested output mode and returns the exit code.
+const writeScanOutput = async (
+  scan: ScanOutcome,
+  options: OutputOptions
+): Promise<number> => {
+  const { diagnostics, failures, project, rootDir, scannedFileCount } = scan;
+  const { score, label } = calculateScore(
+    diagnostics,
+    scannedFileCount - failures.length
+  );
+
+  reportScanFailures(failures);
+
+  if (scannedFileCount === 0) {
+    // --json and --score keep their stdout contract (an empty report,
+    // score 100), so they only get a warning on stderr.
+    if (options.score || options.json) {
+      console.error(`Warning: ${noFilesFoundMessage(rootDir)}`);
+    } else {
+      printNothingScanned(rootDir);
+      return 0;
+    }
+  }
+
+  // Every output mode gates on the same condition, so the same
+  // project cannot pass in one mode and fail in another.
+  const hasErrors = diagnostics.some((d) => d.severity === "error");
+  const exitCode = scanExitCode(failures.length > 0, hasErrors);
+
+  if (options.score) {
+    console.log(score);
+    return exitCode;
+  }
+  if (options.json) {
+    const report = toJsonReport(diagnostics, score, label, project, failures);
+    console.log(JSON.stringify(report, null, 2));
+    return exitCode;
+  }
+  return await writeTerminalReport(
+    scan,
+    { label, score },
+    options.verbose,
+    exitCode
+  );
+};
+
 const pathExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
@@ -813,12 +907,6 @@ program
           setStatus
         );
 
-        // Calculate score
-        const { score, label } = calculateScore(
-          diagnostics,
-          scannedFileCount - failures.length
-        );
-
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
 
@@ -835,63 +923,17 @@ program
           );
         }
 
-        reportScanFailures(failures);
-        const scanIncomplete = failures.length > 0;
-
-        if (scannedFileCount === 0) {
-          // --json and --score keep their stdout contract (an empty report,
-          // score 100), so they only get a warning on stderr.
-          if (isSilent) {
-            console.error(`Warning: ${noFilesFoundMessage(rootDir)}`);
-          } else {
-            printNothingScanned(rootDir);
-            process.exitCode = 0;
-            return;
-          }
-        }
-
-        // Every output mode gates on the same condition, so the same
-        // project cannot pass in one mode and fail in another.
-        const hasErrors = diagnostics.some((d) => d.severity === "error");
-
-        if (options.score) {
-          console.log(score);
-          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
-          return;
-        } else if (options.json) {
-          const report = toJsonReport(
+        process.exitCode = await writeScanOutput(
+          {
             diagnostics,
-            score,
-            label,
+            failures,
+            fileContents,
             project,
-            failures
-          );
-          console.log(JSON.stringify(report, null, 2));
-          process.exitCode = scanExitCode(scanIncomplete, hasErrors);
-          return;
-        }
-        await formatTerminal(
-          diagnostics,
-          score,
-          label,
-          project,
-          options.verbose,
-          fileContents,
-          failures.length
-        );
-
-        let wizardOk = true;
-        if (process.stdout.isTTY && process.stdin.isTTY) {
-          wizardOk = await runInteractiveWizard({
-            diagnostics,
-            report: toJsonReport(diagnostics, score, label, project, failures),
             rootDir,
-          });
-        }
-        const exitCode = scanExitCode(scanIncomplete, hasErrors);
-        process.exitCode = wizardOk
-          ? exitCode
-          : Math.max(POST_SCAN_FAILURE_EXIT_CODE, exitCode);
+            scannedFileCount,
+          },
+          options
+        );
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
