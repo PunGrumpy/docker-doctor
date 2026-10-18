@@ -58,7 +58,7 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       currentChange = null;
     } else if (line.startsWith("- ") && currentSection && currentVersion) {
       // oxlint-disable-next-line prefer-named-capture-group
-      const shaMatch = line.match(/^-\s+([a-f0-9]+):\s+(.+)/u);
+      const shaMatch = /^-\s+([a-f0-9]+):\s+(.+)/u.exec(line);
 
       if (shaMatch) {
         currentChange = {

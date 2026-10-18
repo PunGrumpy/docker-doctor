@@ -9,5 +9,7 @@ export const env = createEnv({
     NEXT_PUBLIC_DATABUDDY_CLIENT_ID:
       process.env.NEXT_PUBLIC_DATABUDDY_CLIENT_ID,
   },
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation:
+    process.env.SKIP_ENV_VALIDATION !== undefined &&
+    process.env.SKIP_ENV_VALIDATION !== "",
 });

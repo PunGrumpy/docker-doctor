@@ -50,7 +50,7 @@ const AgentStep = ({ icon, label, actions }: AgentStepProps) => (
             className="text-muted-foreground flex min-w-0 items-center gap-1.5 font-mono text-xs"
             key={action.text}
           >
-            {action.warn ? (
+            {action.warn === true ? (
               <AlertTriangle
                 aria-hidden="true"
                 className="size-3 min-w-3 text-yellow-600 dark:text-yellow-400"

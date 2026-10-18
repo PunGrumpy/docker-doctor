@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Cursor } from "@/components/icons/cursor";
 import { Pill } from "@/components/pill";
 import { getScoreData } from "@/lib/score";
+import { hasText } from "@/lib/text";
 import { cn, pluralize } from "@/lib/utils";
 
 interface CardProps {
@@ -45,7 +46,7 @@ const ShareButton = ({
   score,
   children,
 }: ShareButtonProps) => {
-  if (href) {
+  if (hasText(href)) {
     return (
       <a
         data-channel={channel}
@@ -166,7 +167,13 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
           <ShareButton channel="linkedin" href={linkedinUrl} score={score}>
             Share on LinkedIn
           </ShareButton>
-          <ShareButton channel="badge" onClick={handleCopyBadge} score={score}>
+          <ShareButton
+            channel="badge"
+            onClick={() => {
+              void handleCopyBadge();
+            }}
+            score={score}
+          >
             Copy GitHub badge
           </ShareButton>
         </div>

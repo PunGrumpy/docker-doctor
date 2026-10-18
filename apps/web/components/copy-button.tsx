@@ -7,6 +7,16 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
+// Calls onReset after the check mark has shown for two seconds. Returns the
+// cleanup that cancels it.
+const startResetTimer = (onReset: () => void): (() => void) => {
+  const timer = setTimeout(onReset, 2000);
+
+  return () => {
+    clearTimeout(timer);
+  };
+};
+
 interface CopyButtonProps extends Omit<ComponentProps<"button">, "onClick"> {
   readonly value: string;
 }
@@ -26,22 +36,22 @@ export const CopyButton = ({ value, className, ...props }: CopyButtonProps) => {
     }
   }, [value]);
 
-  useEffect(() => {
-    if (!copied) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [copied]);
+  useEffect(
+    () =>
+      copied
+        ? startResetTimer(() => {
+            setCopied(false);
+          })
+        : undefined,
+    [copied]
+  );
 
   return (
     <button
       type="button"
-      onClick={handleCopy}
+      onClick={() => {
+        void handleCopy();
+      }}
       className={cn(
         "shadow-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:ring-primary focus-visible:ring-offset-background relative flex size-9 cursor-pointer items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         "transition-[opacity,transform,background-color,border-color] duration-150 ease-out active:scale-[0.96]",

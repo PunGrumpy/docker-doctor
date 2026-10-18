@@ -5,6 +5,7 @@ import { DocsMobileToc } from "@/components/docs/mobile-toc";
 import { DocsToc } from "@/components/docs/toc";
 import { getMDXComponents } from "@/components/mdx";
 import { getPageImageUrl, source } from "@/lib/source";
+import { hasText } from "@/lib/text";
 
 interface DocPageProps {
   readonly params: Promise<{ slug?: string[] }>;
@@ -49,7 +50,7 @@ const Page = async ({ params }: DocPageProps) => {
         <h1 className="font-serif text-4xl font-normal tracking-tight">
           {page.data.title}
         </h1>
-        {page.data.description ? (
+        {hasText(page.data.description) ? (
           <p className="text-muted-foreground mt-2">{page.data.description}</p>
         ) : null}
         <DocsMobileToc toc={page.data.toc} />

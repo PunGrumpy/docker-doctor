@@ -72,8 +72,12 @@ const Row = ({
         )}
         href={`${entry.githubUrl}/tree/${entry.commitSha}`}
         onBlur={onDeactivate}
-        onFocus={() => onActivate(entry)}
-        onMouseEnter={() => onActivate(entry)}
+        onFocus={() => {
+          onActivate(entry);
+        }}
+        onMouseEnter={() => {
+          onActivate(entry);
+        }}
         onMouseLeave={onDeactivate}
         rel="noopener noreferrer"
         target="_blank"
@@ -191,7 +195,9 @@ export const Leaderboard = ({
 
   // Keep the last entry so the label fades out in place instead of
   // snapping to 0 while it disappears.
-  const deactivate = () => setVisible(false);
+  const deactivate = () => {
+    setVisible(false);
+  };
 
   return (
     <Section className="pt-8 pb-16">

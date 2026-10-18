@@ -10,6 +10,23 @@ import { DocsSidebar } from "@/components/docs/sidebar";
 import { Logo } from "@/components/logo";
 import { ChangelogButton, LeaderboardButton } from "@/components/nav-buttons";
 
+// Closes the dialog when its backdrop is clicked. Returns the cleanup, which
+// also lets the page scroll again.
+const closeOnBackdropClick = (dialog: HTMLDialogElement): (() => void) => {
+  const onBackdropClick = (event: MouseEvent) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  };
+
+  dialog.addEventListener("click", onBackdropClick);
+
+  return () => {
+    dialog.removeEventListener("click", onBackdropClick);
+    document.body.style.overflow = "";
+  };
+};
+
 interface DocsMobileNavProps {
   readonly tree: PageTreeRoot;
 }
@@ -34,22 +51,7 @@ export const DocsMobileNav = ({ tree }: DocsMobileNavProps) => {
   useEffect(() => {
     const dialog = dialogRef.current;
 
-    if (!dialog) {
-      return;
-    }
-
-    const onBackdropClick = (event: MouseEvent) => {
-      if (event.target === dialog) {
-        dialog.close();
-      }
-    };
-
-    dialog.addEventListener("click", onBackdropClick);
-
-    return () => {
-      dialog.removeEventListener("click", onBackdropClick);
-      document.body.style.overflow = "";
-    };
+    return dialog ? closeOnBackdropClick(dialog) : undefined;
   }, []);
 
   const openMenu = () => {
