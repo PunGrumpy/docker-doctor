@@ -151,7 +151,6 @@ export const preferSlimBase: DockerfileRule = {
   category: "Image Size",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
-    const stageAliases = collectStageAliases(instructions);
 
     // A build stage that is discarded never reaches the image, so its base
     // has no effect on the image's size.
@@ -162,6 +161,7 @@ export const preferSlimBase: DockerfileRule = {
       }
 
       const ref = parseImageRef(imagePart);
+      const stageAliases = collectStageAliases(instructions, from.line);
 
       if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
         continue;

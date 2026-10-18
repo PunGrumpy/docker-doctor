@@ -135,13 +135,18 @@ export const parseFromArgs = (args: string): FromArgs => {
 export const isScratch = (base: string | null): boolean =>
   base?.toLowerCase() === "scratch";
 
+// The stage names declared on FROM lines above `beforeLine`. A FROM can
+// only refer to a stage declared before it (BuildKit registers a stage's
+// name after resolving its base), so `FROM golang AS golang` pulls the
+// golang image.
 export const collectStageAliases = (
-  instructions: DockerfileInstruction[]
+  instructions: DockerfileInstruction[],
+  beforeLine = Number.POSITIVE_INFINITY
 ): Set<string> => {
   const aliases = new Set<string>();
 
   for (const inst of instructions) {
-    if (inst.instruction !== "FROM") {
+    if (inst.instruction !== "FROM" || inst.line >= beforeLine) {
       continue;
     }
 

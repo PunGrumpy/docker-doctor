@@ -91,6 +91,16 @@ describe("collectStageAliases", () => {
     expect(collectStageAliases(instructions)).toEqual(new Set());
   });
 
+  test("collects only the stages declared before a line", () => {
+    const instructions = parseDockerfile(
+      "FROM node:22-alpine AS build\nFROM golang AS golang\nFROM build AS final"
+    );
+    expect(collectStageAliases(instructions, 2)).toEqual(new Set(["build"]));
+    expect(collectStageAliases(instructions, 3)).toEqual(
+      new Set(["build", "golang"])
+    );
+  });
+
   test("collects a lowercase as clause", () => {
     const instructions = parseDockerfile(`
       FROM node:22-alpine as build

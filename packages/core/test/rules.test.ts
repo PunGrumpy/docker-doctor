@@ -192,6 +192,27 @@ describe("Security Rules", () => {
     expect(counts).toEqual([0, 0, 0]);
   });
 
+  // A FROM refers to a stage only if that stage is declared on an earlier
+  // FROM. Otherwise the name is an image.
+  const stageReferenceCases = [
+    { dockerfile: "FROM golang AS golang\nRUN go build", expected: 1 },
+    { dockerfile: "FROM node AS NODE", expected: 1 },
+    { dockerfile: "FROM builder\nFROM node:22 AS builder", expected: 1 },
+    { dockerfile: "FROM node:22 AS builder\nFROM builder", expected: 0 },
+    { dockerfile: "FROM golang:1.23 AS golang\nFROM golang", expected: 0 },
+  ];
+
+  test.each(stageReferenceCases)(
+    "pin-image-version: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = pinImageVersion.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("pin-image-version", () => {
     const unpinned = parseDockerfile(`
       FROM node
