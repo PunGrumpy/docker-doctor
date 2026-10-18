@@ -304,6 +304,76 @@ describe("--score contract", () => {
   });
 });
 
+describe("analyzed files", () => {
+  // The Dockerfile has 3 warnings and 2 infos. compose.yaml has 2 warnings.
+  // The penalty of 22 averaged over 2 files is 11, which scores 85.
+  const MULTI_FILE_SCORE = "85";
+
+  test("a multi-file project scores the average over its files", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("multi-file"),
+      "--score",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe(MULTI_FILE_SCORE);
+  });
+
+  test("files with nothing to check do not raise the score", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-stubs-"));
+    try {
+      fs.cpSync(fixture("multi-file"), root, { recursive: true });
+      const stubs = {
+        "Dockerfile.empty": "",
+        "Dockerfile.notes": "# notes only\n",
+        "compose.braces.yaml": "{}\n",
+        "compose.empty.yaml": "",
+        "compose.list.yaml": "- web\n",
+      };
+      for (const [name, content] of Object.entries(stubs)) {
+        fs.writeFileSync(path.join(root, name), content);
+      }
+
+      const { exitCode, stdout } = await runCli([root, "--score"]);
+      expect(exitCode).toBe(0);
+      expect(stdout.trim()).toBe(MULTI_FILE_SCORE);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("failures are listed in discovery order", async () => {
+    // The files are read in parallel. Larger files finish reading later, so
+    // with the largest file first a scan that kept completion order would
+    // list the failures out of order.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-order-"));
+    const fileCount = 12;
+    const paddingLine = `# ${"x".repeat(78)}\n`;
+    const broken = 'services:\n  web:\n    ports: [ "80:80"\n';
+    try {
+      const expected: string[] = [];
+      for (let index = 1; index <= fileCount; index += 1) {
+        const dir = `s${String(index).padStart(2, "0")}`;
+        fs.mkdirSync(path.join(root, dir));
+        fs.writeFileSync(
+          path.join(root, dir, "compose.yaml"),
+          paddingLine.repeat((fileCount + 1 - index) * 200) + broken
+        );
+        expected.push(`${dir}/compose.yaml`);
+      }
+
+      const { exitCode, stdout } = await runCli([root, "--json"]);
+      expect(exitCode).toBe(2);
+      const report = JSON.parse(stdout);
+      expect(report.project.composeFiles).toEqual(expected);
+      expect(report.failures.map((f: { file: string }) => f.file)).toEqual(
+        expected
+      );
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("empty project", () => {
   test("scanning an empty directory with --json exits 0 with no diagnostics", async () => {
     const { exitCode, stdout } = await runCli([fixture("empty"), "--json"]);

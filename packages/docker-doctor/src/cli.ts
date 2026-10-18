@@ -21,6 +21,8 @@ import {
   loadConfig,
   allRules,
   findRule,
+  isAnalyzableCompose,
+  isAnalyzableDockerfile,
   toJsonReport,
 } from "@docker-doctor/core";
 import type { SkillAgentType } from "agent-install";
@@ -504,10 +506,40 @@ interface ScanFailure {
   message: string;
 }
 
+interface FileResult {
+  // The file had content the rules could check. See isAnalyzableDockerfile
+  // and isAnalyzableCompose.
+  analyzed: boolean;
+  diagnostics: Diagnostic[];
+  failure?: ScanFailure;
+}
+
 interface RulesEngineResult {
+  analyzedFileCount: number;
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
 }
+
+// The files are read in parallel and finish in any order. Collecting the
+// results afterwards keeps diagnostics and failures in discovery order, so
+// two scans of the same project print the same report.
+const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
+  const summary: RulesEngineResult = {
+    analyzedFileCount: 0,
+    diagnostics: [],
+    failures: [],
+  };
+  for (const result of results) {
+    summary.diagnostics.push(...result.diagnostics);
+    if (result.failure) {
+      summary.failures.push(result.failure);
+    }
+    if (result.analyzed) {
+      summary.analyzedFileCount += 1;
+    }
+  }
+  return summary;
+};
 
 const runRulesEngine = async (
   rootDir: string,
@@ -519,11 +551,6 @@ const runRulesEngine = async (
   options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void
 ): Promise<RulesEngineResult> => {
-  const diagnostics: Diagnostic[] = [];
-  // A file we could not read or parse has not been checked. Collect those so
-  // the caller can refuse to report the run as clean.
-  const failures: ScanFailure[] = [];
-
   const isSilent = options.score || options.json;
 
   if (process.stdout.isTTY && !isSilent) {
@@ -533,30 +560,35 @@ const runRulesEngine = async (
 
   // 1. Scan Dockerfiles in parallel
   const dockerfileResults = await Promise.all(
-    project.dockerfiles.map(async (df) => {
+    project.dockerfiles.map(async (df): Promise<FileResult> => {
       const fullPath = path.join(rootDir, df);
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[df] = content;
         const instructions = parseDockerfile(content, df);
-        return runDockerfileRules(
-          instructions,
-          df,
-          projectFilesList,
-          rulesConfig,
-          categoriesConfig
-        );
+        return {
+          analyzed: isAnalyzableDockerfile(instructions),
+          diagnostics: runDockerfileRules(
+            instructions,
+            df,
+            projectFilesList,
+            rulesConfig,
+            categoriesConfig
+          ),
+        };
       } catch (error: unknown) {
+        // A file we could not read or parse has not been checked. The
+        // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
-        failures.push({ file: df, message: msg });
-        return [];
+        return {
+          analyzed: false,
+          diagnostics: [],
+          failure: { file: df, message: msg },
+        };
       }
     })
   );
-  for (const diags of dockerfileResults) {
-    diagnostics.push(...diags);
-  }
 
   if (process.stdout.isTTY && !isSilent) {
     setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
@@ -565,32 +597,35 @@ const runRulesEngine = async (
 
   // 2. Scan Compose files in parallel
   const composeResults = await Promise.all(
-    project.composeFiles.map(async (cf) => {
+    project.composeFiles.map(async (cf): Promise<FileResult> => {
       const fullPath = path.join(rootDir, cf);
       try {
         const content = await fs.readFile(fullPath, "utf-8");
         fileContents[cf] = content;
         const composeObj = parseCompose(content, cf);
-        return runComposeRules(
-          composeObj,
-          cf,
-          rulesConfig,
-          categoriesConfig,
-          createComposeLocator(content)
-        );
+        return {
+          analyzed: isAnalyzableCompose(composeObj),
+          diagnostics: runComposeRules(
+            composeObj,
+            cf,
+            rulesConfig,
+            categoriesConfig,
+            createComposeLocator(content)
+          ),
+        };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
-        failures.push({ file: cf, message: msg });
-        return [];
+        return {
+          analyzed: false,
+          diagnostics: [],
+          failure: { file: cf, message: msg },
+        };
       }
     })
   );
-  for (const diags of composeResults) {
-    diagnostics.push(...diags);
-  }
 
-  return { diagnostics, failures };
+  return summarizeFileResults([...dockerfileResults, ...composeResults]);
 };
 
 // Exit 2 ("scan incomplete") outranks exit 1 ("findings"): a file we could not
@@ -650,6 +685,7 @@ const printNothingScanned = (rootDir: string): void => {
 };
 
 interface ScanOutcome {
+  analyzedFileCount: number;
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
   fileContents: Record<string, string>;
@@ -698,10 +734,7 @@ const writeScanOutput = async (
   options: OutputOptions
 ): Promise<number> => {
   const { diagnostics, failures, project, rootDir, scannedFileCount } = scan;
-  const { score, label } = calculateScore(
-    diagnostics,
-    scannedFileCount - failures.length
-  );
+  const { score, label } = calculateScore(diagnostics, scan.analyzedFileCount);
 
   reportScanFailures(failures);
 
@@ -896,16 +929,17 @@ program
         const scannedFileCount =
           project.dockerfiles.length + project.composeFiles.length;
 
-        const { diagnostics, failures } = await runRulesEngine(
-          rootDir,
-          project,
-          config.rules,
-          config.categories,
-          projectFilesList,
-          fileContents,
-          options,
-          setStatus
-        );
+        const { analyzedFileCount, diagnostics, failures } =
+          await runRulesEngine(
+            rootDir,
+            project,
+            config.rules,
+            config.categories,
+            projectFilesList,
+            fileContents,
+            options,
+            setStatus
+          );
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
@@ -925,6 +959,7 @@ program
 
         process.exitCode = await writeScanOutput(
           {
+            analyzedFileCount,
             diagnostics,
             failures,
             fileContents,
