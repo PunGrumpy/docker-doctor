@@ -38,7 +38,7 @@ const Grain = () => {
 
   return (
     <AbsoluteFill style={{ opacity: 0.055, pointerEvents: "none" }}>
-      <svg height="100%" width="100%">
+      <svg aria-hidden="true" height="100%" width="100%">
         <filter id="grain">
           <feTurbulence
             baseFrequency="0.8"
