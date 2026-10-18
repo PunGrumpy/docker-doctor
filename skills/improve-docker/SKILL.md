@@ -21,7 +21,7 @@ npx @docker-doctor/cli@latest . --json > docker-doctor-report.json   # diagnosti
 - The JSON `project` field lists every Dockerfile / Compose / .dockerignore discovered.
 - The JSON `diagnostics[]` carry `rule`, `category`, `severity`, `file`, `line`, `message`, `help` (report `schemaVersion` 3+). Group by `category` directly — no second command is needed.
 - The JSON `failures[]` (schema 4+) lists files that were discovered but could not be parsed. Treat them as unknown, not clean.
-- Note the `score` and `label` as the baseline.
+- Note the exit code, the count of diagnostics per rule, and the `score` and `label` as the baseline.
 
 ## Phase 2 — Audit
 
@@ -40,7 +40,9 @@ Create `plans/` and write one file per opportunity using [references/plan-templa
 Every plan's verification step is mechanical:
 
 ```bash
-npx @docker-doctor/cli@latest . --score   # must not drop; the targeted diagnostic must clear on re-scan
+npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-after.json; echo "exit=$?"
 ```
+
+The targeted rule's diagnostics must be gone at the planned locations, no other rule may gain findings, and the exit code must not get worse (`0` no error, `1` at least one error, `2` a file could not be analyzed). The score averages over every analyzed file, so treat it as a coarse signal and never as the pass condition.
 
 End with a short `plans/README.md` index: findings by priority, the baseline score, and the target score once all plans are applied.

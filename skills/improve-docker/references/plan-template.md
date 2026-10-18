@@ -21,7 +21,7 @@ The exact change. Show before → after diff-style snippets. Pull the recipe fro
 ## Verify
 
 - [ ] `npx @docker-doctor/cli@latest . --verbose` no longer reports `<rule>` at this location
-- [ ] `npx @docker-doctor/cli@latest . --score` did not drop (ideally rose)
+- [ ] `npx @docker-doctor/cli@latest . --json` exits with the same code as before or lower, and no rule has more diagnostics than before (the score is a coarse signal, not the check)
 - [ ] Image still builds: `docker build .` (and `docker compose config` if Compose changed)
 
 ## Risks / notes
@@ -33,5 +33,5 @@ Anything that could break at runtime (non-root file permissions, healthcheck end
 
 - **Self-contained:** no "see the audit" references — inline what the executor needs.
 - **One concern per plan:** if a change spans categories, pick the primary and cross-link the others.
-- **Verifiable:** every plan ends in a mechanical check (`--score` / re-scan / `docker build`), never "looks good".
+- **Verifiable:** every plan ends in a mechanical check (exit code and per-rule counts from a `--json` re-scan, `docker build`), never "looks good".
 - **Honest priority:** a one-line security fix on a public image beats a big refactor that shaves megabytes off an internal one.
