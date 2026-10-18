@@ -17,6 +17,8 @@ export {
   toJsonReport,
 } from "@docker-doctor/core";
 export type {
+  ComposeMapping,
+  ComposeValue,
   Diagnostic,
   DockerDoctorConfig,
   RuleCategory,

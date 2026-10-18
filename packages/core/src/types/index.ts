@@ -62,6 +62,24 @@ export interface DockerfileRule extends RuleDefinition {
 }
 
 /**
+ * A value in a parsed Compose file. yaml's parse produces scalars, arrays
+ * and objects. A YAML tag such as `!!binary` or `!!timestamp` produces a
+ * built-in object (a Uint8Array, a Date). The rules never asked for those,
+ * so they read them as mappings, through their own keys, as before.
+ */
+export type ComposeValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly ComposeValue[]
+  | ComposeMapping;
+
+export interface ComposeMapping {
+  readonly [key: string]: ComposeValue | undefined;
+}
+
+/**
  * Maps a path of YAML keys/indices (e.g. `["services", "web"]`) to the
  * 1-based line where that key is defined, or `undefined` when the path does
  * not resolve to a concrete node in the source document.
@@ -72,7 +90,7 @@ export type ComposeLocator = (
 
 export interface ComposeRule extends RuleDefinition {
   check: (
-    composeContent: unknown,
+    composeContent: ComposeValue,
     file: string,
     context?: { locate?: ComposeLocator }
   ) => Diagnostic[];
