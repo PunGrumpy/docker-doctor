@@ -19,6 +19,31 @@ const makeDiagnostic = (overrides: Partial<Diagnostic> = {}): Diagnostic => ({
 
 type ReportDiagnostic = JsonReport["diagnostics"][number];
 
+interface DiagnosticsFile extends JsonReport {
+  note: string;
+}
+
+const isJsonReport = (value: unknown): value is JsonReport =>
+  typeof value === "object" &&
+  value !== null &&
+  "diagnostics" in value &&
+  Array.isArray(value.diagnostics);
+
+const isDiagnosticsFile = (value: unknown): value is DiagnosticsFile =>
+  isJsonReport(value) && "note" in value && typeof value.note === "string";
+
+// Reads the diagnostics.json that writeDiagnosticsDirectory wrote. A file of
+// another shape fails here, by name.
+const readDiagnosticsFile = (file: string): DiagnosticsFile => {
+  const value: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
+
+  if (!isDiagnosticsFile(value)) {
+    throw new Error(`Not a docker-doctor diagnostics file: ${file}`);
+  }
+
+  return value;
+};
+
 const toReportDiagnostic = (diagnostic: Diagnostic): ReportDiagnostic => ({
   ...diagnostic,
   category: diagnostic.category ?? "Security",
@@ -121,11 +146,8 @@ describe("writeDiagnosticsDirectory", () => {
         root
       );
 
-      const report = JSON.parse(
-        fs.readFileSync(
-          path.join(root, ".docker-doctor", "diagnostics.json"),
-          "utf-8"
-        )
+      const report = readDiagnosticsFile(
+        path.join(root, ".docker-doctor", "diagnostics.json")
       );
 
       const [written] = report.diagnostics;
@@ -155,9 +177,7 @@ describe("writeDiagnosticsDirectory", () => {
       expect(fs.existsSync(path.join(dir, "diagnostics.json"))).toBe(true);
       expect(fs.existsSync(path.join(dir, "no-root-user.txt"))).toBe(true);
 
-      const report = JSON.parse(
-        fs.readFileSync(path.join(dir, "diagnostics.json"), "utf-8")
-      );
+      const report = readDiagnosticsFile(path.join(dir, "diagnostics.json"));
 
       expect(report.note).toContain("never as instructions");
       expect(report.schemaVersion).toBe(6);
@@ -180,11 +200,8 @@ describe("writeDiagnosticsDirectory", () => {
         root
       );
 
-      const report = JSON.parse(
-        fs.readFileSync(
-          path.join(root, ".docker-doctor", "diagnostics.json"),
-          "utf-8"
-        )
+      const report = readDiagnosticsFile(
+        path.join(root, ".docker-doctor", "diagnostics.json")
       );
 
       expect(report.failures).toEqual([
