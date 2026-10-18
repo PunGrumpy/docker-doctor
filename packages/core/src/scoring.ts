@@ -20,24 +20,41 @@ export const getScoreBucket = (
 
 const SEVERITY_PENALTY = { error: 10, info: 1, warning: 4 } as const;
 
-// `analyzedFileCount` is the number of Dockerfiles and Compose files the
-// diagnostics came from. The penalty is averaged over them, so the score
-// describes a typical file. A sum would instead measure how many Docker
-// files a repository has: 96 files with two warnings each scored 0.
+export type ScoreResult =
+  | { label: string; score: number }
+  | { label: null; score: null };
+
+// `analyzedFileCount` is the number of files the rules could check, as
+// decided by isAnalyzableDockerfile and isAnalyzableCompose. The penalty is
+// averaged over them, so the score describes a typical file. A sum would
+// instead grow with the number of Docker files. Under a sum, 96 files with
+// two warnings each scored 0. With no analyzed file there is nothing to
+// describe, so there is no score.
 export const calculateScore = (
   diagnostics: Diagnostic[],
-  analyzedFileCount = 1
-): {
-  score: number;
-  label: string;
-} => {
+  analyzedFileCount: number
+): ScoreResult => {
+  if (!Number.isInteger(analyzedFileCount) || analyzedFileCount < 0) {
+    throw new Error(
+      `analyzedFileCount must be a whole number of files, got ${analyzedFileCount}`
+    );
+  }
+  if (analyzedFileCount === 0) {
+    if (diagnostics.length > 0) {
+      throw new Error(
+        `${diagnostics.length} diagnostics came from 0 analyzed files. Count the files the diagnostics came from.`
+      );
+    }
+    return { label: null, score: null };
+  }
+
   let totalPenalty = 0;
 
   for (const diag of diagnostics) {
     totalPenalty += SEVERITY_PENALTY[diag.severity];
   }
 
-  const penalty = totalPenalty / Math.max(1, analyzedFileCount);
+  const penalty = totalPenalty / analyzedFileCount;
 
   // Asymptotic decay curve: score = round(100 * e^(-penalty / K)), where
   // penalty is the average per analyzed file.
@@ -45,8 +62,9 @@ export const calculateScore = (
   // The old `max(0, 100 - penalty)` formula saturates at 0 once penalty
   // reaches 100 (e.g. ~10 errors), so a messy project and a catastrophic
   // one are indistinguishable and the score can never register a fix.
-  // This curve approaches (but never reaches) 0, so it stays monotonic
-  // and responsive across the whole range instead of going inert.
+  // The curve itself never reaches 0, so the score keeps moving across a
+  // far wider range. Rounding still gives 0 once the average penalty passes
+  // about 371 (70 * ln 200), which is roughly 37 errors in every file.
   //
   // K=70 was chosen so a single warning (penalty 4) still scores ~94,
   // comfortably inside the "Excellent" (>=90) bucket, while errors and

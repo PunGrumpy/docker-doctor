@@ -9,6 +9,8 @@ const DOCUMENTED_EXPORTS = [
   "defineConfig",
   "discoverProject",
   "findRule",
+  "isAnalyzableCompose",
+  "isAnalyzableDockerfile",
   "loadConfig",
   "parseCompose",
   "parseDockerfile",

@@ -4,6 +4,7 @@ import type {
   Diagnostic,
   RuleSeverity,
 } from "../types/index";
+import { isAnalyzableDockerfile } from "./analyzable";
 import { resolveSeverity } from "./resolve-severity";
 
 export const runDockerfileRules = (
@@ -16,7 +17,7 @@ export const runDockerfileRules = (
   // A file with no instructions (empty, comment-only, a stub) has nothing
   // to check. Whole-file rules such as no-root-user would otherwise report
   // the absence of a USER line as "runs as root".
-  if (instructions.length === 0) {
+  if (!isAnalyzableDockerfile(instructions)) {
     return [];
   }
 

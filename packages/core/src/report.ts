@@ -7,7 +7,12 @@ import type { Diagnostic, ProjectInfo, RuleCategory } from "./types/index";
 // v4 (2026-09): added failures[], the files discovered but not analyzed
 // (read or parse errors).
 // v5 (2026-10): the score averages the penalty over the analyzed files.
-export const REPORT_SCHEMA_VERSION = 5;
+// v6 (2026-10): added analyzedFiles, the number of files the score averages
+// over. A file counts only when the rules can check it. An empty or
+// comment-only Dockerfile does not count. Neither does a Compose file with
+// no services, no top-level models and no version key. score and label are
+// null when no file was analyzed.
+export const REPORT_SCHEMA_VERSION = 6;
 
 export interface ReportFailure {
   file: string;
@@ -15,6 +20,7 @@ export interface ReportFailure {
 }
 
 export interface JsonReport {
+  analyzedFiles: number;
   diagnostics: {
     category: RuleCategory;
     column?: number;
@@ -26,10 +32,10 @@ export interface JsonReport {
     severity: "error" | "warning" | "info";
   }[];
   failures: ReportFailure[];
-  label: string;
+  label: string | null;
   project: ProjectInfo;
   schemaVersion: number;
-  score: number;
+  score: number | null;
   timestamp: string;
 }
 
@@ -47,11 +53,13 @@ const resolveCategory = (diagnostic: Diagnostic): RuleCategory => {
 
 export const toJsonReport = (
   diagnostics: Diagnostic[],
-  score: number,
-  label: string,
+  score: number | null,
+  label: string | null,
   project: ProjectInfo,
-  failures: ReportFailure[] = []
+  failures: ReportFailure[],
+  analyzedFiles: number
 ): JsonReport => ({
+  analyzedFiles,
   diagnostics: diagnostics.map((d) => ({
     category: resolveCategory(d),
     column: d.column,

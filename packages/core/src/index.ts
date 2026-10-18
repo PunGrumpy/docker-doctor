@@ -4,6 +4,10 @@ export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 export { runComposeRules } from "./runners/compose-runner";
 export {
+  isAnalyzableCompose,
+  isAnalyzableDockerfile,
+} from "./runners/analyzable";
+export {
   allRules,
   allDockerfileRules,
   allComposeRules,
@@ -15,7 +19,12 @@ export {
   collectUnknownConfigKeys,
   type UnknownConfigKeys,
 } from "./config/unknown-keys";
-export { calculateScore, getScoreBucket, SCORE_BUCKETS } from "./scoring";
+export {
+  calculateScore,
+  getScoreBucket,
+  SCORE_BUCKETS,
+  type ScoreResult,
+} from "./scoring";
 export * from "./errors";
 export * from "./types/index";
 export { toJsonReport, type JsonReport } from "./report";

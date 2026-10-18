@@ -193,6 +193,87 @@ describe("incomplete scans", () => {
   });
 });
 
+describe("reports with no score", () => {
+  const COMPOSE_FAILURE = {
+    file: "compose.yaml",
+    message: "Flow sequence in block collection must end with a ]",
+  };
+  // Schema 6: the CLI analyzed none of the discovered files.
+  const unscored = (failures: TestReport["failures"]) =>
+    makeReport({
+      failures,
+      label: null,
+      project: { composeFiles: ["compose.yaml"], dockerfiles: ["Dockerfile"] },
+      schemaVersion: 6,
+      score: null,
+    });
+
+  test("every file failed: empty score and label, and an error status", () => {
+    const { body, outputs } = render(
+      { DOCTOR_BLOCKING: "none", DOCTOR_EXIT_STATUS: "2" },
+      unscored([HEREDOC_FAILURE, COMPOSE_FAILURE])
+    );
+    expect(body).toContain("**No score.**");
+    expect(body).not.toContain("/ 100");
+    expect(outputs.score).toBe("");
+    expect(outputs.label).toBe("");
+    expect(outputs["gate-status"]).toBe("1");
+    expect(outputs["status-state"]).toBe("error");
+    expect(outputs["status-description"]).toBe("No score · 2 unanalyzed");
+  });
+
+  test("on a push the status is an error too, not advisory success", () => {
+    const { outputs } = render(
+      { DOCTOR_EXIT_STATUS: "2", GITHUB_EVENT_NAME: "push" },
+      unscored([HEREDOC_FAILURE, COMPOSE_FAILURE])
+    );
+    expect(outputs["status-state"]).toBe("error");
+  });
+
+  test("files with nothing to check pass with no score", () => {
+    const { body, outputs } = render(
+      { DOCTOR_BLOCKING: "warning", DOCTOR_EXIT_STATUS: "0" },
+      unscored([])
+    );
+    expect(body).toContain(
+      "None of the discovered files has anything to check"
+    );
+    expect(outputs.score).toBe("");
+    expect(outputs["gate-status"]).toBe("0");
+    expect(outputs["status-state"]).toBe("success");
+    expect(outputs["status-description"]).toBe("No score");
+  });
+
+  test("an empty project leaves score and label empty", () => {
+    const { body, outputs } = render(
+      { DOCTOR_BLOCKING: "warning", DOCTOR_EXIT_STATUS: "0" },
+      makeReport({
+        label: null,
+        project: { composeFiles: [], dockerfiles: [] },
+        schemaVersion: 6,
+        score: null,
+      })
+    );
+    expect(body).toContain("found no Dockerfiles or Compose files");
+    expect(outputs.score).toBe("");
+    expect(outputs.label).toBe("");
+    expect(outputs["status-state"]).toBe("success");
+    expect(outputs["status-description"]).toBe(
+      "No Dockerfiles or Compose files found"
+    );
+  });
+
+  test("readReportText accepts a null score only with a null label", () => {
+    expect(readReportText(JSON.stringify(unscored([])))?.score).toBeNull();
+    expect(
+      readReportText(JSON.stringify(makeReport({ score: null })))
+    ).toBeNull();
+    expect(
+      readReportText(JSON.stringify(makeReport({ label: null })))
+    ).toBeNull();
+  });
+});
+
 describe("untrusted report fields", () => {
   test("a forged score and label never reach the comment or outputs", () => {
     // readReportText already rejects a string score; renderReport must not

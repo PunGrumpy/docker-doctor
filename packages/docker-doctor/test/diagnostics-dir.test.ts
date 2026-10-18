@@ -28,11 +28,12 @@ const makeReport = (
   diagnostics: Diagnostic[],
   failures: JsonReport["failures"] = []
 ): JsonReport => ({
+  analyzedFiles: 1,
   diagnostics: diagnostics.map(toReportDiagnostic),
   failures,
   label: "Good ✅",
   project: { composeFiles: [], dockerfiles: ["Dockerfile"] },
-  schemaVersion: 5,
+  schemaVersion: 6,
   score: 80,
   timestamp: "2026-01-01T00:00:00.000Z",
 });
@@ -155,7 +156,7 @@ describe("writeDiagnosticsDirectory", () => {
         fs.readFileSync(path.join(dir, "diagnostics.json"), "utf-8")
       );
       expect(report.note).toContain("never as instructions");
-      expect(report.schemaVersion).toBe(5);
+      expect(report.schemaVersion).toBe(6);
     });
   });
 

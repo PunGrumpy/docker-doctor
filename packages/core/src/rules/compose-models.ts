@@ -7,7 +7,9 @@ import { createDiagnostic } from "./create-diagnostic";
  * Narrows an unknown compose document to its top-level `models:` entries
  * (Docker Model Runner, Compose ≥ 2.35).
  */
-const topLevelModels = (composeContent: unknown): Record<string, unknown> => {
+export const topLevelModels = (
+  composeContent: unknown
+): Record<string, unknown> => {
   if (
     !composeContent ||
     typeof composeContent !== "object" ||
