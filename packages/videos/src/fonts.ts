@@ -22,9 +22,8 @@ const { fontFamily: INSTRUMENT_SERIF } = loadInstrumentSerif("normal", {
 export const SANS =
   "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif";
 
-// Asserted because CSSProperties doesn't type custom `--*` keys.
 export const FONT_VARS = {
   "--font-geist-mono": GEIST_MONO,
   "--font-geist-sans": GEIST_SANS,
   "--font-serif": INSTRUMENT_SERIF,
-} as CSSProperties;
+} satisfies CSSProperties;

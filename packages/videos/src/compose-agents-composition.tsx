@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -341,13 +341,11 @@ const CTA_CHARS_PER_SECOND = 18;
 const SceneCta = () => (
   <Sequence durationInFrames={CTA_DURATION} layout="none">
     <div
-      style={
-        {
-          "--font-geist-sans": "var(--font-geist-mono)",
-          inset: 0,
-          position: "absolute",
-        } as CSSProperties
-      }
+      style={{
+        "--font-geist-sans": "var(--font-geist-mono)",
+        inset: 0,
+        position: "absolute",
+      }}
     >
       <Typewriter
         background="transparent"
@@ -498,9 +496,7 @@ export const ComposeAgents = () => {
   const stageScale = width / REF_W;
 
   return (
-    <AbsoluteFill
-      style={{ ...FONT_VARS, backgroundColor: BLACK } as CSSProperties}
-    >
+    <AbsoluteFill style={{ ...FONT_VARS, backgroundColor: BLACK }}>
       <AbsoluteFill>
         <div
           style={{
