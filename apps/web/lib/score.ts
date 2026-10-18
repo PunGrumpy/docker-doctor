@@ -5,6 +5,20 @@ export interface ScoreData {
   label: string;
 }
 
+interface ScoreBucket extends ScoreData {
+  readonly min: number;
+}
+
+// The lowest bucket, and the last one in SCORE_BUCKETS. A score below every
+// threshold, which only a negative or NaN score is, lands here too.
+const CRITICAL_BUCKET: ScoreBucket = {
+  background: "bg-red-600/10",
+  border: "border-red-600",
+  color: "#dc2626",
+  label: "Critical",
+  min: 0,
+};
+
 // NOTE: this mirrors `SCORE_BUCKETS` in `packages/core/src/scoring.ts`
 // (thresholds 90/75/50/0). It is intentionally NOT imported from
 // `@docker-doctor/core`: that package exposes one barrel, and the barrel
@@ -15,7 +29,7 @@ export interface ScoreData {
 // support external modules (request: node:fs/promises)". Server routes
 // import core without trouble, which is why `app/schema.json/route.ts`
 // can. Removing this copy needs a `./scoring` subpath export on core.
-const SCORE_BUCKETS = [
+const SCORE_BUCKETS: readonly ScoreBucket[] = [
   {
     background: "bg-green-500/10",
     border: "border-green-500",
@@ -37,23 +51,11 @@ const SCORE_BUCKETS = [
     label: "Needs Work",
     min: 50,
   },
-  {
-    background: "bg-red-600/10",
-    border: "border-red-600",
-    color: "#dc2626",
-    label: "Critical",
-    min: 0,
-  },
-] as const;
+  CRITICAL_BUCKET,
+];
 
-export const getScoreData = (score: number): ScoreData => {
-  for (const bucket of SCORE_BUCKETS) {
-    if (score >= bucket.min) {
-      return bucket;
-    }
-  }
-  return SCORE_BUCKETS.at(-1) as ScoreData;
-};
+export const getScoreData = (score: number): ScoreData =>
+  SCORE_BUCKETS.find((bucket) => score >= bucket.min) ?? CRITICAL_BUCKET;
 
 const clampScore = (n: number): number => Math.min(100, Math.max(0, n));
 

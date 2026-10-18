@@ -9,13 +9,11 @@ const sitemap = (): MetadataRoute.Sitemap => {
   const pages: MetadataRoute.Sitemap = [];
 
   for (const page of source.getPages()) {
-    const data = page.data as {
-      lastModified?: Date;
-    };
+    const { lastModified } = page.data;
 
     pages.push({
       changeFrequency: "weekly" as const,
-      lastModified: data.lastModified ? new Date(data.lastModified) : undefined,
+      lastModified: lastModified ? new Date(lastModified) : undefined,
       priority: 0.5,
       url: new URL(page.url, url).toString(),
     });

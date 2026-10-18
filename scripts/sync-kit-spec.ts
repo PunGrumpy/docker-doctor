@@ -25,11 +25,35 @@ interface KitManifest {
   dependencies?: Record<string, string>;
 }
 
+interface ManifestFields {
+  dependencies?: unknown;
+  version?: unknown;
+}
+
+// Any JSON object can be read field by field. isKitManifest checks the fields.
+const isJsonObject = (value: unknown): value is ManifestFields =>
+  typeof value === "object" && value !== null;
+
+const isString = (value: unknown): value is string => typeof value === "string";
+
+const isDependencyMap = (value: unknown): value is Record<string, string> =>
+  isJsonObject(value) && Object.values(value).every(isString);
+
+const isKitManifest = (value: unknown): value is KitManifest =>
+  isJsonObject(value) &&
+  isString(value.version) &&
+  (value.dependencies === undefined || isDependencyMap(value.dependencies));
+
 const checkOnly = process.argv.includes("--check");
 
-const manifest = JSON.parse(
+const manifest: unknown = JSON.parse(
   await readFile(path.join(KIT_DIR, "package.json"), "utf-8")
-) as KitManifest;
+);
+
+if (!isKitManifest(manifest)) {
+  throw new Error("kits/docker-doctor/package.json is not a package manifest");
+}
+
 const cliVersion = manifest.dependencies?.[CLI_PACKAGE];
 
 if (!cliVersion || !EXACT_VERSION.test(cliVersion)) {

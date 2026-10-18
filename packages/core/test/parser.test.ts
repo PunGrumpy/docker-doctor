@@ -264,8 +264,11 @@ USER node
       throw new Error("expected parseDockerfile to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ParseError);
-      expect((error as ParseError).file).toBe("svc/Dockerfile");
-      expect((error as ParseError).message).toContain("EOF");
+      if (!(error instanceof ParseError)) {
+        throw error;
+      }
+      expect(error.file).toBe("svc/Dockerfile");
+      expect(error.message).toContain("EOF");
     }
   });
 
@@ -314,7 +317,10 @@ describe("Compose Parser", () => {
       throw new Error("expected parseCompose to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ParseError);
-      const { message } = error as ParseError;
+      if (!(error instanceof ParseError)) {
+        throw error;
+      }
+      const { message } = error;
       expect(message).toBe(
         "Nested mappings are not allowed in compact mappings at line 4, column 20"
       );
@@ -330,12 +336,8 @@ services:
     ports:
       - "3000:3000"
     `;
-    const compose = parseCompose(content, "docker-compose.yml") as {
-      services: Record<string, { image?: string }>;
-    };
-    expect(compose.services).toBeDefined();
-    expect(compose.services.web).toBeDefined();
-    expect(compose.services.web.image).toBe("node:22");
+    const compose = parseCompose(content, "docker-compose.yml");
+    expect(compose).toMatchObject({ services: { web: { image: "node:22" } } });
   });
 
   test("resolves merge keys (<<: *anchor)", () => {
@@ -351,11 +353,9 @@ services:
     <<: *base
     image: nginx
     `;
-    const compose = parseCompose(content, "docker-compose.yml") as {
-      services: Record<string, { restart?: string }>;
-    };
-    expect(compose.services.web.restart).toBe("always");
-    expect("<<" in compose.services.web).toBe(false);
+    const compose = parseCompose(content, "docker-compose.yml");
+    expect(compose).toMatchObject({ services: { web: { restart: "always" } } });
+    expect(compose).not.toHaveProperty(["services", "web", "<<"]);
   });
 
   test("resolves plain aliases (no merge key)", () => {
@@ -367,9 +367,9 @@ services:
   b:
     environment: *env
     `;
-    const compose = parseCompose(content, "docker-compose.yml") as {
-      services: Record<string, { environment?: { FOO?: string } }>;
-    };
-    expect(compose.services.b.environment?.FOO).toBe("1");
+    const compose = parseCompose(content, "docker-compose.yml");
+    expect(compose).toMatchObject({
+      services: { b: { environment: { FOO: "1" } } },
+    });
   });
 });

@@ -108,7 +108,10 @@ describe("loadConfig", () => {
       expect.unreachable("loadConfig should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(ConfigError);
-      expect((error as ConfigError)._tag).toBe("ConfigError");
+      if (!(error instanceof ConfigError)) {
+        throw error;
+      }
+      expect(error._tag).toBe("ConfigError");
     }
   });
 
