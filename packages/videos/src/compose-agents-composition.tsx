@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import {
   AbsoluteFill,
-  Audio,
+  Html5Audio,
   Easing,
   interpolate,
   Sequence,
@@ -132,7 +132,7 @@ const SlamLine = ({
   const frame = useCurrentFrame() - delay;
 
   const y = interpolate(frame, [0, 8], [110, 0], {
-    easing: Easing.out(Easing.cubic),
+    easing: Easing.out((t) => Easing.cubic(t)),
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -240,7 +240,7 @@ const SceneCount = () => {
 
   const value = Math.round(
     interpolate(frame, [6, 30], [25, 31], {
-      easing: Easing.out(Easing.quad),
+      easing: Easing.out((t) => Easing.quad(t)),
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     })
@@ -451,7 +451,7 @@ const musicVolume = (frame: number): number =>
 
 const Soundtrack = () => (
   <>
-    <Audio src={staticFile("sfx/music.wav")} volume={musicVolume} />
+    <Html5Audio src={staticFile("sfx/music.wav")} volume={musicVolume} />
     {COUNT_BLIPS.map(({ frame, rate }) => (
       <Sequence
         durationInFrames={10}
@@ -459,7 +459,7 @@ const Soundtrack = () => (
         key={`blip-${frame}`}
         layout="none"
       >
-        <Audio
+        <Html5Audio
           playbackRate={rate}
           src={staticFile("sfx/blip.wav")}
           volume={0.55}
@@ -473,7 +473,7 @@ const Soundtrack = () => (
         key={`tick-${from}-${String(i)}`}
         layout="none"
       >
-        <Audio
+        <Html5Audio
           playbackRate={i % 2 === 0 ? 1 : 0.93}
           src={staticFile("sfx/tick.wav")}
           volume={0.3}
@@ -487,7 +487,7 @@ const Soundtrack = () => (
         key={`thump-${from}`}
         layout="none"
       >
-        <Audio
+        <Html5Audio
           playbackRate={PITCH_STEPS[i % PITCH_STEPS.length]}
           src={staticFile("sfx/thump.wav")}
           volume={0.6}

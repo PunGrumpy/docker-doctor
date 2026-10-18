@@ -212,8 +212,14 @@ const LineBody = (line: LaunchLine) => {
       return line.score ? <ScoreBlock score={line.score} /> : null;
     }
 
-    default: {
+    case "cmd":
+    case "more":
+    case "working": {
       return <span style={{ color: MUTED }}>{`  ${line.text}`}</span>;
+    }
+
+    default: {
+      throw new Error("A terminal line kind has no case in LineBody");
     }
   }
 };

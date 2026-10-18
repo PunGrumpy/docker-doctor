@@ -53,18 +53,23 @@ Config.overrideWebpackConfig((currentConfig) => {
     const entries = Array.isArray(use) ? use.filter(isLoaderEntry) : [];
 
     for (const entry of entries) {
-      if (entry.loader?.includes("esbuild-loader")) {
+      if (entry.loader?.includes("esbuild-loader") === true) {
         entry.options = { ...entry.options, tsconfigRaw };
       }
     }
   }
+
+  // webpack also accepts a list of alias objects. Remotion's config uses the
+  // map form, which is the only one this override extends.
+  const currentAlias = withTailwind.resolve?.alias;
+  const aliasMap = Array.isArray(currentAlias) ? undefined : currentAlias;
 
   return {
     ...withTailwind,
     resolve: {
       ...withTailwind.resolve,
       alias: {
-        ...withTailwind.resolve?.alias,
+        ...aliasMap,
         "@": path.resolve("src"),
       },
     },

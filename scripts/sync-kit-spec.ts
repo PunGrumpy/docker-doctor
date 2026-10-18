@@ -56,7 +56,11 @@ if (!isKitManifest(manifest)) {
 
 const cliVersion = manifest.dependencies?.[CLI_PACKAGE];
 
-if (!cliVersion || !EXACT_VERSION.test(cliVersion)) {
+if (
+  cliVersion === undefined ||
+  cliVersion === "" ||
+  !EXACT_VERSION.test(cliVersion)
+) {
   throw new Error(
     `kits/docker-doctor/package.json must pin ${CLI_PACKAGE} to an exact version (got ${cliVersion ?? "nothing"}); the pin is what makes Changesets bump the kit on every CLI release.`
   );
