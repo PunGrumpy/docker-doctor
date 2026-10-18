@@ -43,6 +43,6 @@ Every plan's verification step is mechanical:
 npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-after.json; echo "exit=$?"
 ```
 
-The targeted rule's diagnostics must be gone at the planned locations, no other rule may gain findings, and the exit code must not get worse (`0` no error, `1` at least one error, `2` a file could not be analyzed). The score averages over every analyzed file, so treat it as a coarse signal and never as the pass condition.
+The targeted rule's diagnostics must be gone at the planned locations, and no other rule may gain findings. Both the baseline and the verification scan must exit `0` or `1`. Exit `2` means a file could not be analyzed, so the two reports cannot be compared. Fix that file and scan again first. The exit code must not go from `0` to `1`. The score averages over every analyzed file, so treat it as a coarse signal and never as the pass condition.
 
 End with a short `plans/README.md` index: findings by priority, the baseline score, and the target score once all plans are applied.

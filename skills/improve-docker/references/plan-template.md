@@ -21,7 +21,7 @@ The exact change. Show before → after diff-style snippets. Pull the recipe fro
 ## Verify
 
 - [ ] `npx @docker-doctor/cli@latest . --verbose` no longer reports `<rule>` at this location
-- [ ] `npx @docker-doctor/cli@latest . --json` exits with the same code as before or lower, and no rule has more diagnostics than before (the score is a coarse signal, not the check)
+- [ ] `npx @docker-doctor/cli@latest . --json` exits `0` or `1` (exit `2` means a file was not analyzed, so the reports cannot be compared), with the same code as the baseline or lower, and no rule has more diagnostics than before (the score is a coarse signal, not the check)
 - [ ] Image still builds: `docker build .` (and `docker compose config` if Compose changed)
 
 ## Risks / notes
