@@ -113,7 +113,7 @@ Prefer YAML? `docker-doctor.config.yaml` works too, with editor autocomplete via
 
 ## How the score works
 
-Every scan produces a 0-100 health score alongside a label (`Excellent 🏆`, `Good ✅`, `Needs Work ⚠️`, `Critical 🚨`).
+Every scan that analyzes at least one file produces a 0-100 health score alongside a label (`Excellent 🏆`, `Good ✅`, `Needs Work ⚠️`, `Critical 🚨`). A file counts as analyzed when docker-doctor parsed it and the rules have something to check in it. A Dockerfile needs at least one instruction. A Compose file needs at least one service, a top-level `models` entry or a `version` key. When no file qualifies, there is no score.
 
 Each diagnostic adds a penalty based on severity:
 

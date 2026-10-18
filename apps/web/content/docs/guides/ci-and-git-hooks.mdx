@@ -73,7 +73,7 @@ The scan still exits `1` on an `error`-severity finding and `2` on an incomplete
 
 The score averages the penalty over the files docker-doctor analyzed. One bad file in a large project barely moves it, so keep the exit code as the gate for errors and use the floor for overall quality. [Scoring](/docs/reference/scoring) explains the formula.
 
-A directory with no Dockerfile or Compose file scores `100` and exits `0`, with a warning on stderr. A mistyped path therefore passes this gate. Scan a path you know holds Docker files.
+When no file was analyzed, there is no score and `--score` prints nothing. If the files failed to parse, the scan exits `2` and `set -e` stops the script before the comparison. If docker-doctor found no Docker files, as with a mistyped path, or only files with nothing to check, the scan exits `0` with a warning on stderr. `score` is then empty, `[ "" -ge 80 ]` fails with an error, and so does the gate.
 
 ## Git hooks
 

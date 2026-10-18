@@ -3,7 +3,7 @@ title: Scoring
 description: How the 0-100 health score and its label are calculated.
 ---
 
-Every scan produces a 0-100 health score alongside a label:
+Every scan that analyzes at least one file produces a 0-100 health score alongside a label:
 
 | Label         | Threshold   |
 | ------------- | ----------- |
@@ -30,7 +30,11 @@ docker-doctor adds up the penalties and divides the total by the number of Docke
 penalty = sum of penalties / analyzed files
 ```
 
-A project with one Docker file is scored on that file alone. A monorepo with 20 files and two warnings in each scores the same 89 as a single file with two warnings. Files that docker-doctor found but could not parse are left out of the count.
+A project with one Docker file is scored on that file alone. A monorepo with 20 files and two warnings in each scores the same 89 as a single file with two warnings.
+
+A file counts as analyzed when docker-doctor parsed it and the rules have something to check in it. A Dockerfile needs at least one instruction. A Compose file needs a top-level mapping with at least one service, a top-level `models` entry or a `version` key. Files that could not be parsed, empty files and files with nothing to check are left out of the count, so they do not pull the average up. The JSON report gives the count as `analyzedFiles`.
+
+When no file was analyzed, there is no score. That covers a directory with no Dockerfile or Compose file, files that all failed to parse, and files with nothing to check. `--json` reports `score` and `label` as `null`, `--score` prints nothing, and the GitHub Action leaves its `score` and `label` outputs empty. The exit code is `2` when files failed to parse and `0` otherwise.
 
 Releases before 0.7.0 used the sum without dividing it. A repository with many Docker files scored near 0 however small each file's problems were.
 
@@ -56,4 +60,4 @@ The old `max(0, 100 - penalty)` formula saturated at 0 once penalty reached 100 
 npx @docker-doctor/cli@latest . --score
 ```
 
-Prints only the numeric score. The exit code follows the same rule as every other mode: non-zero when any `error`-severity diagnostic is present, so a CI gate behaves identically whichever output you pick.
+Prints only the numeric score, and nothing at all when there is no score. The exit code follows the same rule as every other mode: non-zero when any `error`-severity diagnostic is present, so a CI gate behaves identically whichever output you pick.
