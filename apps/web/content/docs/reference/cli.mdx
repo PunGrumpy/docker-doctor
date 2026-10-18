@@ -14,7 +14,7 @@ npx @docker-doctor/cli@latest [dir]
 | Flag | Alias | Description |
 | --- | --- | --- |
 | `--verbose` | `-v` | Show the affected file, line, an explanation, and a `Help:` fix hint for every diagnostic |
-| `--score` | `-s` | Print only the numeric health score |
+| `--score` | `-s` | Print only the numeric health score. Prints nothing when no file was analyzed. |
 | `--json` | `-j` | Output the full report as JSON |
 | `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
 | `--version` | `-V` | Print the CLI version |
@@ -38,9 +38,9 @@ The same rules apply to the default scan, `--score`, and `--json`:
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Scan complete, no `error`-severity diagnostics. Also returned when docker-doctor finds no Dockerfile or Compose file. The terminal output says so, and `--json` and `--score` print a warning on stderr. |
+| `0` | Scan complete, no `error`-severity diagnostics. Also returned when docker-doctor finds no Dockerfile or Compose file, or finds only files with nothing to check. Such a scan has no score. The terminal output says so, and `--json` and `--score` print a warning on stderr. |
 | `1` | Scan complete, at least one `error`-severity diagnostic. In interactive mode, also returned when docker-doctor can't write the workflow scaffold, the `.docker-doctor/` handoff files or the `.gitignore` entry for them. |
-| `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures` (report `schemaVersion` 4). |
+| `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures`. When no file could be analyzed there is no score. See [JSON report](#json-report). |
 | `130` / `143` | Interrupted (SIGINT / SIGTERM) |
 
 ### Environment variables
@@ -51,6 +51,32 @@ The same rules apply to the default scan, `--score`, and `--json`:
 | `CI`, `NO_ANIMATION`, `TERM=dumb` | Print the score box without animating it. This also happens when stdout isn't a TTY. |
 
 The CLI doesn't read `NO_COLOR`. Set `FORCE_COLOR=0` instead.
+
+## JSON report
+
+`--json` prints one object with these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `schemaVersion` | The report format version. See the table below. |
+| `score`, `label` | The health score and its label. Both are `null` when no file was analyzed, including when no Dockerfile or Compose file was found. |
+| `analyzedFiles` | How many Dockerfiles and Compose files the score covers. |
+| `diagnostics` | One entry per finding, with `rule`, `category`, `severity`, `file`, `message` and `help`, plus `line` and `column` when known. |
+| `failures` | Files docker-doctor found but could not read or parse, each with its error `message`. |
+| `project` | The Dockerfiles, Compose files and `.dockerignore` files docker-doctor found. |
+| `timestamp` | When the scan ran, in ISO 8601. |
+
+`schemaVersion` changes when a field is added or when the score formula changes. Compare scores only between reports with the same version.
+
+| Version | Release | Change |
+| --- | --- | --- |
+| 2 | 0.3.0 | Added `schemaVersion`. The score became `round(100 * e^(-penalty / 70))`. |
+| 3 | 0.5.2 | Added `diagnostics[].category`. |
+| 4 | 0.6.0 | Added `failures`. |
+| 5 | 0.7.0 | The score averages the penalty over the analyzed files. Scores are not comparable with version 4. |
+| 6 | 0.8.0 | Added `analyzedFiles`. `score` and `label` are `null` when no file was analyzed. Empty files and files with nothing to check no longer count toward the average. |
+
+Reports from before 0.3.0 have no `schemaVersion` field. Treat them as version 1.
 
 ## Install for agents
 

@@ -28,7 +28,7 @@ node -e 'for (const f of process.argv.slice(1)) { const c = {}; for (const d of 
 
 3. **Score.** A coarse signal only. It averages the penalty over every analyzed file, so a new error in one file of a large project can leave the score almost unchanged. Never accept a change because the score held.
 
-A warning that no Dockerfiles or Compose files were found means the scan had no files. Do not compare its report with any other.
+When no file was analyzed, the report has no score. `score` and `label` are `null`, `analyzedFiles` is `0`, `--score` prints nothing, and stderr carries a warning. That happens when no Dockerfile or Compose file was found, or when none of the files found could be parsed or had anything to check. Compare exit codes and findings only.
 
 ## For general cleanup or code improvement:
 
@@ -63,7 +63,7 @@ npx @docker-doctor/cli@latest . --verbose
 | --- | --- |
 | `.` | Directory to scan (default `.`) |
 | `--verbose`, `-v` | Show affected file, line, explanation, and fix hint per diagnostic |
-| `--score`, `-s` | Output only the numeric score (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
+| `--score`, `-s` | Output only the numeric score, or nothing when no file was analyzed (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
 | `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
 | `--config <path>`, `-c` | Use a custom config file |
 | `rules list` | List every rule with its category, default severity, and description |

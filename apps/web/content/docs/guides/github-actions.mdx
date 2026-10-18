@@ -43,7 +43,7 @@ On a pull request from a fork, GitHub gives the workflow a read-only token. The 
 
 ## Commit status
 
-Every run also publishes a commit status on the scanned commit: `Docker Doctor · Score: 82/100 · 1 error · 3 warnings`, with a Details link to the run. It appears in the checks line on pull requests and on the commit itself, so a push to your default branch still gets a score even though it gets no PR comment. On pull requests the status mirrors the `blocking` gate. On pushes it is always green. Publishing needs `statuses: write`; without it the action logs a warning and moves on. Set `commit-status: false` to turn it off.
+Every run also publishes a commit status on the scanned commit: `Docker Doctor · Score: 82/100 · 1 error · 3 warnings`, with a Details link to the run. It appears in the checks line on pull requests and on the commit itself, so a push to your default branch still gets a score even though it gets no PR comment. On pull requests the status mirrors the `blocking` gate. On pushes findings never turn it red. When a scan has no score because the files it found failed to parse, the status is `error` on pull requests and pushes alike. Publishing needs `statuses: write`; without it the action logs a warning and moves on. Set `commit-status: false` to turn it off.
 
 ## Inputs
 
@@ -58,7 +58,7 @@ Every run also publishes a commit status on the scanned commit: `Docker Doctor �
 
 ## Outputs
 
-Every run exposes step outputs for downstream jobs: `score`, `label`, `error-count`, `warning-count`, `info-count`, and `total-issues`.
+Every run exposes step outputs for downstream jobs: `score`, `label`, `error-count`, `warning-count`, `info-count`, and `total-issues`. `score` and `label` are empty strings when no file was analyzed, including when no Dockerfile or Compose file was found.
 
 ```yaml
 - uses: PunGrumpy/docker-doctor@v1
