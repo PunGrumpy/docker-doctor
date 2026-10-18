@@ -2328,6 +2328,51 @@ describe("Best Practices Rules", () => {
       expected: 1,
       name: "an unsorted apk list reports",
     },
+    {
+      dockerfile: `
+      RUN apk add --no-cache --virtual mydeps \\
+        gcc \\
+        musl-dev
+    `,
+      expected: 0,
+      name: "the apk --virtual group name is not a package",
+    },
+    {
+      dockerfile: `
+      RUN apk add -t mydeps -X https://dl-cdn.alpinelinux.org/alpine/edge/main \\
+        gcc \\
+        musl-dev
+    `,
+      expected: 0,
+      name: "apk -t and -X values are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apk add --no-cache --virtual .build-deps \\
+        musl-dev \\
+        gcc
+    `,
+      expected: 1,
+      name: "an unsorted list after an apk --virtual group still reports",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y -o quiet=2 -t bookworm-backports \\
+        curl \\
+        git
+    `,
+      expected: 0,
+      name: "apt-get -o and -t values are not packages",
+    },
+    {
+      dockerfile: `
+      RUN dnf install -y \\
+        tmux \\
+        curl
+    `,
+      expected: 1,
+      name: "an unsorted dnf list reports",
+    },
   ];
 
   test.each(packageListCases)(

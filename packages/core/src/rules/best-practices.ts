@@ -374,25 +374,78 @@ const WHITESPACE_RE = /\s+/u;
 // command. A `\`-continued RUN has none.
 const UNCONTINUED_NEWLINE_RE = /(?<!\\[ \t]*)\r?\n/u;
 
+// Options whose value is the next word, as listed in apt-get(8), apk(8) and
+// apk-add(8). `apk add --virtual .build-deps gcc` names a group, not a
+// package.
+const APT_GET_VALUE_OPTIONS = new Set([
+  "-a",
+  "--host-architecture",
+  "-c",
+  "--config-file",
+  "-o",
+  "--option",
+  "-P",
+  "--build-profiles",
+  "-t",
+  "--target-release",
+  "--default-release",
+  "--with-source",
+]);
+const APK_VALUE_OPTIONS = new Set([
+  "--arch",
+  "--cache-dir",
+  "--cache-max-age",
+  "--keys-dir",
+  "-p",
+  "--root",
+  "--repositories-file",
+  "-X",
+  "--repository",
+  "--repository-config",
+  "--timeout",
+  "-t",
+  "--virtual",
+]);
+const NO_VALUE_OPTIONS = new Set<string>();
+
+const valueOptionsFor = (command: string): Set<string> => {
+  if (command.startsWith("apt-get")) {
+    return APT_GET_VALUE_OPTIONS;
+  }
+  if (command.startsWith("apk")) {
+    return APK_VALUE_OPTIONS;
+  }
+  return NO_VALUE_OPTIONS;
+};
+
 // The words after the install verb up to the next shell separator or
-// command-ending newline, minus options and continuation backslashes.
-// Everything past that point belongs to another command, so it is not part
-// of the list.
+// command-ending newline, minus options, their values and continuation
+// backslashes. Everything past that point belongs to another command, so it
+// is not part of the list.
 const collectPackageList = (raw: string): string[] => {
   const start = PACKAGE_LIST_START_RE.exec(raw);
   if (!start) {
     return [];
   }
+  const valueOptions = valueOptionsFor(start[0]);
   const packages: string[] = [];
   const [command] = raw
     .slice(start.index + start[0].length)
     .split(UNCONTINUED_NEWLINE_RE);
   const tokens = command.split(WHITESPACE_RE);
+  let isOptionValue = false;
   for (const token of tokens) {
     if (SHELL_SEPARATOR_RE.test(token)) {
       break;
     }
-    if (token !== "" && token !== "\\" && !token.startsWith("-")) {
+    if (token === "" || token === "\\") {
+      continue;
+    }
+    if (isOptionValue) {
+      isOptionValue = false;
+    } else if (token.startsWith("-")) {
+      isOptionValue = valueOptions.has(token);
+    } else {
       packages.push(token);
     }
   }
