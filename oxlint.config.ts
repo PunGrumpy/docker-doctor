@@ -1,12 +1,13 @@
 import { defineConfig } from "oxlint";
 import core from "ultracite/oxlint/core";
+import gdp from "ultracite/oxlint/gdp";
 import next from "ultracite/oxlint/next";
 import nextJsPlugins from "ultracite/oxlint/next/js-plugins";
 import react from "ultracite/oxlint/react";
 
 export default defineConfig({
   env: core.env,
-  extends: [core, next, react, nextJsPlugins],
+  extends: [core, next, react, nextJsPlugins, gdp],
   ignorePatterns: [
     ".cursor/hooks",
     // Deliberately malformed inputs for the CLI's end-to-end tests.
