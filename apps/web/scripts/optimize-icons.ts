@@ -202,7 +202,11 @@ const main = async () => {
   }
 
   console.log(`Optimizing ${files.length} icon file(s)…\n`);
-  await Promise.all(files.map((file) => processFile(file)));
+  await Promise.all(
+    files.map(async (file) => {
+      await processFile(file);
+    })
+  );
   console.log("\nDone.");
 };
 

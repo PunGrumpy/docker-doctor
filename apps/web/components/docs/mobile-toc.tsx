@@ -4,8 +4,29 @@ import { AnchorProvider } from "fumadocs-core/toc";
 import type { TableOfContents } from "fumadocs-core/toc";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
+import type { RefObject } from "react";
 
 import { TocLink } from "@/components/docs/toc";
+
+// Closes the panel on Escape and moves focus back to its summary. Returns the
+// cleanup that stops listening.
+const closeOnEscape = (
+  details: HTMLDetailsElement,
+  summaryRef: RefObject<HTMLElement | null>
+): (() => void) => {
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && details.open) {
+      details.open = false;
+      summaryRef.current?.focus();
+    }
+  };
+
+  details.addEventListener("keydown", onKeyDown);
+
+  return () => {
+    details.removeEventListener("keydown", onKeyDown);
+  };
+};
 
 interface DocsMobileTocProps {
   readonly toc: TableOfContents;
@@ -20,20 +41,7 @@ export const DocsMobileToc = ({ toc }: DocsMobileTocProps) => {
   useEffect(() => {
     const details = detailsRef.current;
 
-    if (!details) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && details.open) {
-        details.open = false;
-        summaryRef.current?.focus();
-      }
-    };
-
-    details.addEventListener("keydown", onKeyDown);
-
-    return () => details.removeEventListener("keydown", onKeyDown);
+    return details ? closeOnEscape(details, summaryRef) : undefined;
   }, []);
 
   if (toc.length === 0) {

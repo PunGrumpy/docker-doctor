@@ -1,5 +1,6 @@
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
+import { hasText } from "../text";
 import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 
@@ -37,7 +38,9 @@ export const useMultiStage: DockerfileRule = {
             this.defaultSeverity,
             "Only one build stage (FROM) was detected, but build instructions were found. Multi-stage builds can significantly reduce final image size.",
             this.help,
-            instructions.find((inst) => inst.instruction === "FROM")?.line || 1
+            (instructions.find((inst) => inst.instruction === "FROM")?.line ??
+              0) ||
+              1
           ),
         ];
       }
@@ -66,7 +69,7 @@ export const orderLayers: DockerfileRule = {
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
 
-        if (!src) {
+        if (!hasText(src)) {
           continue;
         }
 
@@ -207,7 +210,7 @@ export const useDockerignore: DockerfileRule = {
         const parts = inst.args.split(/\s+/u);
         const src = parts.find((p) => !p.startsWith("--"));
 
-        if (!src) {
+        if (!hasText(src)) {
           return false;
         }
 

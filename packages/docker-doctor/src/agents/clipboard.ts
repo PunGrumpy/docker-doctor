@@ -21,9 +21,9 @@ const getClipboardCommands = (): ClipboardCommand[] => {
   ];
 };
 
-const tryCopy = ({ command, args }: ClipboardCommand, text: string) =>
+const tryCopy = async ({ command, args }: ClipboardCommand, text: string) =>
   /* eslint-disable promise/avoid-new */
-  new Promise<boolean>((resolve) => {
+  await new Promise<boolean>((resolve) => {
     const child = spawn(command, args, {
       stdio: ["pipe", "ignore", "ignore"],
     });
@@ -42,21 +42,23 @@ const tryCommands = async (
   commands: ClipboardCommand[],
   text: string
 ): Promise<boolean> => {
-  const [first, ...rest] = commands;
+  const first = commands.at(0);
 
-  if (!first) {
+  if (first === undefined) {
     return false;
   }
+
+  const rest = commands.slice(1);
 
   if (await tryCopy(first, text)) {
     return true;
   }
 
-  return tryCommands(rest, text);
+  return await tryCommands(rest, text);
 };
 
 // Best-effort: tries each platform clipboard tool in order (they're fallbacks,
 // so the attempts are sequential). Returns false when none worked — the
 // caller prints the payload instead.
-export const copyToClipboard = (text: string): Promise<boolean> =>
-  tryCommands(getClipboardCommands(), text);
+export const copyToClipboard = async (text: string): Promise<boolean> =>
+  await tryCommands(getClipboardCommands(), text);

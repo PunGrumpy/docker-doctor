@@ -4,6 +4,7 @@ import { isValidElement } from "react";
 
 import { CopyButton } from "@/components/copy-button";
 import { Pill } from "@/components/pill";
+import { hasText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 const isTextNode = (node: ReactNode): node is string | number =>
@@ -113,7 +114,7 @@ export const Anchor = ({
   children,
   ...props
 }: ComponentProps<"a">) => {
-  if (href?.startsWith("/")) {
+  if (href?.startsWith("/") === true) {
     return (
       <Link
         className={cn(
@@ -169,7 +170,7 @@ export const Pre = ({
 
   return (
     <div className="group bg-background shadow-border relative my-6 overflow-hidden rounded-xl">
-      {title ? (
+      {hasText(title) ? (
         <div className="text-muted-foreground border-b border-dashed px-4 py-2 font-mono text-xs">
           {title}
         </div>
@@ -228,15 +229,18 @@ interface CardProps {
 }
 
 export const Card = ({ icon, title, href, children }: CardProps) => {
+  const hasIcon = Boolean(icon);
+  const hasBody = Boolean(children);
+
   const content = (
     <>
-      {icon ? (
+      {hasIcon ? (
         <div className="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-lg [&>svg]:size-4">
           {icon}
         </div>
       ) : null}
       <p className="mt-3 font-medium">{title}</p>
-      {children ? (
+      {hasBody ? (
         // `children` is the card body from MDX, already wrapped in our
         // custom `p` (Paragraph) component — use a `div` here so we don't
         // nest a `<p>` inside another `<p>`.
@@ -247,7 +251,7 @@ export const Card = ({ icon, title, href, children }: CardProps) => {
     </>
   );
 
-  if (href) {
+  if (hasText(href)) {
     return (
       <Link
         className={cn(

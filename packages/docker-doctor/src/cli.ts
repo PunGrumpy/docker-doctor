@@ -54,6 +54,7 @@ import {
   installSkillForAgents,
 } from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
+import { hasText } from "./text";
 import {
   scaffoldActionWorkflow,
   WORKFLOW_RELATIVE_PATH,
@@ -86,15 +87,18 @@ const stopPrompt = (
   process.stdout.write("\u001B[?25h");
 };
 
-const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
+const askConfirm = async (
+  question: string,
+  defaultYes = false
+): Promise<boolean> => {
   const isRaw = process.stdin.isTTY;
 
   if (!isRaw) {
-    return Promise.resolve(defaultYes);
+    return defaultYes;
   }
 
   /* eslint-disable promise/avoid-new */
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     let value = defaultYes;
 
     readline.emitKeypressEvents(process.stdin);
@@ -160,7 +164,7 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
         process.stdout.write("\r\u001B[K\n");
         process.stdout.write("\u001B[2A");
         resolve(value);
-      } else if (key.ctrl && key.name === "c") {
+      } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
@@ -172,7 +176,7 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
   /* eslint-enable promise/avoid-new */
 };
 
-const askSelect = (
+const askSelect = async (
   question: string,
   options: string[],
   defaultIndex = 0
@@ -180,11 +184,11 @@ const askSelect = (
   const isRaw = process.stdin.isTTY;
 
   if (!isRaw) {
-    return Promise.resolve(defaultIndex);
+    return defaultIndex;
   }
 
   /* eslint-disable promise/avoid-new */
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     let index = defaultIndex;
 
     readline.emitKeypressEvents(process.stdin);
@@ -244,7 +248,7 @@ const askSelect = (
 
         process.stdout.write(`\u001B[${options.length}A`);
         resolve(index);
-      } else if (key.ctrl && key.name === "c") {
+      } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
@@ -261,20 +265,18 @@ interface MultiSelectOption {
   selected: boolean;
 }
 
-const askMultiSelect = (
+const askMultiSelect = async (
   question: string,
   options: MultiSelectOption[]
 ): Promise<number[]> => {
   const isRaw = process.stdin.isTTY;
 
   if (!isRaw) {
-    return Promise.resolve(
-      options.flatMap((option, i) => (option.selected ? [i] : []))
-    );
+    return options.flatMap((option, i) => (option.selected ? [i] : []));
   }
 
   /* eslint-disable promise/avoid-new */
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     let index = 0;
     const selected = options.map((option) => option.selected);
     const lineCount = options.length + 2;
@@ -354,7 +356,7 @@ const askMultiSelect = (
 
         process.stdout.write(`\u001B[${lineCount - 1}A`);
         resolve(options.flatMap((_, i) => (selected[i] ? [i] : [])));
-      } else if (key.ctrl && key.name === "c") {
+      } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
@@ -476,8 +478,8 @@ const runInteractiveWizard = async (
     if (addGhActions) {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
-        confirmOverwrite: () =>
-          askConfirm(
+        confirmOverwrite: async () =>
+          await askConfirm(
             `A ${WORKFLOW_RELATIVE_PATH} already exists. Overwrite it?`
           ),
         rootDir: context.rootDir,
@@ -572,7 +574,7 @@ const runRulesEngine = async (
   options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void
 ): Promise<RulesEngineResult> => {
-  const isSilent = options.score || options.json;
+  const isSilent = options.score === true || options.json === true;
 
   if (process.stdout.isTTY && !isSilent) {
     setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
@@ -841,7 +843,7 @@ const writeScanOutput = async (
   const hasErrors = diagnostics.some((d) => d.severity === "error");
   const exitCode = scanExitCode(failures.length > 0, hasErrors);
 
-  if (options.score || options.json) {
+  if (options.score === true || options.json === true) {
     if (scoreResult.score === null) {
       const message =
         scan.scannedFileCount === 0
@@ -891,7 +893,7 @@ const resolveConfigPath = async (
   configOption: string | undefined,
   rootDir: string
 ): Promise<string | undefined> => {
-  if (!configOption) {
+  if (!hasText(configOption)) {
     return undefined;
   }
 
@@ -941,6 +943,14 @@ program
   .description("Static analysis for Dockerfile and Docker Compose files")
   .version(packageJson.version, "-V, --version", "display the version number");
 
+// The default scan command's options, as commander parses them.
+interface ScanOptions {
+  config?: string;
+  json: boolean;
+  score: boolean;
+  verbose: boolean;
+}
+
 // Default scan command
 program
   .argument("[dir]", "directory to scan", ".")
@@ -948,11 +958,11 @@ program
   .option("-s, --score", "only output numeric health score", false)
   .option("-j, --json", "output results as JSON report", false)
   .option("-c, --config <path>", "custom config file path")
-  .action(async (dir, options) => {
+  .action(async (dir: string, options: ScanOptions) => {
     const isSilent = options.score || options.json;
     // The spinner and progress lines only make sense on an interactive
     // terminal in the default output mode.
-    const showProgress = Boolean(process.stdout.isTTY) && !isSilent;
+    const showProgress = process.stdout.isTTY && !isSilent;
 
     // Helper to safely show terminal cursor
     const restoreCursor = (): void => {
@@ -1041,7 +1051,7 @@ program
         const projectFilesList = [
           ...project.dockerfiles,
           ...project.composeFiles,
-          ...(project.dockerignores || []),
+          ...(project.dockerignores ?? []),
         ];
 
         // .dockerignore files are discovered for use-dockerignore, not scanned.
@@ -1170,7 +1180,7 @@ program
   .action(async (options: { agent?: string[]; global?: boolean }) => {
     const source = getSkillSourceDirectory();
 
-    if (!source) {
+    if (source === null) {
       console.error(
         "Bundled skill not found — this looks like a broken installation."
       );
@@ -1218,7 +1228,7 @@ program
     }
 
     if (result.installed.length > 0) {
-      const scope = options.global ? "any project" : "this project";
+      const scope = options.global === true ? "any project" : "this project";
       console.log(
         `\n  The agent can now run ${chalk.cyan("/docker-doctor")} to scan and triage ${scope}.`
       );
@@ -1249,7 +1259,7 @@ rules
 rules
   .command("explain <rule>")
   .description("explain a specific rule in detail")
-  .action((ruleKey) => {
+  .action((ruleKey: string) => {
     const rule = findRule(ruleKey) ?? findRule(`docker-doctor/${ruleKey}`);
 
     if (!rule) {

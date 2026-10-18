@@ -14,6 +14,16 @@ import { cn } from "@/lib/utils";
 const COMMAND = "docker-doctor .";
 const TOTAL_TICKS = 210;
 const TICK_MS = 100;
+
+// Calls tick every TICK_MS milliseconds. Returns the cleanup that stops it.
+const startTicking = (tick: () => void): (() => void) => {
+  const timer = setInterval(tick, TICK_MS);
+
+  return () => {
+    clearInterval(timer);
+  };
+};
+
 const SPINNERFRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 const Cursor = ({ visible }: { readonly visible: boolean }) => {
@@ -422,25 +432,21 @@ export const TerminalDemo = () => {
     el.scrollTo({ top: el.scrollHeight });
   }, [ticks]);
 
-  useEffect(() => {
-    if (isPaused) {
-      return;
-    }
+  useEffect(
+    () =>
+      isPaused
+        ? undefined
+        : startTicking(() => {
+            setTicks((prev) => {
+              if (prev >= TOTAL_TICKS) {
+                return 0;
+              }
 
-    const timer = setInterval(() => {
-      setTicks((prev) => {
-        if (prev >= TOTAL_TICKS) {
-          return 0;
-        }
-
-        return prev + 1;
-      });
-    }, TICK_MS);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [isPaused]);
+              return prev + 1;
+            });
+          }),
+    [isPaused]
+  );
 
   const commandText1 = getCommandSlice(ticks, 1, 14, COMMAND);
   const commandText2 = getCommandSlice(ticks, 86, 19, "claude");
@@ -516,7 +522,9 @@ export const TerminalDemo = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setIsPaused(!isPaused)}
+              onClick={() => {
+                setIsPaused(!isPaused);
+              }}
               className={cn(
                 "flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 font-medium",
                 "bg-card hover:bg-muted/40",

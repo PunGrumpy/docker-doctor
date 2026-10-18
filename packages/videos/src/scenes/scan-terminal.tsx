@@ -331,7 +331,9 @@ const ScoreBlock = ({
 
 const LineBody = (line: TermLine) => {
   switch (line.kind) {
-    case "blank": {
+    case "blank":
+    case "cmd":
+    case "working": {
       return null;
     }
 
@@ -409,7 +411,7 @@ const LineBody = (line: TermLine) => {
     }
 
     default: {
-      return null;
+      throw new Error("A terminal line kind has no case in LineBody");
     }
   }
 };

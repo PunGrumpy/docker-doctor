@@ -1,3 +1,4 @@
+import { hasText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,7 +38,7 @@ export const ClaudeDiff = ({
         <span className="text-muted-foreground">)</span>
       </span>
     </div>
-    {summary ? (
+    {hasText(summary) ? (
       <div className="text-muted-foreground flex min-w-0 items-baseline gap-2">
         {/* invisible status glyph spacer: aligns ⎿ under "Update" */}
         <span aria-hidden className="invisible shrink-0">

@@ -46,7 +46,9 @@ const makeProject = () => {
   }
 
   return {
-    cleanup: () => fs.rmSync(root, { force: true, recursive: true }),
+    cleanup: () => {
+      fs.rmSync(root, { force: true, recursive: true });
+    },
     root,
   };
 };
@@ -188,7 +190,9 @@ describe("discoverProject", () => {
 
         const project = await discoverProject(root, {
           ignoreFiles: ["examples/**"],
-          onSkippedDirectory: (dir) => skipped.push(dir),
+          onSkippedDirectory: (dir) => {
+            skipped.push(dir);
+          },
         });
 
         expect(project.dockerfiles).toEqual(["Dockerfile"]);
@@ -215,7 +219,9 @@ describe("discoverProject", () => {
 
         const project = await discoverProject(root, {
           ignoreFiles: ["**/vendor/**"],
-          onSkippedDirectory: (dir) => skipped.push(dir),
+          onSkippedDirectory: (dir) => {
+            skipped.push(dir);
+          },
         });
 
         expect(project.dockerfiles).toEqual(["a/Dockerfile"]);
@@ -239,7 +245,9 @@ describe("discoverProject", () => {
         const skipped: string[] = [];
 
         const project = await discoverProject(root, {
-          onSkippedDirectory: (dir) => skipped.push(dir),
+          onSkippedDirectory: (dir) => {
+            skipped.push(dir);
+          },
         });
 
         expect(project.dockerfiles).toEqual(["ok/Dockerfile"]);
@@ -249,7 +257,9 @@ describe("discoverProject", () => {
         skipped.length = 0;
         await discoverProject(root, {
           ignoreFiles: ["locked/**"],
-          onSkippedDirectory: (dir) => skipped.push(dir),
+          onSkippedDirectory: (dir) => {
+            skipped.push(dir);
+          },
         });
         expect(skipped).toEqual([]);
       } finally {
@@ -268,7 +278,15 @@ describe("discoverProject", () => {
         writeDockerfiles(root, ["Dockerfile"]);
         fs.chmodSync(root, 0o000);
 
-        await expect(discoverProject(root)).rejects.toThrow();
+        let rejected = false;
+
+        try {
+          await discoverProject(root);
+        } catch {
+          rejected = true;
+        }
+
+        expect(rejected).toBe(true);
       } finally {
         fs.chmodSync(root, 0o755);
         fs.rmSync(root, { force: true, recursive: true });
@@ -316,7 +334,9 @@ describe("discoverProject", () => {
 
         const project = await discoverProject(root, {
           ignoreFiles: ["vendor/"],
-          onSkippedDirectory: (dir) => skipped.push(dir),
+          onSkippedDirectory: (dir) => {
+            skipped.push(dir);
+          },
         });
 
         expect(project.dockerfiles).toEqual(["Dockerfile"]);

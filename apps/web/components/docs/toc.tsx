@@ -5,6 +5,8 @@ import type { TableOfContents, TOCItemType } from "fumadocs-core/toc";
 import type { ComponentProps, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { hasText } from "@/lib/text";
+
 interface DocsTocProps {
   readonly toc: TableOfContents;
 }
@@ -35,6 +37,35 @@ interface ThumbPosition {
   readonly height: number;
 }
 
+// Measures the active link now and on every resize. With no container or no
+// active heading the marker is hidden and nothing listens. Returns the
+// cleanup that stops listening.
+const followActiveLink = (
+  container: HTMLElement | null,
+  active: string | undefined,
+  onMeasure: (position: ThumbPosition | null) => void
+): (() => void) => {
+  const canFollow = container !== null && hasText(active);
+
+  const measure = () => {
+    const link = canFollow
+      ? container.querySelector<HTMLElement>(`a[href="#${CSS.escape(active)}"]`)
+      : null;
+
+    onMeasure(link ? { height: link.offsetHeight, top: link.offsetTop } : null);
+  };
+
+  measure();
+
+  if (canFollow) {
+    window.addEventListener("resize", measure);
+  }
+
+  return () => {
+    window.removeEventListener("resize", measure);
+  };
+};
+
 // A solid marker that slides along the dashed rail to track the active
 // heading. It reads the active `TOCItem` anchor's offset within the nav (which
 // is `position: relative`), so it stays aligned regardless of item depth.
@@ -46,30 +77,10 @@ const TocThumb = ({
   const active = useActiveAnchor();
   const [position, setPosition] = useState<ThumbPosition | null>(null);
 
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (!(container && active)) {
-      setPosition(null);
-
-      return;
-    }
-
-    const measure = () => {
-      const link = container.querySelector<HTMLElement>(
-        `a[href="#${CSS.escape(active)}"]`
-      );
-
-      setPosition(
-        link ? { height: link.offsetHeight, top: link.offsetTop } : null
-      );
-    };
-
-    measure();
-    window.addEventListener("resize", measure);
-
-    return () => window.removeEventListener("resize", measure);
-  }, [active, containerRef]);
+  useEffect(
+    () => followActiveLink(containerRef.current, active, setPosition),
+    [active, containerRef]
+  );
 
   if (!position) {
     return null;

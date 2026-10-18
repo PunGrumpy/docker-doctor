@@ -37,7 +37,9 @@ const subscribeReducedMotion = (onChange: () => void) => {
   const mq = window.matchMedia(REDUCED_MOTION_QUERY);
   mq.addEventListener("change", onChange);
 
-  return () => mq.removeEventListener("change", onChange);
+  return () => {
+    mq.removeEventListener("change", onChange);
+  };
 };
 
 // useSyncExternalStore keeps the server render and the first client render
@@ -49,6 +51,15 @@ const usePrefersReducedMotion = () =>
     () => window.matchMedia(REDUCED_MOTION_QUERY).matches,
     () => false
   );
+
+// Calls tick every `ms` milliseconds. Returns the cleanup that stops it.
+const startInterval = (tick: () => void, ms: number): (() => void) => {
+  const id = setInterval(tick, ms);
+
+  return () => {
+    clearInterval(id);
+  };
+};
 
 export const ClaudeThinking = ({
   running = true,
@@ -66,39 +77,36 @@ export const ClaudeThinking = ({
   const [verbIdx, setVerbIdx] = useState(0);
   const [secs, setSecs] = useState(0);
 
-  useEffect(() => {
-    if (!running || prefersReduced) {
-      return;
-    }
+  useEffect(
+    () =>
+      running && !prefersReduced
+        ? startInterval(() => {
+            setGlyph((g) => (g + 1) % GLYPHS.length);
+          }, 110)
+        : undefined,
+    [running, prefersReduced]
+  );
 
-    const id = setInterval(() => setGlyph((g) => (g + 1) % GLYPHS.length), 110);
+  useEffect(
+    () =>
+      running
+        ? startInterval(() => {
+            setSecs((s) => s + 1);
+          }, 1000)
+        : undefined,
+    [running]
+  );
 
-    return () => clearInterval(id);
-  }, [running, prefersReduced]);
-
-  useEffect(() => {
-    if (!running) {
-      return;
-    }
-
-    const id = setInterval(() => setSecs((s) => s + 1), 1000);
-
-    return () => clearInterval(id);
-  }, [running]);
-
-  useEffect(() => {
-    if (!running) {
-      return;
-    }
-
-    // Verbs change slowly, like the real thing — not every second.
-    const id = setInterval(
-      () => setVerbIdx((v) => (v + 1) % verbs.length),
-      5200
-    );
-
-    return () => clearInterval(id);
-  }, [running, verbs.length]);
+  // Verbs change slowly, like the real thing — not every second.
+  useEffect(
+    () =>
+      running
+        ? startInterval(() => {
+            setVerbIdx((v) => (v + 1) % verbs.length);
+          }, 5200)
+        : undefined,
+    [running, verbs.length]
+  );
 
   if (!running) {
     return null;

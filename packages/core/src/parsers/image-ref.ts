@@ -1,3 +1,4 @@
+import { hasText } from "../text";
 import type { DockerfileInstruction } from "../types/index";
 
 export interface ImageRef {
@@ -81,7 +82,7 @@ export const isHardenedRuntimeImage = (imagePart: string): boolean => {
 
   const { tag } = parseImageRef(imagePart);
 
-  return !(tag === "dev" || tag?.endsWith("-dev"));
+  return !(tag === "dev" || tag?.endsWith("-dev") === true);
 };
 
 const DISTROLESS_NONROOT_TAG_RE = /(?:^|-)nonroot(?:-|$)/u;
@@ -110,11 +111,11 @@ export const isDistrolessNonroot = (imagePart: string): boolean => {
 export const mutableRefIssue = (
   ref: ImageRef
 ): "untagged" | "latest" | undefined => {
-  if (!(ref.tag || ref.digest)) {
+  if (!(hasText(ref.tag) || hasText(ref.digest))) {
     return "untagged";
   }
 
-  if (ref.tag === "latest" && !ref.digest) {
+  if (ref.tag === "latest" && !hasText(ref.digest)) {
     return "latest";
   }
 
@@ -161,7 +162,7 @@ export const collectStageAliases = (
 
     const { stage } = parseFromArgs(inst.args);
 
-    if (stage) {
+    if (hasText(stage)) {
       aliases.add(stage.toLowerCase());
     }
   }

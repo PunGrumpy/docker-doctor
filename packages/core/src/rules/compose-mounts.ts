@@ -6,6 +6,7 @@ import {
   isComposeSequence,
   isComposeString,
 } from "../parsers/compose-value";
+import { hasText } from "../text";
 import type { ComposeValue } from "../types/index";
 import { isComposeTrue } from "./compose-services";
 
@@ -156,7 +157,7 @@ export const bindMountSource = (mount: VolumeMount): string | undefined => {
     return undefined;
   }
 
-  if (!mount.source) {
+  if (!hasText(mount.source)) {
     return undefined;
   }
 
@@ -198,7 +199,7 @@ export const mountsDockerSocket = (mount: VolumeMount): boolean => {
     return false;
   }
 
-  if (!mount.source) {
+  if (!hasText(mount.source)) {
     return false;
   }
 

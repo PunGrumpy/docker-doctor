@@ -407,7 +407,7 @@ describe("Security Rules", () => {
     `);
 
     const diags = noSecretsInEnv.check(spellings, "Dockerfile");
-    expect(diags.map((d) => d.message)).toEqual([
+    expect(diags.map((d) => d.message)).toEqual<unknown[]>([
       expect.stringContaining("'PGPASSWORD'"),
       expect.stringContaining("'OPENAI_APIKEY'"),
       expect.stringContaining("'GITHUB_PAT'"),
@@ -1373,7 +1373,7 @@ describe("Compose Security Rules", () => {
     };
 
     const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
-    expect(diags.map((d) => d.message)).toEqual([
+    expect(diags.map((d) => d.message)).toEqual<unknown[]>([
       expect.stringContaining("'GITHUB_PAT'"),
       expect.stringContaining("'OPENAI_APIKEY'"),
       expect.stringContaining("'PGPASSWORD'"),
@@ -1406,7 +1406,7 @@ describe("Compose Security Rules", () => {
     };
 
     const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
-    expect(diags.map((d) => d.message)).toEqual([
+    expect(diags.map((d) => d.message)).toEqual<unknown[]>([
       expect.stringContaining("'POSTGRES_PASSWORD'"),
     ]);
   });

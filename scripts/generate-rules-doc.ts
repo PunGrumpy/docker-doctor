@@ -23,6 +23,7 @@ import {
   allDockerfileRules,
   allRules,
 } from "../packages/core/src/rules/index";
+import { hasText } from "../packages/core/src/text";
 import type {
   Diagnostic,
   DiagnosticSeverity,
@@ -92,7 +93,7 @@ const assertCoverage = (): void => {
   const ruleKeys = new Set(allRules.map((rule) => rule.key));
 
   const missingContent = allRules
-    .filter((rule) => !rulePageContent[rule.key])
+    .filter((rule) => !Object.hasOwn(rulePageContent, rule.key))
     .map((rule) => rule.key);
 
   if (missingContent.length > 0) {
@@ -113,7 +114,7 @@ const assertCoverage = (): void => {
 };
 
 const renderExample = (example: RuleExample): string => {
-  const meta = example.title ? ` title="${example.title}"` : "";
+  const meta = hasText(example.title) ? ` title="${example.title}"` : "";
 
   return `\`\`\`${example.lang}${meta}\n${example.code}\n\`\`\``;
 };
@@ -154,9 +155,9 @@ const exampleDiagnostic = (
         projectFiles: ["Dockerfile"],
       }) ?? []);
 
-  const [diagnostic] = diagnostics;
+  const diagnostic = diagnostics.at(0);
 
-  if (!diagnostic) {
+  if (diagnostic === undefined) {
     throw new Error(
       `The failing example for ${rule.key} in scripts/rule-page-content.ts no longer triggers the rule — its docs page would show scan output that never happens. Update the example.`
     );
@@ -177,7 +178,7 @@ const buildRulePage = (rule: RuleDefinition): string => {
   );
 
   const prefix = SEVERITY_PREFIX[diagnostic.severity] ?? diagnostic.severity;
-  const notes = content.notes ? `\n${content.notes}\n` : "";
+  const notes = hasText(content.notes) ? `\n${content.notes}\n` : "";
 
   return `---
 ${AUTOGEN_HEADER}
@@ -311,19 +312,21 @@ const existing = await readdir(RULES_DIR);
 await Promise.all(
   existing
     .filter((entry) => !expectedFiles.has(entry))
-    .map((entry) => rm(path.join(RULES_DIR, entry)))
+    .map(async (entry) => {
+      await rm(path.join(RULES_DIR, entry));
+    })
 );
 
 await Promise.all([
   writeFile(path.join(RULES_DIR, "index.mdx"), buildIndexPage(), "utf-8"),
   writeFile(path.join(RULES_DIR, "meta.json"), buildMeta(), "utf-8"),
-  ...allRules.map((rule) =>
-    writeFile(
+  ...allRules.map(async (rule) => {
+    await writeFile(
       path.join(RULES_DIR, `${ruleSlug(rule)}.mdx`),
       buildRulePage(rule),
       "utf-8"
-    )
-  ),
+    );
+  }),
 ]);
 
 process.stdout.write(

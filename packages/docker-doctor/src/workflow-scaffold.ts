@@ -36,7 +36,9 @@ const findRepositoryRoot = async (dir: string): Promise<string | null> => {
   const candidates = selfAndAncestors(dir);
 
   const hasGit = await Promise.all(
-    candidates.map((candidate) => fileExists(path.join(candidate, ".git")))
+    candidates.map(
+      async (candidate) => await fileExists(path.join(candidate, ".git"))
+    )
   );
 
   const nearest = hasGit.indexOf(true);

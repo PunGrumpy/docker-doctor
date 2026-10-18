@@ -7,6 +7,7 @@ import { parse as parseYaml } from "yaml";
 import { ConfigError } from "../errors";
 import type { ConfigInput, DockerDoctorConfig } from "../schemas/config";
 import { isConfigObject, validateConfig } from "../schemas/config";
+import { hasText } from "../text";
 import { collectUnknownConfigKeys } from "./unknown-keys";
 
 const fileExists = async (filePath: string): Promise<boolean> => {
@@ -94,13 +95,10 @@ const isKeyedObject = (
 export const typeStrippingFailure = (
   filePath: string,
   cause: unknown
-): string | undefined => {
-  if (!TYPESCRIPT_CONFIG_PATTERN.test(filePath) || !hasErrorCode(cause)) {
-    return;
-  }
-
-  return TYPE_STRIPPING_FAILURES.get(cause.code);
-};
+): string | undefined =>
+  TYPESCRIPT_CONFIG_PATTERN.test(filePath) && hasErrorCode(cause)
+    ? TYPE_STRIPPING_FAILURES.get(cause.code)
+    : undefined;
 
 const importConfig = async (filePath: string): Promise<ConfigInput | null> => {
   if (filePath.endsWith(".json")) {
@@ -121,7 +119,7 @@ const importConfig = async (filePath: string): Promise<ConfigInput | null> => {
   } catch (error: unknown) {
     const reason = typeStrippingFailure(filePath, error);
 
-    if (reason) {
+    if (hasText(reason)) {
       throw new ConfigError({
         message: `Cannot load ${filePath} on Node.js ${process.version}: ${reason}. A docker-doctor.config.yaml or .json needs no TypeScript support at all.`,
       });
@@ -193,7 +191,7 @@ export const loadConfig = async (
 ): Promise<DockerDoctorConfig> => {
   let configObject: ConfigInput | null = null;
 
-  if (customPath) {
+  if (hasText(customPath)) {
     const fullPath = path.resolve(rootDir, customPath);
 
     if (!(await fileExists(fullPath))) {
@@ -225,9 +223,7 @@ export const loadConfig = async (
     }
     /* eslint-enable no-await-in-loop */
 
-    if (configObject === null) {
-      configObject = await readPackageConfig(rootDir);
-    }
+    configObject ??= await readPackageConfig(rootDir);
   }
 
   if (configObject === null) {

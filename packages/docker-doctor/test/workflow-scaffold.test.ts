@@ -18,7 +18,9 @@ const makeProject = (options: { withWorkflow: boolean }) => {
   }
 
   return {
-    cleanup: () => fs.rmSync(root, { force: true, recursive: true }),
+    cleanup: () => {
+      fs.rmSync(root, { force: true, recursive: true });
+    },
     read: () => fs.readFileSync(path.join(root, WORKFLOW_PATH), "utf-8"),
     root,
   };
@@ -111,7 +113,7 @@ describe("scaffoldActionWorkflow", () => {
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
-        confirmOverwrite: () => Promise.resolve(false),
+        confirmOverwrite: async () => await Promise.resolve(false),
         rootDir: root,
       });
 
@@ -128,7 +130,7 @@ describe("scaffoldActionWorkflow", () => {
     try {
       const status = await scaffoldActionWorkflow({
         actionRef: ACTION_REF,
-        confirmOverwrite: () => Promise.resolve(true),
+        confirmOverwrite: async () => await Promise.resolve(true),
         rootDir: root,
       });
 

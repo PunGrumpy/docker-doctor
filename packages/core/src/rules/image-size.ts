@@ -7,6 +7,7 @@ import {
 } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
+import { hasText } from "../text";
 import type {
   Diagnostic,
   DockerfileInstruction,
@@ -166,7 +167,7 @@ export const preferSlimBase: DockerfileRule = {
     for (const { from } of shippedStages(collectStages(instructions))) {
       const imagePart = parseFromArgs(from.args).base;
 
-      if (!imagePart || isScratch(imagePart)) {
+      if (!hasText(imagePart) || isScratch(imagePart)) {
         continue;
       }
 
@@ -184,12 +185,12 @@ export const preferSlimBase: DockerfileRule = {
       }
 
       // Digest pins are already fully deterministic; not our concern here.
-      if (ref.digest) {
+      if (hasText(ref.digest)) {
         continue;
       }
 
       // No tag: pin-image-version owns the untagged case, don't double-report.
-      if (!ref.tag) {
+      if (!hasText(ref.tag)) {
         continue;
       }
 

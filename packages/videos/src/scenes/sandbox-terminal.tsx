@@ -205,8 +205,13 @@ const LineBody = (line: SandboxLine) => {
       return <span style={{ color: MUTED }}>{`        ${line.text}`}</span>;
     }
 
-    default: {
+    case "cmd":
+    case "working": {
       return <span style={{ color: MUTED }}>{`  ${line.text}`}</span>;
+    }
+
+    default: {
+      throw new Error("A terminal line kind has no case in LineBody");
     }
   }
 };
