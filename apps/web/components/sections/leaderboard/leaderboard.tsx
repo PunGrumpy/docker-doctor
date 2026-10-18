@@ -83,13 +83,15 @@ const Row = ({
         target="_blank"
       >
         <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2.5 sm:col-auto sm:row-auto">
-          <span
-            aria-label={tied ? `Rank ${rank}, tied` : `Rank ${rank}`}
-            className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums"
-          >
-            <span className="inline-block w-4 text-right">{rank}</span>
+          <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+            <span aria-hidden="true" className="inline-block w-4 text-right">
+              {rank}
+            </span>
             <span aria-hidden="true" className="inline-block w-2 text-left">
               {tied ? "=" : ""}
+            </span>
+            <span className="sr-only">
+              {tied ? `Rank ${rank}, tied` : `Rank ${rank}`}
             </span>
           </span>
           <Image
@@ -103,11 +105,9 @@ const Row = ({
             <span className="text-foreground/85 block truncate text-sm font-medium">
               {entry.name}
             </span>
-            <span
-              className="text-muted-foreground block truncate text-xs"
-              title={formatFilesDetail(entry)}
-            >
+            <span className="text-muted-foreground block truncate text-xs">
               {formatFiles(entry)}
+              <span className="sr-only"> ({formatFilesDetail(entry)})</span>
             </span>
             <span className="text-muted-foreground block truncate text-xs tabular-nums">
               <span

@@ -373,7 +373,7 @@ export const ArchitectureDiagram = () => (
     <DiagramCanvas className="sm:hidden" layout={PORTRAIT} />
     <DiagramCanvas className="hidden sm:block" layout={LANDSCAPE} />
 
-    <figcaption className="text-muted-foreground relative mt-6 text-center text-[11px] text-balance">
+    <figcaption className="text-muted-foreground relative mt-6 text-center text-xs text-balance">
       33 rules across five categories. Any error-severity finding fails the run;{" "}
       <code className="font-mono">--score</code> prints only the number.{" "}
       <Link
