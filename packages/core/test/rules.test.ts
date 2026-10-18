@@ -1759,6 +1759,69 @@ describe("Image Size Rules", () => {
     expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
   });
 
+  // The usual way to copy the build argument into the environment.
+  const ENV_FROM_ARG = `ENV NODE_ENV=\${NODE_ENV}`;
+
+  // ARG scope follows the Dockerfile reference. RUN sees an ARG of its own
+  // stage or of a stage it is built FROM, and an ENV of the same name wins.
+  // An ARG before the first FROM only gives the default to an
+  // `ARG NODE_ENV` inside a stage.
+  const nodeEnvArgCases = [
+    {
+      dockerfile: `FROM node:22-alpine\nARG NODE_ENV=production\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile:
+        'FROM node:22-alpine\nARG NODE_ENV="production"\nENV NODE_ENV=$NODE_ENV\nRUN npm ci',
+      expected: 0,
+    },
+    {
+      dockerfile: "FROM node:22-alpine\nARG NODE_ENV=production\nRUN npm ci",
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine\nARG NODE_ENV=development\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile: `ARG NODE_ENV=production\nFROM node:22-alpine\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile: `ARG NODE_ENV=production\nFROM node:22-alpine\nARG NODE_ENV\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine AS base\nARG NODE_ENV=production\nFROM base\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine AS build\nARG NODE_ENV=production\nFROM node:22-alpine\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "FROM node:22-alpine\nENV NODE_ENV=development\nARG NODE_ENV=production\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: `FROM oven/bun:1\nARG NODE_ENV=production\n${ENV_FROM_ARG}\nRUN bun install`,
+      expected: 1,
+    },
+  ];
+
+  test.each(nodeEnvArgCases)(
+    "avoid-dev-dependencies: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
     // final image, so a dev install there ships too.

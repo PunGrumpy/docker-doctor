@@ -33,34 +33,80 @@ interface BuildStage {
 const NODE_ENV_ASSIGNMENT_RE =
   /(?:^|\s)NODE_ENV(?:=|\s+)["']?(?<value>[^\s"']*)/u;
 
+// `ARG NODE_ENV` or `ARG NODE_ENV=production`, quoted or not, anywhere in a
+// multi-variable ARG.
+const NODE_ENV_ARG_RE =
+  /(?:^|\s)NODE_ENV(?:=["']?(?<value>[^\s"']*)["']?)?(?=\s|$)/u;
+
+// `ENV NODE_ENV=${NODE_ENV}` copies the build argument into the environment.
+const NODE_ENV_REFERENCE_RE = /^\$(?:NODE_ENV|\{NODE_ENV\})$/u;
+
+interface NodeEnvState {
+  // The default of `ARG NODE_ENV` in this stage, if declared.
+  arg: string | undefined;
+  // The value of `ENV NODE_ENV` in this stage, if set.
+  env: string | undefined;
+}
+
+// RUN sees both ENV and ARG values. ENV takes precedence over an ARG of the
+// same name.
+const currentNodeEnv = (state: NodeEnvState): string | undefined =>
+  state.env ?? state.arg;
+
+// An `ARG NODE_ENV` with no default of its own takes the default of the ARG
+// declared before the first FROM.
+const applyNodeEnv = (
+  inst: DockerfileInstruction,
+  state: NodeEnvState,
+  globalArg: string | undefined
+): void => {
+  if (inst.instruction === "ARG") {
+    const match = NODE_ENV_ARG_RE.exec(inst.args);
+    if (match) {
+      state.arg = match.groups?.value ?? globalArg;
+    }
+  } else if (inst.instruction === "ENV") {
+    const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
+    if (value !== undefined) {
+      state.env = NODE_ENV_REFERENCE_RE.test(value)
+        ? currentNodeEnv(state)
+        : value;
+    }
+  }
+};
+
 const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   const stages: BuildStage[] = [];
-  // A stage built FROM this one inherits the ENV.
-  const productionEnv: boolean[] = [];
+  // A stage built FROM this one inherits its ENV and its ARGs.
+  const nodeEnv: NodeEnvState[] = [];
+  // An ARG before the first FROM is not visible inside a stage.
+  const globalScope: NodeEnvState = { arg: undefined, env: undefined };
   for (const inst of instructions) {
+    const state = nodeEnv.at(-1) ?? globalScope;
     if (inst.instruction === "FROM") {
       const { base, stage } = parseFromArgs(inst.args);
       const baseKey = base?.toLowerCase() ?? "";
       const parent = stages.findIndex(
         (s) => s.name !== null && s.name === baseKey
       );
-      productionEnv.push(parent !== -1 && productionEnv[parent]);
+      nodeEnv.push(
+        parent === -1
+          ? { arg: undefined, env: undefined }
+          : { ...nodeEnv[parent] }
+      );
       stages.push({
         base: baseKey,
         from: inst,
         name: stage?.toLowerCase() ?? null,
         runs: [],
       });
-    } else if (inst.instruction === "ENV" && stages.length > 0) {
-      const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
-      if (value !== undefined) {
-        productionEnv[stages.length - 1] = value === "production";
-      }
-    } else if (inst.instruction === "RUN" && stages.length > 0) {
+    } else if (inst.instruction === "RUN") {
       stages.at(-1)?.runs.push({
         inst,
-        productionEnv: productionEnv[stages.length - 1],
+        productionEnv: currentNodeEnv(state) === "production",
       });
+    } else {
+      applyNodeEnv(inst, state, globalScope.arg);
     }
   }
   return stages;
