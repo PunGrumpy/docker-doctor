@@ -91,6 +91,46 @@ const BROAD_SCOPE_REASONS: Partial<Record<HostPathScope, string>> = {
   system: "a host system directory",
 };
 
+interface BroadMount {
+  reason: string;
+  source: string;
+}
+
+// The host path a bind mount exposes and why that is too broad, or null for
+// a narrow mount, the Docker socket or anything that is not a bind mount.
+const broadBindMount = (volume: ComposeValue): BroadMount | null => {
+  const mount = volumeMount(volume);
+
+  if (!mount || mountsDockerSocket(mount)) {
+    return null;
+  }
+
+  const source = bindMountSource(mount);
+
+  if (source === undefined) {
+    return null;
+  }
+
+  const reason = BROAD_SCOPE_REASONS[classifyHostPath(source)];
+
+  return reason === undefined ? null : { reason, source };
+};
+
+// The host path of a writable bind mount outside the project, or null.
+const writableHostPath = (volume: ComposeValue): string | null => {
+  const mount = volumeMount(volume);
+
+  if (!mount || mount.readOnly || mountsDockerSocket(mount)) {
+    return null;
+  }
+
+  const source = bindMountSource(mount);
+
+  return source === undefined || classifyHostPath(source) === "project"
+    ? null
+    : source;
+};
+
 export const noBroadBindMount: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -104,34 +144,20 @@ export const noBroadBindMount: ComposeRule = {
       }
 
       for (const [index, volume] of volumes.entries()) {
-        const mount = volumeMount(volume);
+        const broad = broadBindMount(volume);
 
-        if (!mount || mountsDockerSocket(mount)) {
-          continue;
+        if (broad !== null) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Service '${name}' bind-mounts '${broad.source}', ${broad.reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              this.help,
+              context?.locate?.(["services", name, "volumes", index])
+            )
+          );
         }
-
-        const source = bindMountSource(mount);
-
-        if (source === undefined) {
-          continue;
-        }
-
-        const reason = BROAD_SCOPE_REASONS[classifyHostPath(source)];
-
-        if (reason === undefined) {
-          continue;
-        }
-
-        diagnostics.push(
-          createDiagnostic(
-            file,
-            this.key,
-            this.defaultSeverity,
-            `Service '${name}' bind-mounts '${source}', ${reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs like CVE-2026-77179.`,
-            this.help,
-            context?.locate?.(["services", name, "volumes", index])
-          )
-        );
       }
     }
 
@@ -156,28 +182,20 @@ export const preferReadOnlyBindMount: ComposeRule = {
       }
 
       for (const [index, volume] of volumes.entries()) {
-        const mount = volumeMount(volume);
+        const source = writableHostPath(volume);
 
-        if (!mount || mount.readOnly || mountsDockerSocket(mount)) {
-          continue;
+        if (source !== null) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              this.help,
+              context?.locate?.(["services", name, "volumes", index])
+            )
+          );
         }
-
-        const source = bindMountSource(mount);
-
-        if (source === undefined || classifyHostPath(source) === "project") {
-          continue;
-        }
-
-        diagnostics.push(
-          createDiagnostic(
-            file,
-            this.key,
-            this.defaultSeverity,
-            `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs like CVE-2026-77179.`,
-            this.help,
-            context?.locate?.(["services", name, "volumes", index])
-          )
-        );
       }
     }
 
@@ -202,6 +220,36 @@ const literalValue = (value: ComposeValue | undefined): string | undefined => {
   }
 
   return undefined;
+};
+
+// The key of a "KEY=value" list entry whose value is a literal secret, or
+// null. A bare "KEY" passes the host value through and holds no literal.
+const listEntrySecretKey = (entry: ComposeValue): string | null => {
+  if (!isComposeString(entry)) {
+    return null;
+  }
+
+  const eqIndex = entry.indexOf("=");
+
+  if (eqIndex <= 0) {
+    return null;
+  }
+
+  const key = entry.slice(0, eqIndex);
+  const value = entry.slice(eqIndex + 1);
+
+  return isSecretKey(key) && isLiteralSecretValue(value) ? key : null;
+};
+
+const isMappingSecret = (
+  key: string,
+  value: ComposeValue | undefined
+): boolean => {
+  const literal = literalValue(value);
+
+  return (
+    literal !== undefined && isSecretKey(key) && isLiteralSecretValue(literal)
+  );
 };
 
 export const noPlaintextSecrets: ComposeRule = {
@@ -229,20 +277,9 @@ export const noPlaintextSecrets: ComposeRule = {
         // List syntax: "KEY=value" entries; a bare "KEY" passes the host
         // value through and holds no literal.
         for (const [index, entry] of environment.entries()) {
-          if (!isComposeString(entry)) {
-            continue;
-          }
+          const key = listEntrySecretKey(entry);
 
-          const eqIndex = entry.indexOf("=");
-
-          if (eqIndex <= 0) {
-            continue;
-          }
-
-          const key = entry.slice(0, eqIndex);
-          const value = entry.slice(eqIndex + 1);
-
-          if (isSecretKey(key) && isLiteralSecretValue(value)) {
+          if (key !== null) {
             flag(
               name,
               key,
@@ -252,13 +289,7 @@ export const noPlaintextSecrets: ComposeRule = {
         }
       } else if (isComposeMapping(environment)) {
         for (const [key, value] of Object.entries(environment)) {
-          const literal = literalValue(value);
-
-          if (
-            literal !== undefined &&
-            isSecretKey(key) &&
-            isLiteralSecretValue(literal)
-          ) {
+          if (isMappingSecret(key, value)) {
             flag(
               name,
               key,

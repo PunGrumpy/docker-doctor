@@ -26,24 +26,17 @@ export const maskQuotedText = (text: string): string => {
 
       out += char;
       index += 1;
-      continue;
-    }
-
-    if (char === quote) {
+    } else if (char === quote) {
       quote = null;
       out += char;
       index += 1;
-      continue;
-    }
-
-    if (quote === '"' && char === "\\" && index + 1 < text.length) {
+    } else if (quote === '"' && char === "\\" && index + 1 < text.length) {
       out += "  ";
       index += 2;
-      continue;
+    } else {
+      out += " ";
+      index += 1;
     }
-
-    out += " ";
-    index += 1;
   }
 
   return out;

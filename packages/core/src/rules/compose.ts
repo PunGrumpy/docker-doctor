@@ -155,32 +155,25 @@ export const pinServiceImage: ComposeRule = {
       }
 
       const ref = parseImageRef(image);
+      const issue = ref.isVariable ? undefined : mutableRefIssue(ref);
 
-      if (ref.isVariable) {
-        continue;
+      if (issue !== undefined) {
+        const detail =
+          issue === "untagged"
+            ? `Service '${name}' image '${image}' does not specify a tag.`
+            : `Service '${name}' image '${image}' uses the mutable 'latest' tag.`;
+
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `${detail} Every pull may fetch a different image.`,
+            this.help,
+            context?.locate?.(["services", name, "image"])
+          )
+        );
       }
-
-      const issue = mutableRefIssue(ref);
-
-      if (!issue) {
-        continue;
-      }
-
-      const detail =
-        issue === "untagged"
-          ? `Service '${name}' image '${image}' does not specify a tag.`
-          : `Service '${name}' image '${image}' uses the mutable 'latest' tag.`;
-
-      diagnostics.push(
-        createDiagnostic(
-          file,
-          this.key,
-          this.defaultSeverity,
-          `${detail} Every pull may fetch a different image.`,
-          this.help,
-          context?.locate?.(["services", name, "image"])
-        )
-      );
     }
 
     return diagnostics;

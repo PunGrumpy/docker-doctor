@@ -124,6 +124,31 @@ const walk = async (
   return fileList;
 };
 
+// Dockerfile, Dockerfile.* and *.dockerfile.
+const isDockerfileName = (base: string): boolean =>
+  base === "dockerfile" ||
+  base.startsWith("dockerfile.") ||
+  base.endsWith(".dockerfile");
+
+const COMPOSE_FILE_NAMES = new Set([
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yml",
+  "compose.yaml",
+]);
+
+const hasComposePrefix = (base: string): boolean =>
+  base.startsWith("docker-compose.") || base.startsWith("compose.");
+
+const hasYamlExtension = (base: string): boolean =>
+  base.endsWith(".yml") || base.endsWith(".yaml");
+
+// docker-compose.yml, docker-compose.*.yml, compose.yml, compose.*.yml and
+// their .yaml spellings.
+const isComposeFileName = (base: string): boolean =>
+  COMPOSE_FILE_NAMES.has(base) ||
+  (hasComposePrefix(base) && hasYamlExtension(base));
+
 export const discoverProject = async (
   rootDir: string,
   options?: {
@@ -155,33 +180,19 @@ export const discoverProject = async (
 
     const base = path.basename(file).toLowerCase();
 
+    // `.dockerignore` and BuildKit's per-Dockerfile `<name>.dockerignore`
+    // are ignore files, never Dockerfiles — even though the latter also
+    // matches the `Dockerfile.*` shape below.
     if (base.endsWith(".dockerignore")) {
-      // `.dockerignore` and BuildKit's per-Dockerfile `<name>.dockerignore`
-      // are ignore files, never Dockerfiles — even though the latter also
-      // matches the `Dockerfile.*` shape below.
       dockerignores.push(relative);
-      continue;
-    }
+    } else {
+      if (isDockerfileName(base)) {
+        dockerfiles.push(relative);
+      }
 
-    // Match Dockerfile, Dockerfile.*, *.dockerfile
-    if (
-      base === "dockerfile" ||
-      base.startsWith("dockerfile.") ||
-      base.endsWith(".dockerfile")
-    ) {
-      dockerfiles.push(relative);
-    }
-
-    // Match docker-compose.yml, docker-compose.*.yml, compose.yml, compose.*.yml, and yaml extensions
-    if (
-      base === "docker-compose.yml" ||
-      base === "docker-compose.yaml" ||
-      base === "compose.yml" ||
-      base === "compose.yaml" ||
-      ((base.startsWith("docker-compose.") || base.startsWith("compose.")) &&
-        (base.endsWith(".yml") || base.endsWith(".yaml")))
-    ) {
-      composeFiles.push(relative);
+      if (isComposeFileName(base)) {
+        composeFiles.push(relative);
+      }
     }
   }
 

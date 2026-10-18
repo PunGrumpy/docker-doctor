@@ -44,7 +44,7 @@ describe("maskQuotedText", () => {
 
   test("preserves the length of every input", () => {
     for (const { input } of CASES) {
-      expect(maskQuotedText(input).length).toBe(input.length);
+      expect(maskQuotedText(input)).toHaveLength(input.length);
     }
   });
 });

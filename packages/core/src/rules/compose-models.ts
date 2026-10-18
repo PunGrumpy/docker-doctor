@@ -86,6 +86,24 @@ interface ModelBinding {
   path: (string | number)[];
 }
 
+// The model a `provider: { type: model, options: { model } }` block names,
+// or null when the block is missing or is another kind of provider.
+const providerModel = (provider: ComposeValue | undefined): string | null => {
+  if (!isComposeMapping(provider)) {
+    return null;
+  }
+
+  const { type, options } = provider;
+
+  if (type !== "model" || !isComposeMapping(options)) {
+    return null;
+  }
+
+  const { model } = options;
+
+  return isComposeString(model) ? model : null;
+};
+
 // Top-level `models:` (Compose ≥ 2.38) plus the older service-level
 // `provider: { type: model }` form (Compose ≥ 2.35).
 const collectModelBindings = (composeContent: ComposeValue): ModelBinding[] => {
@@ -108,21 +126,9 @@ const collectModelBindings = (composeContent: ComposeValue): ModelBinding[] => {
   }
 
   for (const [name, config] of composeServices(composeContent)) {
-    const { provider } = config;
+    const model = providerModel(config.provider);
 
-    if (!isComposeMapping(provider)) {
-      continue;
-    }
-
-    const { type, options } = provider;
-
-    if (type !== "model" || !isComposeMapping(options)) {
-      continue;
-    }
-
-    const { model } = options;
-
-    if (isComposeString(model)) {
+    if (model !== null) {
       bindings.push({
         model,
         path: ["services", name, "provider", "options", "model"],
@@ -143,14 +149,9 @@ export const pinModelVersion: ComposeRule = {
       composeContent
     )) {
       const ref = parseImageRef(model);
+      const issue = ref.isVariable ? undefined : mutableRefIssue(ref);
 
-      if (ref.isVariable) {
-        continue;
-      }
-
-      const issue = mutableRefIssue(ref);
-
-      if (!issue) {
+      if (issue === undefined) {
         continue;
       }
 

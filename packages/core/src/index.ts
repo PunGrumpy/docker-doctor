@@ -36,7 +36,12 @@ export {
   type ScoreResult,
 } from "./scoring";
 
-export * from "./errors";
+export {
+  ConfigError,
+  type DockerDoctorError,
+  FileNotFoundError,
+  ParseError,
+} from "./errors";
 
 export type {
   ComposeLocator,

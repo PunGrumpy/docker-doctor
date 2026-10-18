@@ -1362,7 +1362,7 @@ describe("Compose Security Rules", () => {
       services: {
         agent: {
           environment: {
-            AUTH_URL: "http://auth:8080",
+            AUTH_URL: "http://auth.example:8080",
             GITHUB_PAT: "ghp_abc",
             OPENAI_APIKEY: "sk-proj-abc",
             PGPASSWORD: "hunter2",

@@ -5,12 +5,13 @@ const REDACTED = "***";
 // The userinfo of any `scheme://user:password@host` URL. A bare token can
 // sit in the user part (`https://<token>@github.com`), so a user name is
 // masked even without a password.
-const URL_USERINFO_RE = /(?<scheme>[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/giu;
+const URL_USERINFO_RE =
+  /(?<![a-z])(?<scheme>[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/giu;
 
 // `KEY=value` as a shell assignment or a flag (`--password=value`). A value
 // in quotes may contain spaces.
 const ASSIGNMENT_RE =
-  /(?<key>[^\s=;&|'"`]+)=(?<value>"[^"]*"|'[^']*'|[^\s;&|]+)/gu;
+  /(?<![^\s=;&|'"`])(?<key>[^\s=;&|'"`]+)=(?<value>"[^"]*"|'[^']*'|[^\s;&|]+)/gu;
 
 // `--password value`, the spelling with a space instead of `=`.
 const SPACED_FLAG_RE =
