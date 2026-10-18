@@ -134,11 +134,16 @@ const scoreLine = ({ errors, label, score, warnings }) => {
 
 const isObject = (value) => typeof value === "object" && value !== null;
 
+// Since schema 6 the score and the label are both null when the CLI
+// analyzed no file.
+const hasValidScore = ({ label, score }) =>
+  (typeof score === "number" && typeof label === "string") ||
+  (score === null && label === null);
+
 const isValidReport = (parsed) =>
   isObject(parsed) &&
   Array.isArray(parsed.diagnostics) &&
-  typeof parsed.score === "number" &&
-  typeof parsed.label === "string" &&
+  hasValidScore(parsed) &&
   isObject(parsed.project) &&
   Array.isArray(parsed.project.dockerfiles) &&
   Array.isArray(parsed.project.composeFiles);
@@ -354,6 +359,11 @@ const findingsSection = (ctx, report, hasErrors) => {
   ];
 };
 
+const noScoreNotice = (incomplete) =>
+  incomplete
+    ? "**No score.** None of the discovered files could be analyzed. See the workflow log for the parser output."
+    : "**No score.** None of the discovered files has anything to check. A Dockerfile needs an instruction, and a Compose file needs a service, a top-level `models` entry or a `version` key.";
+
 // With a schema-4 report the failures name the files. An older CLI only
 // signals an incomplete scan through its exit status.
 const incompleteNotice = (failureCount) =>
@@ -366,9 +376,29 @@ const footer = (ctx) => {
   return `<sub>Scanned by <a href="${SITE_URL}">Docker Doctor</a> for commit <code>${shortSha}</code>.</sub>`;
 };
 
+// Pushes are advisory. Findings never mark a default-branch commit red. On
+// a pull request the status mirrors the gate step so the two never disagree.
+// A scan whose files all failed has no result to be advisory about, so it
+// is an error on every event.
+const statusState = (ctx, { gate, incomplete, score }) => {
+  if (score === null && incomplete) {
+    return "error";
+  }
+  return ctx.isPullRequest && gate !== "0" ? "failure" : "success";
+};
+
 const stepOutputs = (
   ctx,
-  { description, errors, gate, infos, label, score, warnings }
+  {
+    description,
+    errors,
+    gate,
+    incomplete = false,
+    infos,
+    label,
+    score,
+    warnings,
+  }
 ) => {
   const errorCount = Number(errors) || 0;
   const warningCount = Number(warnings) || 0;
@@ -377,12 +407,10 @@ const stepOutputs = (
     "error-count": String(errorCount),
     "gate-status": gate,
     "info-count": String(infoCount),
-    label: safeLabel(label),
-    score: String(safeScore(score)),
+    label: score === null ? "" : safeLabel(label),
+    score: score === null ? "" : String(safeScore(score)),
     "status-description": description,
-    // Advisory on pushes: findings never mark a default-branch commit red. On
-    // a pull request the status mirrors the gate step so the two never disagree.
-    "status-state": ctx.isPullRequest && gate !== "0" ? "failure" : "success",
+    "status-state": statusState(ctx, { gate, incomplete, score }),
     "total-issues": String(errorCount + warningCount + infoCount),
     "warning-count": String(warningCount),
   };
@@ -421,6 +449,32 @@ const gateStatus = (ctx, { errors, incomplete, warnings }) => {
   return "0";
 };
 
+const scoreSection = ({
+  errors,
+  failureCount,
+  incomplete,
+  label,
+  score,
+  warnings,
+}) => {
+  if (score === null) {
+    return [noScoreNotice(incomplete)];
+  }
+  const lines = incomplete ? [incompleteNotice(failureCount), ""] : [];
+  lines.push(scoreLine({ errors, label, score, warnings }));
+  return lines;
+};
+
+const statusHeadline = ({ errors, scannedFiles, score, warnings }) => {
+  if (scannedFiles === 0) {
+    return "No Dockerfiles or Compose files found";
+  }
+  if (score === null) {
+    return "No score";
+  }
+  return `Score: ${score}/100 · ${plural(errors, "error")} · ${plural(warnings, "warning")}`;
+};
+
 export const renderReport = (
   ctx,
   report,
@@ -431,7 +485,7 @@ export const renderReport = (
   const errors = count("error");
   const warnings = count("warning");
   const total = report.diagnostics.length;
-  const score = safeScore(report.score);
+  const score = report.score === null ? null : safeScore(report.score);
   const failureCount = report.failures.length;
   const incomplete =
     failureCount > 0 || ctx.exitStatus === SCAN_INCOMPLETE_EXIT_STATUS;
@@ -445,11 +499,18 @@ export const renderReport = (
       `**Docker Doctor** found no Dockerfiles or Compose files in \`${sanitizeText(ctx.scanDirectory)}\`.`
     );
   } else {
-    lines.push(...buildTable(ctx, report, maxOverflowRows), "");
-    if (incomplete) {
-      lines.push(incompleteNotice(failureCount), "");
-    }
-    lines.push(scoreLine({ errors, label: report.label, score, warnings }));
+    lines.push(
+      ...buildTable(ctx, report, maxOverflowRows),
+      "",
+      ...scoreSection({
+        errors,
+        failureCount,
+        incomplete,
+        label: report.label,
+        score,
+        warnings,
+      })
+    );
     if (total > 0) {
       lines.push("", ...findingsSection(ctx, report, errors > 0));
     }
@@ -457,10 +518,7 @@ export const renderReport = (
 
   lines.push("", footer(ctx));
 
-  let description =
-    scannedFiles === 0
-      ? "No Dockerfiles or Compose files found"
-      : `Score: ${score}/100 · ${plural(errors, "error")} · ${plural(warnings, "warning")}`;
+  let description = statusHeadline({ errors, scannedFiles, score, warnings });
   if (failureCount > 0) {
     description += ` · ${failureCount} unanalyzed`;
   } else if (incomplete) {
@@ -473,6 +531,7 @@ export const renderReport = (
       description,
       errors,
       gate: gateStatus(ctx, { errors, incomplete, warnings }),
+      incomplete,
       infos: total - errors - warnings,
       label: report.label,
       score,
@@ -492,12 +551,14 @@ export const renderComment = (ctx, report) => {
     }
   }
   const { outputs } = renderReport(ctx, report);
+  const scoreText =
+    outputs.score === "" ? "**No score**" : `**Score:** ${outputs.score} / 100`;
   return {
     body: [
       MARKER,
       INTRO,
       "",
-      `**Score:** ${outputs.score} / 100 · ${plural(Number(outputs["error-count"]), "error")} · ${plural(Number(outputs["warning-count"]), "warning")}`,
+      `${scoreText} · ${plural(Number(outputs["error-count"]), "error")} · ${plural(Number(outputs["warning-count"]), "warning")}`,
       "",
       "The full report is too long for a comment. The job summary of this workflow run has it.",
       "",
