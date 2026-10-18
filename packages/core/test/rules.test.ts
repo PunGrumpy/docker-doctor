@@ -1684,6 +1684,7 @@ describe("Image Size Rules", () => {
     { expected: 1, run: "NODE_ENV=production bun install" },
     { expected: 0, run: "NODE_ENV=production bun install --production" },
     { expected: 0, run: "NODE_ENV=production yarn install" },
+    { expected: 1, run: "NODE_ENV=production pnpm install" },
   ];
 
   test.each(devDependencyCases)(
@@ -1704,7 +1705,13 @@ describe("Image Size Rules", () => {
       expected: 0,
     },
     {
-      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN pnpm install',
+      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN npm install',
+      expected: 0,
+    },
+    // pnpm 10 and later install devDependencies whatever NODE_ENV says.
+    { dockerfile: "ENV NODE_ENV=production\nRUN pnpm install", expected: 1 },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN pnpm install --prod",
       expected: 0,
     },
     { dockerfile: "RUN npm ci\nENV NODE_ENV=production", expected: 1 },

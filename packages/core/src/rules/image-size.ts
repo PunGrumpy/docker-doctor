@@ -262,10 +262,10 @@ const WHITESPACE_RE = /\s+/u;
 const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
 // The managers that leave devDependencies out when NODE_ENV is
-// "production". Bun ignores it. Yarn 2 and later ignore it too, but a
-// Dockerfile rarely says which Yarn it runs, so `yarn` keeps the Yarn 1
-// behavior.
-const MANAGERS_HONORING_NODE_ENV = new Set(["npm", "yarn", "pnpm"]);
+// "production". Bun and pnpm 10 and later ignore it. Yarn 2 and later
+// ignore it too, but a Dockerfile rarely says which Yarn it runs, so
+// `yarn` keeps the Yarn 1 behavior.
+const MANAGERS_HONORING_NODE_ENV = new Set(["npm", "yarn"]);
 const INSTALL_VERBS = new Set(["install", "ci", "i"]);
 // Flags that mean the install leaves devDependencies out of the image.
 // `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
