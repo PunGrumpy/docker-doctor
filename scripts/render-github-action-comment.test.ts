@@ -195,20 +195,21 @@ describe("incomplete scans", () => {
   });
 });
 
+// Schema 6: the CLI analyzed none of the discovered files.
+const unscored = (failures: TestReport["failures"]) =>
+  makeReport({
+    failures,
+    label: null,
+    project: { composeFiles: ["compose.yaml"], dockerfiles: ["Dockerfile"] },
+    schemaVersion: 6,
+    score: null,
+  });
+
 describe("reports with no score", () => {
   const COMPOSE_FAILURE = {
     file: "compose.yaml",
     message: "Flow sequence in block collection must end with a ]",
   };
-  // Schema 6: the CLI analyzed none of the discovered files.
-  const unscored = (failures: TestReport["failures"]) =>
-    makeReport({
-      failures,
-      label: null,
-      project: { composeFiles: ["compose.yaml"], dockerfiles: ["Dockerfile"] },
-      schemaVersion: 6,
-      score: null,
-    });
 
   test("every file failed: empty score and label, and an error status", () => {
     const { body, outputs } = render(
