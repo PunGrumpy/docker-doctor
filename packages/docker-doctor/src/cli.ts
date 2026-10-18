@@ -72,6 +72,18 @@ interface KeypressKey {
 // releases a breaking major.
 const ACTION_REF = "PunGrumpy/docker-doctor@v1";
 
+// Stops listening for keys, leaves raw mode and shows the cursor again.
+const stopPrompt = (
+  onKeypress: (str: string, key: KeypressKey) => void
+): void => {
+  process.stdin.removeListener("keypress", onKeypress);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(false);
+  }
+  process.stdin.pause();
+  process.stdout.write("\u001B[?25h");
+};
+
 const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
   const isRaw = process.stdin.isTTY;
   if (!isRaw) {
@@ -111,15 +123,6 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
     render(true);
 
     const handleKeypress = (str: string, key: KeypressKey) => {
-      const cleanup = () => {
-        process.stdin.removeListener("keypress", handleKeypress);
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.pause();
-        process.stdout.write("\u001B[?25h");
-      };
-
       if (
         key.name === "left" ||
         key.name === "right" ||
@@ -144,7 +147,7 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
         str === "\r" ||
         str === "\n"
       ) {
-        cleanup();
+        stopPrompt(handleKeypress);
         // Overwrite and resolve vertical layout cleanly
         process.stdout.write("\u001B[3A\r\u001B[K");
         process.stdout.write(
@@ -155,7 +158,7 @@ const askConfirm = (question: string, defaultYes = false): Promise<boolean> => {
         process.stdout.write("\u001B[2A");
         resolve(value);
       } else if (key.ctrl && key.name === "c") {
-        cleanup();
+        stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
       }
@@ -211,15 +214,6 @@ const askSelect = (
     render(true);
 
     const handleKeypress = (str: string, key: KeypressKey) => {
-      const cleanup = () => {
-        process.stdin.removeListener("keypress", handleKeypress);
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.pause();
-        process.stdout.write("\u001B[?25h");
-      };
-
       if (key.name === "up" || key.name === "k") {
         index = (index - 1 + options.length) % options.length;
         render();
@@ -232,7 +226,7 @@ const askSelect = (
         str === "\r" ||
         str === "\n"
       ) {
-        cleanup();
+        stopPrompt(handleKeypress);
         // Overwrite and resolve
         process.stdout.write(`\u001B[${options.length + 1}A\r\u001B[K`);
         process.stdout.write(
@@ -244,7 +238,7 @@ const askSelect = (
         process.stdout.write(`\u001B[${options.length}A`);
         resolve(index);
       } else if (key.ctrl && key.name === "c") {
-        cleanup();
+        stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
       }
@@ -315,15 +309,6 @@ const askMultiSelect = (
     render(true);
 
     const handleKeypress = (str: string, key: KeypressKey) => {
-      const cleanup = () => {
-        process.stdin.removeListener("keypress", handleKeypress);
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.pause();
-        process.stdout.write("\u001B[?25h");
-      };
-
       if (key.name === "up" || key.name === "k") {
         index = (index - 1 + options.length) % options.length;
         render();
@@ -339,7 +324,7 @@ const askMultiSelect = (
         str === "\r" ||
         str === "\n"
       ) {
-        cleanup();
+        stopPrompt(handleKeypress);
         const chosen = options.flatMap((option, i) =>
           selected[i] ? [option.label] : []
         );
@@ -354,7 +339,7 @@ const askMultiSelect = (
         process.stdout.write(`\u001B[${lineCount - 1}A`);
         resolve(options.flatMap((_, i) => (selected[i] ? [i] : [])));
       } else if (key.ctrl && key.name === "c") {
-        cleanup();
+        stopPrompt(handleKeypress);
         process.stdout.write("\n");
         process.exit(130);
       }
