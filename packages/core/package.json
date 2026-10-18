@@ -19,11 +19,11 @@
     "clean": "git clean -xdf .turbo node_modules"
   },
   "dependencies": {
-    "yaml": "^2.7.0"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.2",
-    "@types/node": "^26.5.1",
+    "@types/bun": "^1.4.3",
+    "@types/node": "^26.6.5",
     "typescript": "^7.0.2"
   }
 }

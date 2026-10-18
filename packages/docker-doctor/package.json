@@ -61,15 +61,15 @@
   },
   "dependencies": {
     "agent-install": "0.0.8",
-    "chalk": "^6.0.0",
+    "chalk": "^6.0.1",
     "commander": "^15.0.0",
-    "yaml": "^2.7.0"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@docker-doctor/core": "workspace:*",
-    "@types/bun": "^1.4.2",
-    "@types/node": "^26.5.1",
-    "tsdown": "^0.23.0",
+    "@types/bun": "^1.4.3",
+    "@types/node": "^26.6.5",
+    "tsdown": "^0.23.1",
     "typescript": "^7.0.2"
   },
   "engines": {
