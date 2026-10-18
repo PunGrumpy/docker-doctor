@@ -1,5 +1,29 @@
 # @docker-doctor/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- eb5d0c0: The score now averages only over the files Docker Doctor could check. A Dockerfile with no instructions, such as an empty or comment-only file, no longer counts. Neither does a Compose file with no services, no top-level `models` and no `version` key. Such files have no findings, so they used to raise the score. When no file could be checked, there is no score. `--json` reports `score` and `label` as `null`, `--score` prints nothing, and the terminal report says why instead of showing a score box. This also applies to a directory with no Dockerfile or Compose file, which used to report 100 in `--json` and `--score`. Exit codes are unchanged.
+
+  The JSON report `schemaVersion` is now 6. It adds `analyzedFiles`, the number of files the score averages over, and lists `failures` in discovery order on every run. The GitHub Action leaves its `score` and `label` outputs empty when there is no score, and its commit status is `error` when no file could be analyzed.
+
+  For library users, `calculateScore` now requires the number of analyzed files and returns a `null` score and label for 0. `toJsonReport` requires `failures` and `analyzedFiles`. The new exports `isAnalyzableDockerfile` and `isAnalyzableCompose` decide which files count.
+
+### Patch Changes
+
+- 0e6fbc9: The README and the bundled `docker-doctor` skill say which files count as analyzed and that a scan with no analyzed file has no score. The skill's `--score` row says it prints nothing in that case.
+- 497266c: The README now says the score averages the penalty over the analyzed files, as it has since 0.7.0. It no longer claims the score never reaches 0. Rounding gives 0 at an average penalty of about 371 per file.
+- d9b100b: Rule messages no longer repeat credentials from the scanned files. The user name and password in a URL such as `https://user:token@host` are shown as `***`. A URL with a user name only, such as `ssh://git@host/repo.git`, is masked the same way. The value of a secret-like `KEY=value` or `--flag value` is shown as `***` too. This applies in the terminal, `--json`, `.docker-doctor/` and the agent handoff. A Compose file that fails to parse is reported with its line and column only. The YAML source lines are left out. The agent handoff also replaces invisible Unicode with a space. That covers C1 controls, zero-width and bidi control characters, the BOM, line and paragraph separators, and tag characters.
+- c76f7f3: Eight rule verdicts are corrected. Some files gain findings and some lose them.
+
+  These changes add findings. `avoid-dev-dependencies` reports `bun install` and `pnpm install` under `NODE_ENV=production`. Bun and pnpm 10 and later install devDependencies anyway. `clean-package-cache` reports an apt cache mount on `/var/cache/apt` alone, which leaves the package lists in the layer. `clean-package-cache` also reports an `apk add` whose only `--no-cache` belongs to another command, such as `pip install --no-cache-dir`. An `rm` inside a quoted string no longer counts as cleanup. `pin-image-version` reports `FROM golang AS golang`, which pulls the untagged image. `useradd-no-log-init` reports `useradd -gwheel`, where the `l` belongs to the group name.
+
+  These changes remove findings. `avoid-dev-dependencies` reads `NODE_ENV` from `ARG NODE_ENV=production`, alone or copied with `ENV NODE_ENV=$NODE_ENV`. `clean-package-cache` accepts `rm --recursive --force`. `sort-multiline-args` skips option values such as `apk add --virtual .build-deps` and `apt-get install -o Key=Value`. `useradd-no-log-init` accepts `useradd -lu1000`.
+
+- 497266c: The bundled `docker-doctor` skill no longer treats a steady score as proof that a change is safe. Since 0.7.0 the score averages over the analyzed files, so a new error in one file of a large project can move it by a single point. The skill now compares the exit code and the number of findings per rule before and after a change, and uses the score as a coarse signal. It also says that `rules explain` prints the rule's category, default severity and description next to the same fix text as `Help:`.
+- 475045e: The CLI's runtime dependencies are updated: `yaml` to `^2.9.1` and `chalk` to `^6.0.1`. Scan results and output do not change.
+
 ## 0.7.0
 
 ### Minor Changes
