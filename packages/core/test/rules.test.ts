@@ -192,6 +192,27 @@ describe("Security Rules", () => {
     expect(counts).toEqual([0, 0, 0]);
   });
 
+  // A FROM refers to a stage only if that stage is declared on an earlier
+  // FROM. Otherwise the name is an image.
+  const stageReferenceCases = [
+    { dockerfile: "FROM golang AS golang\nRUN go build", expected: 1 },
+    { dockerfile: "FROM node AS NODE", expected: 1 },
+    { dockerfile: "FROM builder\nFROM node:22 AS builder", expected: 1 },
+    { dockerfile: "FROM node:22 AS builder\nFROM builder", expected: 0 },
+    { dockerfile: "FROM golang:1.23 AS golang\nFROM golang", expected: 0 },
+  ];
+
+  test.each(stageReferenceCases)(
+    "pin-image-version: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = pinImageVersion.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   test("pin-image-version", () => {
     const unpinned = parseDockerfile(`
       FROM node
@@ -1635,6 +1656,30 @@ describe("Image Size Rules", () => {
       expected: 1,
       run: "apk add curl && rm -f /var/cache/apk/APKINDEX.tar.gz",
     },
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm --recursive --force /var/lib/apt/lists/*`,
+    },
+    {
+      expected: 0,
+      run: `${APT_INSTALL} && rm --force --recursive /var/lib/apt/lists/*`,
+    },
+    { expected: 0, run: `${APT_INSTALL} && rm -rf "/var/lib/apt/lists"/*` },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && rm --force /var/lib/apt/lists/lock`,
+    },
+    {
+      expected: 1,
+      run: `${APT_INSTALL} && echo "rm -rf /var/lib/apt/lists/*"`,
+    },
+    { expected: 1, run: "apk add gcc && pip install --no-cache-dir flask" },
+    {
+      expected: 0,
+      run: "apk add --no-cache gcc && pip install --no-cache-dir flask",
+    },
+    { expected: 1, run: "apk add gcc && docker build --no-cache ." },
+    { expected: 1, run: 'apk add gcc && echo "apk add --no-cache"' },
   ];
 
   test.each(cacheCleanupCases)(
@@ -1647,6 +1692,38 @@ describe("Image Size Rules", () => {
       expect(diagnostics).toHaveLength(expected);
     }
   );
+
+  // The package lists live in /var/lib/apt/lists. A cache mount must cover
+  // that directory. /var/cache/apt holds only the downloaded packages.
+  const aptCacheMountCases = [
+    { expected: 1, mounts: ["/var/cache/apt"] },
+    { expected: 1, mounts: ["/var/cache/apt", "/var/lib/apt/lists/partial"] },
+    { expected: 0, mounts: ["/var/lib/apt"] },
+    { expected: 0, mounts: ["/var/lib/apt/"] },
+    { expected: 0, mounts: ["/var/lib/apt/lists"] },
+    { expected: 0, mounts: ["/var/cache/apt", "/var/lib/apt"] },
+  ];
+
+  test.each(aptCacheMountCases)(
+    "clean-package-cache: apt cache mounts on $mounts report $expected",
+    ({ expected, mounts }) => {
+      const flags = mounts
+        .map((target) => `--mount=type=cache,target=${target}`)
+        .join(" ");
+      const diagnostics = cleanPackageCache.check(
+        parseDockerfile(`RUN ${flags} ${APT_INSTALL}`),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("clean-package-cache: a cache mount on /var/cache/apt plus rm of the lists is clean", () => {
+    const dockerfile = parseDockerfile(
+      `RUN --mount=type=cache,target=/var/cache/apt ${APT_INSTALL} && rm -rf /var/lib/apt/lists/*`
+    );
+    expect(cleanPackageCache.check(dockerfile, "Dockerfile")).toHaveLength(0);
+  });
 
   test("avoid-dev-dependencies", () => {
     const withDev = parseDockerfile(`
@@ -1680,6 +1757,11 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "npm ci && npm run build && npm prune --production" },
     { expected: 0, run: "yarn install --production=true" },
     { expected: 1, run: "yarn install --production=false" },
+    // Bun installs devDependencies whatever NODE_ENV says.
+    { expected: 1, run: "NODE_ENV=production bun install" },
+    { expected: 0, run: "NODE_ENV=production bun install --production" },
+    { expected: 0, run: "NODE_ENV=production yarn install" },
+    { expected: 1, run: "NODE_ENV=production pnpm install" },
   ];
 
   test.each(devDependencyCases)(
@@ -1700,7 +1782,13 @@ describe("Image Size Rules", () => {
       expected: 0,
     },
     {
-      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN pnpm install',
+      dockerfile: 'ENV PORT=3000 NODE_ENV="production"\nRUN npm install',
+      expected: 0,
+    },
+    // pnpm 10 and later install devDependencies whatever NODE_ENV says.
+    { dockerfile: "ENV NODE_ENV=production\nRUN pnpm install", expected: 1 },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN pnpm install --prod",
       expected: 0,
     },
     { dockerfile: "RUN npm ci\nENV NODE_ENV=production", expected: 1 },
@@ -1711,6 +1799,11 @@ describe("Image Size Rules", () => {
       expected: 1,
     },
     { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
+    { dockerfile: "ENV NODE_ENV=production\nRUN bun install", expected: 1 },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN bun install --production",
+      expected: 0,
+    },
   ];
 
   test.each(nodeEnvCases)(
@@ -1742,6 +1835,69 @@ describe("Image Size Rules", () => {
     `);
     expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
   });
+
+  // The usual way to copy the build argument into the environment.
+  const ENV_FROM_ARG = `ENV NODE_ENV=\${NODE_ENV}`;
+
+  // ARG scope follows the Dockerfile reference. RUN sees an ARG of its own
+  // stage or of a stage it is built FROM, and an ENV of the same name wins.
+  // An ARG before the first FROM only gives the default to an
+  // `ARG NODE_ENV` inside a stage.
+  const nodeEnvArgCases = [
+    {
+      dockerfile: `FROM node:22-alpine\nARG NODE_ENV=production\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile:
+        'FROM node:22-alpine\nARG NODE_ENV="production"\nENV NODE_ENV=$NODE_ENV\nRUN npm ci',
+      expected: 0,
+    },
+    {
+      dockerfile: "FROM node:22-alpine\nARG NODE_ENV=production\nRUN npm ci",
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine\nARG NODE_ENV=development\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile: `ARG NODE_ENV=production\nFROM node:22-alpine\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile: `ARG NODE_ENV=production\nFROM node:22-alpine\nARG NODE_ENV\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine AS base\nARG NODE_ENV=production\nFROM base\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 0,
+    },
+    {
+      dockerfile: `FROM node:22-alpine AS build\nARG NODE_ENV=production\nFROM node:22-alpine\n${ENV_FROM_ARG}\nRUN npm ci`,
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "FROM node:22-alpine\nENV NODE_ENV=development\nARG NODE_ENV=production\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: `FROM oven/bun:1\nARG NODE_ENV=production\n${ENV_FROM_ARG}\nRUN bun install`,
+      expected: 1,
+    },
+  ];
+
+  test.each(nodeEnvArgCases)(
+    "avoid-dev-dependencies: $dockerfile reports $expected",
+    ({ dockerfile, expected }) => {
+      const diagnostics = avoidDevDependencies.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
 
   test("avoid-dev-dependencies audits stages the final image inherits", () => {
     // Issue #90: FROM <previous stage> carries that stage's layers into the
@@ -2217,6 +2373,51 @@ describe("Best Practices Rules", () => {
       expected: 1,
       name: "an unsorted apk list reports",
     },
+    {
+      dockerfile: `
+      RUN apk add --no-cache --virtual mydeps \\
+        gcc \\
+        musl-dev
+    `,
+      expected: 0,
+      name: "the apk --virtual group name is not a package",
+    },
+    {
+      dockerfile: `
+      RUN apk add -t mydeps -X https://dl-cdn.alpinelinux.org/alpine/edge/main \\
+        gcc \\
+        musl-dev
+    `,
+      expected: 0,
+      name: "apk -t and -X values are not packages",
+    },
+    {
+      dockerfile: `
+      RUN apk add --no-cache --virtual .build-deps \\
+        musl-dev \\
+        gcc
+    `,
+      expected: 1,
+      name: "an unsorted list after an apk --virtual group still reports",
+    },
+    {
+      dockerfile: `
+      RUN apt-get install -y -o quiet=2 -t bookworm-backports \\
+        curl \\
+        git
+    `,
+      expected: 0,
+      name: "apt-get -o and -t values are not packages",
+    },
+    {
+      dockerfile: `
+      RUN dnf install -y \\
+        tmux \\
+        curl
+    `,
+      expected: 1,
+      name: "an unsorted dnf list reports",
+    },
   ];
 
   test.each(packageListCases)(
@@ -2239,6 +2440,12 @@ describe("Best Practices Rules", () => {
     },
     { expected: 1, run: "useradd app && ls -l /home" },
     { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
+    { expected: 0, run: "useradd -lu1000 app" },
+    { expected: 0, run: "useradd -rlu1000 app" },
+    { expected: 0, run: "useradd -lu 1000 app" },
+    { expected: 1, run: "useradd -u1000 app" },
+    { expected: 1, run: "useradd -gwheel app" },
+    { expected: 1, run: "useradd -cl app" },
   ];
 
   test.each(useraddCases)(

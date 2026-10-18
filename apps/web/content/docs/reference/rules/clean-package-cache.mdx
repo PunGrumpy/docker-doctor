@@ -39,7 +39,7 @@ RUN apt-get update \
 
 The pattern per package manager:
 
-- **apt-get** — append `&& rm -rf /var/lib/apt/lists/*`
+- With **apt-get**, append `&& rm -rf /var/lib/apt/lists/*`, or put the lists in a BuildKit cache mount (`RUN --mount=type=cache,target=/var/lib/apt …`). A cache mount on `/var/cache/apt` alone leaves the lists in the layer.
 - **apk** — use `apk add --no-cache <pkg>` (no cleanup step needed)
 - **dnf / yum** — append `&& dnf clean all` / `&& yum clean all`
 - **pip** — use `pip install --no-cache-dir <pkg>`

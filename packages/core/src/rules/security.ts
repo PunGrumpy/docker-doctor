@@ -154,7 +154,6 @@ export const pinImageVersion: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
-    const stageAliases = collectStageAliases(instructions);
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
@@ -167,6 +166,7 @@ export const pinImageVersion: DockerfileRule = {
         }
 
         const ref = parseImageRef(imagePart);
+        const stageAliases = collectStageAliases(instructions, inst.line);
 
         if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
           continue;
