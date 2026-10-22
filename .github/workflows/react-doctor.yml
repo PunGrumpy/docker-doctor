@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: millionco/react-doctor@673ce802a375eeb4c3c5cb9a96d21eaeb7eafd93 # v2.3.1
+      - uses: millionco/react-doctor@695e46eee203a5d1855020191aa7e9c010a1250e # v2.4.0
         # The action's default is `project: *` (scan every workspace project),
         # and an explicit project selection overrides the `projects` field in
         # doctor.config.ts — so the videos exclusion must be repeated here.
