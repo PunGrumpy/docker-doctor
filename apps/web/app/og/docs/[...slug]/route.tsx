@@ -37,7 +37,7 @@ const renderDocImage = async (
 
   return new ImageResponse(
     <div style={{ fontFamily: "Geist" }} tw="flex h-full w-full bg-black">
-      {/* oxlint-disable-next-line next/no-img-element */}
+      {/* oxlint-disable-next-line next/no-img-element -- ImageResponse renders through Satori, which cannot load next/image */}
       <img
         alt="Docker Doctor OpenGraph Background"
         height={630}
