@@ -1,5 +1,11 @@
 # @docker-doctor/cli
 
+## 0.9.0
+
+### Minor Changes
+
+- dd6fd5a: `parseCompose` now returns a `ComposeValue`, and `runComposeRules` and `isAnalyzableCompose` take one. Both `ComposeValue` and `ComposeMapping` are exported. A TypeScript caller that passed these functions an `unknown` value passes the result of `parseCompose` instead. Nothing changes at run time.
+
 ## 0.8.0
 
 ### Minor Changes
