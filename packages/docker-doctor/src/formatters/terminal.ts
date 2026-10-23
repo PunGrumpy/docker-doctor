@@ -180,13 +180,13 @@ const printDiagnostics = (
   verbose: boolean,
   fileContents: Record<string, string>,
   categoryIssueCounts: Record<string, number>,
-  unanalyzedCount: number
+  failedFileCount: number
 ): void => {
   if (diagnostics.length === 0) {
     // "Healthy" is a claim about every discovered file, so an incomplete
     // scan does not make it.
     console.log(
-      unanalyzedCount === 0
+      failedFileCount === 0
         ? `\n${chalk.green.bold("✔ No issues found! Your Docker setup looks healthy.")}`
         : `\n${chalk.yellow.bold("⚠ No issues found in the files that could be analyzed.")}`
     );
@@ -233,7 +233,7 @@ const printScoreBox = async (
   label: string,
   warningsCount: number,
   errorsCount: number,
-  unanalyzedCount: number
+  failedFileCount: number
 ): Promise<void> => {
   const { isTTY } = process.stdout;
 
@@ -334,13 +334,13 @@ const printScoreBox = async (
     `\n  ${chalk.dim("────────────────────────────────────────────────────────────")}\n`
   );
 
-  if (unanalyzedCount === 0) {
+  if (failedFileCount === 0) {
     console.log(`  Share: ${chalk.cyan(shareUrl)}`);
     console.log(`  Tell others how you did on socials\n`);
   } else {
     // The score covers only part of the project, so it is not one to share.
-    const fileWord = unanalyzedCount === 1 ? "file" : "files";
-    const warning = `⚠ Incomplete scan: ${unanalyzedCount} ${fileWord} could not be analyzed.`;
+    const fileWord = failedFileCount === 1 ? "file" : "files";
+    const warning = `⚠ Incomplete scan: ${failedFileCount} ${fileWord} could not be analyzed.`;
 
     console.log(`  ${chalk.yellow(warning)}`);
     console.log(`  The score covers only the analyzed files.\n`);
@@ -362,8 +362,7 @@ export const formatTerminal = async (
   project: ProjectInfo,
   verbose = false,
   fileContents: Record<string, string> = {},
-  // Files that were discovered but could not be read or parsed.
-  unanalyzedCount = 0
+  failedFileCount = 0
 ): Promise<void> => {
   if (verbose) {
     console.log(`\n${chalk.bold("Docker Doctor Diagnostics")}`);
@@ -400,7 +399,7 @@ export const formatTerminal = async (
     verbose,
     fileContents,
     categoryIssueCounts,
-    unanalyzedCount
+    failedFileCount
   );
 
   await printScoreBox(
@@ -408,6 +407,6 @@ export const formatTerminal = async (
     label,
     warningsCount,
     errorsCount,
-    unanalyzedCount
+    failedFileCount
   );
 };
