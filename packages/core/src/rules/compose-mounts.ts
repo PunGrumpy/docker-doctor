@@ -3,7 +3,6 @@ import path from "node:path";
 import {
   composeField,
   isComposeMapping,
-  isComposeSequence,
   isComposeString,
 } from "../parsers/compose-value";
 import { hasText } from "../text";
@@ -121,8 +120,7 @@ export const volumeMount = (
     };
   }
 
-  // A sequence here is invalid Compose. It has none of these keys.
-  if (isComposeMapping(volume) || isComposeSequence(volume)) {
+  if (isComposeMapping(volume)) {
     return {
       readOnly: isComposeTrue(composeField(volume, "read_only")),
       source: stringOrUndefined(composeField(volume, "source")),

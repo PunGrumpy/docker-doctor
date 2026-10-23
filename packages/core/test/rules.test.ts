@@ -1227,6 +1227,28 @@ describe("Compose Security Rules", () => {
     );
   });
 
+  test("compose mount rules skip a volume entry written as a sequence", () => {
+    const source = `services:
+  agent:
+    image: myagent:1.0
+    volumes:
+      - [/var/run/docker.sock, /var/run/docker.sock]
+      - [/, /host]
+`;
+
+    const composeContent = parseCompose(source, "compose.yml");
+
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
+    expect(noBroadBindMount.check(composeContent, "compose.yml")).toHaveLength(
+      0
+    );
+    expect(
+      preferReadOnlyBindMount.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
+  });
+
   test("prefer-read-only-bind-mount: writable host paths in short and long syntax", () => {
     const source = `services:
   web:
