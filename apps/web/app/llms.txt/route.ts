@@ -2,7 +2,6 @@ import { llms } from "fumadocs-core/source/llms";
 
 import { source } from "@/lib/source";
 
-// cached forever
 export const revalidate = false;
 
 const serveLlmsIndex = () =>

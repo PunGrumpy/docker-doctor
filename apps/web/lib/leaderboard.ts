@@ -36,7 +36,6 @@ interface ResultsBody {
   schemaVersion?: unknown;
 }
 
-// Any JSON object can be read field by field. The fields are checked below.
 const isResultsBody = (value: unknown): value is ResultsBody =>
   typeof value === "object" && value !== null;
 

@@ -7,7 +7,6 @@ import type { Config } from "svgo";
 const ICONS_DIR = path.resolve(import.meta.dirname, "../components/icons");
 
 // React camelCase SVG attributes → standard SVG hyphenated names
-// Only those that differ and could reference IDs are important.
 const REACT_SVG_ATTR_MAP = new Map([
   ["clipPath", "clip-path"],
   ["clipRule", "clip-rule"],

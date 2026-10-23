@@ -11,8 +11,6 @@ interface MarkdownNode {
   type?: unknown;
 }
 
-// Every object in a remark tree is a node. Its fields are checked where they
-// are read.
 const isMarkdownNode = (value: unknown): value is MarkdownNode =>
   typeof value === "object" && value !== null;
 

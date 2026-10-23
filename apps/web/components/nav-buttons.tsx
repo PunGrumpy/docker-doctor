@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
-// The outlined buttons. Docs, the filled one, has its own classes below.
 const OutlinedNavButton = ({
   destination,
   href,

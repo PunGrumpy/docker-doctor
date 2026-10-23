@@ -117,7 +117,6 @@
   /* iOS-like drawer curve (from Ionic Framework) */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* Global Scrollbar Colors */
   --scrollbar-track: transparent;
   --scrollbar-thumb: oklch(0.8 0 0);
   --scrollbar-thumb-hover: oklch(0.65 0 0);
@@ -180,7 +179,6 @@
   --shadow-border: 0 0 0 1px #ffffff14;
   --shadow-custom: 0 0 0 1px #ffffff14;
 
-  /* Global Scrollbar Colors */
   --scrollbar-track: transparent;
   --scrollbar-thumb: oklch(0.3 0 0);
   --scrollbar-thumb-hover: oklch(0.45 0 0);

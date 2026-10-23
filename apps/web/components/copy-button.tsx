@@ -7,8 +7,6 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
-// Calls onReset after the check mark has shown for two seconds. Returns the
-// cleanup that cancels it.
 const startResetTimer = (onReset: () => void): (() => void) => {
   const timer = setTimeout(onReset, 2000);
 
