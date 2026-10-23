@@ -249,7 +249,7 @@ export const classifyHostPath = (hostPath: string): HostPathScope => {
     return normalized.startsWith("~/.") ? "home-dotfile" : "host";
   }
 
-  if (normalized === "." || normalized.startsWith("./")) {
+  if (normalized === ".") {
     return "project";
   }
 
