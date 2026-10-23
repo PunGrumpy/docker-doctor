@@ -8,6 +8,7 @@ import type {
 import { findRule } from "@docker-doctor/core";
 import chalk from "chalk";
 
+import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
 import { hasText } from "../text";
 
 const isLineNumber = (line: number | undefined): line is number =>
@@ -274,8 +275,7 @@ const printScoreBox = async (
     const frameCount = 20;
     const frameDelay = 15;
 
-    // Hide cursor
-    process.stdout.write("\u001B[?25l");
+    process.stdout.write(HIDE_CURSOR);
 
     try {
       for (let frame = 0; frame <= frameCount; frame += 1) {
@@ -289,10 +289,8 @@ const printScoreBox = async (
           chalk.dim("░".repeat(emptyBlocks));
 
         if (frame > 0) {
-          // Move cursor up 4 lines and carriage return
-          process.stdout.write("\u001B[4A\r");
+          process.stdout.write(`${cursorUp(whaleLines.length)}\r`);
         } else {
-          // print an extra newline first to start
           console.log();
         }
 
@@ -311,11 +309,9 @@ const printScoreBox = async (
         }
       }
     } finally {
-      // Show cursor
-      process.stdout.write("\u001B[?25h");
+      process.stdout.write(SHOW_CURSOR);
     }
   } else {
-    // Non-TTY fall back to static print
     const filledBlocks = Math.round(score / 2);
     const emptyBlocks = 50 - filledBlocks;
 
