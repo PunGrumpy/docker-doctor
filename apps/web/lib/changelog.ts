@@ -19,6 +19,8 @@ export interface ChangelogData {
 
 type Section = "minor" | "patch";
 
+const CHANGE_LINE_RE = /^-\s+(?<sha>[a-f0-9]+):\s+(?<title>.+)/u;
+
 // The section a `### ...` heading opens. Changes under any other heading are
 // not collected.
 const sectionOf = (line: string): Section | null => {
@@ -66,14 +68,13 @@ export const parseChangelog = (filePath: string): ChangelogData => {
       currentSection = sectionOf(line);
       currentChange = null;
     } else if (line.startsWith("- ") && currentSection && currentVersion) {
-      // oxlint-disable-next-line prefer-named-capture-group
-      const shaMatch = /^-\s+([a-f0-9]+):\s+(.+)/u.exec(line);
+      const change = CHANGE_LINE_RE.exec(line)?.groups;
 
-      if (shaMatch) {
+      if (change) {
         currentChange = {
           details: [],
-          sha: shaMatch[1],
-          title: shaMatch[2],
+          sha: change.sha,
+          title: change.title,
         };
         currentVersion[currentSection].push(currentChange);
       } else if (currentChange) {
