@@ -18,11 +18,10 @@ const isString = (value: unknown): value is string => typeof value === "string";
 
 const VALID_LANG = /^[a-zA-Z][a-zA-Z0-9+#-]*$/u;
 
-// Some docs use non-standard fenced code labels like
-// `\`\`\`384:401:path/to/file.ts` (line range + file path instead of a
-// language). Shiki rejects those. Normalize anything that isn't a plain
-// language identifier to `text`, preserving the original label as fence
-// meta so it still renders above the block.
+// Shiki rejects a fence label that is not a language, such as
+// `\`\`\`384:401:path/to/file.ts` (a line range and a file path). Normalize
+// anything that isn't a plain language identifier to `text`, preserving the
+// original label as fence meta so it still renders above the block.
 const normalizeCodeLang = (node: MarkdownNode): void => {
   if (
     node.type === "code" &&
