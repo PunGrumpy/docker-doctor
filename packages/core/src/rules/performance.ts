@@ -41,7 +41,6 @@ export const useMultiStage: DockerfileRule = {
     ).length;
 
     if (fromCount === 1) {
-      // Check if it's not a trivial/short Dockerfile (e.g., has some build steps)
       const hasBuildSteps = instructions.some(
         (inst) => inst.instruction === "RUN" && runsBuild(inst.args)
       );
@@ -201,7 +200,6 @@ const hasDockerignoreFor = (
 export const useDockerignore: DockerfileRule = {
   category: "Performance",
   check(instructions, file, context) {
-    // If copying everything, we definitely need .dockerignore
     const hasCopyAll = instructions.some((inst) => {
       if (inst.instruction === "COPY" || inst.instruction === "ADD") {
         // COPY --from=<stage> reads from a previous build stage, not the

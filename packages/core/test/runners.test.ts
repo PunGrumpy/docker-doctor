@@ -43,7 +43,6 @@ describe("runDockerfileRules", () => {
     expect(
       diagnostics.some((d) => d.rule === "docker-doctor/no-root-user")
     ).toBe(false);
-    // A different Security rule (unpinned base image) should still fire.
     expect(
       diagnostics.some((d) => d.rule === "docker-doctor/pin-image-version")
     ).toBe(true);

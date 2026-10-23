@@ -90,13 +90,10 @@ export const noRootUser: DockerfileRule = {
 const isLiteralSecret = (key: string, value: string): boolean =>
   isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{");
 
-// The keys of an ENV or ARG instruction that hold a literal secret, in the
-// order they appear.
 const secretKeysIn = (instruction: string, rawArgs: string): string[] => {
   const args = rawArgs.trim();
 
   if (instruction === "ENV" && !args.includes("=")) {
-    // KEY VALUE format
     const groups = /^(?<key>\S+)\s+(?<value>(?:\S.*)?)$/u.exec(args)?.groups;
 
     return groups !== undefined && isLiteralSecret(groups.key, groups.value)
@@ -104,7 +101,6 @@ const secretKeysIn = (instruction: string, rawArgs: string): string[] => {
       : [];
   }
 
-  // KEY=VALUE format, several per instruction
   return args.split(/\s+/u).flatMap((part) => {
     const eqIndex = part.indexOf("=");
     const key = eqIndex > 0 ? part.slice(0, eqIndex) : part;
@@ -169,8 +165,6 @@ export const pinImageVersion: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
-        // FROM image or FROM image:tag or FROM image@sha256:hash
-        // Also respect multi-stage builds (AS stageName)
         const imagePart = parseFromArgs(inst.args).base;
 
         const issue = hasText(imagePart)

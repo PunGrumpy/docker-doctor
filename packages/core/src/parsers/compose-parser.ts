@@ -49,17 +49,17 @@ export const parseCompose = (
   return document;
 };
 
+const isSequenceIndex = (segment: string | number): segment is number =>
+  typeof segment === "number";
+
 /**
  * Builds a {@link ComposeLocator} over the same source text a compose object
  * was parsed from, so rules can attach line numbers to their diagnostics.
  *
  * Keys pulled in via YAML merge keys (`<<: *anchor`) have no concrete node
- * at the merge site, so paths through them resolve to `undefined` — callers
- * fall back to an unnumbered diagnostic, which matches the old behavior.
+ * at the merge site, so paths through them resolve to `undefined` and
+ * callers fall back to an unnumbered diagnostic.
  */
-const isSequenceIndex = (segment: string | number): segment is number =>
-  typeof segment === "number";
-
 export const createComposeLocator = (content: string): ComposeLocator => {
   const lineCounter = new LineCounter();
   const doc = parseDocument(content, { lineCounter, merge: true });

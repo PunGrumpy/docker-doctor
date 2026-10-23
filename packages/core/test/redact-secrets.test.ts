@@ -5,7 +5,6 @@ import { allRules } from "../src/rules/index";
 import { redactSecrets } from "../src/rules/redact-secrets";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 
-// A stand-in for a real credential. It must never reach a diagnostic.
 const PLACEHOLDER = "PLACEHOLDER_TOKEN_VALUE";
 
 describe("redactSecrets", () => {

@@ -53,8 +53,6 @@ interface ParserState {
   currentArgs: string;
   startLine: number;
   rawAccumulator: string[];
-  // FIFO of heredoc delimiters still open for the current instruction, in
-  // the order they were opened (closed in the same order).
   heredocQueue: string[];
 }
 
@@ -112,10 +110,6 @@ const findHeredocDelimiters = (lineContent: string): string[] => {
   );
 };
 
-// Heredoc body lines are never treated as instructions (not even comment
-// lines, which are shell-comment content here) — they are folded verbatim
-// into the owning instruction's args until the delimiter line closes the
-// (possibly multiple) open heredoc(s), in the order they were opened.
 const processHeredocLine = (state: ParserState, trimmed: string): void => {
   if (trimmed === state.heredocQueue[0]) {
     state.heredocQueue.shift();
@@ -124,7 +118,6 @@ const processHeredocLine = (state: ParserState, trimmed: string): void => {
   }
 
   if (state.heredocQueue.length === 0) {
-    // Last open heredoc just closed: the instruction ends here.
     closeInstruction(state);
   }
 };
@@ -146,7 +139,6 @@ const processInstructionLine = (
     state.currentArgs += (state.currentArgs ? " " : "") + lineContent;
   } else {
     state.startLine = lineNum;
-    // Match the first instruction word (e.g. FROM, RUN, COPY)
     const matched = matchInstructionKeyword(lineContent);
 
     if (matched) {
@@ -211,8 +203,6 @@ export const parseDockerfile = (
     });
   }
 
-  // EOF: a trailing backslash continuation still emits whatever was
-  // accumulated so far, rather than dropping it.
   closeInstruction(state);
 
   return state.instructions;

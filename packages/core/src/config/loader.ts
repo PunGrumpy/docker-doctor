@@ -61,9 +61,6 @@ const parseConfigFile = async (
 
 const TYPESCRIPT_CONFIG_PATTERN = /\.[cm]?ts$/u;
 
-// Node refuses a TypeScript config in two distinguishable ways, and only one
-// of them is a matter of the runtime being too old, so they do not get the
-// same advice.
 const TYPE_STRIPPING_FAILURES = new Map([
   [
     "ERR_UNKNOWN_FILE_EXTENSION",
@@ -81,8 +78,6 @@ const hasErrorCode = (cause: unknown): cause is { readonly code: string } =>
   "code" in cause &&
   typeof cause.code === "string";
 
-// The module namespace import() resolves to, and a parsed package.json.
-// Both are objects whose keys are read before they are checked.
 const isKeyedObject = (
   value: unknown
 ): value is { readonly default?: unknown; readonly dockerDoctor?: unknown } =>
@@ -156,7 +151,6 @@ const readPackageConfig = async (
     const pkgJson: unknown = JSON.parse(pkgContent);
     dockerDoctor = isKeyedObject(pkgJson) ? pkgJson.dockerDoctor : undefined;
   } catch {
-    // ignore package.json read/parse failures
     return null;
   }
 
@@ -185,8 +179,6 @@ const warnUnknownKeys = (
 export const loadConfig = async (
   rootDir: string,
   customPath?: string,
-  // Called once per unrecognized config key. Optional so existing callers are
-  // unaffected; without it, unknown keys stay silent as before.
   onWarning?: (message: string) => void
 ): Promise<DockerDoctorConfig> => {
   let configObject: ConfigInput | null = null;

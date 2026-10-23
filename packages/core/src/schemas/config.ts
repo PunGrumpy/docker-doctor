@@ -21,8 +21,6 @@ const RULE_CATEGORIES: ReadonlySet<string> = new Set<RuleCategory>([
   "Security",
 ]);
 
-// A config file's export and its sections, before their values are
-// checked. Any object fits these, since every key is optional.
 export interface ConfigInput {
   readonly categories?: unknown;
   readonly ignore?: unknown;
@@ -92,8 +90,6 @@ const validateCategories = (
 
   for (const [key, severity] of Object.entries(categories)) {
     if (!isRuleCategory(key)) {
-      // Unknown category keys are silently dropped (matches the
-      // legacy schema's excess-property behavior).
       continue;
     }
 
@@ -145,13 +141,6 @@ export const isConfigObject = (input: unknown): input is ConfigInput => {
   throw new Error(`Invalid config: expected an object, got ${received}`);
 };
 
-/**
- * Validates and normalizes a raw config object, throwing on invalid input.
- *
- * Mirrors the legacy schema's behavior exactly, including silently
- * dropping unknown top-level (and nested) keys rather than throwing
- * or preserving them.
- */
 export const validateConfig = (input: ConfigInput): DockerDoctorConfig => {
   const result: DockerDoctorConfig = {};
 

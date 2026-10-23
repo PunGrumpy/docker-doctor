@@ -1,6 +1,3 @@
-// Shared between the Dockerfile ENV/ARG rule (no-secrets-in-env) and the
-// Compose environment rule (no-plaintext-secrets) so both flag the same
-// key shapes and the same value shapes.
 const SECRET_KEY_PATTERNS: readonly RegExp[] = [
   // No leading separator, for PGPASSWORD.
   /password(?:[_-]|$)/iu,
@@ -23,7 +20,6 @@ export const isSecretKey = (key: string): boolean =>
   !SECRET_LOCATION_SUFFIX.test(key) &&
   SECRET_KEY_PATTERNS.some((regex) => regex.test(key));
 
-// A URL with no userinfo in its authority. `user:pw@host` does not match.
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
 
 // An on/off switch is not a secret. `AUTH_ENABLED=true` matches the `auth`

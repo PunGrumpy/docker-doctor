@@ -2,16 +2,6 @@ import { findRule } from "./rules/index";
 import type { Diagnostic, ProjectInfo, RuleCategory } from "./types/index";
 
 // Bump whenever the JSON report shape or the score formula/weights change.
-// The unversioned shape shipped before this field existed is implicitly 1.
-// v3 (2026-09): added diagnostics[].category.
-// v4 (2026-09): added failures[], the files discovered but not analyzed
-// (read or parse errors).
-// v5 (2026-10): the score averages the penalty over the analyzed files.
-// v6 (2026-10): added analyzedFiles, the number of files the score averages
-// over. A file counts only when the rules can check it. An empty or
-// comment-only Dockerfile does not count. Neither does a Compose file with
-// no services, no top-level models and no version key. score and label are
-// null when no file was analyzed.
 export const REPORT_SCHEMA_VERSION = 6;
 
 export interface ReportFailure {
