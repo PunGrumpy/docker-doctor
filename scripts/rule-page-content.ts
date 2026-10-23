@@ -38,7 +38,6 @@ interface RulePages {
   readonly [ruleKey: string]: RulePageContent;
 }
 
-// Examples that more than one rule page shows.
 const APT_CLEAN_LAYER =
   "FROM debian:12-slim\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends curl \\\n  && rm -rf /var/lib/apt/lists/*";
 
