@@ -16,8 +16,7 @@ export const TRUST_BOUNDARY_NOTE =
 
 const UNSAFE_FILE_CHARS = /[^a-z0-9-]+/giu;
 
-// ":12" for a diagnostic on line 12, nothing for one without a line.
-const lineSuffix = (line: number | undefined): string =>
+export const lineSuffix = (line: number | undefined): string =>
   line === undefined ? "" : `:${line}`;
 
 const ruleFileName = (rule: string): string => {
