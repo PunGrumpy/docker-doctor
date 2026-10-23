@@ -31,7 +31,7 @@ export const getSkillSourceDirectory = (): string | null => {
 // default, or each agent's global dir (e.g. ~/.claude/skills; universal
 // agents share ~/.agents/skills) when `global`.
 // Best-effort: returns null when the bundled skill is missing or the install
-// throws — callers treat that as "skill not installed", never as a failure.
+// throws.
 export const installSkillForAgents = async (
   agents: SkillAgentType[],
   options: { projectRoot: string; global?: boolean }

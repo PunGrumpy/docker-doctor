@@ -25,7 +25,7 @@ const flatten = (value: string, maxLength: number): string => {
 export const sanitizeMessage = (message: string): string =>
   flatten(message, MAX_MESSAGE_LENGTH);
 
-// Paths are attacker-controlled in the same way messages are -- a filename
-// may legally contain newlines and ANSI escapes on every platform we run on.
+// Paths are attacker-controlled in the same way messages are. On Linux and
+// macOS a filename may contain newlines and ANSI escapes.
 export const sanitizePath = (filePath: string): string =>
   flatten(filePath, MAX_PATH_LENGTH);
