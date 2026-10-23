@@ -201,8 +201,8 @@ jobs:
       # redeploy. Kick a fresh deploy of main once the release has fully landed.
       - name: Trigger web deploy
         # !cancelled(): the changelog page only needs the npm publish, so a
-        # failed kit push earlier in the job must not skip this step (it did
-        # for 0.4.4, leaving the page stale — the exact problem #98 fixed).
+        # failed step earlier in the job must not skip this one once
+        # `published` is true.
         if: ${{ !cancelled() && steps.publish.outputs.published == 'true' }}
         env:
           DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}

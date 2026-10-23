@@ -14,7 +14,7 @@ export default defineConfig({
   extends: [core, next, react, nextJsPlugins, antiSlop, gdp, jsPlugins],
   ignorePatterns: [
     ".cursor/hooks",
-    // Deliberately malformed inputs for the CLI's end-to-end tests.
+    // The CLI's end-to-end fixtures, some of them deliberately malformed.
     "packages/docker-doctor/test/fixtures",
     "apps/web/components/ui",
     "packages/videos/src/components",
