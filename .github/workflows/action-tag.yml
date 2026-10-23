@@ -30,7 +30,6 @@ on:
       - action.yml
       - scripts/render-github-action-comment.mjs
 
-# No default permissions. Each job declares its own.
 permissions: {}
 
 concurrency:

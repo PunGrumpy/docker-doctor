@@ -6,12 +6,10 @@
  *
  *   bun run docs:rules
  *
- * Run by Bun (not the app's `tsc`), so importing core's raw-TS sources is
- * safe here even though the web app cannot import them directly — see the
- * note in `apps/web/lib/score.ts` about core's ES2018 regex named groups
- * versus the web app's ES2017 target. Generation fails if a rule has no
- * authored content (or content references a rule that no longer ships), so
- * the pages can never drift from the rules the CLI actually runs.
+ * Run by Bun, which imports core's raw TypeScript sources directly.
+ * Generation fails if a rule has no authored content (or content references
+ * a rule that no longer ships), so the pages can never drift from the rules
+ * the CLI actually runs.
  */
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

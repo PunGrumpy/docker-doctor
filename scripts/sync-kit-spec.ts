@@ -30,7 +30,6 @@ interface ManifestFields {
   version?: unknown;
 }
 
-// Any JSON object can be read field by field. isKitManifest checks the fields.
 const isJsonObject = (value: unknown): value is ManifestFields =>
   typeof value === "object" && value !== null;
 
