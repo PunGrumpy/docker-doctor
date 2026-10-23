@@ -19,7 +19,8 @@ const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_]\w*/gu;
 // the generic interpolation pass would erase them.
 const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?!\w)/gu;
 
-// Compose runs from the project directory, so `$PWD` and `${PWD}` name it.
+// `$PWD` is the directory Compose was started from, usually the project
+// directory, so `$PWD` and `${PWD}` are read as `.`.
 const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?!\w)/gu;
 
 const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_]\w*)/u;

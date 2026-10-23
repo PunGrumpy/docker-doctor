@@ -209,8 +209,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
 // shell invoked with `-o pipefail`). Matching the flag directly (rather than
 // a shell name) also works inside joined exec-form argv, and cannot backtrack
 // pathologically. Known limitation: the word inside quotes (e.g.
-// `echo "set -o pipefail" >> .bashrc`) still matches — same class as the
-// existing pending test for quoted pipes.
+// `echo "set -o pipefail" >> .bashrc`) still matches.
 export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 
 const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
