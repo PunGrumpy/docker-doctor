@@ -12,7 +12,7 @@ const FAKE_AGENT =
 
 const withFakeAgentOnPath = async (
   run: (project: string) => Promise<void>,
-  options: { installAgent: boolean }
+  options: { installAgent: boolean; script?: string }
 ): Promise<void> => {
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), "dd-agent-bin-"));
 
@@ -26,7 +26,9 @@ const withFakeAgentOnPath = async (
 
   try {
     if (options.installAgent) {
-      fs.writeFileSync(path.join(bin, "claude"), FAKE_AGENT, { mode: 0o755 });
+      fs.writeFileSync(path.join(bin, "claude"), options.script ?? FAKE_AGENT, {
+        mode: 0o755,
+      });
     }
 
     process.env.PATH = options.installAgent
@@ -59,6 +61,15 @@ describe.skipIf(process.platform === "win32")("launchAgent", () => {
         expect(args).toEqual(["--dangerously-skip-permissions", "fix it"]);
       },
       { installAgent: true }
+    );
+  });
+
+  test("resolves true when the agent exits with a failure code", async () => {
+    await withFakeAgentOnPath(
+      async (project) => {
+        expect(await launchAgent("claude-code", "fix it", project)).toBe(true);
+      },
+      { installAgent: true, script: "#!/bin/sh\nexit 3\n" }
     );
   });
 

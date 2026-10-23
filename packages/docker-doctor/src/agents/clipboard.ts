@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 
 interface ClipboardCommand {
   command: string;
@@ -21,22 +22,25 @@ const getClipboardCommands = (): ClipboardCommand[] => {
   ];
 };
 
-const tryCopy = async ({ command, args }: ClipboardCommand, text: string) =>
-  /* eslint-disable promise/avoid-new */
-  await new Promise<boolean>((resolve) => {
-    const child = spawn(command, args, {
-      stdio: ["pipe", "ignore", "ignore"],
-    });
-
-    child.once("error", () => {
-      resolve(false);
-    });
-    child.once("exit", (code) => {
-      resolve(code === 0);
-    });
-    child.stdin.end(text);
+const tryCopy = async (
+  { command, args }: ClipboardCommand,
+  text: string
+): Promise<boolean> => {
+  const child = spawn(command, args, {
+    stdio: ["pipe", "ignore", "ignore"],
   });
-/* eslint-enable promise/avoid-new */
+
+  const exited = once(child, "exit");
+  child.stdin.end(text);
+
+  try {
+    await exited;
+  } catch {
+    return false;
+  }
+
+  return child.exitCode === 0;
+};
 
 const tryCommands = async (
   commands: ClipboardCommand[],
