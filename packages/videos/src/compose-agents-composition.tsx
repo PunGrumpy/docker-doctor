@@ -28,8 +28,6 @@ const BRAND = "#2b7fff";
 const FAINT = "rgba(17,17,16,0.38)";
 const HAIRLINE = "rgba(17,17,16,0.14)";
 
-// ─── Texture ────────────────────────────────────────────────────────────────
-
 // Film grain: SVG turbulence re-seeded every other frame so the noise
 // crawls like scanned film instead of sitting frozen on the frame.
 const Grain = () => {
@@ -53,8 +51,6 @@ const Grain = () => {
     </AbsoluteFill>
   );
 };
-
-// ─── Marquee ────────────────────────────────────────────────────────────────
 
 // Two identical halves shifted by their own width: translating by
 // `-(t mod 50%)` loops seamlessly without measuring pixels.
@@ -102,8 +98,6 @@ const Marquee = ({
     </div>
   );
 };
-
-// ─── Type ───────────────────────────────────────────────────────────────────
 
 // Cap a display line's font size so it bleeds close to the frame edge but
 // never clips: Geist bold caps average ~0.62em per character.
@@ -203,8 +197,6 @@ const Centered = ({ children }: { readonly children: ReactNode }) => (
   </AbsoluteFill>
 );
 
-// ─── Scene 1 · Title ────────────────────────────────────────────────────────
-
 const TITLE_DURATION = 80;
 
 const SceneTitle = () => (
@@ -214,8 +206,6 @@ const SceneTitle = () => (
     <SlamLine color={BRAND} delay={14} fontSize={90} text="v0.5.0" />
   </Centered>
 );
-
-// ─── Scene 2 · Theme ────────────────────────────────────────────────────────
 
 const THEME_DURATION = 70;
 
@@ -230,8 +220,6 @@ const SceneTheme = () => (
     <MonoCaption delay={16} text="one release. two fronts." />
   </Centered>
 );
-
-// ─── Scene 3 · Rule counter ─────────────────────────────────────────────────
 
 const COUNT_DURATION = 60;
 
@@ -264,8 +252,6 @@ const SceneCount = () => {
     </Centered>
   );
 };
-
-// ─── Scene 4 · Feature slams ────────────────────────────────────────────────
 
 const FEATURES: { title: string; caption: string }[] = [
   {
@@ -338,8 +324,6 @@ const SceneFeatures = () => (
   </>
 );
 
-// ─── Scene 5 · CTA ──────────────────────────────────────────────────────────
-
 const CTA_DURATION = 100;
 const OUT_DURATION = 80;
 
@@ -376,8 +360,6 @@ const SceneOut = () => (
   </Centered>
 );
 
-// ─── Composition ────────────────────────────────────────────────────────────
-
 export const FPS = 30;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
@@ -387,8 +369,6 @@ const COUNT_END = THEME_END + COUNT_DURATION;
 const FEATURES_END = COUNT_END + FEATURES_DURATION;
 const CTA_END = FEATURES_END + CTA_DURATION;
 export const DURATION = CTA_END + OUT_DURATION;
-
-// ─── Sound ──────────────────────────────────────────────────────────────────
 
 // A composed music bed plus two accents (scripts/make-sfx.py), in the
 // product-launch style of ElevenLabs' videos: 22.5 s of minimal electronic

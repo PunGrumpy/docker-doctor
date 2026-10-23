@@ -49,7 +49,6 @@ const Positioned = ({
   </div>
 );
 
-// ─── Scene 1 · The hook ─────────────────────────────────────────────────────
 // The post's opening question. SoftBlurIn needs ~45 frames to land a
 // 17-character line, so the scene is sized to the last line's arrival plus a
 // one-second hold.
@@ -74,7 +73,6 @@ const SceneHook = () => (
   </>
 );
 
-// ─── Scene 3 · The close ────────────────────────────────────────────────────
 // The command on a pill, large enough to read on a phone — it already typed
 // out in the terminal, so this is the thing to copy, not the reveal.
 const CTA_DURATION = 66;
