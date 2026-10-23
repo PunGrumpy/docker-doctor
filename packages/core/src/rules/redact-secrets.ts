@@ -13,7 +13,6 @@ const URL_USERINFO_RE =
 const ASSIGNMENT_RE =
   /(?<![^\s=;&|'"`])(?<key>[^\s=;&|'"`]+)=(?<value>"[^"]*"|'[^']*'|[^\s;&|]+)/gu;
 
-// `--password value`, the spelling with a space instead of `=`.
 const SPACED_FLAG_RE =
   /(?<flag>--[a-z][\w-]*)(?<gap>\s+)(?<value>[^\s;&|-][^\s;&|]*)/giu;
 

@@ -56,14 +56,12 @@ export const undefinedModelReference: ComposeRule = {
       const { models } = config;
 
       if (isComposeSequence(models)) {
-        // Short syntax: a list of model names.
         for (const [index, entry] of models.entries()) {
           if (isComposeString(entry) && !defined.has(entry)) {
             flag(name, entry, index);
           }
         }
       } else if (isComposeMapping(models)) {
-        // Long syntax: a map of model name → binding config.
         for (const modelName of Object.keys(models)) {
           if (!defined.has(modelName)) {
             flag(name, modelName, modelName);

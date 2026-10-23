@@ -274,8 +274,6 @@ export const noPlaintextSecrets: ComposeRule = {
       const { environment } = config;
 
       if (isComposeSequence(environment)) {
-        // List syntax: "KEY=value" entries; a bare "KEY" passes the host
-        // value through and holds no literal.
         for (const [index, entry] of environment.entries()) {
           const key = listEntrySecretKey(entry);
 

@@ -21,7 +21,6 @@ const IMAGE_SIZE = "Image Size" satisfies RuleCategory;
 
 interface StageRun {
   inst: DockerfileInstruction;
-  // True when the RUN executes with NODE_ENV=production.
   productionEnv: boolean;
 }
 
@@ -42,13 +41,10 @@ const NODE_ENV_ASSIGNMENT_RE =
 const NODE_ENV_ARG_RE =
   /(?:^|\s)NODE_ENV(?:=["']?(?<value>[^\s"']*)["']?)?(?=\s|$)/u;
 
-// `ENV NODE_ENV=${NODE_ENV}` copies the build argument into the environment.
 const NODE_ENV_REFERENCE_RE = /^\$(?:NODE_ENV|\{NODE_ENV\})$/u;
 
 interface NodeEnvState {
-  // The default of `ARG NODE_ENV` in this stage, if declared.
   arg?: string;
-  // The value of `ENV NODE_ENV` in this stage, if set.
   env?: string;
 }
 
@@ -205,8 +201,6 @@ export const preferSlimBase: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
-    // A build stage that is discarded never reaches the image, so its base
-    // has no effect on the image's size.
     for (const { from } of shippedStages(collectStages(instructions))) {
       const imagePart = fullOsBase(from, instructions);
 
@@ -307,7 +301,6 @@ export const cleanPackageCache: DockerfileRule = {
       if (inst.instruction === "RUN") {
         const { args } = inst;
 
-        // check apt-get install without cleanup
         if (
           hasAptGetInstall(args) &&
           !removesRecursively(args, APT_LISTS_DIR) &&
@@ -325,7 +318,6 @@ export const cleanPackageCache: DockerfileRule = {
           );
         }
 
-        // check apk add without --no-cache
         if (
           args.includes("apk add") &&
           !APK_ADD_NO_CACHE_RE.test(maskQuotedText(args)) &&
@@ -432,8 +424,6 @@ export const avoidDevDependencies: DockerfileRule = {
     const stages = collectStages(instructions);
     const finalStage = stages.at(-1);
 
-    // A dev install in an inherited stage ships just like one in the final
-    // stage itself.
     for (const stage of shippedStages(stages)) {
       for (const run of stage.runs) {
         if (!installsDevDependencies(run)) {

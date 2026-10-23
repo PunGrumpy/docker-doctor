@@ -16,7 +16,6 @@ export const requireHealthcheck: DockerfileRule = {
       (inst) => inst.instruction === "HEALTHCHECK"
     );
 
-    // Only suggest healthcheck if it has exposed ports or command lines indicating it runs an app
     const hasExposedPortsOrEntry = instructions.some(
       (inst) =>
         inst.instruction === "EXPOSE" ||
@@ -72,7 +71,6 @@ export const preferCopyOverAdd: DockerfileRule = {
           continue;
         }
 
-        // If it's not a remote url (handled by security/no-add-remote) and not a compressed file
         const isRemote =
           src.startsWith("http://") || src.startsWith("https://");
 
@@ -215,7 +213,6 @@ export const combineAptUpdateInstall: DockerfileRule = {
 // existing pending test for quoted pipes.
 export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 
-// A RUN line uses a pipe: a single `|` not part of `||`.
 const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
 
 // `cd` only where a command can start: line start, or after a list/pipe
@@ -276,8 +273,6 @@ export const usePipefail: DockerfileRule = {
       if (inst.instruction === "FROM") {
         const { base, stage } = parseFromArgs(inst.args);
 
-        // Only a reference to an earlier stage carries state forward; a real
-        // base image, scratch, or a variable we cannot resolve resets it.
         const parentStage = isScratch(base)
           ? null
           : (base?.toLowerCase() ?? null);
@@ -473,7 +468,6 @@ const collectPackageList = (raw: string): string[] => {
 
   const tokens = command.split(WHITESPACE_RE);
 
-  // The words up to the first shell separator belong to this command.
   const separatorIndex = tokens.findIndex((token) =>
     SHELL_SEPARATOR_RE.test(token)
   );

@@ -10,13 +10,6 @@ import { hasText } from "../text";
 import type { ComposeValue } from "../types/index";
 import { isComposeTrue } from "./compose-services";
 
-/**
- * Shared parsing for Compose `volumes:` entries, used by every rule that
- * reasons about bind mounts. A Compose volume entry is either the short
- * `[SOURCE:]TARGET[:MODE]` string or the long-syntax object; both collapse
- * to a `VolumeMount`.
- */
-
 // `${VAR:-default}` resolves to its default; `${VAR}`, `$VAR` and the
 // `?error` forms resolve to nothing.
 const INTERPOLATION_WITH_DEFAULT = /\$\{[^}:?-]+:?-(?<fallback>[^}]*)\}/gu;
@@ -29,11 +22,8 @@ const HOME_INTERPOLATION = /\$\{HOME\}|\$HOME(?!\w)/gu;
 // Compose runs from the project directory, so `$PWD` and `${PWD}` name it.
 const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?!\w)/gu;
 
-// A source that starts with an unresolved variable, e.g. `${DATA_DIR}/pg`.
 const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_]\w*)/u;
 
-// Folds `$HOME`/`$PWD` and applies `${VAR:-default}` defaults, but leaves
-// interpolations with no default in place.
 const applyFoldsAndDefaults = (value: string): string =>
   value
     .replace(HOME_INTERPOLATION, "~")
