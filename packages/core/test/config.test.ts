@@ -210,13 +210,6 @@ describe("loadConfig", () => {
     expect(config).toEqual({});
   });
 
-  // Pins the CURRENT Effect Schema.Struct behavior for unknown top-level
-  // (and nested) keys: they are silently accepted and STRIPPED, not
-  // thrown on and not preserved. Verified directly against
-  // Schema.decodeSync(DockerDoctorConfigSchema)({ rules: {...}, unknownKey: "surprise" })
-  // before this migration: result was `{"rules":{"foo":"error"}}` with
-  // "unknownKey" absent from the decoded output (no throw).
-  // The hand-rolled validator introduced in Step 3 MUST match this exactly.
   test("silently strips unknown top-level keys instead of throwing", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),

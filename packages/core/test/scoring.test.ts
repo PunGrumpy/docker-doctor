@@ -14,7 +14,6 @@ const diag = (severity: "error" | "warning" | "info"): Diagnostic => ({
 const many = (severity: "error" | "warning" | "info", n: number) =>
   Array.from({ length: n }, () => diag(severity));
 
-// For comparisons that need a number. One analyzed file always has a score.
 const scoreOfOneFile = (diagnostics: Diagnostic[]): number =>
   calculateScore(diagnostics, 1).score ?? Number.NaN;
 
