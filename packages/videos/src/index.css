@@ -1,10 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Design tokens mirror apps/web/app/globals.css (the `.dark` theme) so the
- * video renders in the exact same visual language as the marketing site:
- * shadcn neutral palette (oklch, chroma 0) + Geist / Instrument Serif fonts.
- * The video is always dark, so the dark values are baked straight in.
+ * Design tokens mirror apps/web/app/globals.css so the video renders in the
+ * same visual language as the marketing site: shadcn neutral palette (oklch,
+ * chroma 0) + Geist / Instrument Serif fonts.
  */
 @theme {
   --radius: 0.625rem;

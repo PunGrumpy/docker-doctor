@@ -15,8 +15,8 @@ import { FONT_VARS, SANS } from "./fonts";
 
 // The v0.5.0 release video, styled after basement.studio: paper-white stage,
 // heavy Geist stacked caps slamming in on hard cuts, marquee
-// strips top and bottom, film grain, one brand-blue accent. No fades anywhere —
-// every scene change is a cut, every reveal is a clip-mask slam.
+// strips top and bottom, film grain, one brand-blue accent. Every scene
+// change is a hard cut.
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
 
@@ -370,7 +370,7 @@ const FEATURES_END = COUNT_END + FEATURES_DURATION;
 const CTA_END = FEATURES_END + CTA_DURATION;
 export const DURATION = CTA_END + OUT_DURATION;
 
-// A composed music bed plus two accents (scripts/make-sfx.py), in the
+// A composed music bed plus three accents (scripts/make-sfx.ts), in the
 // product-launch style of ElevenLabs' videos: 22.5 s of minimal electronic
 // in D minor at 96 BPM under the whole video, a soft sub thump on each
 // scene cut, a rising pluck per counter increment, and a tiny key tick per
@@ -539,7 +539,7 @@ export const ComposeAgents = () => {
             <SceneOut />
           </Sequence>
 
-          {/* Chrome that rides above every scene: marquees, crosshairs. */}
+          {/* Chrome that rides above every scene: the marquees. */}
           <div style={{ left: 0, position: "absolute", right: 0, top: 0 }}>
             <Marquee phrase={MARQUEE} />
           </div>
