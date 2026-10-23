@@ -65,7 +65,6 @@ const CenteredLine = ({
   </AbsoluteFill>
 );
 
-// ─── Scene 1 · The setup ────────────────────────────────────────────────────
 // Two centered lines blur in — the second trails the first by 0.25s (8f
 // @30fps) so the question lands as a beat, not a single flash.
 const SceneTagline = () => (
@@ -81,7 +80,6 @@ const SceneTagline = () => (
   </>
 );
 
-// ─── Scene 3 · The question ─────────────────────────────────────────────────
 // The pivot between the two terminals, in the tagline's two-line rhythm.
 const QUESTION_DURATION = 80;
 
@@ -98,7 +96,6 @@ const SceneQuestion = () => (
   </>
 );
 
-// ─── Scene 5 · The feature run ──────────────────────────────────────────────
 const SNAPS = [
   "30 rules. Zero setup.",
   "Root users. Mutable tags.",
@@ -139,7 +136,6 @@ const SceneFeatures = () => (
   </>
 );
 
-// ─── Scene 6 · The close ────────────────────────────────────────────────────
 const SceneCta = () => (
   // Transparent so the backdrop carries through, with the caret running out
   // to the final frame.

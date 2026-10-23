@@ -20,8 +20,8 @@ const isTextName = (name: ReactNode): name is string | number =>
 const nameKey = (node: PageTreeNode): string =>
   isTextName(node.name) ? String(node.name) : node.type;
 
-// Every page-tree node carries a stable `$id`; pages also have a unique
-// `url`. Prefer those over the array index so keys survive reordering.
+// Prefer a node's `$id`, then a page's `url`, over the array index so keys
+// survive reordering.
 const nodeKey = (node: PageTreeNode): string =>
   node.$id ?? ("url" in node ? node.url : nameKey(node));
 

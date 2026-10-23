@@ -1,10 +1,3 @@
-/**
- * Note: When using the Node.JS APIs, the config file
- * doesn't apply. Instead, pass options directly to the APIs.
- *
- * All configuration options: https://remotion.dev/docs/config
- */
-
 import fs from "node:fs";
 import path from "node:path";
 
@@ -28,8 +21,6 @@ interface WebpackRule {
   use?: unknown;
 }
 
-// A rule or a loader entry is any object. The fields are checked where they
-// are read.
 const isWebpackRule = (rule: unknown): rule is WebpackRule =>
   typeof rule === "object" && rule !== null;
 

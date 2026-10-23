@@ -43,7 +43,6 @@ const Positioned = ({
   </div>
 );
 
-// ─── Scene 1 · The setup ────────────────────────────────────────────────────
 // The post's hook, in the launch video's rhythm: one size, one color, and the
 // timing alone carries the beat — a smaller, dimmer last line would read as a
 // subtitle when it is the actual question.
@@ -67,7 +66,6 @@ const SceneHook = () => (
   </>
 );
 
-// ─── Scene 4 · The payoff ───────────────────────────────────────────────────
 // SoftBlurIn spends ~27 frames per character plus a frame of stagger each, so
 // a 20-character line is not fully on screen for ~47 frames. Every text scene
 // below is sized to that arrival plus a two-second hold; at the old durations
@@ -91,7 +89,6 @@ const ScenePayoff = () => (
   </>
 );
 
-// ─── Scene 5 · The close ────────────────────────────────────────────────────
 // The command on a pill, at a size that survives a phone screen — it already
 // typed out legibly in scene 2, so this is a reminder, not the reveal.
 const CTA_DURATION = 112;

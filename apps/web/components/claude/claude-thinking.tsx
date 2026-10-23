@@ -52,7 +52,6 @@ const usePrefersReducedMotion = () =>
     () => false
   );
 
-// Calls tick every `ms` milliseconds. Returns the cleanup that stops it.
 const startInterval = (tick: () => void, ms: number): (() => void) => {
   const id = setInterval(tick, ms);
 

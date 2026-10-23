@@ -15,7 +15,6 @@ const COMMAND = "docker-doctor .";
 const TOTAL_TICKS = 210;
 const TICK_MS = 100;
 
-// Calls tick every TICK_MS milliseconds. Returns the cleanup that stops it.
 const startTicking = (tick: () => void): (() => void) => {
   const timer = setInterval(tick, TICK_MS);
 

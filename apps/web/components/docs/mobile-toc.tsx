@@ -8,8 +8,6 @@ import type { RefObject } from "react";
 
 import { TocLink } from "@/components/docs/toc";
 
-// Closes the panel on Escape and moves focus back to its summary. Returns the
-// cleanup that stops listening.
 const closeOnEscape = (
   details: HTMLDetailsElement,
   summaryRef: RefObject<HTMLElement | null>
