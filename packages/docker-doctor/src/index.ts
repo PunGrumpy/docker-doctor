@@ -1,6 +1,5 @@
 import packageJson from "../package.json" with { type: "json" };
 
-// Re-export core programmatic API
 export {
   discoverProject,
   parseDockerfile,

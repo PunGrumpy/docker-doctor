@@ -583,7 +583,6 @@ const runRulesEngine = async (
     await setTimeout(100);
   }
 
-  // 1. Scan Dockerfiles in parallel
   const dockerfileResults = await Promise.all(
     project.dockerfiles.map(async (df): Promise<FileResult> => {
       const fullPath = path.join(rootDir, df);
@@ -623,7 +622,6 @@ const runRulesEngine = async (
     await setTimeout(100);
   }
 
-  // 2. Scan Compose files in parallel
   const composeResults = await Promise.all(
     project.composeFiles.map(async (cf): Promise<FileResult> => {
       const fullPath = path.join(rootDir, cf);
@@ -675,7 +673,6 @@ const WHITESPACE_RUN = /\s+/gu;
 const flattenMessage = (message: string): string =>
   message.replaceAll(WHITESPACE_RUN, " ").trim();
 
-// Exit 2 wins over 1 whenever any file went unanalyzed, in every output mode.
 const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
   if (scanIncomplete) {
     return SCAN_FAILURE_EXIT_CODE;
@@ -830,7 +827,6 @@ const writeMachineReport = (
   console.log(JSON.stringify(report, null, 2));
 };
 
-// Prints the result in the requested output mode and returns the exit code.
 const writeScanOutput = async (
   scan: ScanOutcome,
   options: OutputOptions
@@ -953,7 +949,6 @@ program
   .description("Static analysis for Dockerfile and Docker Compose files")
   .version(packageJson.version, "-V, --version", "display the version number");
 
-// The default scan command's options, as commander parses them.
 interface ScanOptions {
   config?: string;
   json: boolean;
@@ -961,7 +956,6 @@ interface ScanOptions {
   verbose: boolean;
 }
 
-// Default scan command
 program
   .argument("[dir]", "directory to scan", ".")
   .option("-v, --verbose", "show verbose diagnostics description", false)
@@ -1034,7 +1028,6 @@ program
         }
 
         setStatus("Loading configuration...");
-        // Load config first
         // Warnings go to stderr so the --json and --score stdout contracts
         // stay machine-readable.
         const configPath = await resolveConfigPath(options.config, rootDir);
@@ -1045,7 +1038,6 @@ program
 
         setStatus("Scanning workspace files...");
 
-        // Project discovery, minus anything the config ignores
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
           onSkippedDirectory: (skippedDir) => {
@@ -1055,7 +1047,6 @@ program
           },
         });
 
-        // Collect all diagnostics
         const fileContents: Record<string, string> = {};
 
         const projectFilesList = [
@@ -1247,7 +1238,6 @@ program
     process.exitCode = result.failed.length > 0 ? 1 : 0;
   });
 
-// Rules subcommand group
 const rules = program
   .command("rules")
   .description("manage and list configuration rules");

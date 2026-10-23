@@ -15,7 +15,6 @@ const fileExists = async (filePath: string): Promise<boolean> => {
   }
 };
 
-// `dir` and each of its ancestors, nearest first.
 const selfAndAncestors = (dir: string): string[] => {
   const dirs = [dir];
   let parent = path.dirname(dir);
@@ -51,8 +50,6 @@ const findRepositoryRoot = async (dir: string): Promise<string | null> => {
 // workflow without consent. GitHub only runs workflows from the repository
 // root, so a scan of a subdirectory writes the workflow at that root and
 // passes the subdirectory as the action's `directory` input.
-// confirmOverwrite is injected so the caller owns the prompt and the
-// function is testable without a TTY.
 export const scaffoldActionWorkflow = async (options: {
   actionRef: string;
   confirmOverwrite: () => Promise<boolean>;
