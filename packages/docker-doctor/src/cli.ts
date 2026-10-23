@@ -380,9 +380,8 @@ interface WizardContext {
   rootDir: string;
 }
 
-// getSkillAgentConfig rejects the synthetic "universal" id at the type level.
 const agentDisplayName = (agent: SkillAgentType): string =>
-  agent === "universal" ? "Universal" : getSkillAgentConfig(agent).displayName;
+  getSkillAgentConfig(agent).displayName;
 
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
