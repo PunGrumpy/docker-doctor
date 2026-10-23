@@ -10,8 +10,6 @@ import chalk from "chalk";
 
 import { hasText } from "../text";
 
-// True for a line number a code frame can point at. A missing, zero or NaN
-// line gets no frame, as the truthiness test before it decided.
 const isLineNumber = (line: number | undefined): line is number =>
   line !== undefined && line !== 0 && !Number.isNaN(line);
 
@@ -56,7 +54,6 @@ const printDiscoveredFiles = (project: ProjectInfo): void => {
 };
 
 const printMigrationWarning = (diagnostics: Diagnostic[]): void => {
-  // Migration-scale checks: the same rule firing many times.
   const findingsByRule = new Map<
     string,
     { count: number; files: Set<string> }
@@ -137,7 +134,6 @@ const printDiagnosticsByFile = (
 ): void => {
   console.log(`\nFound ${chalk.bold(diagnostics.length)} issue(s):`);
 
-  // Group by file
   const filesGrouped = new Map<string, Diagnostic[]>();
 
   for (const d of diagnostics) {
@@ -168,7 +164,6 @@ const printDiagnosticsByFile = (
       const lineInfo = isLineNumber(d.line) ? `:${d.line}` : "";
       console.log(`  ${sevColor(prefix)} [${chalk.dim(d.rule)}]${lineInfo}`);
 
-      // Print Code Frame
       const content = fileContents[file];
       printCodeFrame(content, d.line, sevColor);
 
@@ -380,7 +375,6 @@ export const formatTerminal = async (
     printDiscoveredFiles(project);
   }
 
-  // Calculate scores per category once
   const categoryIssueCounts = {
     "Best Practices": 0,
     Compose: 0,
