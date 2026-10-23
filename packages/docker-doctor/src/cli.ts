@@ -55,6 +55,12 @@ import {
   installSkillForAgents,
 } from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
+import {
+  CLEAR_TO_LINE_END,
+  cursorUp,
+  HIDE_CURSOR,
+  SHOW_CURSOR,
+} from "./terminal-control";
 import { hasText } from "./text";
 import {
   scaffoldActionWorkflow,
@@ -74,7 +80,6 @@ interface KeypressKey {
 // releases a breaking major.
 const ACTION_REF = "PunGrumpy/docker-doctor@v1";
 
-// Stops listening for keys, leaves raw mode and shows the cursor again.
 const stopPrompt = (
   onKeypress: (str: string, key: KeypressKey) => void
 ): void => {
@@ -85,7 +90,7 @@ const stopPrompt = (
   }
 
   process.stdin.pause();
-  process.stdout.write("\u001B[?25h");
+  process.stdout.write(SHOW_CURSOR);
 };
 
 // Arrow keys and their vim equivalents flip a yes/no prompt.
@@ -110,7 +115,7 @@ const askConfirm = async (
     return defaultYes;
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let value = defaultYes;
 
@@ -118,26 +123,24 @@ const askConfirm = async (
     process.stdin.setRawMode(true);
     process.stdin.resume();
 
-    // Hide cursor during prompt
-    process.stdout.write("\u001B[?25l");
+    process.stdout.write(HIDE_CURSOR);
 
     const render = (firstTime = false) => {
       if (!firstTime) {
-        process.stdout.write("\u001B[3A\r");
+        process.stdout.write(`${cursorUp(3)}\r`);
       }
 
       process.stdout.write(
-        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+        `\r${CLEAR_TO_LINE_END}  ${chalk.green("✔")} ${chalk.bold(question)}\n`
       );
 
-      // Print options vertically
       const yesPrefix = value ? chalk.cyan("❯ ") : "  ";
       const yesText = value ? chalk.cyan.bold("Yes") : chalk.dim("Yes");
-      process.stdout.write(`\r\u001B[K${yesPrefix}${yesText}\n`);
+      process.stdout.write(`\r${CLEAR_TO_LINE_END}${yesPrefix}${yesText}\n`);
 
       const noPrefix = value ? "  " : chalk.cyan("❯ ");
       const noText = value ? chalk.dim("No") : chalk.cyan.bold("No");
-      process.stdout.write(`\r\u001B[K${noPrefix}${noText}\n`);
+      process.stdout.write(`\r${CLEAR_TO_LINE_END}${noPrefix}${noText}\n`);
     };
 
     render(true);
@@ -159,14 +162,13 @@ const askConfirm = async (
         str === "\n"
       ) {
         stopPrompt(handleKeypress);
-        // Overwrite and resolve vertical layout cleanly
-        process.stdout.write("\u001B[3A\r\u001B[K");
+        process.stdout.write(`${cursorUp(3)}\r${CLEAR_TO_LINE_END}`);
         process.stdout.write(
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${value ? chalk.cyan("Yes") : chalk.dim("No")}\n`
         );
-        process.stdout.write("\r\u001B[K\n");
-        process.stdout.write("\r\u001B[K\n");
-        process.stdout.write("\u001B[2A");
+        process.stdout.write(`\r${CLEAR_TO_LINE_END}\n`);
+        process.stdout.write(`\r${CLEAR_TO_LINE_END}\n`);
+        process.stdout.write(cursorUp(2));
         resolve(value);
       } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
@@ -191,7 +193,7 @@ const askSelect = async (
     return defaultIndex;
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let index = defaultIndex;
 
@@ -199,27 +201,24 @@ const askSelect = async (
     process.stdin.setRawMode(true);
     process.stdin.resume();
 
-    // Hide cursor during prompt
-    process.stdout.write("\u001B[?25l");
+    process.stdout.write(HIDE_CURSOR);
 
     const render = (firstTime = false) => {
       if (!firstTime) {
-        // Move back up to overwrite previous render
-        process.stdout.write(`\u001B[${options.length + 1}A\r`);
+        process.stdout.write(`${cursorUp(options.length + 1)}\r`);
       }
 
       process.stdout.write(
-        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+        `\r${CLEAR_TO_LINE_END}  ${chalk.green("✔")} ${chalk.bold(question)}\n`
       );
 
-      // Print options
       let i = 0;
 
       for (const option of options) {
         const isSelected = i === index;
         const prefix = isSelected ? chalk.cyan("❯ ") : "  ";
         const text = isSelected ? chalk.cyan.bold(option) : chalk.dim(option);
-        process.stdout.write(`\r\u001B[K${prefix}${text}\n`);
+        process.stdout.write(`\r${CLEAR_TO_LINE_END}${prefix}${text}\n`);
         i += 1;
       }
     };
@@ -240,15 +239,16 @@ const askSelect = async (
         str === "\n"
       ) {
         stopPrompt(handleKeypress);
-        // Overwrite and resolve
-        process.stdout.write(`\u001B[${options.length + 1}A\r\u001B[K`);
+        process.stdout.write(
+          `${cursorUp(options.length + 1)}\r${CLEAR_TO_LINE_END}`
+        );
         process.stdout.write(
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chalk.cyan(options[index])}\n`
         );
 
-        process.stdout.write("\r\u001B[K\n".repeat(options.length));
+        process.stdout.write(`\r${CLEAR_TO_LINE_END}\n`.repeat(options.length));
 
-        process.stdout.write(`\u001B[${options.length}A`);
+        process.stdout.write(cursorUp(options.length));
         resolve(index);
       } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
@@ -277,7 +277,7 @@ const askMultiSelect = async (
     return options.flatMap((option, i) => (option.selected ? [i] : []));
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let index = 0;
     const selected = options.map((option) => option.selected);
@@ -287,16 +287,15 @@ const askMultiSelect = async (
     process.stdin.setRawMode(true);
     process.stdin.resume();
 
-    // Hide cursor during prompt
-    process.stdout.write("\u001B[?25l");
+    process.stdout.write(HIDE_CURSOR);
 
     const render = (firstTime = false) => {
       if (!firstTime) {
-        process.stdout.write(`\u001B[${lineCount}A\r`);
+        process.stdout.write(`${cursorUp(lineCount)}\r`);
       }
 
       process.stdout.write(
-        `\r\u001B[K  ${chalk.green("✔")} ${chalk.bold(question)}\n`
+        `\r${CLEAR_TO_LINE_END}  ${chalk.green("✔")} ${chalk.bold(question)}\n`
       );
 
       let i = 0;
@@ -313,12 +312,12 @@ const askMultiSelect = async (
           text = option.label;
         }
 
-        process.stdout.write(`\r\u001B[K${cursor}${box} ${text}\n`);
+        process.stdout.write(`\r${CLEAR_TO_LINE_END}${cursor}${box} ${text}\n`);
         i += 1;
       }
 
       process.stdout.write(
-        `\r\u001B[K  ${chalk.dim("space to toggle · enter to confirm")}\n`
+        `\r${CLEAR_TO_LINE_END}  ${chalk.dim("space to toggle · enter to confirm")}\n`
       );
     };
 
@@ -346,17 +345,16 @@ const askMultiSelect = async (
           selected[i] ? [option.label] : []
         );
 
-        // Overwrite the prompt with a one-line summary
-        process.stdout.write(`\u001B[${lineCount}A\r\u001B[K`);
+        process.stdout.write(`${cursorUp(lineCount)}\r${CLEAR_TO_LINE_END}`);
         process.stdout.write(
           `  ${chalk.green("✔")} ${chalk.bold(question)} › ${chosen.length > 0 ? chalk.cyan(chosen.join(", ")) : chalk.dim("none")}\n`
         );
 
         for (let i = 0; i < lineCount - 1; i += 1) {
-          process.stdout.write("\r\u001B[K\n");
+          process.stdout.write(`\r${CLEAR_TO_LINE_END}\n`);
         }
 
-        process.stdout.write(`\u001B[${lineCount - 1}A`);
+        process.stdout.write(cursorUp(lineCount - 1));
         resolve(options.flatMap((_, i) => (selected[i] ? [i] : [])));
       } else if (key.ctrl === true && key.name === "c") {
         stopPrompt(handleKeypress);
@@ -382,9 +380,8 @@ interface WizardContext {
   rootDir: string;
 }
 
-// getSkillAgentConfig rejects the synthetic "universal" id at the type level.
 const agentDisplayName = (agent: SkillAgentType): string =>
-  agent === "universal" ? "Universal" : getSkillAgentConfig(agent).displayName;
+  getSkillAgentConfig(agent).displayName;
 
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
@@ -968,14 +965,12 @@ program
     // terminal in the default output mode.
     const showProgress = process.stdout.isTTY && !isSilent;
 
-    // Helper to safely show terminal cursor
     const restoreCursor = (): void => {
       if (showProgress) {
-        process.stdout.write("\u001B[?25h");
+        process.stdout.write(SHOW_CURSOR);
       }
     };
 
-    // Set signal handlers to restore cursor on aborts
     process.on("exit", restoreCursor);
     process.once("SIGINT", () => {
       restoreCursor();
@@ -1011,12 +1006,11 @@ program
       };
 
       if (showProgress) {
-        // Hide cursor during progress/spinner
-        process.stdout.write("\u001B[?25l");
+        process.stdout.write(HIDE_CURSOR);
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
         spinnerInterval = setInterval(() => {
           process.stdout.write(
-            `\r\u001B[K${chalk.cyan(spinnerFrames[frameIndex])} ${statusText}`
+            `\r${CLEAR_TO_LINE_END}${chalk.cyan(spinnerFrames[frameIndex])} ${statusText}`
           );
           frameIndex = (frameIndex + 1) % spinnerFrames.length;
         }, 80);
@@ -1077,8 +1071,7 @@ program
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
           spinnerInterval = null;
-          // Clear spinner line and restore cursor
-          process.stdout.write("\r\u001B[K\u001B[?25h");
+          process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
 
         if (showProgress) {
@@ -1102,7 +1095,7 @@ program
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
-          process.stdout.write("\r\u001B[K\u001B[?25h");
+          process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
       }
     } catch (error: unknown) {

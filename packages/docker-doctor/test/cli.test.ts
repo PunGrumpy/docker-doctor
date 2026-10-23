@@ -856,6 +856,22 @@ describe("install", () => {
     }
   });
 
+  test("names every installed agent, the universal one included", async () => {
+    const { project, env, cleanup } = makeTempDirs();
+
+    try {
+      const { exitCode, stdout } = await runCli(
+        ["install", "--agent", "universal"],
+        { cwd: project, env }
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("Universal →");
+    } finally {
+      cleanup();
+    }
+  });
+
   test("non-interactive run without --agent exits 1 with guidance", async () => {
     const { project, env, cleanup } = makeTempDirs();
 

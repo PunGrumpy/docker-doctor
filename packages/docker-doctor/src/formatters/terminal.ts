@@ -8,6 +8,7 @@ import type {
 import { findRule } from "@docker-doctor/core";
 import chalk from "chalk";
 
+import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
 import { hasText } from "../text";
 
 const isLineNumber = (line: number | undefined): line is number =>
@@ -179,13 +180,13 @@ const printDiagnostics = (
   verbose: boolean,
   fileContents: Record<string, string>,
   categoryIssueCounts: Record<string, number>,
-  unanalyzedCount: number
+  failedFileCount: number
 ): void => {
   if (diagnostics.length === 0) {
     // "Healthy" is a claim about every discovered file, so an incomplete
     // scan does not make it.
     console.log(
-      unanalyzedCount === 0
+      failedFileCount === 0
         ? `\n${chalk.green.bold("✔ No issues found! Your Docker setup looks healthy.")}`
         : `\n${chalk.yellow.bold("⚠ No issues found in the files that could be analyzed.")}`
     );
@@ -232,7 +233,7 @@ const printScoreBox = async (
   label: string,
   warningsCount: number,
   errorsCount: number,
-  unanalyzedCount: number
+  failedFileCount: number
 ): Promise<void> => {
   const { isTTY } = process.stdout;
 
@@ -274,8 +275,7 @@ const printScoreBox = async (
     const frameCount = 20;
     const frameDelay = 15;
 
-    // Hide cursor
-    process.stdout.write("\u001B[?25l");
+    process.stdout.write(HIDE_CURSOR);
 
     try {
       for (let frame = 0; frame <= frameCount; frame += 1) {
@@ -289,10 +289,8 @@ const printScoreBox = async (
           chalk.dim("░".repeat(emptyBlocks));
 
         if (frame > 0) {
-          // Move cursor up 4 lines and carriage return
-          process.stdout.write("\u001B[4A\r");
+          process.stdout.write(`${cursorUp(whaleLines.length)}\r`);
         } else {
-          // print an extra newline first to start
           console.log();
         }
 
@@ -306,16 +304,14 @@ const printScoreBox = async (
         );
 
         if (frame < frameCount) {
-          // eslint-disable-next-line no-await-in-loop
+          // eslint-disable-next-line no-await-in-loop -- each frame waits for the one before it
           await setTimeout(frameDelay);
         }
       }
     } finally {
-      // Show cursor
-      process.stdout.write("\u001B[?25h");
+      process.stdout.write(SHOW_CURSOR);
     }
   } else {
-    // Non-TTY fall back to static print
     const filledBlocks = Math.round(score / 2);
     const emptyBlocks = 50 - filledBlocks;
 
@@ -338,13 +334,13 @@ const printScoreBox = async (
     `\n  ${chalk.dim("────────────────────────────────────────────────────────────")}\n`
   );
 
-  if (unanalyzedCount === 0) {
+  if (failedFileCount === 0) {
     console.log(`  Share: ${chalk.cyan(shareUrl)}`);
     console.log(`  Tell others how you did on socials\n`);
   } else {
     // The score covers only part of the project, so it is not one to share.
-    const fileWord = unanalyzedCount === 1 ? "file" : "files";
-    const warning = `⚠ Incomplete scan: ${unanalyzedCount} ${fileWord} could not be analyzed.`;
+    const fileWord = failedFileCount === 1 ? "file" : "files";
+    const warning = `⚠ Incomplete scan: ${failedFileCount} ${fileWord} could not be analyzed.`;
 
     console.log(`  ${chalk.yellow(warning)}`);
     console.log(`  The score covers only the analyzed files.\n`);
@@ -366,8 +362,7 @@ export const formatTerminal = async (
   project: ProjectInfo,
   verbose = false,
   fileContents: Record<string, string> = {},
-  // Files that were discovered but could not be read or parsed.
-  unanalyzedCount = 0
+  failedFileCount = 0
 ): Promise<void> => {
   if (verbose) {
     console.log(`\n${chalk.bold("Docker Doctor Diagnostics")}`);
@@ -404,7 +399,7 @@ export const formatTerminal = async (
     verbose,
     fileContents,
     categoryIssueCounts,
-    unanalyzedCount
+    failedFileCount
   );
 
   await printScoreBox(
@@ -412,6 +407,6 @@ export const formatTerminal = async (
     label,
     warningsCount,
     errorsCount,
-    unanalyzedCount
+    failedFileCount
   );
 };
