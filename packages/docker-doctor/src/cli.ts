@@ -115,7 +115,7 @@ const askConfirm = async (
     return defaultYes;
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let value = defaultYes;
 
@@ -193,7 +193,7 @@ const askSelect = async (
     return defaultIndex;
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let index = defaultIndex;
 
@@ -277,7 +277,7 @@ const askMultiSelect = async (
     return options.flatMap((option, i) => (option.selected ? [i] : []));
   }
 
-  /* eslint-disable promise/avoid-new */
+  /* eslint-disable promise/avoid-new -- the prompt settles from inside its keypress listener */
   return await new Promise((resolve) => {
     let index = 0;
     const selected = options.map((option) => option.selected);

@@ -304,7 +304,7 @@ const printScoreBox = async (
         );
 
         if (frame < frameCount) {
-          // eslint-disable-next-line no-await-in-loop
+          // eslint-disable-next-line no-await-in-loop -- each frame waits for the one before it
           await setTimeout(frameDelay);
         }
       }
