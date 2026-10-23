@@ -1,5 +1,3 @@
-# Keeps the SHA-pinned action references in .github/workflows/ current.
-# Pinning without this means the pins silently rot.
 version: 2
 updates:
   - package-ecosystem: github-actions
