@@ -124,7 +124,6 @@ const walk = async (
   return fileList;
 };
 
-// Dockerfile, Dockerfile.* and *.dockerfile.
 const isDockerfileName = (base: string): boolean =>
   base === "dockerfile" ||
   base.startsWith("dockerfile.") ||

@@ -9,8 +9,6 @@
 export const parseExecForm = (args: string): string[] | null => {
   const trimmed = args.trim();
 
-  // Cheap reject first: most instructions are shell form, and reaching them
-  // through a thrown JSON.parse would be far more expensive.
   if (!trimmed.startsWith("[")) {
     return null;
   }
