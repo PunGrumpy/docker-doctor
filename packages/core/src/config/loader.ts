@@ -20,6 +20,30 @@ const fileExists = async (filePath: string): Promise<boolean> => {
   }
 };
 
+const CONFIG_FILE_NAMES = [
+  "docker-doctor.config.ts",
+  "docker-doctor.config.js",
+  "docker-doctor.config.mjs",
+  "docker-doctor.config.cjs",
+  "docker-doctor.config.json",
+  "docker-doctor.config.yaml",
+  "docker-doctor.config.yml",
+];
+
+const findFirstConfigFile = async (
+  rootDir: string
+): Promise<string | undefined> => {
+  const candidates = CONFIG_FILE_NAMES.map((name) => path.join(rootDir, name));
+
+  const exists = await Promise.all(
+    candidates.map(async (candidate) => await fileExists(candidate))
+  );
+
+  const first = exists.indexOf(true);
+
+  return first === -1 ? undefined : candidates[first];
+};
+
 const describeError = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
@@ -194,26 +218,11 @@ export const loadConfig = async (
 
     configObject = await importConfig(fullPath);
   } else {
-    const candidates = [
-      "docker-doctor.config.ts",
-      "docker-doctor.config.js",
-      "docker-doctor.config.mjs",
-      "docker-doctor.config.cjs",
-      "docker-doctor.config.json",
-      "docker-doctor.config.yaml",
-      "docker-doctor.config.yml",
-    ];
+    const configPath = await findFirstConfigFile(rootDir);
 
-    /* eslint-disable no-await-in-loop */
-    for (const cand of candidates) {
-      const fullPath = path.join(rootDir, cand);
-
-      if (await fileExists(fullPath)) {
-        configObject = await importConfig(fullPath);
-        break;
-      }
+    if (configPath !== undefined) {
+      configObject = await importConfig(configPath);
     }
-    /* eslint-enable no-await-in-loop */
 
     configObject ??= await readPackageConfig(rootDir);
   }

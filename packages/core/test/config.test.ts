@@ -22,6 +22,24 @@ describe("loadConfig", () => {
     expect(config).toEqual({});
   });
 
+  test("reads the first config file in lookup order", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.yaml"),
+      "rules:\n  docker-doctor/no-root-user: info\n"
+    );
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: { "docker-doctor/no-root-user": "error" } })
+    );
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.mjs"),
+      'export default { rules: { "docker-doctor/no-root-user": "warning" } };\n'
+    );
+
+    const config = await loadConfig(dir);
+    expect(config.rules).toEqual({ "docker-doctor/no-root-user": "warning" });
+  });
+
   test("warns about unknown rule and category keys", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),
