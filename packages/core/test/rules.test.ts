@@ -665,6 +665,155 @@ describe("Performance Rules", () => {
     expect(orderLayers.check(usrSrcPath, "Dockerfile")).toHaveLength(0);
   });
 
+  // `pip install .` installs the project itself, so it cannot move above the
+  // copy of the project. It is only skipped when it fetches nothing new.
+  const orderLayersAfterCopyCases = [
+    { expected: 1, run: "npm install" },
+    { expected: 1, run: "npm install -g pnpm@9" },
+    { expected: 1, run: "pip install ." },
+    { expected: 1, run: "pip install -e ." },
+    { expected: 1, run: "pip install --no-cache-dir -r requirements.txt" },
+    { expected: 1, run: "pip install --no-deps -r ./requirements.txt" },
+    { expected: 1, run: "pip install --no-deps flask" },
+    { expected: 1, run: "pip install --no-deps . flask" },
+    {
+      expected: 1,
+      run: "pip install -r requirements.txt && pip install --no-deps .",
+    },
+    { expected: 1, run: "npm install -g pnpm@9 && pip install --no-deps ." },
+    { expected: 0, run: "pip install --no-deps ." },
+    { expected: 0, run: "pip install --no-dependencies ." },
+    { expected: 0, run: "pip install --no-deps -e ." },
+    { expected: 0, run: "pip install --editable . --no-deps" },
+    { expected: 0, run: 'pip install --no-cache-dir --no-deps ".[dev]"' },
+    { expected: 0, run: "pip install --no-deps ./packages/api" },
+    { expected: 0, run: "pip install --no-deps /app" },
+    { expected: 0, run: "cd /app && pip install --no-deps ." },
+    {
+      expected: 0,
+      run: "--mount=type=cache,target=/root/.cache/pip pip install --no-deps .",
+    },
+  ];
+
+  test.each(orderLayersAfterCopyCases)(
+    "order-layers: COPY . . then RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = orderLayers.check(
+        parseDockerfile(`FROM python:3.13-slim\nCOPY . .\nRUN ${run}`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  // The dependencies were installed before the copy, so the project's own
+  // install fetches nothing new and stays cached with them.
+  const orderLayersAfterInstallCases = [
+    { expected: 0, run: "pip install ." },
+    { expected: 0, run: "pip install -e ." },
+    { expected: 0, run: "pip install --editable '.[dev]'" },
+    { expected: 0, run: "pip install ./packages/api" },
+    { expected: 1, run: "pip install flask" },
+    { expected: 1, run: "pip install -r requirements.txt" },
+    { expected: 1, run: "pip install -r ./requirements.txt ." },
+    { expected: 1, run: "npm install -g pnpm@9" },
+    { expected: 1, run: "pip install . && npm ci" },
+  ];
+
+  test.each(orderLayersAfterInstallCases)(
+    "order-layers: an earlier install then COPY . . then RUN $run reports $expected",
+    ({ expected, run }) => {
+      const dockerfile = [
+        "FROM python:3.13-slim",
+        "COPY requirements.txt .",
+        "RUN pip install -r requirements.txt",
+        "COPY . .",
+        `RUN ${run}`,
+      ].join("\n");
+
+      const diagnostics = orderLayers.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  // Only an earlier pip install of dependencies excuses the project install
+  // after the copy. Upgrading pip, setuptools or wheel installs none, and
+  // another tool's install leaves the Python dependencies uncached.
+  const orderLayersEarlierInstallCases = [
+    { earlier: "pip install --upgrade pip", expected: 1 },
+    { earlier: "pip install -U pip setuptools wheel", expected: 1 },
+    { earlier: "pip install --no-cache-dir Pip==24.0 SETUPTOOLS", expected: 1 },
+    { earlier: 'pip install --upgrade "pip>=23,<25" wheel~=0.43', expected: 1 },
+    { earlier: "python -m pip install --upgrade pip", expected: 1 },
+    {
+      earlier: "pip install --upgrade pip && pip install --upgrade setuptools",
+      expected: 1,
+    },
+    { earlier: "pip install -r requirements.txt", expected: 0 },
+    {
+      earlier: "pip install --upgrade pip && pip install -r requirements.txt",
+      expected: 0,
+    },
+    { earlier: "pip install --upgrade pip flask", expected: 0 },
+    { earlier: "pip install pip --requirement=requirements.txt", expected: 0 },
+    { earlier: "pip install flask", expected: 0 },
+    { earlier: "pip install pipx", expected: 0 },
+    { earlier: "pip install pip-tools", expected: 0 },
+    { earlier: "npm ci", expected: 1 },
+    { earlier: "cargo fetch", expected: 1 },
+    { earlier: "pip install --upgrade pip && npm ci", expected: 1 },
+    { earlier: "npm ci && pip install -r requirements.txt", expected: 0 },
+  ];
+
+  test.each(orderLayersEarlierInstallCases)(
+    "order-layers: RUN $earlier then COPY . . then RUN pip install . reports $expected",
+    ({ earlier, expected }) => {
+      const dockerfile = [
+        "FROM python:3.13-slim",
+        `RUN ${earlier}`,
+        "COPY . .",
+        "RUN pip install .",
+      ].join("\n");
+
+      const diagnostics = orderLayers.check(
+        parseDockerfile(dockerfile),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("order-layers: an install after the copy does not excuse the next one", () => {
+    const installsAfterCopy = parseDockerfile(`
+      FROM python:3.13-slim
+      COPY . .
+      RUN pip install flask
+      RUN pip install .
+    `);
+
+    expect(orderLayers.check(installsAfterCopy, "Dockerfile")).toHaveLength(2);
+  });
+
+  test("order-layers: an install in an earlier stage does not excuse this one", () => {
+    const installInOtherStage = parseDockerfile(`
+      FROM python:3.13-slim AS deps
+      RUN pip install flask
+      FROM python:3.13-slim
+      COPY . .
+      RUN pip install .
+    `);
+
+    expect(orderLayers.check(installInOtherStage, "Dockerfile")).toHaveLength(
+      1
+    );
+  });
+
   test("use-multi-stage", () => {
     const singleStage = parseDockerfile(`
         FROM node:22
