@@ -1,5 +1,0 @@
----
-"@docker-doctor/cli": patch
----
-
-Rule messages and `--verbose` code frames no longer repeat more kinds of credentials from the scanned files. The query string of a URL is shown as `?***`, which covers signed links such as `https://host/a.tgz?token=...` and S3 `X-Amz-Signature` URLs. The value of an `Authorization` or `Proxy-Authorization` header, of a header whose name looks secret such as `PRIVATE-TOKEN` or `X-API-Key`, and of `-u`, `--user` or `--proxy-user` in `curl -u user:password` is shown as `***`. A numeric `-u 1000:1000` stays visible. A YAML line such as `POSTGRES_PASSWORD: value` and the old `ENV KEY value` form of a Dockerfile are masked the same way. The `--verbose` code frames used to print the file as written, including the secret a rule had just flagged. They now mask each line. Masking a file with a very long run of characters such as `a.a.a.` used to take minutes. It now takes milliseconds. `.docker-doctor/diagnostics.json` also replaces invisible Unicode in the project's file names, as it already did for the file names of findings.
