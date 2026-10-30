@@ -58,7 +58,8 @@ export const writeDiagnosticsDirectory = async (
 
   // The handoff prompt tells the agent to read this file in full, so it gets
   // the same treatment as the .txt reports. `help` is authored by the rules,
-  // never by scanned content, so it is left as written.
+  // never by scanned content, so it is left as written. The project's file
+  // lists are file names from the repository, like `file` above.
   const sanitizedReport: JsonReport = {
     ...report,
     diagnostics: report.diagnostics.map((d) => ({
@@ -70,6 +71,16 @@ export const writeDiagnosticsDirectory = async (
       file: sanitizePath(failure.file),
       message: sanitizeMessage(failure.message),
     })),
+    project: {
+      ...report.project,
+      composeFiles: report.project.composeFiles.map((file) =>
+        sanitizePath(file)
+      ),
+      dockerfiles: report.project.dockerfiles.map((file) => sanitizePath(file)),
+      dockerignores: report.project.dockerignores?.map((file) =>
+        sanitizePath(file)
+      ),
+    },
   };
 
   // The directory ignores itself. When the scanned directory is a
