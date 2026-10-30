@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // `remotion bundle` writes to build/ in this package directory.
+      "outputs": ["build/**"]
+    }
+  }
+}
