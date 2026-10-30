@@ -30,6 +30,15 @@ const tryCopy = async (
     stdio: ["pipe", "ignore", "ignore"],
   });
 
+  // A tool that exits without reading its input, as wl-copy does when it
+  // cannot reach a Wayland display, closes the pipe, and the write fails with
+  // EPIPE. Node throws a stream error nobody listens for, so listen, and
+  // count that tool as failed.
+  let writeFailed = false;
+  child.stdin.on("error", () => {
+    writeFailed = true;
+  });
+
   const exited = once(child, "exit");
   child.stdin.end(text);
 
@@ -39,7 +48,7 @@ const tryCopy = async (
     return false;
   }
 
-  return child.exitCode === 0;
+  return !writeFailed && child.exitCode === 0;
 };
 
 const tryCommands = async (
