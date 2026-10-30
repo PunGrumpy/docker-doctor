@@ -190,6 +190,25 @@ describe("unanalyzable files", () => {
   });
 });
 
+describe("Compose merge tags", () => {
+  test("a file that uses !reset and !override scans without writing to stderr", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("compose-merge-tags"),
+      "--json",
+    ]);
+
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+
+    // web sets its limits under !override, so only worker is reported.
+    const report = parseReport(stdout);
+    expect(report.failures).toEqual([]);
+    expect(report.diagnostics.map((d) => d.rule)).toEqual([
+      "docker-doctor/require-resource-limits",
+    ]);
+  });
+});
+
 describe("unreadable directories", () => {
   // chmod 000 does not stop root, and Windows has no POSIX modes.
   const canTestPermissions =

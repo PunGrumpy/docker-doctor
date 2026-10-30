@@ -32,7 +32,10 @@ export const parseCompose = (
   try {
     // Compose files rely on YAML 1.1 merge keys (`<<: *anchor`); yaml's
     // default 1.2 schema leaves `<<` as a literal key without this option.
-    document = parse(content, { merge: true });
+    // logLevel "error" keeps yaml from warning about Compose's own tags
+    // (`!reset`, `!override`) and still throws on a parse error. "silent"
+    // would swallow the error too.
+    document = parse(content, { logLevel: "error", merge: true });
   } catch (error: unknown) {
     throw new ParseError({ file: filepath, message: describeYamlError(error) });
   }

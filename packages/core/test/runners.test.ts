@@ -143,6 +143,39 @@ describe("runComposeRules", () => {
     expect(restartDiag?.severity).toBe("warning");
   });
 
+  test("reads the values behind Compose merge tags", () => {
+    const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: !reset []
+    deploy: !override
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+  worker:
+    build: .
+    restart: unless-stopped
+    image: !reset null
+`;
+
+    const diagnostics = runComposeRules(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      undefined,
+      undefined,
+      createComposeLocator(source)
+    );
+
+    // web keeps the limits it sets under !override. Only worker has none.
+    expect(diagnostics.map((d) => d.rule)).toEqual([
+      "docker-doctor/require-resource-limits",
+    ]);
+    expect(diagnostics[0].message).toContain("'worker'");
+    expect(diagnostics[0].line).toBe(11);
+  });
+
   test("forwards a locator so diagnostics carry line numbers", () => {
     const source = 'version: "3.8"\nservices:\n  web:\n    image: node:22\n';
 
