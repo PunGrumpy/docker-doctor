@@ -5,7 +5,7 @@ import type {
   ProjectInfo,
   RuleCategory,
 } from "@docker-doctor/core";
-import { findRule } from "@docker-doctor/core";
+import { findRule, redactSecrets } from "@docker-doctor/core";
 import chalk from "chalk";
 
 import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
@@ -28,7 +28,9 @@ const printCodeFrame = (
   const end = Math.min(lines.length, line + 1);
 
   for (let i = start; i <= end; i += 1) {
-    const rawLine = lines[i - 1];
+    // The frame quotes the file itself, so a secret the rules flagged would
+    // print here as written.
+    const rawLine = redactSecrets(lines[i - 1]);
     const isTarget = i === line;
     const lineNumberStr = String(i).padStart(5, " ");
 

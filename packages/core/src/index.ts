@@ -61,3 +61,5 @@ export type {
 } from "./types/index";
 
 export { toJsonReport, type JsonReport } from "./report";
+
+export { redactSecrets } from "./rules/redact-secrets";

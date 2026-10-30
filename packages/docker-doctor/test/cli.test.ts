@@ -822,6 +822,53 @@ const makeTempDirs = () => {
   };
 };
 
+describe("verbose code frames", () => {
+  const dockerfile = [
+    "FROM node:22-slim",
+    "ENV DB_PASSWORD=FAKEenvpw",
+    "ENV LEGACY_TOKEN FAKElegacytok",
+    "ADD https://example.com/a.tgz?token=FAKEtok /opt/",
+    "COPY . .",
+    'RUN curl -H "Authorization: Bearer FAKE.x.y" https://example.com/ping && npm install',
+    "RUN curl -u deploy:FAKEcurlpw https://example.com/pkg && npm install",
+    "",
+  ].join("\n");
+
+  const compose = [
+    "services:",
+    "  db:",
+    "    image: postgres:16",
+    "    environment:",
+    "      POSTGRES_PASSWORD: FAKEcomposepw",
+    "",
+  ].join("\n");
+
+  test("--verbose never prints a credential from the scanned files", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-frames-"));
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), dockerfile);
+      fs.writeFileSync(path.join(root, "compose.yaml"), compose);
+
+      const { stderr, stdout } = await runCli([root, "--verbose"], {
+        env: { CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" },
+      });
+
+      // The frames are printed, with the values masked.
+      expect(stdout).toContain("│ ENV DB_PASSWORD=***");
+      expect(stdout).toContain("│ ENV LEGACY_TOKEN ***");
+      expect(stdout).toContain("│       POSTGRES_PASSWORD: ***");
+      expect(stdout).toContain("│ ADD https://example.com/a.tgz?*** /opt/");
+      expect(stdout).toContain('-H "Authorization: ***"');
+      expect(stdout).toContain("-u *** https://example.com/pkg");
+      expect(stdout).not.toContain("FAKE");
+      expect(stderr).not.toContain("FAKE");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("install", () => {
   test("--global installs into HOME and leaves the project untouched", async () => {
     const { home, project, env, cleanup } = makeTempDirs();
