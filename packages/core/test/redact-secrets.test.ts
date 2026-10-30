@@ -114,6 +114,44 @@ describe("redactSecrets", () => {
       input: `curl -H "X-API-Key: ${PLACEHOLDER}  " https://example.com`,
       output: 'curl -H "X-API-Key: ***" https://example.com',
     },
+    {
+      input: `      POSTGRES_PASSWORD: ${PLACEHOLDER}`,
+      output: "      POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `      - API_TOKEN: "${PLACEHOLDER} with spaces" # keep`,
+      output: "      - API_TOKEN: ***",
+    },
+    {
+      input: `    db_password: '${PLACEHOLDER}'`,
+      output: "    db_password: ***",
+    },
+    {
+      input: "      POSTGRES_PASSWORD: correct horse battery staple",
+      output: "      POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `# POSTGRES_PASSWORD: ${PLACEHOLDER}`,
+      output: "# POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `Authorization: Bearer ${PLACEHOLDER}`,
+      output: "Authorization: ***",
+    },
+    {
+      input: [
+        "    environment:",
+        "      POSTGRES_USER: app",
+        `      POSTGRES_PASSWORD: ${PLACEHOLDER}\r`,
+        "      NODE_ENV: production",
+      ].join("\n"),
+      output: [
+        "    environment:",
+        "      POSTGRES_USER: app",
+        "      POSTGRES_PASSWORD: ***\r",
+        "      NODE_ENV: production",
+      ].join("\n"),
+    },
   ];
 
   test.each(masked)("masks $output", ({ input, output }) => {
@@ -143,6 +181,17 @@ describe("redactSecrets", () => {
     "curl -H 'PRIVATE-TOKEN: $CI_TOKEN' https://example.com",
     'curl -H "X-Auth-Enabled: true" https://example.com',
     "Base image 'auth:1.2' may be a full-OS distribution.",
+    "      POSTGRES_PASSWORD: $DB_PASSWORD",
+    `      POSTGRES_PASSWORD: \${DB_PASSWORD}`,
+    `      POSTGRES_PASSWORD: \${DB_PASSWORD} # from the .env file`,
+    "      POSTGRES_PASSWORD_FILE: /run/secrets/db_password",
+    "      AUTH_ENABLED: true",
+    '      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"',
+    "      POSTGRES_PASSWORD:",
+    "      NODE_ENV: production",
+    "    image: auth:1.2",
+    "# Set the password: see the README",
+    "Service db has password: weak",
   ];
 
   test.each(unchanged)("leaves %p alone", (input) => {
@@ -248,6 +297,26 @@ const adversarialInputs = [
     text: '"A: b '.repeat(ADVERSARIAL_LENGTH / 6),
   },
   { name: "spaces in a header", text: `"A:${" ".repeat(ADVERSARIAL_LENGTH)}` },
+  { name: "pairs on one line", text: "A: b ".repeat(ADVERSARIAL_LENGTH / 5) },
+  { name: "many mapping lines", text: "A: b\n".repeat(ADVERSARIAL_LENGTH / 5) },
+  {
+    name: "secret lines with comments",
+    text: "  PASSWORD: x # c\n".repeat(ADVERSARIAL_LENGTH / 17),
+  },
+  { name: "a run of dashes", text: "-".repeat(ADVERSARIAL_LENGTH) },
+  { name: "list markers", text: "- ".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "spaces before a key",
+    text: `${" ".repeat(ADVERSARIAL_LENGTH)}A: b`,
+  },
+  {
+    name: "spaces after a key",
+    text: `PASSWORD:${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+  {
+    name: "spaces after a value",
+    text: `PASSWORD: x${" ".repeat(ADVERSARIAL_LENGTH)}y`,
+  },
 ];
 
 describe("redactSecrets on a long adversarial line", () => {

@@ -40,6 +40,15 @@ const QUOTE_EDGES_RE = /^["']|["']$/gu;
 const HEADER_RE =
   /(?<open>["'])(?<name>[\w-]+)(?<sep>:[ \t]*)(?<value>(?:(?!\k<open>)[^\r\n])+)/gu;
 
+// `POSTGRES_PASSWORD: value` as a YAML block mapping line, with an optional
+// `- ` list marker or `# ` comment marker. A key at the start of the line
+// keeps one match from swallowing a later key. The value is the rest of the
+// line, so a trailing comment is masked with it.
+const MAPPING_LINE_RE =
+  /^(?<lead>[ \t]*(?:[-#][ \t]+)?)(?<key>[\w.-]+)(?<sep>:[ \t]+)(?<value>\S[^\r\n]*)/gmu;
+
+const TRAILING_COMMENT_RE = /[ \t]#.*$/u;
+
 const AUTH_HEADER_RE = /^(?:proxy-)?authorization$/iu;
 const WHITESPACE_RE = /\s+/u;
 
@@ -86,6 +95,17 @@ const maskField = (
     ? `${lead}${name}${sep}${REDACTED}`
     : match;
 
+// A trailing `# comment` is not part of the value: `${DB_PASSWORD} # note`
+// still names a variable.
+const maskMapping = (
+  match: string,
+  lead: string,
+  key: string,
+  sep: string,
+  rest: string
+): string =>
+  maskField(match, lead, key, sep, rest.replace(TRAILING_COMMENT_RE, ""));
+
 /**
  * Masks credentials in text quoted from a scanned file before it becomes
  * part of a diagnostic. Detection stays with the secrets rules. This only
@@ -112,4 +132,5 @@ export const redactSecrets = (text: string): string =>
         looksSecret(flag) && isLiteralSecretValue(value)
           ? `${flag}${gap}${REDACTED}`
           : match
-    );
+    )
+    .replaceAll(MAPPING_LINE_RE, maskMapping);
