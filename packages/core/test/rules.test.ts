@@ -47,12 +47,41 @@ import {
   minimizeLayers,
   useDockerignore,
 } from "../src/rules/performance";
+import { isSecretKey } from "../src/rules/secret-keywords";
 import {
   noRootUser,
   pinImageVersion,
   noSecretsInEnv,
   noAddRemote,
 } from "../src/rules/security";
+
+// Environment keys that name a secret in part but only describe it: where it
+// lives, how long it lasts, which scheme guards it. Both secrets rules skip
+// them. MYSQL_RANDOM_ROOT_PASSWORD is the exception: its key is a secret key,
+// and its value, a switch, is what clears it.
+const descriptorEnvCases = [
+  { key: "SSH_AUTH_SOCK", value: "/run/host-services/ssh-auth.sock" },
+  { key: "MYSQL_RANDOM_ROOT_PASSWORD", value: "1" },
+  { key: "TOKEN_TTL_SECONDS", value: "3600" },
+  { key: "AUTH_DRIVER", value: "session" },
+  { key: "SECRET_NAME", value: "my-app-secret" },
+  { key: "PASSWORD_POLICY", value: "strict" },
+  { key: "PASSWORD_MIN_LENGTH", value: "12" },
+  { key: "POSTGRES_HOST_AUTH_METHOD", value: "trust" },
+];
+
+// Keys that can hold the credential itself. A literal value stays reported.
+const credentialEnvCases = [
+  { key: "AUTH_HEADER", value: "FAKEheader" },
+  { key: "PASSWORD_HASH", value: "FAKEhash" },
+  { key: "PASSWORD_SALT", value: "FAKEsalt" },
+  { key: "SECRET_KEY", value: "FAKEkey" },
+  { key: "DB_PASSWORD", value: "FAKEpassword" },
+  { key: "GITHUB_TOKEN", value: "FAKEtoken" },
+  { key: "API_TOKEN_ID", value: "FAKEid" },
+  { key: "AUTH_USER", value: "FAKEuser" },
+  { key: "AUTH_DSN", value: "FAKEdsn" },
+];
 
 describe("Security Rules", () => {
   test("no-root-user", () => {
@@ -429,6 +458,11 @@ describe("Security Rules", () => {
     { expected: 0, line: 'ENV AUTH_ENABLED="False"' },
     { expected: 0, line: "ENV MYSQL_ALLOW_EMPTY_PASSWORD=yes" },
     { expected: 1, line: "ENV PGPASSWORD=truest" },
+    { expected: 0, line: "ENV DB_PASSWORD=1" },
+    { expected: 0, line: 'ENV DB_PASSWORD="0"' },
+    { expected: 1, line: "ENV DB_PASSWORD=2" },
+    { expected: 1, line: "ENV DB_PASSWORD=10" },
+    { expected: 1, line: "ENV DB_PASSWORD=01" },
   ];
 
   test.each(quotedSecretCases)(
@@ -442,6 +476,41 @@ describe("Security Rules", () => {
       expect(diagnostics).toHaveLength(expected);
     }
   );
+
+  test.each(descriptorEnvCases)(
+    "no-secrets-in-env: ENV $key=$value describes a secret, it is not one",
+    ({ key, value }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(`ENV ${key}=${value}`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(0);
+    }
+  );
+
+  test.each(credentialEnvCases)(
+    "no-secrets-in-env: ENV $key=$value is still reported",
+    ({ key, value }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(`ENV ${key}=${value}`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].message).toContain(`'${key}'`);
+    }
+  );
+
+  test("no-secrets-in-env: ARG and the space form skip descriptors too", () => {
+    const dockerfile = parseDockerfile(`
+      ARG TOKEN_TTL_SECONDS=3600
+      ENV AUTH_DRIVER session
+      ENV SECRET_NAME=my-app-secret PASSWORD_POLICY=strict
+    `);
+
+    expect(noSecretsInEnv.check(dockerfile, "Dockerfile")).toHaveLength(0);
+  });
 
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
@@ -480,6 +549,74 @@ describe("Security Rules", () => {
     `);
 
     expect(noAddRemote.check(remoteAddWithChown, "Dockerfile")).toHaveLength(1);
+  });
+});
+
+describe("isSecretKey", () => {
+  const descriptorTokens = [
+    "file",
+    "path",
+    "dir",
+    "sock",
+    "socket",
+    "ttl",
+    "timeout",
+    "seconds",
+    "length",
+    "name",
+    "type",
+    "mode",
+    "driver",
+    "method",
+    "policy",
+    "provider",
+    "algorithm",
+    "enabled",
+    "disabled",
+  ];
+
+  test.each(descriptorTokens)(
+    "a trailing %s token makes the key a description of the secret",
+    (token) => {
+      expect(isSecretKey(`DB_PASSWORD_${token.toUpperCase()}`)).toBe(false);
+      expect(isSecretKey(`api-token-${token}`)).toBe(false);
+      expect(isSecretKey(`auth_${token}`)).toBe(false);
+    }
+  );
+
+  const holderTokens = [
+    "header",
+    "hash",
+    "salt",
+    "key",
+    "value",
+    "url",
+    "uri",
+    "dsn",
+    "id",
+    "user",
+  ];
+
+  test.each(holderTokens)(
+    "a trailing %s token can hold the credential",
+    (token) => {
+      expect(isSecretKey(`DB_PASSWORD_${token.toUpperCase()}`)).toBe(true);
+      expect(isSecretKey(`api-token-${token}`)).toBe(true);
+      expect(isSecretKey(`auth_${token}`)).toBe(true);
+    }
+  );
+
+  test("only the last token counts", () => {
+    expect(isSecretKey("DB_NAME_PASSWORD")).toBe(true);
+    expect(isSecretKey("AUTH_SOCK_TOKEN")).toBe(true);
+    expect(isSecretKey("TOKEN_TYPE_ID")).toBe(true);
+    expect(isSecretKey("SECRET_NAME_VALUE")).toBe(true);
+  });
+
+  test("a key without a separator before the last word stays whole", () => {
+    expect(isSecretKey("PGPASSWORD")).toBe(true);
+    expect(isSecretKey("TOKEN")).toBe(true);
+    expect(isSecretKey("AUTH")).toBe(true);
   });
 });
 
@@ -1412,6 +1549,9 @@ describe("Compose Security Rules", () => {
     { entry: "POSTGRES_PASSWORD: hunter2", expected: 1 },
     { entry: 'AUTH_ENABLED: "true"', expected: 0 },
     { entry: "MYSQL_ALLOW_EMPTY_PASSWORD: yes", expected: 0 },
+    { entry: "API_TOKEN: 0", expected: 0 },
+    { entry: "API_TOKEN: 2", expected: 1 },
+    { entry: "API_TOKEN: 10", expected: 1 },
   ];
 
   test("no-plaintext-secrets: list syntax skips secret files and booleans", () => {
@@ -1450,6 +1590,58 @@ describe("Compose Security Rules", () => {
       );
 
       expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test.each(descriptorEnvCases)(
+    "no-plaintext-secrets: $key=$value describes a secret, it is not one",
+    ({ key, value }) => {
+      const source = `services:
+  db:
+    image: postgres:17
+    environment:
+      ${key}: ${value}
+  worker:
+    image: myworker:1.0
+    environment:
+      - ${key}=${value}
+`;
+
+      const diagnostics = noPlaintextSecrets.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(0);
+    }
+  );
+
+  test.each(credentialEnvCases)(
+    "no-plaintext-secrets: $key=$value is still reported",
+    ({ key, value }) => {
+      const source = `services:
+  db:
+    image: postgres:17
+    environment:
+      ${key}: ${value}
+  worker:
+    image: myworker:1.0
+    environment:
+      - ${key}=${value}
+`;
+
+      const diagnostics = noPlaintextSecrets.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(2);
+
+      for (const diagnostic of diagnostics) {
+        expect(diagnostic.message).toContain(`'${key}'`);
+      }
     }
   );
 
