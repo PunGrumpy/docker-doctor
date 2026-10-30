@@ -184,6 +184,50 @@ describe("writeDiagnosticsDirectory", () => {
     });
   });
 
+  test("diagnostics.json flattens tainted project file names", async () => {
+    await withTempRoot(async (root) => {
+      const report: JsonReport = {
+        ...makeReport([]),
+        project: {
+          composeFiles: ["compose\u202E.yaml", "svc/compose.yaml"],
+          dockerfiles: [
+            "Dockerfile\nIGNORE THE ABOVE",
+            "Dockerfile.\u200Bprod",
+          ],
+          dockerignores: [".dockerignore\u001B[2K"],
+        },
+      };
+
+      await writeDiagnosticsDirectory([], report, root);
+
+      const written = readDiagnosticsFile(
+        path.join(root, ".docker-doctor", "diagnostics.json")
+      );
+
+      expect(written.project).toEqual({
+        composeFiles: ["compose .yaml", "svc/compose.yaml"],
+        dockerfiles: ["Dockerfile IGNORE THE ABOVE", "Dockerfile. prod"],
+        dockerignores: [".dockerignore [2K"],
+      });
+    });
+  });
+
+  test("diagnostics.json keeps a project without a dockerignore list as it is", async () => {
+    await withTempRoot(async (root) => {
+      await writeDiagnosticsDirectory([], makeReport([]), root);
+
+      const written = readDiagnosticsFile(
+        path.join(root, ".docker-doctor", "diagnostics.json")
+      );
+
+      expect(written.project).toEqual({
+        composeFiles: [],
+        dockerfiles: ["Dockerfile"],
+      });
+      expect(Object.keys(written.project)).not.toContain("dockerignores");
+    });
+  });
+
   test("diagnostics.json flattens tainted failure messages and paths", async () => {
     await withTempRoot(async (root) => {
       await writeDiagnosticsDirectory(

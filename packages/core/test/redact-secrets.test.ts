@@ -14,6 +14,10 @@ describe("redactSecrets", () => {
       output: "ADD https://***@example.com/a.bin /a",
     },
     {
+      input: `curl -https://ci:${PLACEHOLDER}@example.com/a 1.https://ci:${PLACEHOLDER}@example.com/b`,
+      output: "curl -https://***@example.com/a 1.https://***@example.com/b",
+    },
+    {
       input: `git clone https://${PLACEHOLDER}@github.com/o/r.git`,
       output: "git clone https://***@github.com/o/r.git",
     },
@@ -37,10 +41,145 @@ describe("redactSecrets", () => {
       input: `tool --api-key=${PLACEHOLDER} --apiKey ${PLACEHOLDER}`,
       output: "tool --api-key=*** --apiKey ***",
     },
+    {
+      input: `ADD https://example.com/a.tgz?token=${PLACEHOLDER} /opt/`,
+      output: "ADD https://example.com/a.tgz?*** /opt/",
+    },
+    {
+      input: `curl -https://example.com/p?token=${PLACEHOLDER} 1.https://example.com/q?sig=${PLACEHOLDER}`,
+      output: "curl -https://example.com/p?*** 1.https://example.com/q?***",
+    },
+    {
+      input: `ADD https://example.com/pkg(v1).tar.gz?token=${PLACEHOLDER} /tmp/`,
+      output: "ADD https://example.com/pkg(v1).tar.gz?*** /tmp/",
+    },
+    {
+      input: `RUN V=$(curl -fsSL https://example.com/y?t=${PLACEHOLDER}) && echo ok`,
+      output: "RUN V=$(curl -fsSL https://example.com/y?*** && echo ok",
+    },
+    {
+      input: `curl 'https://b.s3.amazonaws.com/k?X-Amz-Date=1&X-Amz-Signature=${PLACEHOLDER}' -o k`,
+      output: "curl 'https://b.s3.amazonaws.com/k?***' -o k",
+    },
+    {
+      input: `curl https://example.com/p?sig=${PLACEHOLDER}&&npm install`,
+      output: "curl https://example.com/p?***&&npm install",
+    },
+    {
+      input: `ADD https://ci:${PLACEHOLDER}@example.com/a.bin?v=1#frag /a`,
+      output: "ADD https://***@example.com/a.bin?***#frag /a",
+    },
+    {
+      input: `curl -H "Authorization: Bearer ${PLACEHOLDER}" https://example.com`,
+      output: 'curl -H "Authorization: ***" https://example.com',
+    },
+    {
+      input: `curl --header 'authorization: Basic ${PLACEHOLDER}' https://example.com`,
+      output: "curl --header 'authorization: ***' https://example.com",
+    },
+    {
+      input: `curl -H "Proxy-Authorization:Basic ${PLACEHOLDER}" https://example.com`,
+      output: 'curl -H "Proxy-Authorization:***" https://example.com',
+    },
+    {
+      input: `curl -H 'PRIVATE-TOKEN: ${PLACEHOLDER}' https://example.com`,
+      output: "curl -H 'PRIVATE-TOKEN: ***' https://example.com",
+    },
+    {
+      input: `wget --header="X-API-Key: ${PLACEHOLDER}" https://example.com`,
+      output: 'wget --header="X-API-Key: ***" https://example.com',
+    },
+    {
+      input: `Running 'curl --header 'X-Auth-Token: ${PLACEHOLDER}' https://example.com && npm install' after copying`,
+      output:
+        "Running 'curl --header 'X-Auth-Token: ***' https://example.com && npm install' after copying",
+    },
+    {
+      input: `curl -u deploy:${PLACEHOLDER} https://example.com`,
+      output: "curl -u *** https://example.com",
+    },
+    {
+      input: `curl --user "deploy:${PLACEHOLDER}" https://example.com`,
+      output: "curl --user *** https://example.com",
+    },
+    {
+      input: `curl --proxy-user proxy:${PLACEHOLDER} https://example.com`,
+      output: "curl --proxy-user *** https://example.com",
+    },
+    {
+      input: `tool --user=deploy:${PLACEHOLDER}`,
+      output: "tool --user=***",
+    },
+    {
+      input: `curl -H "X-API-Key: ${PLACEHOLDER}  " https://example.com`,
+      output: 'curl -H "X-API-Key: ***" https://example.com',
+    },
+    {
+      input: `      POSTGRES_PASSWORD: ${PLACEHOLDER}`,
+      output: "      POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `      - API_TOKEN: "${PLACEHOLDER} with spaces" # keep`,
+      output: "      - API_TOKEN: ***",
+    },
+    {
+      input: `    db_password: '${PLACEHOLDER}'`,
+      output: "    db_password: ***",
+    },
+    {
+      input: "      POSTGRES_PASSWORD: correct horse battery staple",
+      output: "      POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `# POSTGRES_PASSWORD: ${PLACEHOLDER}`,
+      output: "# POSTGRES_PASSWORD: ***",
+    },
+    {
+      input: `Authorization: Bearer ${PLACEHOLDER}`,
+      output: "Authorization: ***",
+    },
+    {
+      input: [
+        "    environment:",
+        "      POSTGRES_USER: app",
+        `      POSTGRES_PASSWORD: ${PLACEHOLDER}\r`,
+        "      NODE_ENV: production",
+      ].join("\n"),
+      output: [
+        "    environment:",
+        "      POSTGRES_USER: app",
+        "      POSTGRES_PASSWORD: ***\r",
+        "      NODE_ENV: production",
+      ].join("\n"),
+    },
+    {
+      input: `ENV DB_PASSWORD ${PLACEHOLDER}`,
+      output: "ENV DB_PASSWORD ***",
+    },
+    {
+      input: `  env api_token "${PLACEHOLDER} with spaces" \\`,
+      output: "  env api_token ***",
+    },
+    {
+      input: [
+        "FROM node:22",
+        `ENV GITHUB_PAT ${PLACEHOLDER}\r`,
+        "ENV NODE_ENV production",
+      ].join("\n"),
+      output: [
+        "FROM node:22",
+        "ENV GITHUB_PAT ***\r",
+        "ENV NODE_ENV production",
+      ].join("\n"),
+    },
   ];
 
   test.each(masked)("masks $output", ({ input, output }) => {
     expect(redactSecrets(input)).toBe(output);
+  });
+
+  test.each(masked)("masking $output twice changes nothing", ({ output }) => {
+    expect(redactSecrets(output)).toBe(output);
   });
 
   const unchanged = [
@@ -52,6 +191,35 @@ describe("redactSecrets", () => {
     "POSTGRES_PASSWORD_FILE=/run/secrets/db",
     "Potential secret found in ENV: 'API_TOKEN'.",
     "docker login --password-stdin",
+    "curl https://example.com/health && npm install",
+    "ADD https://example.com/pkg(v1).tar.gz /tmp/",
+    "docker run -u 1000:1000 app",
+    "docker run --user 0:0 app",
+    "su -u app",
+    'curl -H "Content-Type: application/json" https://example.com',
+    'curl -H "Authorization: Bearer $TOKEN" https://example.com',
+    "curl -H 'PRIVATE-TOKEN: $CI_TOKEN' https://example.com",
+    'curl -H "X-Auth-Enabled: true" https://example.com',
+    "Base image 'auth:1.2' may be a full-OS distribution.",
+    "      POSTGRES_PASSWORD: $DB_PASSWORD",
+    `      POSTGRES_PASSWORD: \${DB_PASSWORD}`,
+    `      POSTGRES_PASSWORD: \${DB_PASSWORD} # from the .env file`,
+    "      POSTGRES_PASSWORD_FILE: /run/secrets/db_password",
+    "      AUTH_ENABLED: true",
+    '      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"',
+    "      POSTGRES_PASSWORD:",
+    "      NODE_ENV: production",
+    "    image: auth:1.2",
+    "# Set the password: see the README",
+    "Service db has password: weak",
+    "ENV NODE_ENV production",
+    "ENV DB_PASSWORD $DB_PASSWORD",
+    "ENV DB_PASSWORD_FILE /run/secrets/db_password",
+    "ENV AUTH_ENABLED true",
+    "ENV DB_PASSWORD",
+    "ENV DB_PASSWORD=$DB_PASSWORD",
+    "Set ENV DB_PASSWORD at run time",
+    "ARG DB_PASSWORD",
   ];
 
   test.each(unchanged)("leaves %p alone", (input) => {
@@ -74,11 +242,15 @@ describe("no Dockerfile rule repeats a credential", () => {
     `ADD https://ci:${PLACEHOLDER}@example.com/tool.bin /tool.bin`,
     `ADD https://${PLACEHOLDER}@example.com/vendor.tar.gz /vendor`,
     `ADD ftp://ci:${PLACEHOLDER}@example.com/notes.txt /notes.txt`,
+    `ADD https://example.com/a.tgz?token=${PLACEHOLDER} /opt/`,
     "COPY . .",
     `RUN NPM_TOKEN=${PLACEHOLDER} npm ci`,
     `RUN npm config set //registry.npmjs.org/:_authToken=${PLACEHOLDER} && npm install`,
     `RUN pip install --index-url https://__token__:${PLACEHOLDER}@pypi.example.com/simple flask`,
     `RUN yarn install --auth-token ${PLACEHOLDER}`,
+    `RUN curl -H "Authorization: Bearer ${PLACEHOLDER}" https://example.com/ping && npm install`,
+    `RUN curl --header 'PRIVATE-TOKEN: ${PLACEHOLDER}' https://example.com/ping && npm install`,
+    `RUN curl -u deploy:${PLACEHOLDER} https://example.com/pkg && npm install`,
   ].join("\n");
 
   const diagnostics = runDockerfileRules(
@@ -116,4 +288,87 @@ describe("no Dockerfile rule repeats a credential", () => {
     expect(keys.some((m) => m.includes("'GITHUB_PAT'"))).toBe(true);
     expect(keys.some((m) => m.includes("'API_TOKEN'"))).toBe(true);
   });
+});
+
+// Scanned files can come from a pull request, so a line built to make a
+// pattern backtrack must not stall a scan or a CI run.
+const ADVERSARIAL_LENGTH = 200_000;
+const TIME_LIMIT_MS = 1000;
+
+const adversarialInputs = [
+  { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
+  { name: "digits and dots", text: "1.".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "repeated schemes",
+    text: "http://".repeat(Math.floor(ADVERSARIAL_LENGTH / 7)),
+  },
+  {
+    name: "repeated URLs with a query",
+    text: "https://a?".repeat(ADVERSARIAL_LENGTH / 10),
+  },
+  {
+    name: "ampersands in a query",
+    text: `https://a?${"&".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+  {
+    name: "parentheses in a URL query",
+    text: `https://a?${"()".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "repeated URLs with parentheses",
+    text: "https://(a)?(b)".repeat(ADVERSARIAL_LENGTH / 15),
+  },
+  { name: "repeated -u flags", text: "-u a ".repeat(ADVERSARIAL_LENGTH / 5) },
+  { name: "spaces after -u", text: `-u${" ".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "repeated header openers",
+    text: '"A: b '.repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  { name: "spaces in a header", text: `"A:${" ".repeat(ADVERSARIAL_LENGTH)}` },
+  { name: "pairs on one line", text: "A: b ".repeat(ADVERSARIAL_LENGTH / 5) },
+  { name: "many mapping lines", text: "A: b\n".repeat(ADVERSARIAL_LENGTH / 5) },
+  {
+    name: "secret lines with comments",
+    text: "  PASSWORD: x # c\n".repeat(ADVERSARIAL_LENGTH / 17),
+  },
+  { name: "a run of dashes", text: "-".repeat(ADVERSARIAL_LENGTH) },
+  { name: "list markers", text: "- ".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "spaces before a key",
+    text: `${" ".repeat(ADVERSARIAL_LENGTH)}A: b`,
+  },
+  {
+    name: "spaces after a key",
+    text: `PASSWORD:${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+  {
+    name: "spaces after a value",
+    text: `PASSWORD: x${" ".repeat(ADVERSARIAL_LENGTH)}y`,
+  },
+  { name: "many ENV lines", text: "ENV a b\n".repeat(ADVERSARIAL_LENGTH / 8) },
+  {
+    name: "ENV repeated on a line",
+    text: "ENV a ".repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  { name: "spaces after ENV", text: `ENV${" ".repeat(ADVERSARIAL_LENGTH)}` },
+  { name: "a long ENV key", text: `ENV ${"a".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "spaces after an ENV key",
+    text: `ENV a${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+  {
+    name: "spaces before ENV",
+    text: `${" ".repeat(ADVERSARIAL_LENGTH)}ENV a b`,
+  },
+];
+
+describe("redactSecrets on a long adversarial line", () => {
+  test.each(adversarialInputs)(
+    "finishes 200,000 characters of $name within a second",
+    ({ text }) => {
+      const start = performance.now();
+      redactSecrets(text);
+      expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
+    }
+  );
 });
