@@ -22,8 +22,11 @@
       "cache": false,
       "persistent": true
     },
+    // Tests build the packages they depend on, not their own package: most
+    // packages have no test script, and a package that needs its own build
+    // says so in its turbo.json (see packages/docker-doctor/turbo.json).
     "test": {
-      "dependsOn": ["^build", "build"],
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "test:coverage": {
