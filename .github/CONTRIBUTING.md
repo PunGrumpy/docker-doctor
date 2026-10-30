@@ -36,7 +36,7 @@ Docker Doctor is a monorepo managed with [Bun](https://bun.sh) workspaces and [T
 1. Fork the repository on GitHub
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/docker-doctor.git`
 3. Install dependencies: `bun install`
-4. Set up the web app environment: if you are not working on the web app, export `SKIP_ENV_VALIDATION=1` before `bun run build` and `bun run typecheck`; otherwise copy `apps/web/.env.example` to `apps/web/.env` and fill it in
+4. Set up the web app environment: if you are not working on the web app, export `SKIP_ENV_VALIDATION=1` before `bun run build`, the only command in this list that builds the web app (`bun run test` and `bun run typecheck` do not need it); otherwise copy `apps/web/.env.example` to `apps/web/.env` and fill it in
 5. Create a new branch for your feature or bug fix: `git checkout -b fix/description`
 6. Make your changes
 7. Run tests: `bun run test`
