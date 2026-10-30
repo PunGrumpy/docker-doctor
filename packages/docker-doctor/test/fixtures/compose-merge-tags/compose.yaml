@@ -1,0 +1,14 @@
+services:
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: !reset []
+    deploy: !override
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+  worker:
+    build: .
+    restart: unless-stopped
+    image: !reset null

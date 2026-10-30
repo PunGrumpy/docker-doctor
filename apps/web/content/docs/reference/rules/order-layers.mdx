@@ -44,6 +44,8 @@ CMD ["node", "server.js"]
 
 The same pattern applies to every ecosystem: `requirements.txt` before `pip install`, `go.mod`/`go.sum` before `go mod download`, `Gemfile` before `bundle install`, `Cargo.toml` before the build. Pair it with a [`.dockerignore`](/docs/reference/rules/use-dockerignore) so stray files can't invalidate the copy layer either.
 
+Installing the project itself has to come after the copy, so the rule skips a `pip install` whose targets are all local paths, such as `pip install .` or `pip install -e .`, in two cases: the command has `--no-deps`, or a `pip install` of your dependencies already ran earlier in the same stage, before the copy. Upgrading `pip`, `setuptools` or `wheel` does not count, because it installs none of your dependencies, and neither does another tool's install such as `npm ci`, because it caches nothing for Python. A bare `pip install .` with no earlier install is still flagged, because pip resolves the dependencies again on every build. So is an install that names a package or a requirements file (`pip install -r requirements.txt`), and so is a global install such as `npm install -g pnpm`: move it above the copy and its download is cached.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/order-layers`

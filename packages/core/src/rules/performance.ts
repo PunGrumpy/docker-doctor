@@ -22,6 +22,140 @@ const INSTALL_COMMANDS = [
   "cargo fetch",
 ];
 
+const PIP_INSTALL_RE = /pip install(?<pipArgs>.*)/isu;
+const NO_DEPS_FLAGS = new Set(["--no-deps", "--no-dependencies"]);
+const SHELL_SEPARATOR_RE = /&&|\|\||[;|]/gu;
+const WHITESPACE_RE = /\s+/u;
+const QUOTE_RE = /["']/gu;
+const LEADING_DOT_SLASH_RE = /^\.\//u;
+
+// `pip`, `setuptools` and `wheel`, each with an optional version specifier.
+const PIP_TOOLING_RE = /^(?:pip|setuptools|wheel)(?:[=<>!~]\S*)?$/iu;
+
+// `.`, `..`, `./pkg`, `../pkg` and `/app`, each with optional `[extras]`.
+const LOCAL_PATH_RE = /^(?:\.{1,2}(?:\[[^\]]*\])?|(?:\.{1,2})?\/\S*)$/u;
+
+// The commands of a RUN, split at `&&`, `||`, `;` and `|` outside quotes.
+const shellCommands = (args: string): string[] => {
+  const commands: string[] = [];
+  let start = 0;
+
+  for (const match of maskQuotedText(args).matchAll(SHELL_SEPARATOR_RE)) {
+    commands.push(args.slice(start, match.index));
+    start = match.index + match[0].length;
+  }
+
+  commands.push(args.slice(start));
+
+  return commands;
+};
+
+const matchedInstallCommands = (command: string): string[] => {
+  const lowered = command.toLowerCase();
+
+  return INSTALL_COMMANDS.filter((install) => lowered.includes(install));
+};
+
+// `-r ./requirements.txt` looks like a local path but lists packages to download.
+const isRequirementsOption = (word: string): boolean =>
+  word === "--requirement" ||
+  word.startsWith("--requirement=") ||
+  (word.startsWith("-r") && !word.startsWith("--"));
+
+// The words after `pip install`, or undefined when the command is not a
+// plain `pip install` (it also runs another install command).
+const pipInstallWords = (command: string): string[] | undefined => {
+  const pipArgs = PIP_INSTALL_RE.exec(command)?.groups?.pipArgs;
+
+  if (pipArgs === undefined || matchedInstallCommands(command).length !== 1) {
+    return undefined;
+  }
+
+  return pipArgs.split(WHITESPACE_RE).filter(Boolean);
+};
+
+const pipTargets = (words: string[]): string[] =>
+  words.flatMap((word) =>
+    word.startsWith("-") ? [] : [word.replace(QUOTE_RE, "")]
+  );
+
+// `pip install .` and `pip install -e ".[dev]"` install the project that was
+// just copied, so they cannot move above the copy. They fetch nothing new
+// when the dependencies were installed earlier or the command skips them
+// with `--no-deps`. Any other target (a package, a URL, `-r file`) is a
+// download that can move.
+const installsOnlyTheProject = (
+  command: string,
+  dependenciesInstalled: boolean
+): boolean => {
+  const words = pipInstallWords(command);
+
+  if (words === undefined) {
+    return false;
+  }
+
+  const targets = pipTargets(words);
+
+  const targetsOnlyLocalPaths =
+    targets.length > 0 &&
+    targets.every((target) => LOCAL_PATH_RE.test(target)) &&
+    !words.some(isRequirementsOption);
+
+  return (
+    targetsOnlyLocalPaths &&
+    (dependenciesInstalled || words.some((word) => NO_DEPS_FLAGS.has(word)))
+  );
+};
+
+// `pip install --upgrade pip` and the like install no project dependency.
+const installsOnlyPipTooling = (command: string): boolean => {
+  const words = pipInstallWords(command);
+
+  if (words === undefined) {
+    return false;
+  }
+
+  const targets = pipTargets(words);
+
+  return (
+    targets.length > 0 &&
+    targets.every((target) => PIP_TOOLING_RE.test(target)) &&
+    !words.some(isRequirementsOption)
+  );
+};
+
+// Whether the RUN is a pip install of something other than pip's own tooling.
+// Only that fills the cached layer a later `pip install .` reuses: an upgrade
+// of pip installs no dependency, and `npm ci` caches nothing for Python.
+const installsPipDependencies = (args: string): boolean =>
+  shellCommands(args).some(
+    (command) =>
+      PIP_INSTALL_RE.test(command) && !installsOnlyPipTooling(command)
+  );
+
+// A COPY or ADD of the whole build context or of `src/`.
+const copiesAllSource = (args: string): boolean => {
+  const src = args.split(WHITESPACE_RE).find((part) => !part.startsWith("--"));
+
+  if (!hasText(src)) {
+    return false;
+  }
+
+  const normalized = src.replace(LEADING_DOT_SLASH_RE, "");
+
+  return COPY_ALL_SOURCES.has(normalized) || normalized.startsWith("src/");
+};
+
+// Whether the RUN downloads packages that the copy before it makes the build
+// fetch again.
+const refetchesPackages = (
+  args: string,
+  dependenciesInstalled: boolean
+): boolean =>
+  shellCommands(args)
+    .filter((command) => matchedInstallCommands(command).length > 0)
+    .some((command) => !installsOnlyTheProject(command, dependenciesInstalled));
+
 // `make` only where a command can start, so `apk add make` (installing the
 // tool) is not a build step while `cd src && make` is.
 const BUILD_TOOL_COMMAND_RE =
@@ -74,34 +208,25 @@ export const orderLayers: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
     let copyAllLine = -1;
+    let installedBeforeCopy = false;
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         copyAllLine = -1;
+        installedBeforeCopy = false;
       }
 
-      if (inst.instruction === "COPY" || inst.instruction === "ADD") {
-        const parts = inst.args.split(/\s+/u);
-        const src = parts.find((p) => !p.startsWith("--"));
+      const copiesSource =
+        inst.instruction === "COPY" || inst.instruction === "ADD";
 
-        if (!hasText(src)) {
-          continue;
-        }
-
-        const normalized = src.replace(/^\.\//u, "");
-
-        const isCopyAll =
-          COPY_ALL_SOURCES.has(normalized) || normalized.startsWith("src/");
-
-        if (isCopyAll && copyAllLine === -1) {
-          copyAllLine = inst.line;
-        }
+      if (copiesSource && copyAllLine === -1 && copiesAllSource(inst.args)) {
+        copyAllLine = inst.line;
       }
 
-      if (inst.instruction === "RUN" && copyAllLine !== -1) {
-        const args = inst.args.toLowerCase();
-
-        if (INSTALL_COMMANDS.some((command) => args.includes(command))) {
+      if (inst.instruction === "RUN") {
+        if (copyAllLine === -1) {
+          installedBeforeCopy ||= installsPipDependencies(inst.args);
+        } else if (refetchesPackages(inst.args, installedBeforeCopy)) {
           diagnostics.push(
             createDiagnostic(
               file,

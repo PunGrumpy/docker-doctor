@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, spyOn } from "bun:test";
 
 import { ParseError } from "../src/errors";
 import { parseCompose } from "../src/parsers/compose-parser";
@@ -351,6 +351,40 @@ describe("Compose Parser", () => {
         "Nested mappings are not allowed in compact mappings at line 4, column 20"
       );
       expect(message).not.toContain("PLACEHOLDER_TOKEN_VALUE");
+    }
+  });
+
+  test("Compose merge tags parse without a YAML warning", () => {
+    const content = `
+services:
+  web:
+    image: nginx:1.27-alpine
+    ports: !reset []
+    deploy: !override
+      resources:
+        limits:
+          memory: 256M
+`;
+
+    // yaml reports an unknown tag through process.emitWarning, which Node
+    // prints to stderr as a YAMLWarning.
+    const emitWarning = spyOn(process, "emitWarning");
+
+    try {
+      const compose = parseCompose(content, "compose.yaml");
+
+      expect(compose).toEqual({
+        services: {
+          web: {
+            deploy: { resources: { limits: { memory: "256M" } } },
+            image: "nginx:1.27-alpine",
+            ports: [],
+          },
+        },
+      });
+      expect(emitWarning).not.toHaveBeenCalled();
+    } finally {
+      emitWarning.mockRestore();
     }
   });
 
