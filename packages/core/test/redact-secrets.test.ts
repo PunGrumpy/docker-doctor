@@ -152,6 +152,26 @@ describe("redactSecrets", () => {
         "      NODE_ENV: production",
       ].join("\n"),
     },
+    {
+      input: `ENV DB_PASSWORD ${PLACEHOLDER}`,
+      output: "ENV DB_PASSWORD ***",
+    },
+    {
+      input: `  env api_token "${PLACEHOLDER} with spaces" \\`,
+      output: "  env api_token ***",
+    },
+    {
+      input: [
+        "FROM node:22",
+        `ENV GITHUB_PAT ${PLACEHOLDER}\r`,
+        "ENV NODE_ENV production",
+      ].join("\n"),
+      output: [
+        "FROM node:22",
+        "ENV GITHUB_PAT ***\r",
+        "ENV NODE_ENV production",
+      ].join("\n"),
+    },
   ];
 
   test.each(masked)("masks $output", ({ input, output }) => {
@@ -192,6 +212,14 @@ describe("redactSecrets", () => {
     "    image: auth:1.2",
     "# Set the password: see the README",
     "Service db has password: weak",
+    "ENV NODE_ENV production",
+    "ENV DB_PASSWORD $DB_PASSWORD",
+    "ENV DB_PASSWORD_FILE /run/secrets/db_password",
+    "ENV AUTH_ENABLED true",
+    "ENV DB_PASSWORD",
+    "ENV DB_PASSWORD=$DB_PASSWORD",
+    "Set ENV DB_PASSWORD at run time",
+    "ARG DB_PASSWORD",
   ];
 
   test.each(unchanged)("leaves %p alone", (input) => {
@@ -316,6 +344,21 @@ const adversarialInputs = [
   {
     name: "spaces after a value",
     text: `PASSWORD: x${" ".repeat(ADVERSARIAL_LENGTH)}y`,
+  },
+  { name: "many ENV lines", text: "ENV a b\n".repeat(ADVERSARIAL_LENGTH / 8) },
+  {
+    name: "ENV repeated on a line",
+    text: "ENV a ".repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  { name: "spaces after ENV", text: `ENV${" ".repeat(ADVERSARIAL_LENGTH)}` },
+  { name: "a long ENV key", text: `ENV ${"a".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "spaces after an ENV key",
+    text: `ENV a${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+  {
+    name: "spaces before ENV",
+    text: `${" ".repeat(ADVERSARIAL_LENGTH)}ENV a b`,
   },
 ];
 

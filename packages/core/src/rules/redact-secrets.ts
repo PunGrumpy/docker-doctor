@@ -47,6 +47,12 @@ const HEADER_RE =
 const MAPPING_LINE_RE =
   /^(?<lead>[ \t]*(?:[-#][ \t]+)?)(?<key>[\w.-]+)(?<sep>:[ \t]+)(?<value>\S[^\r\n]*)/gmu;
 
+// The old `ENV KEY value` form of a Dockerfile, without an equals sign.
+// Docker still accepts it and `no-secrets-in-env` flags it. The value is the
+// rest of the line.
+const ENV_SPACE_FORM_RE =
+  /^(?<lead>[ \t]*ENV[ \t]+)(?<key>[^\s=]+)(?<sep>[ \t]+)(?<value>\S[^\r\n]*)/gimu;
+
 const TRAILING_COMMENT_RE = /[ \t]#.*$/u;
 
 const AUTH_HEADER_RE = /^(?:proxy-)?authorization$/iu;
@@ -77,6 +83,17 @@ const maskQuery = (url: string): string => {
     ? url
     : `${url.slice(0, queryStart + 1)}${REDACTED}`;
 };
+
+const maskEnvSpaceForm = (
+  match: string,
+  lead: string,
+  key: string,
+  sep: string,
+  value: string
+): string =>
+  looksSecret(key) && isLiteralSecretValue(value.trimEnd())
+    ? `${lead}${key}${sep}${REDACTED}`
+    : match;
 
 const isUserCredential = (value: string): boolean => {
   const unquoted = value.replaceAll(QUOTE_EDGES_RE, "");
@@ -133,4 +150,5 @@ export const redactSecrets = (text: string): string =>
           ? `${flag}${gap}${REDACTED}`
           : match
     )
+    .replaceAll(ENV_SPACE_FORM_RE, maskEnvSpaceForm)
     .replaceAll(MAPPING_LINE_RE, maskMapping);
