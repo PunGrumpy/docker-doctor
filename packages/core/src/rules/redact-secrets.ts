@@ -4,9 +4,10 @@ const REDACTED = "***";
 
 // The userinfo of any `scheme://user:password@host` URL. A bare token can
 // sit in the user part (`https://<token>@github.com`), so a user name is
-// masked even without a password.
+// masked even without a password. A scheme starts where a run of scheme
+// characters starts, so a long run is tried once, not once per character.
 const URL_USERINFO_RE =
-  /(?<![a-z])(?<scheme>[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/giu;
+  /(?<![a-z0-9+.-])(?<scheme>[0-9+.-]*[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/giu;
 
 // `KEY=value` as a shell assignment or a flag (`--password=value`). A value
 // in quotes may contain spaces.

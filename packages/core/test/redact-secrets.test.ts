@@ -14,6 +14,10 @@ describe("redactSecrets", () => {
       output: "ADD https://***@example.com/a.bin /a",
     },
     {
+      input: `curl -https://ci:${PLACEHOLDER}@example.com/a 1.https://ci:${PLACEHOLDER}@example.com/b`,
+      output: "curl -https://***@example.com/a 1.https://***@example.com/b",
+    },
+    {
       input: `git clone https://${PLACEHOLDER}@github.com/o/r.git`,
       output: "git clone https://***@github.com/o/r.git",
     },
@@ -116,4 +120,29 @@ describe("no Dockerfile rule repeats a credential", () => {
     expect(keys.some((m) => m.includes("'GITHUB_PAT'"))).toBe(true);
     expect(keys.some((m) => m.includes("'API_TOKEN'"))).toBe(true);
   });
+});
+
+// Scanned files can come from a pull request, so a line built to make a
+// pattern backtrack must not stall a scan or a CI run.
+const ADVERSARIAL_LENGTH = 200_000;
+const TIME_LIMIT_MS = 1000;
+
+const adversarialInputs = [
+  { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
+  { name: "digits and dots", text: "1.".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "repeated schemes",
+    text: "http://".repeat(Math.floor(ADVERSARIAL_LENGTH / 7)),
+  },
+];
+
+describe("redactSecrets on a long adversarial line", () => {
+  test.each(adversarialInputs)(
+    "finishes 200,000 characters of $name within a second",
+    ({ text }) => {
+      const start = performance.now();
+      redactSecrets(text);
+      expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
+    }
+  );
 });
