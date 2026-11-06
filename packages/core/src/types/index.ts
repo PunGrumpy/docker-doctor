@@ -5,6 +5,10 @@ export interface DockerfileInstruction {
   raw: string;
 }
 
+export interface DockerfileDirectives {
+  syntax?: { value: string; line: number };
+}
+
 export type DiagnosticSeverity = "error" | "warning" | "info";
 
 export interface Diagnostic {
