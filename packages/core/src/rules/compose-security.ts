@@ -4,7 +4,13 @@ import {
   isComposeSequence,
   isComposeString,
 } from "../parsers/compose-value";
-import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
+import type {
+  ComposeMapping,
+  ComposeRule,
+  ComposeValue,
+  Diagnostic,
+} from "../types/index";
+import { parseComposeImage } from "./compose-images";
 import type { HostPathScope } from "./compose-mounts";
 import {
   bindMountSource,
@@ -44,15 +50,58 @@ export const noPrivilegedService: ComposeRule = {
   message: "Do not run services in privileged mode",
 };
 
+const SOCKET_PROXY_REGISTRIES = new Set([
+  "docker.io",
+  "ghcr.io",
+  "index.docker.io",
+  "lscr.io",
+]);
+
+const SOCKET_PROXY_REPOSITORIES = new Set([
+  "linuxserver/socket-proxy",
+  "tecnativa/docker-socket-proxy",
+  "wollomatic/socket-proxy",
+]);
+
+const isSocketProxy = (config: ComposeMapping): boolean => {
+  const { build, image } = config;
+
+  if (build !== undefined || !isComposeString(image)) {
+    return false;
+  }
+
+  const parsed = parseComposeImage(image);
+
+  return (
+    parsed !== undefined &&
+    (parsed.registry === undefined ||
+      SOCKET_PROXY_REGISTRIES.has(parsed.registry)) &&
+    SOCKET_PROXY_REPOSITORIES.has(parsed.repository)
+  );
+};
+
 export const noDockerSocketMount: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
+      if (isComposeTrue(config.use_api_socket)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Service '${name}' sets use_api_socket. Compose mounts the Docker socket into this container and copies your registry credentials into it, so anything running there can control the Docker daemon and push or pull as you.`,
+            this.help,
+            context?.locate?.(["services", name, "use_api_socket"])
+          )
+        );
+      }
+
       const { volumes } = config;
 
-      if (!isComposeSequence(volumes)) {
+      if (!isComposeSequence(volumes) || isSocketProxy(config)) {
         continue;
       }
 
@@ -77,7 +126,7 @@ export const noDockerSocketMount: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "error",
-  help: "If the service genuinely needs the Docker API (agent tooling like MCP gateways often does), prefer `use_api_socket: true` or a filtering socket proxy over a raw bind mount of `/var/run/docker.sock`.",
+  help: "Prefer a filtering socket proxy that allows only the API calls the service needs, and do not publish the service's port. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.",
   key: "docker-doctor/no-docker-socket-mount",
   message: "Do not bind-mount the Docker socket into services",
 };
@@ -152,7 +201,7 @@ export const noBroadBindMount: ComposeRule = {
               file,
               this.key,
               this.defaultSeverity,
-              `Service '${name}' bind-mounts '${broad.source}', ${broad.reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              `Service '${name}' bind-mounts '${broad.source}', ${broad.reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )
@@ -190,7 +239,7 @@ export const preferReadOnlyBindMount: ComposeRule = {
               file,
               this.key,
               this.defaultSeverity,
-              `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )

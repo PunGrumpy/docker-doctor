@@ -24,7 +24,7 @@ const PWD_INTERPOLATION = /\$\{PWD\}|\$PWD(?!\w)/gu;
 
 const LEADING_INTERPOLATION_RE = /^\$(?:\{[^}]*\}|[A-Za-z_]\w*)/u;
 
-const applyFoldsAndDefaults = (value: string): string =>
+export const applyFoldsAndDefaults = (value: string): string =>
   value
     .replace(HOME_INTERPOLATION, "~")
     .replace(PWD_INTERPOLATION, ".")

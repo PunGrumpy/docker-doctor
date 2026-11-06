@@ -3,10 +3,10 @@
 # Do not edit by hand — run `bun run docs:rules` to regenerate.
 title: no-docker-socket-mount
 description: >-
-  Bind-mounting /var/run/docker.sock into a Compose service hands the container root on the host. Safer alternatives for tools that need the Docker API.
+  Bind-mounting /var/run/docker.sock into a Compose service hands the container root on the host. A filtering socket proxy limits what a service can ask the Docker daemon to do. use_api_socket does not.
 ---
 
-Mounting `/var/run/docker.sock` into a container is the standard trick for anything that needs to talk to Docker: CI runners, reverse proxies that watch containers, and increasingly AI-agent tooling like MCP gateways that launch tool containers on demand. It is also equivalent to giving that container root on the host, because the Docker API can start privileged containers, mount any host path, and read every volume. This rule flags any service whose `volumes` bind-mount the Docker socket, in either the short or long syntax. It resolves `${VAR:-default}` interpolation to its default and recognizes the socket under its other host spellings: `/run/docker.sock`, rootless and Docker Desktop sockets under a home directory, and the Windows named pipe.
+Mounting `/var/run/docker.sock` into a container is the standard trick for anything that needs to talk to Docker: CI runners, reverse proxies that watch containers, and increasingly AI-agent tooling like MCP gateways that launch tool containers on demand. It is also equivalent to giving that container root on the host, because the Docker API can start privileged containers, mount any host path, and read every volume. This rule flags any service that enables `use_api_socket` or whose `volumes` bind-mount the Docker socket, in either the short or long syntax. It resolves `${VAR:-default}` interpolation to its default and recognizes the socket under its other host spellings: `/run/docker.sock`, rootless and Docker Desktop sockets under a home directory, and the Windows named pipe.
 
 ## What the rule catches
 
@@ -27,24 +27,49 @@ Scanning this file reports:
 
 ## Why it matters
 
-The Docker daemon runs as root and its API has no notion of partial trust. Any client can do anything, including `docker run --privileged -v /:/host`, so a compromised process in a socket-mounted container escapes to the host in one API call. Agent stacks raise the stakes: an MCP gateway or agent runtime executes model-directed actions, so prompt injection anywhere in the toolchain becomes a path to that socket.
+The Docker daemon runs as root and its API has no notion of partial trust. Any client can do anything, including `docker run --privileged -v /:/host`, so a compromised process in a socket-mounted container escapes to the host in one API call. Agent stacks raise the stakes: an MCP gateway or agent runtime executes model-directed actions, so prompt injection anywhere in the toolchain becomes a path to that socket. The MCP gateway advisory CVE-2026-76099 names the Docker API socket as a precondition for host root.
 
 ## How to fix it
 
-If the service genuinely needs the Docker API (agent tooling like MCP gateways often does), prefer `use_api_socket: true` or a filtering socket proxy over a raw bind mount of `/var/run/docker.sock`.
+Prefer a filtering socket proxy that allows only the API calls the service needs, and do not publish the service's port. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.
 
-```yaml title="compose.yaml — scoped API access via use_api_socket"
+```yaml title="compose.yaml — a read-only log viewer behind a socket proxy"
 services:
-  mcp-gateway:
-    image: docker/mcp-gateway:0.9.0
-    # Compose provisions scoped Docker API credentials for this service
-    use_api_socket: true
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-api
+  dozzle:
+    image: amir20/dozzle:v11.4.1
+    environment:
+      DOZZLE_REMOTE_HOST: tcp://docker-proxy:2375
+    ports:
+      - 127.0.0.1:8080:8080
+    networks:
+      - docker-api
+      - web
+
+networks:
+  docker-api:
+    internal: true
+  web: {}
 ```
 
-If the service genuinely needs the Docker API, use a mechanism that limits what a compromised container can do:
+If the service genuinely needs the Docker API, put a filtering socket proxy between it and the daemon:
 
-- **`use_api_socket: true`** (Compose ≥ 2.36): Compose mounts the API socket together with scoped credentials. Docker's own `compose-for-agents` examples use this for MCP gateways.
-- **A filtering socket proxy**: exposes only the API endpoints the client needs, such as read-only container listing.
+- **Allow only the calls the service needs.** `tecnativa/docker-socket-proxy` and `linuxserver/socket-proxy` turn API sections on with variables, so a client that only reads can get `CONTAINERS=1` with `POST=0`. `wollomatic/socket-proxy` blocks every call until you allow it with a regular expression per HTTP method.
+- **Know what a section grants.** `CONTAINERS=1` is not list-only. Through GET calls a client can also read the logs and download the files of every container, and `POST=0` does not stop that.
+- **Keep the proxy off the network.** Do not publish its port, and reach it from the app over an internal network.
+
+The rule does not report a raw socket mount on those three proxy images when they come from Docker Hub, `ghcr.io`, or `lscr.io`, because a proxy has to mount the socket. It still reports a service with `build:`, and the same image name on any other registry, so a private mirror needs its own ignore entry. A proxy that allows container creation is still root-equivalent, since a client can start a privileged container through it.
+
+`use_api_socket: true` is not a safer option. Compose mounts the same socket read-write and also copies your registry credentials into the container, so the rule reports it too.
 
 Mounting the socket `:ro` does _not_ help. Writes go through the connected socket, not the file, so a read-only mount still allows every API call.
 
