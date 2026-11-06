@@ -7,6 +7,7 @@ import { setTimeout } from "node:timers/promises";
 
 import type {
   Diagnostic,
+  DockerDoctorConfig,
   JsonReport,
   ProjectInfo,
   RuleSeverity,
@@ -377,6 +378,7 @@ const printAgentPrompt = (payload: string): void => {
 
 interface WizardContext {
   diagnostics: Diagnostic[];
+  ignoredConfig: boolean;
   report: JsonReport;
   rootDir: string;
 }
@@ -414,6 +416,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   const payload = buildHandoffPayload({
     diagnostics: context.diagnostics,
+    ignoredConfig: context.ignoredConfig,
     projectDir: context.rootDir,
     projectName: path.basename(context.rootDir),
   });
@@ -750,6 +753,7 @@ interface ScanOutcome {
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
   fileContents: Record<string, string>;
+  ignoredConfig: boolean;
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
@@ -767,7 +771,15 @@ const writeTerminalReport = async (
   verbose: boolean,
   exitCode: number
 ): Promise<number> => {
-  const { diagnostics, failures, fileContents, project, rootDir } = scan;
+  const {
+    diagnostics,
+    failures,
+    fileContents,
+    ignoredConfig,
+    project,
+    rootDir,
+  } = scan;
+
   await formatTerminal(
     diagnostics,
     score,
@@ -783,6 +795,7 @@ const writeTerminalReport = async (
   if (process.stdout.isTTY && process.stdin.isTTY) {
     wizardOk = await runInteractiveWizard({
       diagnostics,
+      ignoredConfig,
       report: toJsonReport(
         diagnostics,
         score,
@@ -949,11 +962,23 @@ program
   .version(packageJson.version, "-V, --version", "display the version number");
 
 interface ScanOptions {
-  config?: string;
+  config?: string | false;
   json: boolean;
   score: boolean;
   verbose: boolean;
 }
+
+// --config and --no-config share one option value and the last flag wins, so
+// the conflict has to be seen as the flags are parsed.
+const configFlags = new Set<string>();
+
+program.on("option:config", () => {
+  configFlags.add("--config");
+});
+
+program.on("option:no-config", () => {
+  configFlags.add("--no-config");
+});
 
 program
   .argument("[dir]", "directory to scan", ".")
@@ -961,6 +986,10 @@ program
   .option("-s, --score", "only output numeric health score", false)
   .option("-j, --json", "output results as JSON report", false)
   .option("-c, --config <path>", "custom config file path")
+  .option(
+    "--no-config",
+    "ignore config files and use the defaults, for repositories you did not write"
+  )
   .action(async (dir: string, options: ScanOptions) => {
     const isSilent = options.score || options.json;
     // The spinner and progress lines only make sense on an interactive
@@ -984,6 +1013,15 @@ program
     });
 
     try {
+      if (configFlags.size > 1) {
+        console.error(
+          "Error: --config and --no-config cannot be used together."
+        );
+        process.exitCode = 1;
+
+        return;
+      }
+
       const rootDir = path.resolve(dir);
       // Checked before the spinner starts, so the error path never hides
       // the cursor.
@@ -1023,14 +1061,19 @@ program
           await setTimeout(150);
         }
 
-        setStatus("Loading configuration...");
-        // Warnings go to stderr so the --json and --score stdout contracts
-        // stay machine-readable.
-        const configPath = await resolveConfigPath(options.config, rootDir);
+        // A config file can be code, so --no-config never reads one.
+        let config: DockerDoctorConfig = {};
 
-        const config = await loadConfig(rootDir, configPath, (message) => {
-          console.error(`Warning: ${message}`);
-        });
+        if (options.config !== false) {
+          setStatus("Loading configuration...");
+          // Warnings go to stderr so the --json and --score stdout contracts
+          // stay machine-readable.
+          const configPath = await resolveConfigPath(options.config, rootDir);
+
+          config = await loadConfig(rootDir, configPath, (message) => {
+            console.error(`Warning: ${message}`);
+          });
+        }
 
         setStatus("Scanning workspace files...");
 
@@ -1088,6 +1131,7 @@ program
             diagnostics,
             failures,
             fileContents,
+            ignoredConfig: options.config === false,
             project,
             rootDir,
             scannedFileCount,

@@ -25,6 +25,9 @@ const SEVERITY_LABEL: Record<Diagnostic["severity"], string> = {
 
 export interface HandoffPayloadInput {
   diagnostics: Diagnostic[];
+  // The scan ran with --no-config, so the agent's re-run must not load the
+  // scanned repository's config either.
+  ignoredConfig?: boolean;
   // The scanned directory. Every file path in the prompt is relative to it.
   projectDir: string;
   projectName: string;
@@ -34,6 +37,8 @@ export interface HandoffPayloadInput {
 // projects rarely have hundreds of findings), errors first, each with its fix
 // recipe and affected files, plus a pointer to the full on-disk report.
 export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
+  const rerunFlag = input.ignoredConfig === true ? " --no-config" : "";
+
   const groups = [
     ...groupDiagnosticsByRule(input.diagnostics).entries(),
   ].toSorted(([, a], [, b]) => {
@@ -87,7 +92,7 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
     `Full report (diagnostics.json + a .txt per rule): ${DIAGNOSTICS_DIR_NAME}/`,
     "",
     "Read each file and fix the root cause — don't suppress or silence the rule.",
-    "When you're done, re-run `npx @docker-doctor/cli@latest .` and confirm the score improved and no errors remain."
+    `When you're done, re-run \`docker-doctor .${rerunFlag}\` (or \`npx @docker-doctor/cli@latest .${rerunFlag}\`) and confirm the score improved and no errors remain.`
   );
 
   return lines.join("\n");

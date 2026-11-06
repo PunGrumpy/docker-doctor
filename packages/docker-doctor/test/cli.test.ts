@@ -749,6 +749,169 @@ describe("JavaScript config", () => {
   });
 });
 
+const MARKER_FILE = "config-ran.txt";
+
+const RUNNING_CONFIG = `import fs from "node:fs";
+fs.writeFileSync(new URL("./${MARKER_FILE}", import.meta.url), "ran");
+export default ${RULES_OFF};
+`;
+
+const withRepo = async (
+  files: Record<string, string>,
+  run: (root: string) => Promise<void>
+) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-no-config-"));
+
+  try {
+    fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+
+    for (const [name, source] of Object.entries(files)) {
+      fs.writeFileSync(path.join(root, name), source);
+    }
+
+    await run(root);
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
+  }
+};
+
+const markerExists = (root: string): boolean =>
+  fs.existsSync(path.join(root, MARKER_FILE));
+
+describe("--no-config", () => {
+  test("without the flag, a JavaScript config in the scanned directory runs", async () => {
+    await withRepo(
+      { "docker-doctor.config.mjs": RUNNING_CONFIG },
+      async (root) => {
+        const { exitCode, stdout } = await runCli([root, "--json"]);
+
+        expect(exitCode).toBe(0);
+        expect(markerExists(root)).toBe(true);
+        expect(reportsRequireLabels(stdout)).toBe(false);
+      }
+    );
+  });
+
+  test("never runs the config and reports with the defaults", async () => {
+    await withRepo(
+      { "docker-doctor.config.mjs": RUNNING_CONFIG },
+      async (root) => {
+        const { exitCode, stderr, stdout } = await runCli([
+          root,
+          "--json",
+          "--no-config",
+        ]);
+
+        expect(exitCode).toBe(0);
+        expect(stderr).toBe("");
+        expect(markerExists(root)).toBe(false);
+        expect(reportsRequireLabels(stdout)).toBe(true);
+      }
+    );
+  });
+
+  test("never runs the config on the --score path", async () => {
+    await withRepo(
+      { "docker-doctor.config.mjs": RUNNING_CONFIG },
+      async (root) => {
+        const { exitCode, stdout } = await runCli([
+          root,
+          "--score",
+          "--no-config",
+        ]);
+
+        expect(exitCode).toBe(0);
+        expect(stdout.trim()).toMatch(/^\d+$/u);
+        expect(markerExists(root)).toBe(false);
+      }
+    );
+  });
+
+  test("never runs the config on the default terminal report", async () => {
+    await withRepo(
+      { "docker-doctor.config.mjs": RUNNING_CONFIG },
+      async (root) => {
+        const { exitCode, stdout } = await runCli([root, "--no-config"]);
+
+        expect(exitCode).toBe(0);
+        expect(markerExists(root)).toBe(false);
+        expect(stdout).toContain(" / 100");
+      }
+    );
+  });
+
+  test("ignores a YAML config that turns a rule off", async () => {
+    const yamlConfig = 'rules:\n  docker-doctor/require-labels: "off"\n';
+
+    await withRepo(
+      { "docker-doctor.config.yaml": yamlConfig },
+      async (root) => {
+        const withConfig = await runCli([root, "--json"]);
+        expect(reportsRequireLabels(withConfig.stdout)).toBe(false);
+
+        const withoutConfig = await runCli([root, "--json", "--no-config"]);
+        expect(reportsRequireLabels(withoutConfig.stdout)).toBe(true);
+      }
+    );
+  });
+
+  test("ignores the dockerDoctor key in package.json", async () => {
+    const packageJson = JSON.stringify({
+      dockerDoctor: { rules: { "docker-doctor/require-labels": "off" } },
+    });
+
+    await withRepo({ "package.json": packageJson }, async (root) => {
+      const withConfig = await runCli([root, "--json"]);
+      expect(reportsRequireLabels(withConfig.stdout)).toBe(false);
+
+      const withoutConfig = await runCli([root, "--json", "--no-config"]);
+      expect(reportsRequireLabels(withoutConfig.stdout)).toBe(true);
+    });
+  });
+
+  test("ignores an invalid config instead of failing on it", async () => {
+    await withRepo(
+      { "docker-doctor.config.yaml": "rules: [not, a, map\n" },
+      async (root) => {
+        const { exitCode, stderr } = await runCli([
+          root,
+          "--json",
+          "--no-config",
+        ]);
+
+        expect(exitCode).toBe(0);
+        expect(stderr).toBe("");
+      }
+    );
+  });
+
+  test.each([
+    ["--no-config before --config", ["--no-config", "--config"]],
+    ["--config before --no-config", ["--config", "--no-config"]],
+  ])("%s exits 1 without running the config", async (_name, order) => {
+    await withRepo(
+      { "docker-doctor.config.mjs": RUNNING_CONFIG },
+      async (root) => {
+        const args = order.map((flag) =>
+          flag === "--config" ? [flag, "docker-doctor.config.mjs"] : [flag]
+        );
+
+        const { exitCode, stderr, stdout } = await runCli(
+          [root, "--json", ...args.flat()],
+          { cwd: root }
+        );
+
+        expect(exitCode).toBe(1);
+        expect(stderr).toContain(
+          "--config and --no-config cannot be used together"
+        );
+        expect(stdout).toBe("");
+        expect(markerExists(root)).toBe(false);
+      }
+    );
+  });
+});
+
 describe("piped --json output is not truncated", () => {
   test("--json on a piped stdout exits (does not hang) and parses", async () => {
     const { exitCode, stdout } = await runCli([
