@@ -1836,6 +1836,9 @@ describe("Compose Security Rules", () => {
         target: /host/proc
         read_only: true
       - C:\\:/mnt/c
+      - /dev:/host-dev
+      - /var:/host-var
+      - /var/lib/docker:/var/lib/docker
 `;
 
     const composeContent = parseCompose(source, "compose.yml");
@@ -1844,7 +1847,9 @@ describe("Compose Security Rules", () => {
       locate: createComposeLocator(source),
     });
 
-    expect(diags.map((d) => d.line)).toEqual([5, 6, 7, 8, 9, 10, 11, 15]);
+    expect(diags.map((d) => d.line)).toEqual([
+      5, 6, 7, 8, 9, 10, 11, 15, 16, 17, 18,
+    ]);
     expect(diags[0].message).toContain("the host's root filesystem");
     expect(diags[1].message).toContain("the whole home directory");
     expect(diags[2].message).toContain("hidden directory");
@@ -1866,6 +1871,9 @@ describe("Compose Security Rules", () => {
             "/opt/models:/models",
             "/var/lib/app:/data",
             "/dev/shm:/dev/shm",
+            "/dev/dri:/dev/dri",
+            "/var/www:/usr/share/nginx/html",
+            "/var/log/app:/logs",
             "/var/run/docker.sock:/var/run/docker.sock",
             // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
             "${DATA_DIR}:/data",
