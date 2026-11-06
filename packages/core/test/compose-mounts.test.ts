@@ -16,6 +16,9 @@ describe("classifyHostPath", () => {
     ["/dev/", "system"],
     ["/var", "system"],
     ["/var/", "system"],
+    ["/var/lib", "system"],
+    ["/var/lib/containerd", "system"],
+    ["/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs", "system"],
     ["/var/lib/docker", "system"],
     ["/var/lib/docker/", "system"],
     ["/var/lib/docker/volumes", "system"],
@@ -24,6 +27,7 @@ describe("classifyHostPath", () => {
     ["/dev/shm", "host"],
     ["/var/www", "host"],
     ["/var/log/app", "host"],
+    ["/var/lib/app", "host"],
     ["/var/lib/app", "host"],
     ["/var/lib/docker-data", "host"],
   ];

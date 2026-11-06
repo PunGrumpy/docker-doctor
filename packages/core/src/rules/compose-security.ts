@@ -122,7 +122,8 @@ export const noHostNamespaces: ComposeRule = {
   defaultSeverity: "warning",
   help: "Remove the key so the service gets its own namespace. If `ipc: host` is there for shared memory, as PyTorch and vLLM often need, set `shm_size` instead.",
   key: "docker-doctor/no-host-namespaces",
-  message: "Do not share host namespaces with services",
+  message:
+    "Do not share the host PID, IPC, UTS, cgroup or user namespace with services",
 };
 
 const CAPABILITY_RISKS = new Map([
