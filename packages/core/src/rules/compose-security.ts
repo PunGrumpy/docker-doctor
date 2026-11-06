@@ -22,6 +22,13 @@ import { composeServices, isComposeTrue } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
 
+const CAP_PREFIX = /^CAP_/u;
+
+// Compose passes `cap_add` to Docker, which reads names in any case and
+// with or without the `CAP_` prefix.
+const normalizeCapability = (entry: string): string =>
+  entry.trim().toUpperCase().replace(CAP_PREFIX, "");
+
 export const noPrivilegedService: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -40,14 +47,164 @@ export const noPrivilegedService: ComposeRule = {
           )
         );
       }
+
+      const { cap_add: capAdd } = config;
+
+      if (!isComposeSequence(capAdd)) {
+        continue;
+      }
+
+      for (const [index, entry] of capAdd.entries()) {
+        if (isComposeString(entry) && normalizeCapability(entry) === "ALL") {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Service '${name}' adds every Linux capability with cap_add '${entry.trim()}'. That grants the kernel powers of privileged mode, so compromising this service compromises the host.`,
+              this.help,
+              context?.locate?.(["services", name, "cap_add", index])
+            )
+          );
+        }
+      }
     }
 
     return diagnostics;
   },
   defaultSeverity: "error",
-  help: "Remove `privileged: true` and grant only what the service needs: specific capabilities via `cap_add`, or individual device access via `devices`.",
+  help: "Remove `privileged: true` and `cap_add: [ALL]`, and grant the narrowest specific capability the service needs. `ALL` and `SYS_ADMIN` work like privileged mode. Use `devices` for individual device access.",
   key: "docker-doctor/no-privileged-service",
   message: "Do not run services in privileged mode",
+};
+
+const HOST_NAMESPACE_EFFECTS = new Map([
+  ["cgroup", "the container sees the host's whole cgroup tree, not its own."],
+  ["ipc", "the container shares the host's shared memory and message queues."],
+  ["pid", "the container can see and signal every process on the host."],
+  [
+    "userns_mode",
+    "root in the container is root on the host, because user namespace remapping is off.",
+  ],
+  ["uts", "the container shares the host's hostname and domain name."],
+]);
+
+export const noHostNamespaces: ComposeRule = {
+  category: "Compose",
+  check(composeContent, file, context) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const [name, config] of composeServices(composeContent)) {
+      for (const [key, value] of Object.entries(config)) {
+        const effect = HOST_NAMESPACE_EFFECTS.get(key);
+
+        if (
+          effect !== undefined &&
+          isComposeString(value) &&
+          value.trim().toLowerCase() === "host"
+        ) {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Service '${name}' sets '${key}: host', so ${effect}`,
+              this.help,
+              context?.locate?.(["services", name, key])
+            )
+          );
+        }
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: "Remove the key so the service gets its own namespace. If `ipc: host` is there for shared memory, as PyTorch and vLLM often need, set `shm_size` instead.",
+  key: "docker-doctor/no-host-namespaces",
+  message:
+    "Do not share the host PID, IPC, UTS, cgroup or user namespace with services",
+};
+
+const CAPABILITY_RISKS = new Map([
+  [
+    "DAC_READ_SEARCH",
+    "lets it read any file on the host it can name by handle, whatever the permissions",
+  ],
+  ["SYS_ADMIN", "lets it mount filesystems and reach most of the kernel"],
+  ["SYS_MODULE", "lets it load code into the host kernel"],
+  ["SYS_RAWIO", "lets it read and write the host's raw I/O ports and memory"],
+]);
+
+const SECURITY_OPT_RISKS = new Map([
+  ["apparmor:unconfined", "turns off the AppArmor profile"],
+  ["label:disable", "turns off SELinux separation"],
+  ["seccomp:unconfined", "turns off the syscall filter"],
+  [
+    "systempaths:unconfined",
+    "unmasks the /proc and /sys paths Docker hides by default",
+  ],
+]);
+
+// Docker reads `seccomp=unconfined` and `seccomp:unconfined` alike.
+const normalizeSecurityOpt = (entry: string): string =>
+  entry.trim().toLowerCase().replace("=", ":");
+
+const CONFINEMENT_SETTINGS = [
+  {
+    field: "cap_add",
+    normalize: normalizeCapability,
+    risks: CAPABILITY_RISKS,
+  },
+  {
+    field: "security_opt",
+    normalize: normalizeSecurityOpt,
+    risks: SECURITY_OPT_RISKS,
+  },
+] as const;
+
+export const noWeakenedConfinement: ComposeRule = {
+  category: "Compose",
+  check(composeContent, file, context) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const [name, config] of composeServices(composeContent)) {
+      for (const { field, normalize, risks } of CONFINEMENT_SETTINGS) {
+        const entries = config[field];
+
+        if (!isComposeSequence(entries)) {
+          continue;
+        }
+
+        for (const [index, entry] of entries.entries()) {
+          if (!isComposeString(entry)) {
+            continue;
+          }
+
+          const risk = risks.get(normalize(entry));
+
+          if (risk !== undefined) {
+            diagnostics.push(
+              createDiagnostic(
+                file,
+                this.key,
+                this.defaultSeverity,
+                `Service '${name}' sets ${field} '${entry.trim()}', which ${risk}.`,
+                this.help,
+                context?.locate?.(["services", name, field, index])
+              )
+            );
+          }
+        }
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: "Remove the capability or the `security_opt` entry. If the service needs one specific thing, grant that instead, such as a single device in `devices`.",
+  key: "docker-doctor/no-weakened-confinement",
+  message: "Do not weaken container confinement",
 };
 
 const SOCKET_PROXY_REGISTRIES = new Set([
@@ -358,6 +515,8 @@ export const noPlaintextSecrets: ComposeRule = {
 
 export const composeSecurityRules = [
   noPrivilegedService,
+  noHostNamespaces,
+  noWeakenedConfinement,
   noDockerSocketMount,
   noBroadBindMount,
   preferReadOnlyBindMount,

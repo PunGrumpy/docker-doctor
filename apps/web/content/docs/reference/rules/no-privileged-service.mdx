@@ -6,7 +6,7 @@ description: >-
   privileged: true in Docker Compose disables nearly every container isolation mechanism. What it actually grants and the narrower alternatives.
 ---
 
-`privileged: true` is the biggest hammer in the Compose vocabulary: it gives the container every Linux capability, access to every host device, and turns off the seccomp, AppArmor, and cgroup device protections that make a container a container. It usually enters a file as a workaround, because some device wouldn't open or some syscall was blocked, and then never leaves. This rule flags every service that sets it, including the other spellings Compose reads as true (`"true"`, `yes`, `on`).
+`privileged: true` is the biggest hammer in the Compose vocabulary: it gives the container every Linux capability, access to every host device, and turns off the seccomp, AppArmor, and cgroup device protections that make a container a container. It usually enters a file as a workaround, because some device wouldn't open or some syscall was blocked, and then never leaves. This rule flags every service that sets it, including the other spellings Compose reads as true (`"true"`, `yes`, `on`). It also flags `cap_add: [ALL]`, in any case and with or without the `CAP_` prefix, because that grants every capability and most of what privileged mode grants.
 
 ## What the rule catches
 
@@ -30,7 +30,7 @@ A privileged container is not meaningfully contained: it can load kernel modules
 
 ## How to fix it
 
-Remove `privileged: true` and grant only what the service needs: specific capabilities via `cap_add`, or individual device access via `devices`.
+Remove `privileged: true` and `cap_add: [ALL]`, and grant the narrowest specific capability the service needs. `ALL` and `SYS_ADMIN` work like privileged mode. Use `devices` for individual device access.
 
 ```yaml title="compose.yaml — specific capabilities and devices only"
 services:
@@ -50,7 +50,7 @@ Almost every legitimate use has a narrower replacement:
 - **GPU access for model inference**: `deploy.resources.reservations.devices` with the `gpu` capability, not `privileged`.
 - **Docker-in-Docker for CI**: prefer the host's socket via a scoped mechanism (see `no-docker-socket-mount`) or a rootless DinD setup.
 
-Start from nothing and add single capabilities until the service works; the final list is rarely more than two entries.
+Start from nothing and add single capabilities until the service works, and the final list is rarely more than two entries. `SYS_ADMIN` is not a narrow capability. It covers mounts and a large part of the kernel, and [no-weakened-confinement](/docs/reference/rules/no-weakened-confinement) reports it.
 
 ## Rule details
 

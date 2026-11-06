@@ -11,7 +11,7 @@ Assess every discovered Dockerfile and Compose file across these five categories
 - Base image provenance — official/verified publisher? Known-vulnerable tag?
 - Attack surface — is a full OS shipped where distroless/scratch would do?
 - Build-time secrets leaking into layers (check for tokens in `ARG`, `COPY` of `.env`/`.npmrc`).
-- Capabilities / privileged mode in Compose (`privileged: true`, `cap_add`).
+- Privileged mode in Compose (`privileged: true`).
 
 ## 2. Image Size
 

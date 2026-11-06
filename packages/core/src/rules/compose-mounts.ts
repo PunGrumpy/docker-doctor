@@ -224,8 +224,14 @@ const SYSTEM_DIRECTORIES = [
   "/sys",
   "/boot",
   "/run",
+  "/var/lib/containerd",
+  "/var/lib/docker",
   "/var/run",
 ] as const;
+
+// Directories whose children are ordinary application paths. `/var/www` and
+// `/dev/dri` are narrow mounts, but `/var` and `/dev` themselves are not.
+const EXACT_SYSTEM_DIRECTORIES = new Set(["/dev", "/var", "/var/lib"]);
 
 const startsWithDirectory = (hostPath: string, directory: string): boolean =>
   hostPath === directory || hostPath.startsWith(`${directory}/`);
@@ -272,6 +278,10 @@ export const classifyHostPath = (hostPath: string): HostPathScope => {
   if (!normalized.startsWith("/")) {
     // `path.posix.normalize("./src")` yields `src`.
     return "project";
+  }
+
+  if (EXACT_SYSTEM_DIRECTORIES.has(normalized)) {
+    return "system";
   }
 
   for (const directory of SYSTEM_DIRECTORIES) {

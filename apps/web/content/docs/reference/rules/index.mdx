@@ -5,7 +5,7 @@ title: Rules
 description: Every rule docker-doctor ships, grouped by category.
 ---
 
-docker-doctor ships 34 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
+docker-doctor ships 36 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
 
 List everything docker-doctor knows about:
 
@@ -70,6 +70,8 @@ Catches Docker Compose-specific misconfigurations.
 | [`use-depends-on-condition`](/docs/reference/rules/use-depends-on-condition) | Use long-form depends_on with healthcheck conditions | <SeverityPill severity="info" /> |
 | [`pin-service-image`](/docs/reference/rules/pin-service-image) | Pin service images to a specific tag or digest | <SeverityPill severity="warning" /> |
 | [`no-privileged-service`](/docs/reference/rules/no-privileged-service) | Do not run services in privileged mode | <SeverityPill severity="error" /> |
+| [`no-host-namespaces`](/docs/reference/rules/no-host-namespaces) | Do not share the host PID, IPC, UTS, cgroup or user namespace with services | <SeverityPill severity="warning" /> |
+| [`no-weakened-confinement`](/docs/reference/rules/no-weakened-confinement) | Do not weaken container confinement | <SeverityPill severity="warning" /> |
 | [`no-docker-socket-mount`](/docs/reference/rules/no-docker-socket-mount) | Do not bind-mount the Docker socket into services | <SeverityPill severity="error" /> |
 | [`no-broad-bind-mount`](/docs/reference/rules/no-broad-bind-mount) | Do not bind-mount broad host directories into services | <SeverityPill severity="warning" /> |
 | [`prefer-read-only-bind-mount`](/docs/reference/rules/prefer-read-only-bind-mount) | Bind mounts outside the project should be read-only | <SeverityPill severity="info" /> |
