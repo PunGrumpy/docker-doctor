@@ -24,6 +24,8 @@
     "use-depends-on-condition",
     "pin-service-image",
     "no-privileged-service",
+    "no-host-namespaces",
+    "no-weakened-confinement",
     "no-docker-socket-mount",
     "no-broad-bind-mount",
     "prefer-read-only-bind-mount",
