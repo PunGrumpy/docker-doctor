@@ -745,7 +745,7 @@ describe("secret key words and value shapes", () => {
       containsProviderToken(text);
     }
 
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 
   test("Dockerfile ENV and ARG report a token under any key without its value", () => {

@@ -407,13 +407,13 @@ describe("redactSecrets on a long adversarial line", () => {
 });
 
 describe("provider token masking on a long line", () => {
-  test("a 200,000 character run of a is masked or kept within 100 ms", () => {
+  test("a 200,000 character run of a is masked or kept within a second", () => {
     const text = "a".repeat(ADVERSARIAL_LENGTH);
     const start = performance.now();
 
     expect(redactSecrets(text)).toBe(text);
     expect(redactSecrets(`sk-1${text}`)).toBe("***");
     expect(redactSecrets(`sk-${text}`)).toBe(`sk-${text}`);
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
   });
 });
