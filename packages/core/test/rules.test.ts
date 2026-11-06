@@ -30,6 +30,10 @@ import {
   undefinedModelReference,
 } from "../src/rules/compose-models";
 import {
+  noExposedUnauthenticatedService,
+  publishedOnAllInterfaces,
+} from "../src/rules/compose-ports";
+import {
   noBroadBindMount,
   noDockerSocketMount,
   noPlaintextSecrets,
@@ -1934,6 +1938,241 @@ describe("Compose Security Rules", () => {
       expect(diags).toHaveLength(1);
       expect(diags[0].line).toBeUndefined();
     }
+  });
+});
+
+const check = (source: string) => {
+  const composeContent = parseCompose(source, "compose.yml");
+
+  return noExposedUnauthenticatedService.check(composeContent, "compose.yml", {
+    locate: createComposeLocator(source),
+  });
+};
+
+describe("Compose Ports Rules", () => {
+  const portCases = [
+    { entry: "11434:11434", exposed: true },
+    { entry: "11434", exposed: true },
+    { entry: "11434/tcp", exposed: true },
+    { entry: "11434-11436:11434-11436", exposed: true },
+    { entry: "0.0.0.0:11434:11434", exposed: true },
+    { entry: "[::]:11434:11434", exposed: true },
+    { entry: `\${PORT:-11434}:11434`, exposed: true },
+    { entry: `\${BIND:-0.0.0.0}:11434:11434`, exposed: true },
+    { entry: "127.0.0.1:11434:11434", exposed: false },
+    { entry: "[::1]:11434:11434", exposed: false },
+    { entry: "192.168.1.5:11434:11434", exposed: false },
+    { entry: `\${BIND:-127.0.0.1}:11434:11434`, exposed: false },
+    { entry: `\${BIND}:11434:11434`, exposed: false },
+  ];
+
+  for (const { entry, exposed } of portCases) {
+    test(`publishedOnAllInterfaces reads ${entry}`, () => {
+      expect(publishedOnAllInterfaces(entry)).toBe(exposed);
+    });
+  }
+
+  const longSyntaxCases = [
+    { entry: { target: 11_434 }, exposed: true },
+    { entry: { published: 11_434, target: 11_434 }, exposed: true },
+    { entry: { host_ip: "0.0.0.0", target: 11_434 }, exposed: true },
+    { entry: { host_ip: "127.0.0.1", target: 11_434 }, exposed: false },
+    { entry: { host_ip: "::1", target: 11_434 }, exposed: false },
+  ];
+
+  for (const { entry, exposed } of longSyntaxCases) {
+    test(`publishedOnAllInterfaces reads long syntax ${JSON.stringify(entry)}`, () => {
+      expect(publishedOnAllInterfaces(entry)).toBe(exposed);
+    });
+  }
+
+  test("publishedOnAllInterfaces reads a bare number", () => {
+    expect(publishedOnAllInterfaces(11_434)).toBe(true);
+  });
+
+  test("reports Ollama published on all interfaces at the port entry", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "11434:11434"
+`);
+
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toBe(
+      "Service 'ollama' publishes Ollama on all interfaces, and Ollama has no authentication here. Anyone who can reach this host can use it."
+    );
+    expect(diags[0].line).toBe(6);
+  });
+
+  test("reports one finding per service however many ports are exposed", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    ports:
+      - "11434:11434"
+      - "11435:11434"
+`);
+
+    expect(diags).toHaveLength(1);
+  });
+
+  test("does not report loopback or unpublished services", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    ports:
+      - "127.0.0.1:11434:11434"
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    expose:
+      - "6333"
+`);
+
+    expect(diags).toHaveLength(0);
+  });
+
+  test("matches the image repository through a registry, a digest and a tag", () => {
+    const diags = check(`services:
+  a:
+    image: docker.io/ollama/ollama@sha256:${"a".repeat(64)}
+    ports: ["11434:11434"]
+  b:
+    image: registry.example.com/qdrant/qdrant:v1
+    ports: ["6333:6333"]
+  c:
+    image: ollama/ollama-tools:1
+    ports: ["11434:11434"]
+  d:
+    image: nginx:1.27
+    ports: ["80:80"]
+`);
+
+    expect(diags.map((diag) => diag.line)).toEqual([4, 7]);
+  });
+
+  test("skips a service that builds its own image", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    build: .
+    ports: ["11434:11434"]
+`);
+
+    expect(diags).toHaveLength(0);
+  });
+
+  const qdrantCases = [
+    {
+      environment: "environment:\n      QDRANT__SERVICE__API_KEY: from-host",
+      expected: 0,
+    },
+    {
+      environment: "environment:\n      - QDRANT__SERVICE__API_KEY=from-host",
+      expected: 0,
+    },
+    {
+      environment: "environment:\n      - QDRANT__SERVICE__API_KEY",
+      expected: 0,
+    },
+    {
+      environment: "environment:\n      - QDRANT__SERVICE__API_KEY=",
+      expected: 1,
+    },
+    {
+      environment: "environment:\n      QDRANT__LOG_LEVEL: INFO",
+      expected: 1,
+    },
+    { environment: "", expected: 1 },
+  ];
+
+  for (const { environment, expected } of qdrantCases) {
+    test(`Qdrant with ${JSON.stringify(environment)} reports ${expected}`, () => {
+      const diags = check(`services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    ports: ["6333:6333"]
+    ${environment}
+`);
+
+      expect(diags).toHaveLength(expected);
+
+      if (expected > 0) {
+        expect(diags[0].message).toContain("publishes Qdrant");
+      }
+    });
+  }
+
+  const gatewayCases = [
+    { command: "", expected: 0 },
+    { command: 'command: ["--transport=sse", "--port=8811"]', expected: 0 },
+    {
+      command: 'command: ["--transport=sse", "--allow-unauthenticated"]',
+      expected: 1,
+    },
+    {
+      command: "command: --transport=sse --allow-unauthenticated",
+      expected: 1,
+    },
+    { command: "command: --allow-unauthenticated=false", expected: 0 },
+  ];
+
+  for (const { command, expected } of gatewayCases) {
+    test(`MCP gateway with ${JSON.stringify(command)} reports ${expected}`, () => {
+      const diags = check(`services:
+  gateway:
+    image: docker/mcp-gateway:v2
+    ports: ["8811:8811"]
+    ${command}
+`);
+
+      expect(diags).toHaveLength(expected);
+
+      if (expected > 0) {
+        expect(diags[0].message).toContain("publishes MCP gateway");
+      }
+    });
+  }
+
+  test("reports host networking at network_mode", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    network_mode: host
+`);
+
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBe(4);
+  });
+
+  test("does not report an unrelated network mode", () => {
+    const diags = check(`services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    network_mode: bridge
+`);
+
+    expect(diags).toHaveLength(0);
+  });
+
+  test("reports without a locator", () => {
+    const composeContent = parseCompose(
+      `services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    ports: ["11434:11434"]
+`,
+      "compose.yml"
+    );
+
+    const diags = noExposedUnauthenticatedService.check(
+      composeContent,
+      "compose.yml"
+    );
+
+    expect(diags).toHaveLength(1);
+    expect(diags[0].line).toBeUndefined();
   });
 });
 

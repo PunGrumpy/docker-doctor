@@ -5,7 +5,7 @@ title: Rules
 description: Every rule docker-doctor ships, grouped by category.
 ---
 
-docker-doctor ships 33 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
+docker-doctor ships 34 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
 
 List everything docker-doctor knows about:
 
@@ -76,6 +76,7 @@ Catches Docker Compose-specific misconfigurations.
 | [`no-plaintext-secrets`](/docs/reference/rules/no-plaintext-secrets) | Avoid literal secret values in Compose environment | <SeverityPill severity="warning" /> |
 | [`undefined-model-reference`](/docs/reference/rules/undefined-model-reference) | Service model references must be declared in top-level models | <SeverityPill severity="error" /> |
 | [`pin-model-version`](/docs/reference/rules/pin-model-version) | Pin models to a specific tag or digest | <SeverityPill severity="warning" /> |
+| [`no-exposed-unauthenticated-service`](/docs/reference/rules/no-exposed-unauthenticated-service) | Do not publish unauthenticated AI services on all interfaces | <SeverityPill severity="warning" /> |
 
 ## Image Size
 

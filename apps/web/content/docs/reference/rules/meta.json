@@ -30,6 +30,7 @@
     "no-plaintext-secrets",
     "undefined-model-reference",
     "pin-model-version",
+    "no-exposed-unauthenticated-service",
     "prefer-slim-base",
     "clean-package-cache",
     "avoid-dev-dependencies"
