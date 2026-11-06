@@ -2,14 +2,18 @@ import { hasText } from "../text";
 import type { DockerfileDirectives } from "../types/index";
 
 const DIRECTIVE_RE = /^#\s*(?<key>[a-zA-Z][a-zA-Z0-9]*)\s*=(?<value>.*)$/u;
+const LEADING_BOM = /^\uFEFF/u;
 const DIRECTIVE_KEYS = new Set(["check", "escape", "syntax"]);
 
 export const parseDockerfileDirectives = (
   content: string
 ): DockerfileDirectives => {
   const directives: DockerfileDirectives = {};
+  const lines = content.replace(LEADING_BOM, "").split(/\r?\n/u);
 
-  for (const [index, line] of content.split(/\r?\n/u).entries()) {
+  const skipped = lines[0]?.startsWith("#!") ? 1 : 0;
+
+  for (const [index, line] of lines.slice(skipped).entries()) {
     const groups = DIRECTIVE_RE.exec(line)?.groups;
     const key = groups?.key?.toLowerCase();
     const value = groups?.value?.trim();
@@ -19,7 +23,7 @@ export const parseDockerfileDirectives = (
     }
 
     if (key === "syntax") {
-      directives.syntax ??= { line: index + 1, value };
+      directives.syntax ??= { line: index + skipped + 1, value };
     }
   }
 

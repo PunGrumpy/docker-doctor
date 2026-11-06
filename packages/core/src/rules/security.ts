@@ -251,10 +251,18 @@ const TRUSTED_FRONTEND_REPOSITORIES = new Set([
   "docker/dockerfile-upstream",
 ]);
 
+// BuildKit keeps a quoted space inside a flag and then drops the quotes.
+const RUN_FLAG_TOKEN = /(?:"[^"]*"|'[^']*'|[^\s"'])+/gu;
+const QUOTE = /["']/gu;
+const WHITESPACE = /\s/u;
+
 const UNSAFE_RUN_FLAGS = new Set(["--network=host", "--security=insecure"]);
 
+// BuildKit reads the frontend image up to the first space, and passes the
+// rest to the frontend as options.
 const isTrustedFrontend = (value: string): boolean => {
-  const { digest, name, registry } = parseImageRef(value);
+  const [image = ""] = value.split(WHITESPACE, 1);
+  const { digest, name, registry } = parseImageRef(image);
 
   return (
     digest?.startsWith("sha256:") === true ||
@@ -266,10 +274,10 @@ const isTrustedFrontend = (value: string): boolean => {
 const unsafeRunFlags = (args: string): string[] => {
   const flags: string[] = [];
 
-  for (const token of args.split(/\s+/u)) {
-    const flag = token.toLowerCase();
+  for (const [token] of args.matchAll(RUN_FLAG_TOKEN)) {
+    const flag = token.replaceAll(QUOTE, "").toLowerCase();
 
-    if (!flag.startsWith("--")) {
+    if (flag === "--" || !flag.startsWith("--")) {
       break;
     }
 

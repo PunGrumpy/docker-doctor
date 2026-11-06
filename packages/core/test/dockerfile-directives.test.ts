@@ -75,6 +75,22 @@ describe("parseDockerfileDirectives", () => {
       name: "empty value",
     },
     { content: "", expected: null, name: "empty file" },
+    {
+      content: "\uFEFF# syntax=docker/dockerfile:1\nFROM alpine",
+      expected: { line: 1, value: "docker/dockerfile:1" },
+      name: "after a byte order mark",
+    },
+    {
+      content:
+        "#!/usr/bin/env buildctl\n# syntax=docker/dockerfile:1\nFROM alpine",
+      expected: { line: 2, value: "docker/dockerfile:1" },
+      name: "after a shebang",
+    },
+    {
+      content: "# comment\n#!/usr/bin/env x\n# syntax=docker/dockerfile:1",
+      expected: null,
+      name: "a shebang that is not the first line ends the run",
+    },
   ];
 
   test.each(cases)("$name", ({ content, expected }) => {

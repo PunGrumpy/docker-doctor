@@ -18,6 +18,7 @@ describe("no-unsafe-build-features frontends", () => {
     "docker/dockerfile:1.7-labs",
     "docker/dockerfile",
     "docker/dockerfile-upstream:master",
+    "docker/dockerfile:1 --some-option",
     "docker.io/docker/dockerfile:1",
     "index.docker.io/docker/dockerfile:1",
     "attacker.example/frontend@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -183,5 +184,49 @@ describe("no-unsafe-build-features through the runner", () => {
         parseDockerfileDirectives(content)
       ).some((d) => d.rule === RULE)
     ).toBe(false);
+  });
+});
+
+describe("no-unsafe-build-features RUN flag parsing", () => {
+  const reported = [
+    ['RUN --security="insecure" make', "--security=insecure"],
+    ["RUN --network='host' make", "--network=host"],
+    [
+      'RUN --mount=type=bind,target="/path with spaces" --security=insecure make',
+      "--security=insecure",
+    ],
+  ];
+
+  test.each(reported)("%s reports %s", (run, flag) => {
+    const diagnostics = check(`FROM alpine:3.20\n${run}`);
+
+    expect(diagnostics.map((d) => d.message)).toEqual([
+      `RUN uses ${flag}, which removes build isolation for this step.`,
+    ]);
+  });
+
+  test("a flag after the -- delimiter belongs to the command", () => {
+    expect(check("FROM alpine:3.20\nRUN -- --network=host make")).toEqual([]);
+  });
+});
+
+describe("no-unsafe-build-features frontends with file framing", () => {
+  test("a frontend after a shebang or a byte order mark is reported", () => {
+    const shebang = check(
+      "#!/usr/bin/env x\n# syntax=attacker.example/frontend\nFROM alpine:3.20"
+    );
+
+    const bom = check(
+      "\uFEFF# syntax=attacker.example/frontend\nFROM alpine:3.20"
+    );
+
+    expect(shebang.map((d) => d.line)).toEqual([2]);
+    expect(bom.map((d) => d.line)).toEqual([1]);
+  });
+
+  test("options after a third-party frontend do not make it trusted", () => {
+    expect(
+      check("# syntax=attacker.example/frontend --opt\nFROM alpine:3.20")
+    ).toHaveLength(1);
   });
 });
