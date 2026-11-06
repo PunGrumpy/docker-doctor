@@ -681,21 +681,21 @@ describe("secret key words and value shapes", () => {
   });
 
   const providerTokens = [
-    { name: "OpenAI", value: `sk-${"a".repeat(40)}` },
+    { name: "OpenAI", value: `sk-${"a1".repeat(20)}` },
     {
       name: "OpenAI project",
-      value: `sk-proj-${"a".repeat(30)}_${"b".repeat(10)}`,
+      value: `sk-proj-${"a1".repeat(15)}_${"b".repeat(10)}`,
     },
-    { name: "Hugging Face", value: `hf_${"a".repeat(34)}` },
-    { name: "GitHub", value: `ghp_${"a".repeat(36)}` },
-    { name: "GitHub app", value: `ghs_${"a".repeat(36)}` },
+    { name: "Hugging Face", value: `hf_${"a1".repeat(17)}` },
+    { name: "GitHub", value: `ghp_${"a1".repeat(18)}` },
+    { name: "GitHub app", value: `ghs_${"a1".repeat(18)}` },
     {
       name: "GitHub fine-grained",
-      value: `github_pat_${"a".repeat(22)}_${"b".repeat(30)}`,
+      value: `github_pat_${"a1".repeat(11)}_${"b".repeat(30)}`,
     },
-    { name: "AWS access key id", value: `AKIA${"A".repeat(16)}` },
-    { name: "quoted", value: `"sk-${"a".repeat(40)}"` },
-    { name: "after a header word", value: `Bearer sk-${"a".repeat(40)}` },
+    { name: "AWS access key id", value: `AKIA${"A1".repeat(8)}` },
+    { name: "quoted", value: `"sk-${"a1".repeat(20)}"` },
+    { name: "after a header word", value: `Bearer sk-${"a1".repeat(20)}` },
   ];
 
   test.each(providerTokens)("$name token has a secret shape", ({ value }) => {
@@ -704,14 +704,22 @@ describe("secret key words and value shapes", () => {
 
   const notTokens = [
     "sk-short",
-    `sk-${"a".repeat(19)}`,
-    `hf_${"a".repeat(19)}`,
-    `ghp_${"a".repeat(19)}`,
-    `AKIA${"A".repeat(15)}`,
-    `AKIA${"A".repeat(17)}`,
-    `task-${"a".repeat(40)}`,
-    `disk-${"a".repeat(40)}`,
-    `xhf_${"a".repeat(40)}`,
+    `sk-${"a1".repeat(9)}`,
+    `hf_${"a1".repeat(9)}`,
+    `ghp_${"a1".repeat(9)}`,
+    `AKIA${"A1".repeat(7)}A`,
+    `AKIA${"A1".repeat(8)}A`,
+    "sk-your-openai-api-key-here",
+    "sk-learn-preprocessing-pipeline",
+    `sk-${"x".repeat(40)}`,
+    `ghp_${"x".repeat(36)}`,
+    `hf_${"x".repeat(34)}`,
+    `AKIA${"X".repeat(16)}`,
+    "AKIAIOSFODNN7EXAMPLE",
+    `\${KEY:-sk-your-openai-api-key-here}`,
+    `task-${"a1".repeat(20)}`,
+    `disk-${"a1".repeat(20)}`,
+    `xhf_${"a1".repeat(20)}`,
     "",
   ];
 
@@ -725,7 +733,7 @@ describe("secret key words and value shapes", () => {
     for (const text of [
       "a".repeat(200_000),
       "sk-".repeat(70_000),
-      `sk-${"a".repeat(18)}-`.repeat(10_000),
+      `sk-${"a1".repeat(9)}-`.repeat(10_000),
     ]) {
       containsProviderToken(text);
     }
@@ -734,7 +742,7 @@ describe("secret key words and value shapes", () => {
   });
 
   test("Dockerfile ENV and ARG report a token under any key without its value", () => {
-    const token = `sk-${"a".repeat(40)}`;
+    const token = `sk-${"a1".repeat(20)}`;
 
     const instructions = parseDockerfile(`FROM node:22
 ENV FOO=${token}
@@ -760,7 +768,7 @@ ENV BUILD_ID=sk-short
   });
 
   test("Compose environment reports new key words and token shapes in both forms", () => {
-    const token = `sk-${"a".repeat(40)}`;
+    const token = `sk-${"a1".repeat(20)}`;
 
     const composeContent = {
       services: {
@@ -805,7 +813,7 @@ ENV BUILD_ID=sk-short
 });
 
 describe("Compose build args", () => {
-  const token = `sk-${"a".repeat(40)}`;
+  const token = `sk-${"a1".repeat(20)}`;
 
   test("a literal secret in either build.args form is reported at its line", () => {
     const source = `services:

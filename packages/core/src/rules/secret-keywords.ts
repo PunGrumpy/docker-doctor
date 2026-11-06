@@ -101,9 +101,7 @@ export const isLiteralSecretValue = (value: string): boolean => {
 
 // Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
 // `ghp_` and `github_pat_`, and AWS access key ids. The boundary keeps a
-// longer word that merely ends in a prefix, such as `task-`, out. The flag
-// is `g` so `replaceAll` accepts the patterns, and `search` ignores the
-// `lastIndex` that makes `test` stateful on a global regex.
+// longer word that merely ends in a prefix, such as `task-`, out.
 const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
   /(?<![A-Za-z0-9])sk-[\w-]{20,}/gu,
   /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/gu,
@@ -112,14 +110,26 @@ const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
   /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![0-9A-Z])/gu,
 ];
 
+const DIGIT = /\d/u;
+
+// A random token this long has a digit. `sk-your-openai-api-key-here` and
+// `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx` do not, and AWS documents its sample
+// key id with an `EXAMPLE` suffix.
+const isRealToken = (match: string): boolean =>
+  DIGIT.test(match) && !match.endsWith("EXAMPLE");
+
 export const containsProviderToken = (value: string): boolean =>
-  PROVIDER_TOKEN_PATTERNS.some((regex) => value.search(regex) !== -1);
+  PROVIDER_TOKEN_PATTERNS.some((regex) =>
+    [...value.matchAll(regex)].some(([match]) => isRealToken(match))
+  );
 
 export const maskProviderTokens = (text: string, mask: string): string => {
   let masked = text;
 
   for (const regex of PROVIDER_TOKEN_PATTERNS) {
-    masked = masked.replaceAll(regex, mask);
+    masked = masked.replaceAll(regex, (match) =>
+      isRealToken(match) ? mask : match
+    );
   }
 
   return masked;

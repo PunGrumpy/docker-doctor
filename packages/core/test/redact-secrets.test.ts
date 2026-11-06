@@ -227,11 +227,11 @@ describe("redactSecrets", () => {
   });
 
   const providerTokens = [
-    { name: "OpenAI", token: `sk-${"a".repeat(40)}` },
-    { name: "Hugging Face", token: `hf_${"a".repeat(34)}` },
-    { name: "GitHub", token: `ghp_${"a".repeat(36)}` },
-    { name: "GitHub fine-grained", token: `github_pat_${"a".repeat(40)}` },
-    { name: "AWS access key id", token: `AKIA${"A".repeat(16)}` },
+    { name: "OpenAI", token: `sk-${"a1".repeat(20)}` },
+    { name: "Hugging Face", token: `hf_${"a1".repeat(17)}` },
+    { name: "GitHub", token: `ghp_${"a1".repeat(18)}` },
+    { name: "GitHub fine-grained", token: `github_pat_${"a1".repeat(20)}` },
+    { name: "AWS access key id", token: `AKIA${"A1".repeat(8)}` },
   ];
 
   test.each(providerTokens)(
@@ -247,7 +247,7 @@ describe("redactSecrets", () => {
   );
 
   test("leaves a short or embedded token prefix alone", () => {
-    const text = `ENV FOO=sk-short task-${"a".repeat(40)} hf_${"a".repeat(10)}`;
+    const text = `ENV FOO=sk-short task-${"a1".repeat(20)} hf_${"a1".repeat(5)}`;
 
     expect(redactSecrets(text)).toBe(text);
   });
@@ -327,7 +327,7 @@ const adversarialInputs = [
   { name: "AKIA repeated", text: "AKIA".repeat(ADVERSARIAL_LENGTH / 4) },
   {
     name: "short sk- tokens",
-    text: `sk-${"a".repeat(18)} `.repeat(ADVERSARIAL_LENGTH / 22),
+    text: `sk-${"a1".repeat(9)} `.repeat(ADVERSARIAL_LENGTH / 22),
   },
   { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
   { name: "digits and dots", text: "1.".repeat(ADVERSARIAL_LENGTH / 2) },
@@ -412,7 +412,8 @@ describe("provider token masking on a long line", () => {
     const start = performance.now();
 
     expect(redactSecrets(text)).toBe(text);
-    expect(redactSecrets(`sk-${text}`)).toBe("***");
+    expect(redactSecrets(`sk-1${text}`)).toBe("***");
+    expect(redactSecrets(`sk-${text}`)).toBe(`sk-${text}`);
     expect(performance.now() - start).toBeLessThan(100);
   });
 });
