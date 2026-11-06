@@ -87,7 +87,7 @@ export const buildHandoffPayload = (input: HandoffPayloadInput): string => {
     `Full report (diagnostics.json + a .txt per rule): ${DIAGNOSTICS_DIR_NAME}/`,
     "",
     "Read each file and fix the root cause — don't suppress or silence the rule.",
-    "When you're done, re-run `npx @docker-doctor/cli@latest .` and confirm the score improved and no errors remain."
+    "When you're done, re-run `docker-doctor .` (or `npx @docker-doctor/cli@latest .`) and confirm the score improved and no errors remain."
   );
 
   return lines.join("\n");

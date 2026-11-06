@@ -17,6 +17,7 @@ npx @docker-doctor/cli@latest [dir]
 | `--score` | `-s` | Print only the numeric health score. Prints nothing when no file was analyzed. |
 | `--json` | `-j` | Output the full report as JSON |
 | `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
+| `--no-config` |  | Skip config lookup and use the defaults. Use it on a repository you did not write, because a JavaScript or TypeScript config in the scanned directory runs as code. Cannot be combined with `--config`. |
 | `--version` | `-V` | Print the CLI version |
 | `--help` | `-h` | Print usage for the command |
 

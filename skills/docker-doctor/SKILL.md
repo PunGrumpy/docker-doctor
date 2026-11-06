@@ -8,6 +8,10 @@ version: "1.0.0"
 
 Scans Dockerfile and Docker Compose files for security, performance, best-practices, Compose, and image-size issues. Outputs a 0–100 health score.
 
+When `docker-doctor` is on PATH, run it so a sandbox's pinned version is the one that scans. Otherwise run `npx @docker-doctor/cli@latest`. The commands below show the `npx` form.
+
+Pass `--no-config` when you scan a repository the user did not author. A JavaScript or TypeScript config there runs as code, and any config there can turn rules off.
+
 ## After editing a Dockerfile or Compose file:
 
 Scan once before you touch anything and once after your change. Save both reports outside the project and note both exit codes.
