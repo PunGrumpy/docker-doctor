@@ -101,14 +101,26 @@ export const isLiteralSecretValue = (value: string): boolean => {
 
 // Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
 // `ghp_` and `github_pat_`, and AWS access key ids. The boundary keeps a
-// longer word that merely ends in a prefix, such as `task-`, out.
+// longer word that merely ends in a prefix, such as `task-`, out. The flag
+// is `g` so `replaceAll` accepts the patterns, and `search` ignores the
+// `lastIndex` that makes `test` stateful on a global regex.
 const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
-  /(?<![A-Za-z0-9])sk-[\w-]{20,}/u,
-  /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/u,
-  /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}/u,
-  /(?<![A-Za-z0-9])github_pat_\w{20,}/u,
-  /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![0-9A-Z])/u,
+  /(?<![A-Za-z0-9])sk-[\w-]{20,}/gu,
+  /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/gu,
+  /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}/gu,
+  /(?<![A-Za-z0-9])github_pat_\w{20,}/gu,
+  /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![0-9A-Z])/gu,
 ];
 
 export const containsProviderToken = (value: string): boolean =>
-  PROVIDER_TOKEN_PATTERNS.some((regex) => regex.test(value));
+  PROVIDER_TOKEN_PATTERNS.some((regex) => value.search(regex) !== -1);
+
+export const maskProviderTokens = (text: string, mask: string): string => {
+  let masked = text;
+
+  for (const regex of PROVIDER_TOKEN_PATTERNS) {
+    masked = masked.replaceAll(regex, mask);
+  }
+
+  return masked;
+};
