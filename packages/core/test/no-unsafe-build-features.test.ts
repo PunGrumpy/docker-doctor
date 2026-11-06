@@ -195,6 +195,10 @@ describe("no-unsafe-build-features RUN flag parsing", () => {
       'RUN --mount=type=bind,target="/path with spaces" --security=insecure make',
       "--security=insecure",
     ],
+    [
+      "RUN --mount=type=bind,target=/path\\ with\\ spaces --network=host make",
+      "--network=host",
+    ],
   ];
 
   test.each(reported)("%s reports %s", (run, flag) => {

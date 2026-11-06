@@ -25,7 +25,7 @@ docker-doctor is not the only tool that reads a Dockerfile. This page says what 
 
 Choose hadolint when you want deep shell linting, a binary with no runtime, or one of those report formats.
 
-About half of docker-doctor's 21 Dockerfile rules have a hadolint equivalent. Both tools flag a container that runs as root, an unpinned base image, `ADD` where `COPY` would do, shell-form `CMD`, a missing `pipefail`, `cd` inside `RUN` and `useradd` without `--no-log-init`. If you already run hadolint, those findings are not new.
+About half of docker-doctor's 22 Dockerfile rules have a hadolint equivalent. Both tools flag a container that runs as root, an unpinned base image, `ADD` where `COPY` would do, shell-form `CMD`, a missing `pipefail`, `cd` inside `RUN` and `useradd` without `--no-log-init`. If you already run hadolint, those findings are not new.
 
 What docker-doctor adds:
 

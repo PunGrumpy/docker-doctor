@@ -251,8 +251,9 @@ const TRUSTED_FRONTEND_REPOSITORIES = new Set([
   "docker/dockerfile-upstream",
 ]);
 
-// BuildKit keeps a quoted space inside a flag and then drops the quotes.
-const RUN_FLAG_TOKEN = /(?:"[^"]*"|'[^']*'|[^\s"'])+/gu;
+// BuildKit keeps a quoted or escaped space inside a flag and then drops the
+// quotes.
+const RUN_FLAG_TOKEN = /(?:"[^"]*"|'[^']*'|\\.|[^\s"'])+/gu;
 const QUOTE = /["']/gu;
 const WHITESPACE = /\s/u;
 
