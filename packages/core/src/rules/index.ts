@@ -6,6 +6,7 @@ import type {
 import { bestPracticesRules } from "./best-practices";
 import { composeRules } from "./compose";
 import { composeModelRules } from "./compose-models";
+import { composePortsRules } from "./compose-ports";
 import { composeSecurityRules } from "./compose-security";
 import { imageSizeRules } from "./image-size";
 import { performanceRules } from "./performance";
@@ -22,6 +23,7 @@ export const allComposeRules: ComposeRule[] = [
   ...composeRules,
   ...composeSecurityRules,
   ...composeModelRules,
+  ...composePortsRules,
 ];
 
 export const allRules: RuleDefinition[] = [

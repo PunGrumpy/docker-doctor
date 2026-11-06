@@ -72,6 +72,7 @@ CMD ["node", "dist/server.js"]
 | **Narrow bind mounts** — mount `./data`, never `/`, `~`, `~/.ssh`, `../` or `/etc` | `no-broad-bind-mount` |
 | **Read-only host mounts** — `:ro` / `read_only: true` on any bind mount outside the project unless the service writes to it | `prefer-read-only-bind-mount` |
 | **No Docker socket bind mount** — a filtering socket proxy instead | `no-docker-socket-mount` |
+| **Loopback for unauthenticated AI services** — bind Ollama, Qdrant and the MCP gateway to `127.0.0.1` or an internal network | `no-exposed-unauthenticated-service` |
 
 ## Verify before handing off
 

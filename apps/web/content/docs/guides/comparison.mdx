@@ -29,7 +29,7 @@ About half of docker-doctor's 21 Dockerfile rules have a hadolint equivalent. Bo
 
 What docker-doctor adds:
 
-- Compose files. Twelve of the 33 rules check Compose services for things like privileged mode, Docker socket mounts, broad bind mounts, missing resource limits and unpinned images.
+- Compose files. Thirteen of the 34 rules check Compose services for things like privileged mode, Docker socket mounts, broad bind mounts, missing resource limits and unpinned images.
 - Build cache order. [`order-layers`](/docs/reference/rules/order-layers) flags an install that runs after the source copy, and [`use-dockerignore`](/docs/reference/rules/use-dockerignore) looks at the project around the Dockerfile.
 - A [health score](/docs/reference/scoring) you can track over time and show on a pull request.
 - A [skill for coding agents](/docs/guides/coding-agents) that teaches the agent to scan, fix and rescan.
