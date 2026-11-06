@@ -1,4 +1,29 @@
+// A bare `_KEY` suffix would also catch PRIMARY_KEY and PUBLIC_KEY, so only
+// the words that name a credential count.
+const CREDENTIAL_KEY_WORDS = [
+  "master",
+  "encryption",
+  "signing",
+  "access",
+  "service",
+  "admin",
+  "license",
+  "hmac",
+  "jwt",
+  "openai",
+  "anthropic",
+  "gemini",
+  "mistral",
+  "cohere",
+  "groq",
+  "deepseek",
+  "openrouter",
+  "huggingface",
+  "hf",
+] as const;
+
 const SECRET_KEY_PATTERNS: readonly RegExp[] = [
+  new RegExp(`(?:^|[_-])(?:${CREDENTIAL_KEY_WORDS.join("|")})[_-]key$`, "iu"),
   // No leading separator, for PGPASSWORD.
   /password(?:[_-]|$)/iu,
   /(?:^|[_-])secret(?:[_-]|$)/iu,
@@ -73,3 +98,17 @@ export const isLiteralSecretValue = (value: string): boolean => {
     !CREDENTIAL_FREE_URL.test(unquoted)
   );
 };
+
+// Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
+// `ghp_` and `github_pat_`, and AWS access key ids. The boundary keeps a
+// longer word that merely ends in a prefix, such as `task-`, out.
+const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
+  /(?<![A-Za-z0-9])sk-[\w-]{20,}/u,
+  /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/u,
+  /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}/u,
+  /(?<![A-Za-z0-9])github_pat_\w{20,}/u,
+  /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![0-9A-Z])/u,
+];
+
+export const containsProviderToken = (value: string): boolean =>
+  PROVIDER_TOKEN_PATTERNS.some((regex) => regex.test(value));

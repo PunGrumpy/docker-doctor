@@ -20,7 +20,11 @@ import {
 } from "./compose-mounts";
 import { composeServices, isComposeTrue } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
-import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
+import {
+  containsProviderToken,
+  isLiteralSecretValue,
+  isSecretKey,
+} from "./secret-keywords";
 
 const CAP_PREFIX = /^CAP_/u;
 
@@ -428,6 +432,10 @@ const literalValue = (value: ComposeValue | undefined): string | undefined => {
   return undefined;
 };
 
+const isSecretAssignment = (key: string, value: string): boolean =>
+  containsProviderToken(value) ||
+  (isSecretKey(key) && isLiteralSecretValue(value));
+
 // The key of a "KEY=value" list entry whose value is a literal secret, or
 // null. A bare "KEY" passes the host value through and holds no literal.
 const listEntrySecretKey = (entry: ComposeValue): string | null => {
@@ -444,7 +452,7 @@ const listEntrySecretKey = (entry: ComposeValue): string | null => {
   const key = entry.slice(0, eqIndex);
   const value = entry.slice(eqIndex + 1);
 
-  return isSecretKey(key) && isLiteralSecretValue(value) ? key : null;
+  return isSecretAssignment(key, value) ? key : null;
 };
 
 const isMappingSecret = (
@@ -453,9 +461,7 @@ const isMappingSecret = (
 ): boolean => {
   const literal = literalValue(value);
 
-  return (
-    literal !== undefined && isSecretKey(key) && isLiteralSecretValue(literal)
-  );
+  return literal !== undefined && isSecretAssignment(key, literal);
 };
 
 export const noPlaintextSecrets: ComposeRule = {

@@ -53,7 +53,10 @@ import {
   minimizeLayers,
   useDockerignore,
 } from "../src/rules/performance";
-import { isSecretKey } from "../src/rules/secret-keywords";
+import {
+  containsProviderToken,
+  isSecretKey,
+} from "../src/rules/secret-keywords";
 import {
   noRootUser,
   pinImageVersion,
@@ -623,6 +626,181 @@ describe("isSecretKey", () => {
     expect(isSecretKey("PGPASSWORD")).toBe(true);
     expect(isSecretKey("TOKEN")).toBe(true);
     expect(isSecretKey("AUTH")).toBe(true);
+  });
+});
+
+describe("secret key words and value shapes", () => {
+  const credentialWords = [
+    "master",
+    "encryption",
+    "signing",
+    "access",
+    "service",
+    "admin",
+    "license",
+    "hmac",
+    "jwt",
+    "openai",
+    "anthropic",
+    "gemini",
+    "mistral",
+    "cohere",
+    "groq",
+    "deepseek",
+    "openrouter",
+    "huggingface",
+    "hf",
+  ];
+
+  test.each(credentialWords)("%s_KEY names a secret", (word) => {
+    expect(isSecretKey(`${word.toUpperCase()}_KEY`)).toBe(true);
+    expect(isSecretKey(`APP_${word.toUpperCase()}_KEY`)).toBe(true);
+    expect(isSecretKey(`${word}-key`)).toBe(true);
+  });
+
+  test("the named keys from AI gateways are secrets", () => {
+    expect(isSecretKey("LITELLM_MASTER_KEY")).toBe(true);
+    expect(isSecretKey("OPENAI_KEY")).toBe(true);
+    expect(isSecretKey("N8N_ENCRYPTION_KEY")).toBe(true);
+  });
+
+  const notSecretKeys = [
+    "PUBLIC_KEY",
+    "PRIMARY_KEY",
+    "SORT_KEY",
+    "ANON_KEY",
+    "AWS_ACCESS_KEY_ID",
+    "OPENAI_KEY_FILE",
+    "OPENAI_KEY_PATH",
+    "MASTER_KEYS",
+    "MASTERKEY_COUNT",
+  ];
+
+  test.each(notSecretKeys)("%s does not name a secret", (key) => {
+    expect(isSecretKey(key)).toBe(false);
+  });
+
+  const providerTokens = [
+    { name: "OpenAI", value: `sk-${"a".repeat(40)}` },
+    {
+      name: "OpenAI project",
+      value: `sk-proj-${"a".repeat(30)}_${"b".repeat(10)}`,
+    },
+    { name: "Hugging Face", value: `hf_${"a".repeat(34)}` },
+    { name: "GitHub", value: `ghp_${"a".repeat(36)}` },
+    { name: "GitHub app", value: `ghs_${"a".repeat(36)}` },
+    {
+      name: "GitHub fine-grained",
+      value: `github_pat_${"a".repeat(22)}_${"b".repeat(30)}`,
+    },
+    { name: "AWS access key id", value: `AKIA${"A".repeat(16)}` },
+    { name: "quoted", value: `"sk-${"a".repeat(40)}"` },
+    { name: "after a header word", value: `Bearer sk-${"a".repeat(40)}` },
+  ];
+
+  test.each(providerTokens)("$name token has a secret shape", ({ value }) => {
+    expect(containsProviderToken(value)).toBe(true);
+  });
+
+  const notTokens = [
+    "sk-short",
+    `sk-${"a".repeat(19)}`,
+    `hf_${"a".repeat(19)}`,
+    `ghp_${"a".repeat(19)}`,
+    `AKIA${"A".repeat(15)}`,
+    `AKIA${"A".repeat(17)}`,
+    `task-${"a".repeat(40)}`,
+    `disk-${"a".repeat(40)}`,
+    `xhf_${"a".repeat(40)}`,
+    "",
+  ];
+
+  test.each(notTokens)("%p does not have a secret shape", (value) => {
+    expect(containsProviderToken(value)).toBe(false);
+  });
+
+  test("a 200,000 character run finishes quickly", () => {
+    const start = performance.now();
+
+    for (const text of [
+      "a".repeat(200_000),
+      "sk-".repeat(70_000),
+      `sk-${"a".repeat(18)}-`.repeat(10_000),
+    ]) {
+      containsProviderToken(text);
+    }
+
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  test("Dockerfile ENV and ARG report a token under any key without its value", () => {
+    const token = `sk-${"a".repeat(40)}`;
+
+    const instructions = parseDockerfile(`FROM node:22
+ENV FOO=${token}
+ARG BAR=${token}
+ENV BAZ ${token}
+ENV OPENAI_KEY=${token}
+ENV MASTER_KEY=\${MASTER_KEY}
+ENV BUILD_ID=sk-short
+`);
+
+    const diagnostics = noSecretsInEnv.check(instructions, "Dockerfile");
+
+    expect(diagnostics.map((d) => d.message)).toEqual<unknown[]>([
+      expect.stringContaining("ENV: 'FOO'"),
+      expect.stringContaining("ARG: 'BAR'"),
+      expect.stringContaining("ENV: 'BAZ'"),
+      expect.stringContaining("ENV: 'OPENAI_KEY'"),
+    ]);
+
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.message).not.toContain(token);
+    }
+  });
+
+  test("Compose environment reports new key words and token shapes in both forms", () => {
+    const token = `sk-${"a".repeat(40)}`;
+
+    const composeContent = {
+      services: {
+        gateway: {
+          environment: {
+            AWS_ACCESS_KEY_ID: "AKIDEXAMPLE",
+            FOO: token,
+            LITELLM_MASTER_KEY: "literal-master",
+            OPENAI_KEY: "literal-openai",
+            OPENAI_KEY_FILE: "/run/secrets/openai",
+            PRIMARY_KEY: "id",
+            PUBLIC_KEY: "literal-public",
+            SHORT: "sk-short",
+          },
+        },
+        worker: {
+          environment: [
+            `BAR=${token}`,
+            "N8N_ENCRYPTION_KEY=literal-n8n",
+            `OPENAI_KEY=\${OPENAI_KEY}`,
+            "OPENAI_KEY",
+          ],
+        },
+      },
+    };
+
+    const diagnostics = noPlaintextSecrets.check(composeContent, "compose.yml");
+
+    expect(diagnostics.map((d) => d.message)).toEqual<unknown[]>([
+      expect.stringContaining("'FOO'"),
+      expect.stringContaining("'LITELLM_MASTER_KEY'"),
+      expect.stringContaining("'OPENAI_KEY'"),
+      expect.stringContaining("'BAR'"),
+      expect.stringContaining("'N8N_ENCRYPTION_KEY'"),
+    ]);
+
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.message).not.toContain(token);
+      expect(diagnostic.message).not.toContain("literal-");
+    }
   });
 });
 
