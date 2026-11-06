@@ -1,4 +1,8 @@
-import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
+import {
+  isLiteralSecretValue,
+  isSecretKey,
+  maskProviderTokens,
+} from "./secret-keywords";
 
 const REDACTED = "***";
 
@@ -128,8 +132,8 @@ const maskMapping = (
  * part of a diagnostic. Detection stays with the secrets rules. This only
  * keeps a value they would flag out of messages, reports and PR comments.
  */
-export const redactSecrets = (text: string): string =>
-  text
+export const redactSecrets = (text: string): string => {
+  const masked = text
     .replaceAll(URL_USERINFO_RE, `$<scheme>${REDACTED}@`)
     .replaceAll(URL_RE, maskQuery)
     .replaceAll(
@@ -152,3 +156,6 @@ export const redactSecrets = (text: string): string =>
     )
     .replaceAll(ENV_SPACE_FORM_RE, maskEnvSpaceForm)
     .replaceAll(MAPPING_LINE_RE, maskMapping);
+
+  return maskProviderTokens(masked, REDACTED);
+};

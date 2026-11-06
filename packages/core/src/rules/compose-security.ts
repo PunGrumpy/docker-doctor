@@ -20,7 +20,11 @@ import {
 } from "./compose-mounts";
 import { composeServices, isComposeTrue } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
-import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
+import {
+  containsProviderToken,
+  isLiteralSecretValue,
+  isSecretKey,
+} from "./secret-keywords";
 
 const CAP_PREFIX = /^CAP_/u;
 
@@ -428,6 +432,10 @@ const literalValue = (value: ComposeValue | undefined): string | undefined => {
   return undefined;
 };
 
+const isSecretAssignment = (key: string, value: string): boolean =>
+  containsProviderToken(value) ||
+  (isSecretKey(key) && isLiteralSecretValue(value));
+
 // The key of a "KEY=value" list entry whose value is a literal secret, or
 // null. A bare "KEY" passes the host value through and holds no literal.
 const listEntrySecretKey = (entry: ComposeValue): string | null => {
@@ -444,7 +452,7 @@ const listEntrySecretKey = (entry: ComposeValue): string | null => {
   const key = entry.slice(0, eqIndex);
   const value = entry.slice(eqIndex + 1);
 
-  return isSecretKey(key) && isLiteralSecretValue(value) ? key : null;
+  return isSecretAssignment(key, value) ? key : null;
 };
 
 const isMappingSecret = (
@@ -453,54 +461,74 @@ const isMappingSecret = (
 ): boolean => {
   const literal = literalValue(value);
 
-  return (
-    literal !== undefined && isSecretKey(key) && isLiteralSecretValue(literal)
-  );
+  return literal !== undefined && isSecretAssignment(key, literal);
 };
+
+interface SecretEntry {
+  key: string;
+  position: string | number;
+}
+
+// The entries of an `environment` or `build.args` block that hold a literal
+// secret, in list or mapping form.
+const secretEntries = (block: ComposeValue | undefined): SecretEntry[] => {
+  const entries: SecretEntry[] = [];
+
+  if (isComposeSequence(block)) {
+    for (const [index, entry] of block.entries()) {
+      const key = listEntrySecretKey(entry);
+
+      if (key !== null) {
+        entries.push({ key, position: index });
+      }
+    }
+  } else if (isComposeMapping(block)) {
+    for (const [key, value] of Object.entries(block)) {
+      if (isMappingSecret(key, value)) {
+        entries.push({ key, position: key });
+      }
+    }
+  }
+
+  return entries;
+};
+
+const BUILD_ARG_SECRET_HELP =
+  "Pass the value as a Compose `secrets:` entry and read it in the Dockerfile with `RUN --mount=type=secret`.";
 
 export const noPlaintextSecrets: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
 
-    const flag = (name: string, key: string, line: number | undefined) => {
-      diagnostics.push(
-        createDiagnostic(
-          file,
-          this.key,
-          this.defaultSeverity,
-          `Potential secret in service '${name}' environment: '${key}'. A literal value here lives in version control in plain text.`,
-          this.help,
-          line
-        )
-      );
-    };
-
     for (const [name, config] of composeServices(composeContent)) {
-      const { environment } = config;
+      const { build, environment } = config;
+      const buildArgs = isComposeMapping(build) ? build.args : undefined;
 
-      if (isComposeSequence(environment)) {
-        for (const [index, entry] of environment.entries()) {
-          const key = listEntrySecretKey(entry);
+      for (const { key, position } of secretEntries(environment)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Potential secret in service '${name}' environment: '${key}'. A literal value here lives in version control in plain text.`,
+            this.help,
+            context?.locate?.(["services", name, "environment", position])
+          )
+        );
+      }
 
-          if (key !== null) {
-            flag(
-              name,
-              key,
-              context?.locate?.(["services", name, "environment", index])
-            );
-          }
-        }
-      } else if (isComposeMapping(environment)) {
-        for (const [key, value] of Object.entries(environment)) {
-          if (isMappingSecret(key, value)) {
-            flag(
-              name,
-              key,
-              context?.locate?.(["services", name, "environment", key])
-            );
-          }
-        }
+      for (const { key, position } of secretEntries(buildArgs)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `Potential secret in service '${name}' build args: '${key}'. A build arg stays in the image history, so anyone who can pull the image can read it.`,
+            BUILD_ARG_SECRET_HELP,
+            context?.locate?.(["services", name, "build", "args", position])
+          )
+        );
       }
     }
 

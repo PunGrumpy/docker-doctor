@@ -226,6 +226,32 @@ describe("redactSecrets", () => {
     expect(redactSecrets(input)).toBe(input);
   });
 
+  const providerTokens = [
+    { name: "OpenAI", token: `sk-${"a1".repeat(20)}` },
+    { name: "Hugging Face", token: `hf_${"a1".repeat(17)}` },
+    { name: "GitHub", token: `ghp_${"a1".repeat(18)}` },
+    { name: "GitHub fine-grained", token: `github_pat_${"a1".repeat(20)}` },
+    { name: "AWS access key id", token: `AKIA${"A1".repeat(8)}` },
+  ];
+
+  test.each(providerTokens)(
+    "masks a $name token under any key",
+    ({ token }) => {
+      expect(redactSecrets(`ENV FOO=${token}`)).toBe("ENV FOO=***");
+      expect(redactSecrets(`      FOO: ${token}`)).toBe("      FOO: ***");
+      expect(redactSecrets(`run --flag ${token} next`)).toBe(
+        "run --flag *** next"
+      );
+      expect(redactSecrets(`"${token}"`)).toBe('"***"');
+    }
+  );
+
+  test("leaves a short or embedded token prefix alone", () => {
+    const text = `ENV FOO=sk-short task-${"a1".repeat(20)} hf_${"a1".repeat(5)}`;
+
+    expect(redactSecrets(text)).toBe(text);
+  });
+
   test("every rule's own message and help text is unchanged", () => {
     for (const rule of allRules) {
       expect(redactSecrets(rule.message)).toBe(rule.message);
@@ -296,6 +322,13 @@ const ADVERSARIAL_LENGTH = 200_000;
 const TIME_LIMIT_MS = 1000;
 
 const adversarialInputs = [
+  { name: "a run of a", text: "a".repeat(ADVERSARIAL_LENGTH) },
+  { name: "a run of sk-", text: "sk-".repeat(ADVERSARIAL_LENGTH / 3) },
+  { name: "AKIA repeated", text: "AKIA".repeat(ADVERSARIAL_LENGTH / 4) },
+  {
+    name: "short sk- tokens",
+    text: `sk-${"a1".repeat(9)} `.repeat(ADVERSARIAL_LENGTH / 22),
+  },
   { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
   { name: "digits and dots", text: "1.".repeat(ADVERSARIAL_LENGTH / 2) },
   {
@@ -371,4 +404,16 @@ describe("redactSecrets on a long adversarial line", () => {
       expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
     }
   );
+});
+
+describe("provider token masking on a long line", () => {
+  test("a 200,000 character run of a is masked or kept within 100 ms", () => {
+    const text = "a".repeat(ADVERSARIAL_LENGTH);
+    const start = performance.now();
+
+    expect(redactSecrets(text)).toBe(text);
+    expect(redactSecrets(`sk-1${text}`)).toBe("***");
+    expect(redactSecrets(`sk-${text}`)).toBe(`sk-${text}`);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
 });

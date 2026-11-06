@@ -14,7 +14,11 @@ import type {
   DockerfileRule,
 } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
-import { isLiteralSecretValue, isSecretKey } from "./secret-keywords";
+import {
+  containsProviderToken,
+  isLiteralSecretValue,
+  isSecretKey,
+} from "./secret-keywords";
 
 // USER accepts "user", "uid", "user:group" and "uid:gid". Only the user half
 // decides whether the container runs as root; the group half is irrelevant.
@@ -85,10 +89,11 @@ export const noRootUser: DockerfileRule = {
   message: "Run the container as a non-root user",
 };
 
-// A literal value, not a `{...}` placeholder, under a key that names a
-// secret.
+// A token-shaped value under any key, or a literal value, not a `{...}`
+// placeholder, under a key that names a secret.
 const isLiteralSecret = (key: string, value: string): boolean =>
-  isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{");
+  containsProviderToken(value) ||
+  (isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{"));
 
 const secretKeysIn = (instruction: string, rawArgs: string): string[] => {
   const args = rawArgs.trim();

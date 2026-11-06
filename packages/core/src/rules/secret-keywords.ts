@@ -1,4 +1,30 @@
+// A bare `_KEY` suffix would also catch PRIMARY_KEY and PUBLIC_KEY, so only
+// the words that name a credential count.
+const CREDENTIAL_KEY_WORDS = [
+  "master",
+  "encryption",
+  "signing",
+  "access",
+  "service",
+  "service[_-]role",
+  "admin",
+  "license",
+  "hmac",
+  "jwt",
+  "openai",
+  "anthropic",
+  "gemini",
+  "mistral",
+  "cohere",
+  "groq",
+  "deepseek",
+  "openrouter",
+  "huggingface",
+  "hf",
+] as const;
+
 const SECRET_KEY_PATTERNS: readonly RegExp[] = [
+  new RegExp(`(?:^|[_-])(?:${CREDENTIAL_KEY_WORDS.join("|")})[_-]key$`, "iu"),
   // No leading separator, for PGPASSWORD.
   /password(?:[_-]|$)/iu,
   /(?:^|[_-])secret(?:[_-]|$)/iu,
@@ -72,4 +98,42 @@ export const isLiteralSecretValue = (value: string): boolean => {
     !SWITCH_VALUE.test(unquoted) &&
     !CREDENTIAL_FREE_URL.test(unquoted)
   );
+};
+
+// Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
+// `ghp_` and `github_pat_`, and AWS long-term (`AKIA`) and temporary (`ASIA`)
+// access key ids. The boundary keeps a longer word that merely ends in a
+// prefix, such as `task-`, out.
+const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
+  /(?<![A-Za-z0-9])sk-[\w-]{20,}/gu,
+  /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/gu,
+  /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}/gu,
+  /(?<![A-Za-z0-9])github_pat_\w{20,}/gu,
+  /(?<![A-Za-z0-9])A(?:KI|SI)A[0-9A-Z]{16}(?![0-9A-Z])/gu,
+];
+
+const DIGIT = /\d/u;
+const RANDOM_RUN = /[A-Za-z0-9]{16}/u;
+
+// A random token this long has a digit and an unbroken run of characters.
+// `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx` has no digit, `sk-learn-random-forest-v1`
+// has no long run, and AWS documents its sample key id with an `EXAMPLE` suffix.
+const isRealToken = (match: string): boolean =>
+  DIGIT.test(match) && RANDOM_RUN.test(match) && !match.endsWith("EXAMPLE");
+
+export const containsProviderToken = (value: string): boolean =>
+  PROVIDER_TOKEN_PATTERNS.some((regex) =>
+    [...value.matchAll(regex)].some(([match]) => isRealToken(match))
+  );
+
+export const maskProviderTokens = (text: string, mask: string): string => {
+  let masked = text;
+
+  for (const regex of PROVIDER_TOKEN_PATTERNS) {
+    masked = masked.replaceAll(regex, (match) =>
+      isRealToken(match) ? mask : match
+    );
+  }
+
+  return masked;
 };
