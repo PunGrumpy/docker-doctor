@@ -196,7 +196,7 @@ export const noBroadBindMount: ComposeRule = {
               file,
               this.key,
               this.defaultSeverity,
-              `Service '${name}' bind-mounts '${broad.source}', ${broad.reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              `Service '${name}' bind-mounts '${broad.source}', ${broad.reason}. Everything under it is readable by the container, and a writable mount is the foothold for VM-escape bugs.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )
@@ -234,7 +234,7 @@ export const preferReadOnlyBindMount: ComposeRule = {
               file,
               this.key,
               this.defaultSeverity,
-              `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs like CVE-2026-77179.`,
+              `Service '${name}' bind-mounts host path '${source}' read-write. A writable host mount lets the container change files outside the project, and is the foothold for VM-escape bugs.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )
