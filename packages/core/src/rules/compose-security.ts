@@ -50,7 +50,12 @@ export const noPrivilegedService: ComposeRule = {
   message: "Do not run services in privileged mode",
 };
 
-const SOCKET_PROXY_REGISTRIES = new Set(["docker.io", "ghcr.io", "lscr.io"]);
+const SOCKET_PROXY_REGISTRIES = new Set([
+  "docker.io",
+  "ghcr.io",
+  "index.docker.io",
+  "lscr.io",
+]);
 
 const SOCKET_PROXY_REPOSITORIES = new Set([
   "linuxserver/socket-proxy",

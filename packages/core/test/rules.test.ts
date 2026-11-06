@@ -1434,6 +1434,7 @@ describe("Compose Security Rules", () => {
       "linuxserver/socket-proxy:latest",
       "lscr.io/linuxserver/socket-proxy:1.2",
       "docker.io/tecnativa/docker-socket-proxy@sha256:abc",
+      "index.docker.io/tecnativa/docker-socket-proxy:0.3.0",
       "ghcr.io/wollomatic/socket-proxy:1.5",
     ];
 
