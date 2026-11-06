@@ -15,6 +15,7 @@ import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { parseCompose } from "../packages/core/src/parsers/compose-parser";
+import { parseDockerfileDirectives } from "../packages/core/src/parsers/dockerfile-directives";
 import { parseDockerfile } from "../packages/core/src/parsers/dockerfile-parser";
 import {
   allComposeRules,
@@ -150,6 +151,7 @@ const exampleDiagnostic = (
         "compose.yaml"
       )
     : (dockerfileRule?.check(parseDockerfile(example.code), "Dockerfile", {
+        directives: parseDockerfileDirectives(example.code),
         projectFiles: ["Dockerfile"],
       }) ?? []);
 

@@ -4,6 +4,7 @@
     "no-secrets-in-env",
     "pin-image-version",
     "no-add-remote",
+    "no-unsafe-build-features",
     "use-multi-stage",
     "order-layers",
     "minimize-layers",

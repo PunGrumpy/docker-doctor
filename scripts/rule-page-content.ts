@@ -355,6 +355,36 @@ export const rulePageContent: RulePages = {
     why: "An image is an artifact, not a runtime. It gets pushed to registries, cached on CI runners, copied to laptops, and mirrored — every copy carries the secret, forever, in plain text. Leaked registry credentials are one of the most common causes of cloud compromises precisely because images travel further than the people who build them expect. A secret that reaches an image layer must be treated as leaked and rotated.",
   },
 
+  "docker-doctor/no-unsafe-build-features": {
+    bad: {
+      code: [
+        "# syntax=ghcr.io/example/dockerfile-frontend:latest",
+        "FROM debian:12-slim",
+        "RUN --security=insecure make install",
+        "RUN --network=host ./fetch-assets.sh",
+      ].join("\n"),
+      lang: "dockerfile",
+      title:
+        "Dockerfile with a third-party frontend and two RUN steps that drop isolation",
+    },
+    description:
+      "A # syntax= line makes BuildKit run a container as your Dockerfile frontend. Which frontends are safe to use, and why RUN --network=host and --security=insecure weaken the build.",
+    good: {
+      code: [
+        "# syntax=docker/dockerfile:1",
+        "FROM python:3.12-slim",
+        "RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt",
+      ].join("\n"),
+      lang: "dockerfile",
+      title: "Dockerfile with the official frontend and a sandboxed RUN step",
+    },
+    intro:
+      "A `# syntax=` line at the top of a Dockerfile names a container image. BuildKit pulls that image and runs it as the frontend that turns your Dockerfile into a build. Whatever you name there runs as part of your build. This rule reports a `# syntax=` line that selects a frontend outside the official set. It trusts `docker/dockerfile` and `docker/dockerfile-upstream` on Docker Hub, with any tag, so `docker/dockerfile:1` and `docker/dockerfile:1.7-labs` pass. A third-party frontend pinned by digest, such as `registry.example.com/team/frontend@sha256:…`, passes too, because you reviewed one exact artifact. A registry-qualified look-alike such as `ghcr.io/docker/dockerfile` is reported. BuildKit reads the directive only from the comment lines at the very top of the file. A `# syntax=` line after a blank line, a plain comment or an instruction does nothing, and the rule ignores it.\n\nThe rule also reports `RUN --security=insecure` and `RUN --network=host`. Both flags remove isolation from one build step. The rule reads only the flags that come right after `RUN`, so `RUN docker run --network=host app` passes.",
+    notes:
+      "Use the official frontend unless you have a reason not to:\n\n```dockerfile\n# syntax=docker/dockerfile:1\n```\n\nIf you need a third-party frontend, review it and pin the exact image by digest. A tag can move, a digest cannot.\n\nBuildKit lets you set a frontend outside the Dockerfile too, with `--build-arg BUILDKIT_SYNTAX=…`. That value is not in the file, so this rule cannot see it. Check your build scripts and CI for it.\n\n`--security=insecure` and `--network=host` need the matching entitlements on the builder (`--allow security.insecure`, `--allow network.host`). If a build step needs one of them, keep it in a dedicated build and leave it out of the Dockerfile you publish.",
+    why: "A frontend is not a parser that reads your file and stays out of the way. It is a container that BuildKit runs during the build, and it talks to BuildKit over an API. Two BuildKit advisories show what that costs when the frontend is not one you trust. [CVE-2026-33747](https://github.com/moby/buildkit/security/advisories/GHSA-4c29-8rgm-jvjj) let a custom frontend craft an API message that wrote files outside BuildKit's state directory. The advisory says the issue needs an untrusted frontend set with `#syntax` or `--build-arg BUILDKIT_SYNTAX`, and that a well-known frontend image such as `docker/dockerfile` is not affected. The fix shipped in BuildKit v0.28.1. [CVE-2026-61711](https://github.com/moby/buildkit/security/advisories/GHSA-7236-3392-c5c6) let a custom frontend send a crafted build request that turned off Seccomp and AppArmor for the build container, even when the user had not allowed the `security.insecure` entitlement. The fix shipped in BuildKit v0.31.1. The advisory's workaround is to use only frontends from trusted providers.\n\nThe RUN flags are the same trade made on purpose. `--security=insecure` runs the step without the sandbox, and `--network=host` shares the host's network with it. A build step that needs either one can reach more of the machine than a normal step can, so each one deserves a second look.",
+  },
+
   "docker-doctor/no-version-key": {
     bad: {
       code: 'version: "3.8"\n\nservices:\n  web:\n    image: nginx:1.27-alpine',

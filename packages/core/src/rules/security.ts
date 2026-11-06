@@ -244,9 +244,102 @@ export const noAddRemote: DockerfileRule = {
   message: "Avoid using ADD with remote URLs",
 };
 
+const TRUSTED_FRONTEND_REGISTRIES = new Set(["docker.io", "index.docker.io"]);
+
+const TRUSTED_FRONTEND_REPOSITORIES = new Set([
+  "docker/dockerfile",
+  "docker/dockerfile-upstream",
+]);
+
+// BuildKit keeps a quoted or escaped space inside a flag and then drops the
+// quotes.
+const RUN_FLAG_TOKEN = /(?:"[^"]*"|'[^']*'|\\.|[^\s"'])+/gu;
+const QUOTE = /["']/gu;
+const WHITESPACE = /\s/u;
+
+const UNSAFE_RUN_FLAGS = new Set(["--network=host", "--security=insecure"]);
+
+// BuildKit reads the frontend image up to the first space, and passes the
+// rest to the frontend as options.
+const isTrustedFrontend = (value: string): boolean => {
+  const [image = ""] = value.split(WHITESPACE, 1);
+  const { digest, name, registry } = parseImageRef(image);
+
+  return (
+    digest?.startsWith("sha256:") === true ||
+    ((registry === undefined || TRUSTED_FRONTEND_REGISTRIES.has(registry)) &&
+      TRUSTED_FRONTEND_REPOSITORIES.has(name))
+  );
+};
+
+const unsafeRunFlags = (args: string): string[] => {
+  const flags: string[] = [];
+
+  for (const [token] of args.matchAll(RUN_FLAG_TOKEN)) {
+    const flag = token.replaceAll(QUOTE, "").toLowerCase();
+
+    if (flag === "--" || !flag.startsWith("--")) {
+      break;
+    }
+
+    if (UNSAFE_RUN_FLAGS.has(flag)) {
+      flags.push(flag);
+    }
+  }
+
+  return flags;
+};
+
+export const noUnsafeBuildFeatures: DockerfileRule = {
+  category: "Security",
+  check(instructions, file, context) {
+    const diagnostics: Diagnostic[] = [];
+    const syntax = context?.directives?.syntax;
+
+    if (syntax !== undefined && !isTrustedFrontend(syntax.value)) {
+      diagnostics.push(
+        createDiagnostic(
+          file,
+          this.key,
+          this.defaultSeverity,
+          `Dockerfile selects BuildKit frontend '${syntax.value}'. A frontend runs with access to the build, so an untrusted one can read or change what it builds.`,
+          this.help,
+          syntax.line
+        )
+      );
+    }
+
+    for (const inst of instructions) {
+      if (inst.instruction !== "RUN") {
+        continue;
+      }
+
+      for (const flag of unsafeRunFlags(inst.args)) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `RUN uses ${flag}, which removes build isolation for this step.`,
+            this.help,
+            inst.line
+          )
+        );
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: "Use the official `docker/dockerfile` frontend, or pin a third-party one by digest after reviewing it. Remove --security=insecure and --network=host unless the build truly needs them.",
+  key: "docker-doctor/no-unsafe-build-features",
+  message: "Avoid untrusted BuildKit frontends and insecure RUN flags",
+};
+
 export const securityRules = [
   noRootUser,
   noSecretsInEnv,
   pinImageVersion,
   noAddRemote,
+  noUnsafeBuildFeatures,
 ];

@@ -2,6 +2,8 @@ export { discoverProject } from "./project-info/discover";
 
 export { parseDockerfile } from "./parsers/dockerfile-parser";
 
+export { parseDockerfileDirectives } from "./parsers/dockerfile-directives";
+
 export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
 
 export { runDockerfileRules } from "./runners/dockerfile-runner";
@@ -52,6 +54,7 @@ export type {
   Diagnostic,
   DiagnosticSeverity,
   DockerDoctorConfig,
+  DockerfileDirectives,
   DockerfileInstruction,
   DockerfileRule,
   ProjectInfo,

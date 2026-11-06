@@ -5,6 +5,10 @@ export interface DockerfileInstruction {
   raw: string;
 }
 
+export interface DockerfileDirectives {
+  syntax?: { value: string; line: number };
+}
+
 export type DiagnosticSeverity = "error" | "warning" | "info";
 
 export interface Diagnostic {
@@ -58,7 +62,7 @@ export interface DockerfileRule extends RuleDefinition {
   check: (
     instructions: DockerfileInstruction[],
     file: string,
-    context?: { projectFiles?: string[] }
+    context?: { projectFiles?: string[]; directives?: DockerfileDirectives }
   ) => Diagnostic[];
 }
 

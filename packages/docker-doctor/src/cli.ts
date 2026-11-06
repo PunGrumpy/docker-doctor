@@ -15,6 +15,7 @@ import type {
 import {
   discoverProject,
   parseDockerfile,
+  parseDockerfileDirectives,
   createComposeLocator,
   parseCompose,
   runDockerfileRules,
@@ -596,7 +597,8 @@ const runRulesEngine = async (
             df,
             projectFilesList,
             rulesConfig,
-            categoriesConfig
+            categoriesConfig,
+            parseDockerfileDirectives(content)
           ),
         };
       } catch (error: unknown) {

@@ -5,7 +5,7 @@ title: Rules
 description: Every rule docker-doctor ships, grouped by category.
 ---
 
-docker-doctor ships 36 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
+docker-doctor ships 37 rules across 5 categories. Every diagnostic carries a full rule key (e.g. `docker-doctor/no-root-user`) that you can pass to `rules explain` or use to tune severity in your config. Each rule below links to a page with failing and fixed examples.
 
 List everything docker-doctor knows about:
 
@@ -29,6 +29,7 @@ Catches Dockerfile patterns that widen your attack surface.
 | [`no-secrets-in-env`](/docs/reference/rules/no-secrets-in-env) | Avoid storing secrets in ENV or ARG instructions | <SeverityPill severity="error" /> |
 | [`pin-image-version`](/docs/reference/rules/pin-image-version) | Pin base images to a specific tag or digest | <SeverityPill severity="warning" /> |
 | [`no-add-remote`](/docs/reference/rules/no-add-remote) | Avoid using ADD with remote URLs | <SeverityPill severity="warning" /> |
+| [`no-unsafe-build-features`](/docs/reference/rules/no-unsafe-build-features) | Avoid untrusted BuildKit frontends and insecure RUN flags | <SeverityPill severity="warning" /> |
 
 ## Performance
 

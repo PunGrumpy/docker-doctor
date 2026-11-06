@@ -1,5 +1,6 @@
 import { allDockerfileRules } from "../rules/index";
 import type {
+  DockerfileDirectives,
   DockerfileInstruction,
   Diagnostic,
   RuleSeverity,
@@ -12,7 +13,8 @@ export const runDockerfileRules = (
   file: string,
   projectFiles: string[],
   rulesConfig?: Record<string, RuleSeverity>,
-  categoriesConfig?: Record<string, RuleSeverity>
+  categoriesConfig?: Record<string, RuleSeverity>,
+  directives?: DockerfileDirectives
 ): Diagnostic[] => {
   // A file with no instructions (empty, comment-only, a stub) has nothing
   // to check. Whole-file rules such as no-root-user would otherwise report
@@ -30,7 +32,10 @@ export const runDockerfileRules = (
       continue;
     }
 
-    const ruleDiagnostics = rule.check(instructions, file, { projectFiles });
+    const ruleDiagnostics = rule.check(instructions, file, {
+      directives,
+      projectFiles,
+    });
 
     for (const diag of ruleDiagnostics) {
       diag.category = rule.category;
