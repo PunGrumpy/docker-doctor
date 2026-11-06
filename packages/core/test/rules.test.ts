@@ -36,8 +36,10 @@ import {
 import {
   noBroadBindMount,
   noDockerSocketMount,
+  noHostNamespaces,
   noPlaintextSecrets,
   noPrivilegedService,
+  noWeakenedConfinement,
   preferReadOnlyBindMount,
 } from "../src/rules/compose-security";
 import {
@@ -1370,6 +1372,193 @@ describe("Compose Security Rules", () => {
     expect(
       noPrivilegedService.check(composeContent, "compose.yml")
     ).toHaveLength(0);
+  });
+
+  const hostNamespaceKeys = ["pid", "ipc", "uts", "cgroup", "userns_mode"];
+
+  test.each(hostNamespaceKeys)(
+    "no-host-namespaces: %s: host reports one finding on its line",
+    (key) => {
+      const source = `services:
+  agent:
+    image: myagent:1.0
+    ${key}: host
+`;
+
+      const diagnostics = noHostNamespaces.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].line).toBe(4);
+      expect(diagnostics[0].message).toContain(`'agent'`);
+      expect(diagnostics[0].message).toContain(`${key}: host`);
+    }
+  );
+
+  test("no-host-namespaces: one finding per key", () => {
+    const composeContent = parseCompose(
+      "services:\n  agent:\n    pid: host\n    ipc: host\n    uts: host\n",
+      "compose.yaml"
+    );
+
+    expect(
+      noHostNamespaces
+        .check(composeContent, "compose.yaml")
+        .map((d) => d.message)
+    ).toHaveLength(3);
+  });
+
+  test("no-host-namespaces: private, service and container namespaces are clean", () => {
+    const composeContent = {
+      services: {
+        web: {
+          cgroup: "private",
+          image: "nginx:1.27-alpine",
+          ipc: "shareable",
+          network_mode: "host",
+          pid: "service:db",
+          userns_mode: "keep-id",
+        },
+        worker: {
+          image: "worker:1.0",
+          ipc: "service:web",
+          pid: "container:db",
+        },
+      },
+    };
+
+    expect(noHostNamespaces.check(composeContent, "compose.yaml")).toEqual([]);
+  });
+
+  test("no-host-namespaces: values that are not strings do not crash", () => {
+    const composeContent = {
+      services: {
+        web: { image: "nginx", ipc: ["host"], pid: true, uts: { host: 1 } },
+      },
+    };
+
+    expect(noHostNamespaces.check(composeContent, "compose.yaml")).toEqual([]);
+  });
+
+  const confinementCapabilityCases = [
+    { entry: "SYS_ADMIN", name: "SYS_ADMIN" },
+    { entry: "CAP_SYS_ADMIN", name: "SYS_ADMIN" },
+    { entry: "sys_admin", name: "SYS_ADMIN" },
+    { entry: "cap_sys_admin", name: "SYS_ADMIN" },
+    { entry: "SYS_MODULE", name: "SYS_MODULE" },
+    { entry: "CAP_SYS_MODULE", name: "SYS_MODULE" },
+    { entry: "SYS_RAWIO", name: "SYS_RAWIO" },
+    { entry: "DAC_READ_SEARCH", name: "DAC_READ_SEARCH" },
+    { entry: "CAP_DAC_READ_SEARCH", name: "DAC_READ_SEARCH" },
+  ];
+
+  test.each(confinementCapabilityCases)(
+    "no-weakened-confinement: cap_add $entry reports",
+    ({ entry }) => {
+      const source = `services:
+  agent:
+    image: myagent:1.0
+    cap_add:
+      - NET_ADMIN
+      - ${entry}
+`;
+
+      const diagnostics = noWeakenedConfinement.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].line).toBe(6);
+      expect(diagnostics[0].message).toContain(`'${entry}'`);
+    }
+  );
+
+  const confinementSecurityOptCases = [
+    "seccomp:unconfined",
+    "seccomp=unconfined",
+    "apparmor:unconfined",
+    "apparmor=unconfined",
+    "label:disable",
+    "label=disable",
+    "systempaths=unconfined",
+    "systempaths:unconfined",
+    "SECCOMP:UNCONFINED",
+  ];
+
+  test.each(confinementSecurityOptCases)(
+    "no-weakened-confinement: security_opt %s reports",
+    (entry) => {
+      const source = `services:
+  agent:
+    image: myagent:1.0
+    security_opt:
+      - no-new-privileges:true
+      - ${entry}
+`;
+
+      const diagnostics = noWeakenedConfinement.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].line).toBe(6);
+    }
+  );
+
+  test("no-weakened-confinement: capabilities and options services need stay clean", () => {
+    const composeContent = {
+      services: {
+        monitor: {
+          cap_add: [
+            "NET_ADMIN",
+            "NET_RAW",
+            "SYS_PTRACE",
+            "CAP_NET_BIND_SERVICE",
+          ],
+          image: "monitor:1.0",
+          security_opt: [
+            "no-new-privileges:true",
+            "seccomp:./profile.json",
+            "apparmor:docker-default",
+            "label:type:svirt_apache_t",
+            "systempaths=default",
+          ],
+        },
+      },
+    };
+
+    expect(noWeakenedConfinement.check(composeContent, "compose.yaml")).toEqual(
+      []
+    );
+  });
+
+  test("no-weakened-confinement: values that are not sequences or strings do not crash", () => {
+    const composeContent = {
+      services: {
+        mapped: {
+          cap_add: { SYS_ADMIN: true },
+          image: "a",
+          security_opt: "seccomp:unconfined",
+        },
+        mixed: {
+          cap_add: [1, null, ["SYS_ADMIN"]],
+          image: "b",
+          security_opt: [{}, true],
+        },
+        scalar: { cap_add: "SYS_ADMIN", image: "c" },
+      },
+    };
+
+    expect(noWeakenedConfinement.check(composeContent, "compose.yaml")).toEqual(
+      []
+    );
   });
 
   test("no-docker-socket-mount: short and long volume syntax", () => {
