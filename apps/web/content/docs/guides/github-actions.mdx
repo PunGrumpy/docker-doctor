@@ -41,7 +41,7 @@ The same summary is mirrored to the workflow's job summary. GitHub limits a comm
 
 On a pull request from a fork, GitHub gives the workflow a read-only token. The action then skips the comment and the commit status with a warning. The job summary and the `blocking` gate still work.
 
-Do not trigger this workflow with `pull_request_target` and check out the pull request head. Docker Doctor loads the config file from the scanned directory, and a JavaScript or TypeScript config runs as code, so the pull request's own config would run with a privileged token. Use `pull_request`.
+Use `pull_request`, not `pull_request_target`. Docker Doctor loads the config file from the scanned directory, and a JavaScript or TypeScript config runs as code, so a pull request's own config runs on the runner. Under `pull_request`, a pull request from a fork gets a read-only token and no secrets. Under `pull_request_target` with a checkout of the pull request head, that code would run with the base repository's token and secrets. The action also comments and applies the `blocking` gate only on `pull_request`. A branch in the same repository runs with the permissions the workflow grants, so review a changed config file as you would any other code.
 
 ## Commit status
 

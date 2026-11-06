@@ -378,6 +378,7 @@ const printAgentPrompt = (payload: string): void => {
 
 interface WizardContext {
   diagnostics: Diagnostic[];
+  ignoredConfig: boolean;
   report: JsonReport;
   rootDir: string;
 }
@@ -415,6 +416,7 @@ const runAgentHandoff = async (context: WizardContext): Promise<void> => {
 
   const payload = buildHandoffPayload({
     diagnostics: context.diagnostics,
+    ignoredConfig: context.ignoredConfig,
     projectDir: context.rootDir,
     projectName: path.basename(context.rootDir),
   });
@@ -751,6 +753,7 @@ interface ScanOutcome {
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
   fileContents: Record<string, string>;
+  ignoredConfig: boolean;
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
@@ -768,7 +771,15 @@ const writeTerminalReport = async (
   verbose: boolean,
   exitCode: number
 ): Promise<number> => {
-  const { diagnostics, failures, fileContents, project, rootDir } = scan;
+  const {
+    diagnostics,
+    failures,
+    fileContents,
+    ignoredConfig,
+    project,
+    rootDir,
+  } = scan;
+
   await formatTerminal(
     diagnostics,
     score,
@@ -784,6 +795,7 @@ const writeTerminalReport = async (
   if (process.stdout.isTTY && process.stdin.isTTY) {
     wizardOk = await runInteractiveWizard({
       diagnostics,
+      ignoredConfig,
       report: toJsonReport(
         diagnostics,
         score,
@@ -1119,6 +1131,7 @@ program
             diagnostics,
             failures,
             fileContents,
+            ignoredConfig: options.config === false,
             project,
             rootDir,
             scannedFileCount,

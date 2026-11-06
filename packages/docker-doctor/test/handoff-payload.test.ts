@@ -132,7 +132,7 @@ describe("buildHandoffPayload", () => {
     );
   });
 
-  test("tells the agent to re-run the installed CLI before falling back to npx", () => {
+  test("names the installed CLI and npx for the re-run", () => {
     const payload = buildHandoffPayload({
       diagnostics: [makeDiagnostic()],
       projectDir: PROJECT_DIR,
@@ -141,6 +141,19 @@ describe("buildHandoffPayload", () => {
 
     expect(payload).toContain(
       "re-run `docker-doctor .` (or `npx @docker-doctor/cli@latest .`)"
+    );
+  });
+
+  test("keeps --no-config on the re-run when the scan ignored the config", () => {
+    const payload = buildHandoffPayload({
+      diagnostics: [makeDiagnostic()],
+      ignoredConfig: true,
+      projectDir: PROJECT_DIR,
+      projectName: "example",
+    });
+
+    expect(payload).toContain(
+      "re-run `docker-doctor . --no-config` (or `npx @docker-doctor/cli@latest . --no-config`)"
     );
   });
 });

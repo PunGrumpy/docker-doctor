@@ -831,10 +831,11 @@ describe("--no-config", () => {
     await withRepo(
       { "docker-doctor.config.mjs": RUNNING_CONFIG },
       async (root) => {
-        const { exitCode } = await runCli([root, "--no-config"]);
+        const { exitCode, stdout } = await runCli([root, "--no-config"]);
 
         expect(exitCode).toBe(0);
         expect(markerExists(root)).toBe(false);
+        expect(stdout).toContain(" / 100");
       }
     );
   });
