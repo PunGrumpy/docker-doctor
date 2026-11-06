@@ -62,7 +62,7 @@ export interface DockerfileRule extends RuleDefinition {
   check: (
     instructions: DockerfileInstruction[],
     file: string,
-    context?: { projectFiles?: string[] }
+    context?: { projectFiles?: string[]; directives?: DockerfileDirectives }
   ) => Diagnostic[];
 }
 
