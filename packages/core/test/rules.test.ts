@@ -1362,6 +1362,66 @@ describe("Compose Security Rules", () => {
     }
   );
 
+  const capAddAllCases = [
+    { entry: "ALL", expected: 1 },
+    { entry: "all", expected: 1 },
+    { entry: "CAP_ALL", expected: 1 },
+    { entry: "cap_all", expected: 1 },
+    { entry: "NET_ADMIN", expected: 0 },
+    { entry: "SYS_ADMIN", expected: 0 },
+  ];
+
+  test.each(capAddAllCases)(
+    "no-privileged-service: cap_add $entry reports $expected as an error",
+    ({ entry, expected }) => {
+      const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    cap_add:
+      - NET_BIND_SERVICE
+      - ${entry}
+`;
+
+      const diagnostics = noPrivilegedService.check(
+        parseCompose(source, "compose.yaml"),
+        "compose.yaml",
+        { locate: createComposeLocator(source) }
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+      expect(diagnostics.map((d) => d.line)).toEqual(expected === 1 ? [6] : []);
+      expect(diagnostics.map((d) => d.severity)).toEqual(
+        expected === 1 ? ["error"] : []
+      );
+    }
+  );
+
+  test("no-privileged-service: privileged and cap_add ALL report separately", () => {
+    const composeContent = {
+      services: {
+        web: { cap_add: ["ALL"], image: "a", privileged: true },
+      },
+    };
+
+    expect(
+      noPrivilegedService.check(composeContent, "compose.yaml")
+    ).toHaveLength(2);
+  });
+
+  test("no-privileged-service: cap_add values that are not sequences of strings do not crash", () => {
+    const composeContent = {
+      services: {
+        mapped: { cap_add: { ALL: true }, image: "a" },
+        mixed: { cap_add: [1, null, ["ALL"]], image: "b" },
+        scalar: { cap_add: "ALL", image: "c" },
+      },
+    };
+
+    expect(noPrivilegedService.check(composeContent, "compose.yaml")).toEqual(
+      []
+    );
+  });
+
   test("no-privileged-service: privileged false or absent is clean", () => {
     const composeContent = {
       services: {

@@ -47,12 +47,33 @@ export const noPrivilegedService: ComposeRule = {
           )
         );
       }
+
+      const { cap_add: capAdd } = config;
+
+      if (!isComposeSequence(capAdd)) {
+        continue;
+      }
+
+      for (const [index, entry] of capAdd.entries()) {
+        if (isComposeString(entry) && normalizeCapability(entry) === "ALL") {
+          diagnostics.push(
+            createDiagnostic(
+              file,
+              this.key,
+              this.defaultSeverity,
+              `Service '${name}' adds every Linux capability with cap_add '${entry.trim()}'. That grants the kernel powers of privileged mode, so compromising this service compromises the host.`,
+              this.help,
+              context?.locate?.(["services", name, "cap_add", index])
+            )
+          );
+        }
+      }
     }
 
     return diagnostics;
   },
   defaultSeverity: "error",
-  help: "Remove `privileged: true` and grant only what the service needs: specific capabilities via `cap_add`, or individual device access via `devices`.",
+  help: "Remove `privileged: true` and `cap_add: [ALL]`, and grant the narrowest specific capability the service needs. `ALL` and `SYS_ADMIN` work like privileged mode. Use `devices` for individual device access.",
   key: "docker-doctor/no-privileged-service",
   message: "Do not run services in privileged mode",
 };
