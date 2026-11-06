@@ -84,7 +84,7 @@ const HOST_NAMESPACE_EFFECTS = new Map([
   ["pid", "the container can see and signal every process on the host."],
   [
     "userns_mode",
-    "user namespace remapping is off, so root in the container is root on the host.",
+    "root in the container is root on the host, because user namespace remapping is off.",
   ],
   ["uts", "the container shares the host's hostname and domain name."],
 ]);
@@ -95,10 +95,14 @@ export const noHostNamespaces: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
-      for (const [key, effect] of HOST_NAMESPACE_EFFECTS) {
-        const value = config[key];
+      for (const [key, value] of Object.entries(config)) {
+        const effect = HOST_NAMESPACE_EFFECTS.get(key);
 
-        if (isComposeString(value) && value.trim().toLowerCase() === "host") {
+        if (
+          effect !== undefined &&
+          isComposeString(value) &&
+          value.trim().toLowerCase() === "host"
+        ) {
           diagnostics.push(
             createDiagnostic(
               file,

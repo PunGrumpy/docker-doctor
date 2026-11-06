@@ -36,7 +36,7 @@ Scanning this file reports:
 
 ## Why it matters
 
-A container shares the host's kernel, so the capabilities, syscall filter and security profile are the only things that limit what a compromised process can ask of it. Removing them widens the kernel surface it can attack and turns an ordinary bug into a host compromise. The runc escapes [CVE-2025-31133](https://github.com/opencontainers/runc/security/advisories/GHSA-9493-h29p-rfm2) and [CVE-2025-52881](https://github.com/opencontainers/runc/security/advisories/GHSA-cgrx-mc8f-2prm) show how much rides on these defaults. Their advisories say not to run untrusted images, and for containers without user namespaces to avoid root privileges and turn on no new privileges. A service that adds `SYS_ADMIN` or sets `seccomp:unconfined` works against that advice.
+A container shares the host's kernel, so the capabilities, syscall filter and security profile are the only things that limit what a compromised process can ask of it. Removing them widens the kernel surface it can attack and turns an ordinary bug into a host compromise. The runc escapes [CVE-2025-31133](https://github.com/opencontainers/runc/security/advisories/GHSA-9493-h29p-rfm2) and [CVE-2025-52565](https://github.com/opencontainers/runc/security/advisories/GHSA-qw9x-cqr3-wc7r) show how much rides on these defaults. Their advisories say not to run untrusted images, and for containers without user namespaces to avoid root privileges and turn on no new privileges. A service that adds `SYS_ADMIN` or sets `seccomp:unconfined` works against that advice.
 
 ## How to fix it
 

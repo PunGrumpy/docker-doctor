@@ -1652,6 +1652,23 @@ describe("Compose Security Rules", () => {
     expect(diags[1].line).toBe(9);
   });
 
+  test("no-host-namespaces: findings follow the order of the file", () => {
+    const source = `services:
+  agent:
+    image: my-agent:1.2.0
+    pid: host
+    ipc: host
+`;
+
+    const diags = noHostNamespaces.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([4, 5]);
+  });
+
   test("no-docker-socket-mount: use_api_socket is reported as the socket", () => {
     const source = `services:
   a:

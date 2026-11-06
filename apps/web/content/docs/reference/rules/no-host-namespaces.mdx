@@ -30,7 +30,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/no-host-namespaces]
-  Service 'agent' sets 'ipc: host', so the container shares the host's shared memory and message queues.
+  Service 'agent' sets 'pid: host', so the container can see and signal every process on the host.
 ```
 
 ## Why it matters
