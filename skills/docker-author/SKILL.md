@@ -71,7 +71,7 @@ CMD ["node", "dist/server.js"]
 | **`depends_on` with `condition: service_healthy`**, not the short list form | `use-depends-on-condition` |
 | **Narrow bind mounts** — mount `./data`, never `/`, `~`, `~/.ssh`, `../` or `/etc` | `no-broad-bind-mount` |
 | **Read-only host mounts** — `:ro` / `read_only: true` on any bind mount outside the project unless the service writes to it | `prefer-read-only-bind-mount` |
-| **No Docker socket bind mount** — `use_api_socket: true` or a filtering proxy instead | `no-docker-socket-mount` |
+| **No Docker socket bind mount** — a filtering socket proxy instead | `no-docker-socket-mount` |
 
 ## Verify before handing off
 

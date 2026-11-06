@@ -1399,6 +1399,121 @@ describe("Compose Security Rules", () => {
     expect(diags[1].line).toBe(9);
   });
 
+  test("no-docker-socket-mount: use_api_socket is reported as the socket", () => {
+    const source = `services:
+  a:
+    image: docker/mcp-gateway:1.0
+    use_api_socket: true
+  b:
+    image: docker/mcp-gateway:1.0
+    use_api_socket: "true"
+  c:
+    image: docker/mcp-gateway:1.0
+    use_api_socket: yes
+  d:
+    image: docker/mcp-gateway:1.0
+    use_api_socket: false
+`;
+
+    const composeContent = parseCompose(source, "compose.yml");
+
+    const diags = noDockerSocketMount.check(composeContent, "compose.yml", {
+      locate: createComposeLocator(source),
+    });
+
+    expect(diags.map((d) => d.line)).toEqual([4, 7, 10]);
+    expect(diags[0].message).toContain("use_api_socket");
+    expect(diags[0].message).toContain("registry credentials");
+    expect(diags[0].message).not.toContain("CVE-");
+  });
+
+  test("no-docker-socket-mount: a filtering socket proxy may mount the socket", () => {
+    const images = [
+      "tecnativa/docker-socket-proxy:0.3.0",
+      "wollomatic/socket-proxy:1.5",
+      "linuxserver/socket-proxy:latest",
+      "lscr.io/linuxserver/socket-proxy:1.2",
+      "docker.io/tecnativa/docker-socket-proxy@sha256:abc",
+      "ghcr.io/wollomatic/socket-proxy:1.5",
+    ];
+
+    for (const image of images) {
+      const composeContent = {
+        services: {
+          proxy: {
+            image,
+            volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"],
+          },
+        },
+      };
+
+      expect(
+        noDockerSocketMount.check(composeContent, "compose.yml")
+      ).toHaveLength(0);
+    }
+  });
+
+  test("no-docker-socket-mount: a look-alike proxy image is still reported", () => {
+    const composeContent = {
+      services: {
+        proxy: {
+          image: "evil/docker-socket-proxy:1.0",
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+        },
+      },
+    };
+
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(1);
+  });
+
+  test("no-docker-socket-mount: a proxy name on another registry is still reported", () => {
+    const composeContent = {
+      services: {
+        proxy: {
+          image: "evil.example/tecnativa/docker-socket-proxy:1.0",
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+        },
+      },
+    };
+
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(1);
+  });
+
+  test("no-docker-socket-mount: a built service tagged with a proxy name is still reported", () => {
+    const composeContent = {
+      services: {
+        proxy: {
+          build: "./agent",
+          image: "tecnativa/docker-socket-proxy:1.0",
+          volumes: ["/var/run/docker.sock:/var/run/docker.sock"],
+        },
+      },
+    };
+
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(1);
+  });
+
+  test("no-docker-socket-mount: use_api_socket on a proxy image is still reported", () => {
+    const composeContent = {
+      services: {
+        proxy: {
+          image: "tecnativa/docker-socket-proxy:0.3.0",
+          use_api_socket: true,
+        },
+      },
+    };
+
+    expect(
+      noDockerSocketMount.check(composeContent, "compose.yml")
+    ).toHaveLength(1);
+  });
+
   test("no-docker-socket-mount: every host spelling of the socket", () => {
     const source = `services:
   gateway:
