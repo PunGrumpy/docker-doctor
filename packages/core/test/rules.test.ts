@@ -804,6 +804,72 @@ ENV BUILD_ID=sk-short
   });
 });
 
+describe("Compose build args", () => {
+  const token = `sk-${"a".repeat(40)}`;
+
+  test("a literal secret in either build.args form is reported at its line", () => {
+    const source = `services:
+  agent:
+    build:
+      context: .
+      args:
+        OPENAI_API_KEY: literal-openai
+        NODE_VERSION: "22"
+        FOO: ${token}
+  worker:
+    build:
+      context: .
+      args:
+        - HF_KEY=literal-hf
+        - NODE_VERSION=22
+        - BAR=${token}
+        - OPENAI_API_KEY
+`;
+
+    const diagnostics = noPlaintextSecrets.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diagnostics.map((d) => d.line)).toEqual([6, 8, 13, 15]);
+    expect(diagnostics.map((d) => d.message)).toEqual<unknown[]>([
+      expect.stringContaining(
+        "service 'agent' build args: 'OPENAI_API_KEY'. A build arg stays in the image history, so anyone who can pull the image can read it."
+      ),
+      expect.stringContaining("build args: 'FOO'"),
+      expect.stringContaining("service 'worker' build args: 'HF_KEY'"),
+      expect.stringContaining("build args: 'BAR'"),
+    ]);
+
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.help).toContain("RUN --mount=type=secret");
+      expect(diagnostic.message).not.toContain(token);
+      expect(diagnostic.message).not.toContain("literal-");
+    }
+  });
+
+  test("interpolated, descriptor and string build values are not reported", () => {
+    const composeContent = {
+      services: {
+        api: {
+          build: {
+            args: {
+              OPENAI_API_KEY: `\${OPENAI_API_KEY}`,
+              OPENAI_KEY_FILE: "/run/secrets/openai",
+              PUBLIC_KEY: "literal-public",
+            },
+          },
+        },
+        web: { build: "./web" },
+        worker: { build: { args: null, context: "." } },
+      },
+    };
+
+    expect(noPlaintextSecrets.check(composeContent, "compose.yml")).toEqual([]);
+  });
+});
+
 describe("Performance Rules", () => {
   test("order-layers", () => {
     const badOrder = parseDockerfile(`
