@@ -652,6 +652,10 @@ describe("secret key words and value shapes", () => {
     "hf",
   ];
 
+  test("SUPABASE_SERVICE_ROLE_KEY names a secret", () => {
+    expect(isSecretKey("SUPABASE_SERVICE_ROLE_KEY")).toBe(true);
+  });
+
   test.each(credentialWords)("%s_KEY names a secret", (word) => {
     expect(isSecretKey(`${word.toUpperCase()}_KEY`)).toBe(true);
     expect(isSecretKey(`APP_${word.toUpperCase()}_KEY`)).toBe(true);
@@ -694,6 +698,7 @@ describe("secret key words and value shapes", () => {
       value: `github_pat_${"a1".repeat(11)}_${"b".repeat(30)}`,
     },
     { name: "AWS access key id", value: `AKIA${"A1".repeat(8)}` },
+    { name: "AWS temporary key id", value: `ASIA${"A1".repeat(8)}` },
     { name: "quoted", value: `"sk-${"a1".repeat(20)}"` },
     { name: "after a header word", value: `Bearer sk-${"a1".repeat(20)}` },
   ];
@@ -711,6 +716,8 @@ describe("secret key words and value shapes", () => {
     `AKIA${"A1".repeat(8)}A`,
     "sk-your-openai-api-key-here",
     "sk-learn-preprocessing-pipeline",
+    "sk-learn-random-forest-v1",
+    "sk-20240101-checkpoint-final",
     `sk-${"x".repeat(40)}`,
     `ghp_${"x".repeat(36)}`,
     `hf_${"x".repeat(34)}`,

@@ -6,6 +6,7 @@ const CREDENTIAL_KEY_WORDS = [
   "signing",
   "access",
   "service",
+  "service[_-]role",
   "admin",
   "license",
   "hmac",
@@ -100,23 +101,25 @@ export const isLiteralSecretValue = (value: string): boolean => {
 };
 
 // Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
-// `ghp_` and `github_pat_`, and AWS access key ids. The boundary keeps a
-// longer word that merely ends in a prefix, such as `task-`, out.
+// `ghp_` and `github_pat_`, and AWS long-term (`AKIA`) and temporary (`ASIA`)
+// access key ids. The boundary keeps a longer word that merely ends in a
+// prefix, such as `task-`, out.
 const PROVIDER_TOKEN_PATTERNS: readonly RegExp[] = [
   /(?<![A-Za-z0-9])sk-[\w-]{20,}/gu,
   /(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}/gu,
   /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}/gu,
   /(?<![A-Za-z0-9])github_pat_\w{20,}/gu,
-  /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![0-9A-Z])/gu,
+  /(?<![A-Za-z0-9])A(?:KI|SI)A[0-9A-Z]{16}(?![0-9A-Z])/gu,
 ];
 
 const DIGIT = /\d/u;
+const RANDOM_RUN = /[A-Za-z0-9]{16}/u;
 
-// A random token this long has a digit. `sk-your-openai-api-key-here` and
-// `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx` do not, and AWS documents its sample
-// key id with an `EXAMPLE` suffix.
+// A random token this long has a digit and an unbroken run of characters.
+// `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx` has no digit, `sk-learn-random-forest-v1`
+// has no long run, and AWS documents its sample key id with an `EXAMPLE` suffix.
 const isRealToken = (match: string): boolean =>
-  DIGIT.test(match) && !match.endsWith("EXAMPLE");
+  DIGIT.test(match) && RANDOM_RUN.test(match) && !match.endsWith("EXAMPLE");
 
 export const containsProviderToken = (value: string): boolean =>
   PROVIDER_TOKEN_PATTERNS.some((regex) =>
