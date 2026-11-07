@@ -62,12 +62,13 @@ The CLI doesn't read `NO_COLOR`. Set `FORCE_COLOR=0` instead.
 | `schemaVersion` | The report format version. See the table below. |
 | `score`, `label` | The health score and its label. Both are `null` when no file was analyzed, including when no Dockerfile or Compose file was found. |
 | `analyzedFiles` | How many Dockerfiles and Compose files the score covers. |
-| `diagnostics` | One entry per finding, with `rule`, `category`, `severity`, `file`, `message` and `help`, plus `line` and `column` when known. |
+| `diagnostics` | One entry per finding, with `rule`, `category`, `severity`, `file`, `message` and `help`, plus `line` when known. |
+| `suppressed` | Findings an inline ignore comment hid. Each has the fields of a `diagnostics` entry plus `reason`, the text after `--` in the comment, or `null`. They count toward neither the score nor the exit code. |
 | `failures` | Files docker-doctor found but could not read or parse, each with its error `message`. |
 | `project` | The Dockerfiles, Compose files and `.dockerignore` files docker-doctor found. |
 | `timestamp` | When the scan ran, in ISO 8601. |
 
-`schemaVersion` changes when a field is added or when the score formula changes. Compare scores only between reports with the same version.
+`schemaVersion` changes when a field is added or removed, or when the score formula changes. Compare scores only between reports with the same version.
 
 | Version | Release | Change |
 | --- | --- | --- |
@@ -76,6 +77,7 @@ The CLI doesn't read `NO_COLOR`. Set `FORCE_COLOR=0` instead.
 | 4 | 0.6.0 | Added `failures`. |
 | 5 | 0.7.0 | The score averages the penalty over the analyzed files. Scores are not comparable with version 4. |
 | 6 | 0.8.0 | Added `analyzedFiles`. `score` and `label` are `null` when no file was analyzed. Empty files and files with nothing to check no longer count toward the average. |
+| 7 | 0.10.0 | Added `suppressed`. Removed `diagnostics[].column`, which was never set. |
 
 Reports from before 0.3.0 have no `schemaVersion` field. Treat them as version 1.
 

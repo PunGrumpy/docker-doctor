@@ -79,6 +79,11 @@ export type {
   SuppressedDiagnostic,
 } from "./types/index";
 
-export { toJsonReport, type JsonReport } from "./report";
+export {
+  toJsonReport,
+  type JsonReport,
+  type ReportDiagnostic,
+  type ReportSuppressed,
+} from "./report";
 
 export { redactSecrets } from "./rules/redact-secrets";

@@ -20,7 +20,6 @@ export interface Diagnostic {
   // Set by the runners from the owning rule; rules never fill it themselves.
   category?: RuleCategory;
   line?: number;
-  column?: number;
 }
 
 export interface SuppressedDiagnostic extends Diagnostic {

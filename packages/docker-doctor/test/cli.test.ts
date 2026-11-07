@@ -285,15 +285,16 @@ describe("--json contract", () => {
         "project",
         "schemaVersion",
         "score",
+        "suppressed",
         "timestamp",
       ].toSorted()
     );
   });
 
-  test("schemaVersion is 6 and analyzedFiles counts the scanned files", async () => {
+  test("schemaVersion is 7 and analyzedFiles counts the scanned files", async () => {
     const { stdout } = await runCli([fixture("multi-file"), "--json"]);
     const report = parseReport(stdout);
-    expect(report.schemaVersion).toBe(6);
+    expect(report.schemaVersion).toBe(7);
     expect(report.analyzedFiles).toBe(2);
   });
 

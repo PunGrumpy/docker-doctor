@@ -12,6 +12,7 @@ import type {
   ProjectInfo,
   RuleSeverity,
   ScoreResult,
+  SuppressedDiagnostic,
 } from "@docker-doctor/core";
 import {
   discoverProject,
@@ -757,6 +758,7 @@ interface ScanOutcome {
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
+  suppressed: SuppressedDiagnostic[];
 }
 
 interface OutputOptions {
@@ -802,7 +804,8 @@ const writeTerminalReport = async (
         label,
         project,
         failures,
-        scan.analyzedFileCount
+        scan.analyzedFileCount,
+        scan.suppressed
       ),
       rootDir,
     });
@@ -833,7 +836,8 @@ const writeMachineReport = (
     label,
     scan.project,
     scan.failures,
-    scan.analyzedFileCount
+    scan.analyzedFileCount,
+    scan.suppressed
   );
 
   console.log(JSON.stringify(report, null, 2));
@@ -1135,6 +1139,7 @@ program
             project,
             rootDir,
             scannedFileCount,
+            suppressed: [],
           },
           options
         );
