@@ -78,6 +78,15 @@ const descriptorEnvCases = [
   { key: "PASSWORD_POLICY", value: "strict" },
   { key: "PASSWORD_MIN_LENGTH", value: "12" },
   { key: "POSTGRES_HOST_AUTH_METHOD", value: "trust" },
+  { key: "ACCESS_TOKEN_EXPIRE_MINUTES", value: "30" },
+  { key: "TOKEN_EXPIRY", value: "30m" },
+  { key: "TOKEN_EXPIRES_IN", value: "3600" },
+  { key: "TOKEN_LIMIT", value: "4096" },
+  { key: "TOKEN_BUDGET", value: "1000" },
+  { key: "TOKEN_COUNT", value: "8" },
+  { key: "TOKEN_SIZE", value: "32" },
+  { key: "MAX_TOKEN", value: "4096" },
+  { key: "MIN_TOKENS", value: "16" },
 ];
 
 // Keys that can hold the credential itself. A literal value stays reported.
@@ -674,6 +683,17 @@ describe("isSecretKey", () => {
     "timeout",
     "seconds",
     "length",
+    "minutes",
+    "hours",
+    "days",
+    "expire",
+    "expires",
+    "expiry",
+    "expiration",
+    "limit",
+    "budget",
+    "count",
+    "size",
     "name",
     "type",
     "mode",
@@ -716,6 +736,19 @@ describe("isSecretKey", () => {
       expect(isSecretKey(`auth_${token}`)).toBe(true);
     }
   );
+
+  test("an expiry written as expires_in describes the secret", () => {
+    expect(isSecretKey("ACCESS_TOKEN_EXPIRES_IN")).toBe(false);
+    expect(isSecretKey("api-token-expire-in")).toBe(false);
+  });
+
+  test("a MAX_ or MIN_ prefix names a bound, not a secret", () => {
+    expect(isSecretKey("MAX_TOKEN")).toBe(false);
+    expect(isSecretKey("min-token")).toBe(false);
+    expect(isSecretKey("MAX_PASSWORD_ATTEMPTS")).toBe(false);
+    expect(isSecretKey("SERVICE_MAX_TOKEN")).toBe(true);
+    expect(isSecretKey("MAXIMUM_TOKEN")).toBe(true);
+  });
 
   test("only the last token counts", () => {
     expect(isSecretKey("DB_NAME_PASSWORD")).toBe(true);

@@ -53,7 +53,20 @@ const SECRET_DESCRIPTOR_WORDS = [
   "ttl",
   "timeout",
   "seconds",
+  "minutes",
+  "hours",
+  "days",
+  "expire",
+  "expires",
+  "expiry",
+  "expiration",
+  "expires?[_-]in",
   "length",
+  // How many, or how large.
+  "limit",
+  "budget",
+  "count",
+  "size",
   // Which one, or which scheme guards it.
   "name",
   "type",
@@ -73,8 +86,12 @@ const SECRET_DESCRIPTOR_SUFFIX = new RegExp(
   "iu"
 );
 
+// `MAX_TOKEN` and `MIN_TOKENS` name a bound on a count of tokens.
+const BOUND_PREFIX = /^(?:max|min)[_-]/iu;
+
 export const isSecretKey = (key: string): boolean =>
   !SECRET_DESCRIPTOR_SUFFIX.test(key) &&
+  !BOUND_PREFIX.test(key) &&
   SECRET_KEY_PATTERNS.some((regex) => regex.test(key));
 
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
