@@ -4,13 +4,7 @@ import {
   isComposeSequence,
   isComposeString,
 } from "../parsers/compose-value";
-import type {
-  ComposeMapping,
-  ComposeRule,
-  ComposeValue,
-  Diagnostic,
-} from "../types/index";
-import { parseComposeImage } from "./compose-images";
+import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
 import type { HostPathScope } from "./compose-mounts";
 import {
   bindMountSource,
@@ -20,6 +14,7 @@ import {
   volumeMount,
 } from "./compose-mounts";
 import { composeServices, isComposeTrue } from "./compose-services";
+import { isSocketProxy, socketProxyRisk } from "./compose-socket-proxy";
 import { createDiagnostic } from "./create-diagnostic";
 import {
   containsProviderToken,
@@ -213,36 +208,6 @@ export const noWeakenedConfinement: ComposeRule = {
   message: "Do not weaken container confinement",
 };
 
-const SOCKET_PROXY_REGISTRIES = new Set([
-  "docker.io",
-  "ghcr.io",
-  "index.docker.io",
-  "lscr.io",
-]);
-
-const SOCKET_PROXY_REPOSITORIES = new Set([
-  "linuxserver/socket-proxy",
-  "tecnativa/docker-socket-proxy",
-  "wollomatic/socket-proxy",
-]);
-
-const isSocketProxy = (config: ComposeMapping): boolean => {
-  const { build, image } = config;
-
-  if (build !== undefined || !isComposeString(image)) {
-    return false;
-  }
-
-  const parsed = parseComposeImage(image);
-
-  return (
-    parsed !== undefined &&
-    (parsed.registry === undefined ||
-      SOCKET_PROXY_REGISTRIES.has(parsed.registry)) &&
-    SOCKET_PROXY_REPOSITORIES.has(parsed.repository)
-  );
-};
-
 export const noDockerSocketMount: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
@@ -263,8 +228,12 @@ export const noDockerSocketMount: ComposeRule = {
       }
 
       const { volumes } = config;
+      const proxyRisk = socketProxyRisk(config);
 
-      if (!isComposeSequence(volumes) || isSocketProxy(config)) {
+      if (
+        !isComposeSequence(volumes) ||
+        (isSocketProxy(config) && proxyRisk === undefined)
+      ) {
         continue;
       }
 
@@ -277,7 +246,9 @@ export const noDockerSocketMount: ComposeRule = {
               file,
               this.key,
               this.defaultSeverity,
-              `Service '${name}' bind-mounts the Docker socket. Anything running in this container can control the Docker daemon: start privileged containers, read every volume, and escape to the host.`,
+              proxyRisk === undefined
+                ? `Service '${name}' bind-mounts the Docker socket. Anything running in this container can control the Docker daemon: start privileged containers, read every volume, and escape to the host.`
+                : `Service '${name}' bind-mounts the Docker socket, and its socket proxy ${proxyRisk}. A proxy like that is not a read-only filter, so the exemption for socket proxies does not apply.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )
@@ -289,7 +260,7 @@ export const noDockerSocketMount: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "error",
-  help: "Prefer a filtering socket proxy that allows only the API calls the service needs, and do not publish the service's port. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.",
+  help: "Prefer a read-only filtering socket proxy and reach it over an internal network. A proxy stops counting as read-only when it allows POST together with CONTAINERS, EXEC or BUILD, turns on AUTH or SECRETS, passes -allowPOST, or publishes its port on all interfaces. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.",
   key: "docker-doctor/no-docker-socket-mount",
   message: "Do not bind-mount the Docker socket into services",
 };

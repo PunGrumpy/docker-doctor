@@ -31,7 +31,7 @@ The Docker daemon runs as root and its API has no notion of partial trust. Any c
 
 ## How to fix it
 
-Prefer a filtering socket proxy that allows only the API calls the service needs, and do not publish the service's port. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.
+Prefer a read-only filtering socket proxy and reach it over an internal network. A proxy stops counting as read-only when it allows POST together with CONTAINERS, EXEC or BUILD, turns on AUTH or SECRETS, passes -allowPOST, or publishes its port on all interfaces. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.
 
 ```yaml title="compose.yaml — a read-only log viewer behind a socket proxy"
 services:
@@ -67,7 +67,15 @@ If the service genuinely needs the Docker API, put a filtering socket proxy betw
 - **Know what a section grants.** `CONTAINERS=1` is not list-only. Through GET calls a client can also read the logs and download the files of every container, and `POST=0` does not stop that.
 - **Keep the proxy off the network.** Do not publish its port, and reach it from the app over an internal network.
 
-The rule does not report a raw socket mount on those three proxy images when they come from Docker Hub, `ghcr.io`, or `lscr.io`, because a proxy has to mount the socket. It still reports a service with `build:`, and the same image name on any other registry, so a private mirror needs its own ignore entry. A proxy that allows container creation is still root-equivalent, since a client can start a privileged container through it.
+The rule does not report a raw socket mount on those three proxy images when they come from Docker Hub, `ghcr.io`, or `lscr.io` and the proxy is read-only, because a proxy has to mount the socket. It still reports a service with `build:`, and the same image name on any other registry, so a private mirror needs its own ignore entry.
+
+A proxy stops counting as read-only, and the rule reports its mount again with the reason, in any of these cases:
+
+- **It can change things.** A Tecnativa or linuxserver proxy sets `POST=1` together with `CONTAINERS=1`, `EXEC=1` or `BUILD=1`. A client can then start a privileged container, run commands in any container, or build images, which is root-equivalent. A wollomatic proxy passes any `-allowPOST` flag or sets `SP_ALLOW_POST`, because it allows no `POST` call until you ask for one. The Tecnativa README marks `POST` as security-critical, and the proxy reads a value as an integer, so `true` does not turn a section on.
+- **It turns on a security-critical section.** A Tecnativa or linuxserver proxy sets `AUTH=1` or `SECRETS=1`, which the README marks as security-critical along with `POST`.
+- **It is reachable from the network.** The proxy service publishes its own port on all interfaces, in the short or the long syntax. A port bound to `127.0.0.1` or `::1` is fine.
+
+The rule reads `environment` in map and list form and `command`. It does not read `env_file`, so a proxy configured there keeps the exemption. It does not read `network_mode: host` or the per-container labels of the wollomatic proxy.
 
 `use_api_socket: true` is not a safer option. Compose mounts the same socket read-write and also copies your registry credentials into the container, so the rule reports it too.
 
