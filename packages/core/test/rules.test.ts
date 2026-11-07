@@ -2763,6 +2763,42 @@ describe("Compose Ports Rules", () => {
       environment: "environment:\n      QDRANT__LOG_LEVEL: INFO",
       expected: 1,
     },
+    {
+      environment:
+        "environment:\n      QDRANT__SERVICE__READ_ONLY_API_KEY: from-host",
+      expected: 1,
+    },
+    { environment: "env_file: .env", expected: 0 },
+    {
+      environment:
+        "env_file:\n      - .env\n      - path: .env.local\n        required: false",
+      expected: 0,
+    },
+    { environment: "env_file: []", expected: 1 },
+    { environment: 'env_file: ""', expected: 1 },
+    {
+      environment:
+        "volumes:\n      - ./qdrant.yaml:/qdrant/config/production.yaml",
+      expected: 0,
+    },
+    {
+      environment:
+        "volumes:\n      - type: bind\n        source: ./config\n        target: /qdrant/config",
+      expected: 0,
+    },
+    {
+      environment:
+        "volumes:\n      - type: bind\n        source: ./q.yaml\n        target: /qdrant/config/local.yaml\n        read_only: true",
+      expected: 0,
+    },
+    {
+      environment: "volumes:\n      - qdrant_storage:/qdrant/storage",
+      expected: 1,
+    },
+    {
+      environment: "volumes:\n      - ./qdrant.yaml:/qdrant/configs/q.yaml",
+      expected: 1,
+    },
     { environment: "", expected: 1 },
   ];
 

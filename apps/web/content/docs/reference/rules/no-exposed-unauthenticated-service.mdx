@@ -9,7 +9,7 @@ description: >-
 A `ports` entry such as `11434:11434` publishes the container on every network interface of the host. For most services that is a deliberate choice. For some AI services it opens a door with no lock, because the service has no authentication to fall back on. This rule reports a service that runs one of these images, publishes a port on all interfaces, and sets nothing in Compose that turns authentication on.
 
 - **Ollama** has no server authentication, and its official image sets `OLLAMA_HOST=0.0.0.0:11434`, so a published port is reachable from the whole network.
-- **Qdrant** listens on `0.0.0.0` by default, and its `api_key` is commented out. The rule treats `QDRANT__SERVICE__API_KEY` in `environment` as authentication.
+- **Qdrant** listens on `0.0.0.0` by default, and its `api_key` is commented out. The rule treats `QDRANT__SERVICE__API_KEY` in `environment` as authentication, and it stays silent when the service has an `env_file` or mounts a file under `/qdrant/config`, because the key can come from there.
 - **The Docker MCP gateway** creates a bearer token by default. The rule reports it only when `command` contains `--allow-unauthenticated`.
 
 The rule reads `ports` in the short and the long syntax. It reports an entry with no host address and an entry bound to `0.0.0.0` or `[::]`. A `${BIND:-0.0.0.0}` address resolves to its default. A `${BIND}` address with no default is unknown, so the rule does not report it. `network_mode: host` counts as published. `expose` does not, because it never opens a port on the host. The rule matches the image name and skips a service with `build:`, since its `image:` value is only a tag.
@@ -70,7 +70,7 @@ The list holds only products whose default bind and authentication were confirme
 
 Docker publishes ports through its own firewall rules, which run before host firewalls such as ufw. A ufw deny rule does not close a published port, so do not treat the host firewall as the fix.
 
-The rule reads only the `environment` and `command` of the service. A Qdrant key that arrives through `env_file` or a mounted config file is not seen, and the rule still reports the service. Gateway releases from 0.25.0 up to 0.43.0 served no authentication in container mode at all, whatever the flags said, so pin 0.43.1 or later.
+The rule reads the `environment` and `command` of the service. It does not read an `env_file` or a mounted Qdrant config file, so it treats authentication as unknown for those services and reports nothing. The rule does not yet cover Chroma, Weaviate or vLLM, because their default bind and authentication are unconfirmed. Gateway releases from 0.25.0 up to 0.43.0 served no authentication in container mode at all, whatever the flags said, so pin 0.43.1 or later.
 
 A monitoring or lab host that is meant to serve its whole network can set this rule to `off` in `docker-doctor.config.json`.
 
