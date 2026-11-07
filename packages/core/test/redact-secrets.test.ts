@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import { allRules } from "../src/rules/index";
 import { redactSecrets } from "../src/rules/redact-secrets";
-import { isSecretKey } from "../src/rules/secret-keywords";
+import { holdsUrlPassword, isSecretKey } from "../src/rules/secret-keywords";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 
 const PLACEHOLDER = "PLACEHOLDER_TOKEN_VALUE";
@@ -17,6 +17,14 @@ describe("redactSecrets", () => {
     {
       input: `curl -https://ci:${PLACEHOLDER}@example.com/a 1.https://ci:${PLACEHOLDER}@example.com/b`,
       output: "curl -https://***@example.com/a 1.https://***@example.com/b",
+    },
+    {
+      input: "      DATABASE_URL: postgres://app:FAKEpw@db:5432/app",
+      output: "      DATABASE_URL: postgres://***@db:5432/app",
+    },
+    {
+      input: "ENV REDIS_URL redis://:FAKEpw@redis",
+      output: "ENV REDIS_URL redis://***@redis",
     },
     {
       input: `git clone https://${PLACEHOLDER}@github.com/o/r.git`,
@@ -441,6 +449,64 @@ describe("isSecretKey on a long key", () => {
     ({ text }) => {
       const start = performance.now();
       isSecretKey(text);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
+});
+
+const adversarialUrls = [
+  { name: "a run of a", text: "a".repeat(ADVERSARIAL_LENGTH) },
+  { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "repeated schemes",
+    text: "http://".repeat(Math.floor(ADVERSARIAL_LENGTH / 7)),
+  },
+  {
+    name: "a long user part",
+    text: `http://${"a:".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "a long user part before the at sign",
+    text: `http://${"a:".repeat(ADVERSARIAL_LENGTH / 2)}@h`,
+  },
+  {
+    name: "repeated user parts",
+    text: "https://a:".repeat(ADVERSARIAL_LENGTH / 10),
+  },
+  {
+    name: "repeated URLs with a password",
+    text: "https://u:p@h ".repeat(ADVERSARIAL_LENGTH / 14),
+  },
+  { name: "colons", text: `http://${":".repeat(ADVERSARIAL_LENGTH)}@h` },
+  { name: "at signs", text: `http://${"@".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "a long dollar password",
+    text: `http://u:${"$".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long percent password",
+    text: `http://u:${"%".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long brace password",
+    text: `http://u:${"{".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long hash password",
+    text: `http://u:${"#".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "spaces after the scheme",
+    text: `http://${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+];
+
+describe("holdsUrlPassword on a long line", () => {
+  test.each(adversarialUrls)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ text }) => {
+      const start = performance.now();
+      holdsUrlPassword("DATABASE_URL", text);
       expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
     }
   );
