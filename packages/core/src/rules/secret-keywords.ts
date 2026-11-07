@@ -117,6 +117,44 @@ export const isLiteralSecretValue = (value: string): boolean => {
   );
 };
 
+// The userinfo of any `scheme://user:password@host` URL. A bare token can
+// sit in the user part (`https://<token>@github.com`), so the redactor masks
+// a user name even without a password. A scheme starts where a run of scheme
+// characters starts, so a long run is tried once, not once per character.
+// The pattern is global, so use it with `matchAll` or `replaceAll`.
+export const URL_USERINFO_RE =
+  /(?<![a-z0-9+.-])(?<scheme>[0-9+.-]*[a-z][a-z0-9+.-]*:\/\/)(?<userinfo>[^\s/@]+)@/giu;
+
+// A password that names a variable or a template slot holds no literal:
+// `$PW`, `${PW}`, `#{pw}`, `{{pw}}`, `%s` and `%(pw)s`.
+const PASSWORD_PLACEHOLDER_RE = /(?:^\$|\$\{|#\{|\{\{|%s|%\()/u;
+
+// `*_FILE` names a path that holds the value.
+const FILE_POINTER_KEY_RE = /[_-]file$/iu;
+
+const isLiteralPassword = (userinfo: string): boolean => {
+  const colon = userinfo.indexOf(":");
+
+  if (colon === -1) {
+    return false;
+  }
+
+  const password = userinfo.slice(colon + 1);
+
+  return password.length > 0 && !PASSWORD_PLACEHOLDER_RE.test(password);
+};
+
+/**
+ * Whether a value holds a URL with a literal password in its userinfo, such
+ * as `postgres://app:pw@db`. A user name alone (`ssh://git@host`), an empty
+ * password and a placeholder are not literal passwords.
+ */
+export const holdsUrlPassword = (key: string, value: string): boolean =>
+  !FILE_POINTER_KEY_RE.test(key) &&
+  [...value.matchAll(URL_USERINFO_RE)].some(({ groups }) =>
+    isLiteralPassword(groups?.userinfo ?? "")
+  );
+
 // Provider token prefixes: OpenAI-style `sk-`, Hugging Face `hf_`, GitHub
 // `ghp_` and `github_pat_`, and AWS long-term (`AKIA`) and temporary (`ASIA`)
 // access key ids. The boundary keeps a longer word that merely ends in a

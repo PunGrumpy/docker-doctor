@@ -18,6 +18,7 @@ import type {
 import { createDiagnostic } from "./create-diagnostic";
 import {
   containsProviderToken,
+  holdsUrlPassword,
   isLiteralSecretValue,
   isSecretKey,
 } from "./secret-keywords";
@@ -93,11 +94,16 @@ export const noRootUser: DockerfileRule = {
   message: "Run the container as a non-root user",
 };
 
-// A token-shaped value under any key, or a literal value, not a `{...}`
-// placeholder, under a key that names a secret.
+// A literal value, not a `{...}` placeholder, under a key that names a secret.
+const isLiteralSecretUnderKey = (key: string, value: string): boolean =>
+  isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{");
+
+// A token-shaped value or a URL with a literal password under any key, or a
+// literal value under a key that names a secret.
 const isLiteralSecret = (key: string, value: string): boolean =>
   containsProviderToken(value) ||
-  (isSecretKey(key) && isLiteralSecretValue(value) && !value.startsWith("{"));
+  holdsUrlPassword(key, value) ||
+  isLiteralSecretUnderKey(key, value);
 
 const secretKeysIn = (instruction: string, rawArgs: string): string[] => {
   const args = rawArgs.trim();

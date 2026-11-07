@@ -23,6 +23,7 @@ import { composeServices, isComposeTrue } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 import {
   containsProviderToken,
+  holdsUrlPassword,
   isLiteralSecretValue,
   isSecretKey,
 } from "./secret-keywords";
@@ -435,6 +436,7 @@ const literalValue = (value: ComposeValue | undefined): string | undefined => {
 
 const isSecretAssignment = (key: string, value: string): boolean =>
   containsProviderToken(value) ||
+  holdsUrlPassword(key, value) ||
   (isSecretKey(key) && isLiteralSecretValue(value));
 
 // The key of a "KEY=value" list entry whose value is a literal secret, or

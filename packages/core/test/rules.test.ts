@@ -102,6 +102,33 @@ const credentialEnvCases = [
   { key: "AUTH_DSN", value: "FAKEdsn" },
 ];
 
+// A URL value under a key that names no secret. A literal password in its
+// userinfo is reported by both secrets rules. The values are synthetic.
+const urlPasswordCases = [
+  { reported: true, value: "postgres://app:FAKEpw@db:5432/app" },
+  { reported: true, value: "redis://:FAKEpw@redis:6379/0" },
+  { reported: true, value: "amqps://guest:FAKEpw@mq" },
+  { reported: true, value: "mongodb://root:FAKEpw@mongo/db?authSource=admin" },
+  { reported: true, value: "https://user:FAKEpw@registry.example.com/" },
+  { reported: true, value: "postgres://postgres:postgres@db" },
+  { reported: false, value: "postgres://db:5432/app" },
+  { reported: false, value: "postgres://app@db" },
+  { reported: false, value: "postgres://app:@db" },
+  { reported: false, value: "ssh://git@github.com:org/repo.git" },
+  { reported: false, value: "http://localhost:3000/path?email=a@b.com" },
+  {
+    reported: false,
+    value: "https://abcdef0123456789abcdef0123456789@o1.example.io/4",
+  },
+  { reported: false, value: `postgres://app:\${DB_PW}@db/app` },
+  { reported: false, value: "postgres://app:$DB_PW@db/app" },
+  { reported: false, value: `postgres://app:\${DB_PW:-FAKEpw}@db/app` },
+  { reported: false, value: "postgres://app:#{pw}@db/app" },
+  { reported: false, value: "postgres://app:{{pw}}@db/app" },
+  { reported: false, value: "postgres://app:%s@db/app" },
+  { reported: false, value: "postgres://app:%(pw)s@db/app" },
+];
+
 describe("Security Rules", () => {
   test("no-root-user", () => {
     const withoutUser = parseDockerfile(`
@@ -553,6 +580,53 @@ describe("Security Rules", () => {
       ENV AUTH_DRIVER session
       ENV SECRET_NAME=my-app-secret PASSWORD_POLICY=strict
     `);
+
+    expect(noSecretsInEnv.check(dockerfile, "Dockerfile")).toHaveLength(0);
+  });
+
+  test.each(urlPasswordCases)(
+    "no-secrets-in-env: ENV DATABASE_URL=$value reports $reported",
+    ({ reported, value }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(`ENV DATABASE_URL="${value}"`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(reported ? 1 : 0);
+    }
+  );
+
+  test("no-secrets-in-env: a URL password is reported in every ENV and ARG form", () => {
+    const dockerfile = parseDockerfile(`
+      FROM node:22-slim
+      ENV DATABASE_URL=postgres://app:FAKEpw@db:5432/app
+      ENV REDIS_URL redis://:FAKEpw@redis
+      ARG NPM_REGISTRY=https://user:FAKEpw@registry.example.com/
+      ENV PORT=3000 AMQP_URI=amqps://guest:FAKEpw@mq
+      ENV OK_URL=postgres://db:5432/app
+    `);
+
+    const diagnostics = noSecretsInEnv.check(dockerfile, "Dockerfile");
+
+    expect(diagnostics.map((d) => d.line)).toEqual([3, 4, 5, 6]);
+    expect(diagnostics.map((d) => d.severity)).toEqual([
+      "error",
+      "error",
+      "error",
+      "error",
+    ]);
+    expect(diagnostics[3].message).toContain("'AMQP_URI'");
+
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.message).not.toContain("FAKEpw");
+      expect(diagnostic.help).not.toContain("FAKEpw");
+    }
+  });
+
+  test("no-secrets-in-env: a *_FILE key that holds a URL is a pointer, not a secret", () => {
+    const dockerfile = parseDockerfile(
+      "ENV DATABASE_URL_FILE=postgres://app:FAKEpw@db/app"
+    );
 
     expect(noSecretsInEnv.check(dockerfile, "Dockerfile")).toHaveLength(0);
   });
@@ -2571,6 +2645,86 @@ describe("Compose Security Rules", () => {
       expect.stringContaining("'OPENAI_APIKEY'"),
       expect.stringContaining("'PGPASSWORD'"),
     ]);
+  });
+
+  test.each(urlPasswordCases)(
+    "no-plaintext-secrets: DATABASE_URL=$value reports $reported",
+    ({ reported, value }) => {
+      const composeContent = {
+        services: {
+          app: {
+            build: { args: { REGISTRY_URL: value }, context: "." },
+            environment: { DATABASE_URL: value },
+          },
+          worker: {
+            environment: [`DATABASE_URL=${value}`],
+          },
+        },
+      };
+
+      const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
+
+      expect(diags).toHaveLength(reported ? 3 : 0);
+    }
+  );
+
+  test("no-plaintext-secrets: a URL password is reported at its line, as a warning, without the password", () => {
+    const source = `services:
+  app:
+    image: app:1.0
+    environment:
+      DATABASE_URL: postgres://app:FAKEpw@db:5432/app
+      REDIS_URL: redis://:FAKEpw@redis:6379/0
+      SENTRY_DSN: https://abcdef0123456789abcdef0123456789@o123.ingest.sentry.io/45
+      OK_URL: postgres://db:5432/app
+      INTERP: postgres://app:\${DB_PW}@db/app
+  app2:
+    image: app:1.0
+    environment:
+      - DATABASE_URL=postgres://app:FAKEpw@db:5432/app
+  app3:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: https://user:FAKEpw@registry.example.com/
+`;
+
+    const diags = noPlaintextSecrets.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([5, 6, 13, 18]);
+    expect(diags.map((d) => d.severity)).toEqual([
+      "warning",
+      "warning",
+      "warning",
+      "warning",
+    ]);
+    expect(diags[0].message).toContain("'DATABASE_URL'");
+    expect(diags[3].message).toContain("build args: 'NPM_REGISTRY'");
+
+    for (const diagnostic of diags) {
+      expect(diagnostic.message).not.toContain("FAKEpw");
+      expect(diagnostic.help).not.toContain("FAKEpw");
+    }
+  });
+
+  test("no-plaintext-secrets: a *_FILE key that holds a URL is a pointer, not a secret", () => {
+    const composeContent = {
+      services: {
+        app: {
+          environment: {
+            DATABASE_URL_FILE: "postgres://app:FAKEpw@db/app",
+          },
+        },
+      },
+    };
+
+    expect(
+      noPlaintextSecrets.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
   });
 
   const scalarSecretCases = [
