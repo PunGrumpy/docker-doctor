@@ -3944,20 +3944,53 @@ describe("Best Practices Rules", () => {
   );
 
   const useraddCases = [
+    { expected: 1, run: "useradd -m -u 4000000 app" },
+    { expected: 1, run: "useradd -u 100000 app" },
+    { expected: 1, run: "useradd -u4000000 app" },
+    { expected: 1, run: "useradd --uid 4000000 app" },
+    { expected: 1, run: "useradd --uid=4000000 app" },
+    { expected: 1, run: 'useradd -u "100000" app' },
+    { expected: 1, run: "useradd -r -u 1234567 -g app app" },
+    { expected: 1, run: "groupadd -r app && useradd -u 100000 -g app app" },
+    { expected: 1, run: "useradd -u 100000 app && ls -l /home" },
+    { expected: 1, run: "/usr/sbin/useradd -u 100000 app" },
+    { expected: 1, run: "sudo useradd -u 100000 app" },
+    { expected: 1, run: "HOME=/x useradd -u 100000 app" },
+    { expected: 1, run: "--mount=type=cache,target=/x useradd -u 100000 app" },
+    { expected: 1, run: "id app || useradd -cl -u 100000 app" },
+    { expected: 1, run: '["useradd", "-u", "100000", "app"]' },
+    { expected: 1, run: '["/bin/sh", "-c", "useradd -u 100000 app"]' },
     { expected: 0, run: "useradd -l -r -u 1001 app" },
-    { expected: 0, run: "useradd -rl -u 1001 app" },
+    { expected: 0, run: "useradd -rl -u 100000 app" },
     {
       expected: 0,
-      run: "groupadd -r app && useradd --no-log-init -r -g app app",
+      run: "groupadd -r app && useradd --no-log-init -r -u 100000 -g app app",
     },
-    { expected: 1, run: "useradd app && ls -l /home" },
-    { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
-    { expected: 0, run: "useradd -lu1000 app" },
-    { expected: 0, run: "useradd -rlu1000 app" },
-    { expected: 0, run: "useradd -lu 1000 app" },
-    { expected: 1, run: "useradd -u1000 app" },
-    { expected: 1, run: "useradd -gwheel app" },
-    { expected: 1, run: "useradd -cl app" },
+    { expected: 0, run: "useradd -lu100000 app" },
+    { expected: 0, run: "useradd -rlu100000 app" },
+    { expected: 0, run: "useradd -lu 100000 app" },
+    { expected: 0, run: '["useradd", "-l", "-u", "100000", "app"]' },
+    { expected: 0, run: "useradd app" },
+    { expected: 0, run: "useradd -r -g app app" },
+    { expected: 0, run: "useradd --shell /sbin/nologin --system app" },
+    { expected: 0, run: "useradd -m app 2>/dev/null || true" },
+    { expected: 0, run: "useradd -u 1000 app" },
+    { expected: 0, run: "useradd -u1000 app" },
+    { expected: 0, run: "useradd -u 99999 app" },
+    { expected: 0, run: "useradd --uid 1000 app" },
+    { expected: 0, run: "useradd -u 65532 app" },
+    { expected: 0, run: "useradd -u $APP_UID app" },
+    { expected: 0, run: `useradd -u "\${APP_UID}" app` },
+    { expected: 0, run: "useradd -u $(id -u) app" },
+    { expected: 0, run: "useradd -gwheel app" },
+    { expected: 0, run: "useradd -c 100000 app" },
+    { expected: 0, run: "useradd app # -u 100000" },
+    { expected: 0, run: 'echo "useradd -u 100000 app"' },
+    { expected: 0, run: "echo 'useradd -u 100000 app'" },
+    { expected: 0, run: "printf '%s\\n' useradd -u 100000" },
+    { expected: 0, run: "userdel -r app" },
+    { expected: 0, run: "apt-get install -y adduser-doc # useradd -u 100000" },
+    { expected: 0, run: "grep useradd -u 100000 /etc/passwd" },
   ];
 
   test.each(useraddCases)(
@@ -3972,22 +4005,48 @@ describe("Best Practices Rules", () => {
     }
   );
 
-  test("useradd-no-log-init", () => {
+  test("useradd-no-log-init: a useradd inside a multi-line RUN is found", () => {
     const withoutFlag = parseDockerfile(`
-      RUN useradd -r -g mygroup myuser
+      RUN set -eux; \\
+        groupadd --gid 100000 app; \\
+        useradd --uid 100000 --gid app app
     `);
 
-    const diags1 = useraddNoLogInit.check(withoutFlag, "Dockerfile");
-    expect(diags1).toHaveLength(1);
-    expect(diags1[0].rule).toBe("docker-doctor/useradd-no-log-init");
+    const diags = useraddNoLogInit.check(withoutFlag, "Dockerfile");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].rule).toBe("docker-doctor/useradd-no-log-init");
+    expect(diags[0].message).toContain("a large UID");
 
     const withFlag = parseDockerfile(`
-      RUN useradd --no-log-init -r -g mygroup myuser
+      RUN groupadd --gid 100000 app && \\
+        useradd --no-log-init --uid 100000 --gid app app
     `);
 
-    const diags2 = useraddNoLogInit.check(withFlag, "Dockerfile");
-    expect(diags2).toHaveLength(0);
+    expect(useraddNoLogInit.check(withFlag, "Dockerfile")).toHaveLength(0);
   });
+
+  const hostileUseraddRuns = [
+    `${"a ".repeat(50_000)}useradd -u 100000 ${"'\\\\ ".repeat(20_000)}`,
+    "useradd ".repeat(25_000),
+    "useradd;".repeat(25_000),
+    `useradd ${"$(".repeat(100_000)}`,
+  ];
+
+  test.each(hostileUseraddRuns)(
+    "useradd-no-log-init: a 200,000 character hostile RUN is scanned in under 50 ms",
+    (run) => {
+      const instructions = parseDockerfile(`RUN ${run}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        useraddNoLogInit.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
 
   test("require-healthcheck", () => {
     const withoutHealth = parseDockerfile(`
