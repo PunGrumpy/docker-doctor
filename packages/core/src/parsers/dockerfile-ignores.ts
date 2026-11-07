@@ -30,17 +30,21 @@ const indexOfLine = (
 // The parser drops comment and blank lines that sit inside a multi-line
 // instruction, and keeps every other line of the instruction in `raw`. Walking
 // the file against `raw` therefore finds the real end of each instruction and
-// tells a heredoc body line from a comment.
+// tells a heredoc body line from a comment. The parser moves an
+// instruction's `line` forward past a line that is not an instruction keyword
+// and ends in a backslash, but that line stays in `raw`. So each walk starts
+// after the previous instruction's last line, not at `instruction.line`.
 const locateSpans = (
   lines: string[],
   instructions: DockerfileInstruction[]
 ): SpanIndex => {
   const consumed = new Set<number>();
   const ends: number[] = [];
+  let resume = 0;
 
   for (const [position, instruction] of instructions.entries()) {
     const until = (instructions[position + 1]?.line ?? lines.length + 1) - 1;
-    let cursor = instruction.line - 1;
+    let cursor = resume;
     let end = instruction.line;
 
     for (const rawLine of instruction.raw.split("\n")) {
@@ -56,6 +60,7 @@ const locateSpans = (
     }
 
     ends.push(end);
+    resume = Math.max(resume, end);
   }
 
   return { consumed, ends };

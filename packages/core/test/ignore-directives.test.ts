@@ -120,6 +120,27 @@ describe("Dockerfile ignore comments", () => {
     expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
   });
 
+  test("a # line inside a heredoc body is shell after a lone backslash line", () => {
+    const content =
+      "FROM node\n\\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- heredoc body line\nEOT\nCMD x\n";
+
+    expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
+  });
+
+  test("a # line inside a heredoc body is shell after a line that is no instruction", () => {
+    const content =
+      "FROM node\nbogus \\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- from a heredoc body\nEOT\nCMD x\n";
+
+    expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
+  });
+
+  test("a comment after such a heredoc still applies to the next instruction", () => {
+    const content =
+      "FROM node\nbogus \\\nRUN <<EOT\necho hi\nEOT\n# docker-doctor-ignore a\nCMD x\n";
+
+    expect(lineScopes(content)).toEqual([[6, { kind: "line", line: 7 }]]);
+  });
+
   test("a comment between continuation lines does nothing and warns", () => {
     const content =
       "FROM node\nRUN a \\\n  # docker-doctor-ignore b\n  && c\nCMD x\n";
