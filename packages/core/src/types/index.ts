@@ -23,6 +23,10 @@ export interface Diagnostic {
   column?: number;
 }
 
+export interface SuppressedDiagnostic extends Diagnostic {
+  reason: string | null;
+}
+
 export type IgnoreScope = { kind: "file" } | { kind: "line"; line: number };
 
 export interface IgnoreDirective {
