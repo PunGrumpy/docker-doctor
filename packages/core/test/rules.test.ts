@@ -3315,6 +3315,27 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "NODE_ENV=production bun install --production" },
     { expected: 0, run: "NODE_ENV=production yarn install" },
     { expected: 1, run: "NODE_ENV=production pnpm install" },
+    // npm's own switches, set inline before the command.
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=true npm ci" },
+    { expected: 0, run: "npm_config_production=true npm ci" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci" },
+    { expected: 0, run: "npm_config_omit=dev npm install" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=false npm ci" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=optional npm ci" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=true yarn install" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev pnpm install" },
+    { expected: 1, run: "MY_NPM_CONFIG_OMIT=dev npm ci" },
+    // An export reaches the installs after it, a plain assignment does not.
+    { expected: 0, run: "export NODE_ENV=production && npm ci" },
+    { expected: 0, run: "export NODE_ENV=production; yarn install" },
+    { expected: 0, run: "export NPM_CONFIG_OMIT=dev && npm ci" },
+    { expected: 0, run: "export NPM_CONFIG_PRODUCTION=true && npm ci" },
+    { expected: 0, run: "export A=1 NODE_ENV=production && npm ci" },
+    { expected: 1, run: "export NODE_ENV=production && bun install" },
+    { expected: 1, run: "export NODE_ENV=development && npm ci" },
+    { expected: 1, run: "npm ci && export NODE_ENV=production" },
+    { expected: 1, run: "NODE_ENV=production; npm ci" },
+    { expected: 1, run: "export NODE_ENV=production && NODE_ENV=dev npm ci" },
   ];
 
   test.each(devDependencyCases)(
@@ -3354,6 +3375,27 @@ describe("Image Size Rules", () => {
     },
     { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
     { dockerfile: "ENV NODE_ENV=production\nRUN bun install", expected: 1 },
+    { dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV npm_config_production=true\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV NPM_CONFIG_OMIT dev\nRUN npm install", expected: 0 },
+    {
+      dockerfile:
+        'ENV NPM_CONFIG_LOGLEVEL=warn NPM_CONFIG_PRODUCTION="true"\nRUN npm ci',
+      expected: 0,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_PRODUCTION=true\nENV NPM_CONFIG_PRODUCTION=false\nRUN npm ci",
+      expected: 1,
+    },
+    { dockerfile: "RUN npm ci\nENV NPM_CONFIG_OMIT=dev", expected: 1 },
+    { dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN pnpm install", expected: 1 },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN yarn install",
+      expected: 1,
+    },
+    { dockerfile: "ENV MY_NPM_CONFIG_OMIT=dev\nRUN npm ci", expected: 1 },
     {
       dockerfile: "ENV NODE_ENV=production\nRUN bun install --production",
       expected: 0,
@@ -3386,6 +3428,50 @@ describe("Image Size Rules", () => {
     const freshBase = parseDockerfile(`
       FROM node:22-alpine AS build
       ENV NODE_ENV=production
+      FROM node:22-alpine
+      RUN npm ci
+    `);
+
+    expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
+  });
+
+  const hostileInstallRuns = [
+    `ENV ${" ".repeat(200_000)}`,
+    `ENV ${"npm_config_omit ".repeat(14_000)}`,
+    `ENV ${"npm_config_omit=".repeat(13_000)}`,
+    `RUN ${"export ".repeat(28_000)}`,
+    `RUN ${"NPM_CONFIG_OMIT=dev ".repeat(10_000)}npm ci`,
+  ];
+
+  test.each(hostileInstallRuns)(
+    "avoid-dev-dependencies: a 200,000 character hostile instruction is scanned in under 50 ms",
+    (line) => {
+      const instructions = parseDockerfile(`FROM node:22\n${line}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        avoidDevDependencies.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
+
+  test("avoid-dev-dependencies: ENV NPM_CONFIG_OMIT follows the FROM chain", () => {
+    const inherited = parseDockerfile(`
+      FROM node:22-alpine AS base
+      ENV NPM_CONFIG_OMIT=dev
+      FROM base
+      RUN npm ci
+    `);
+
+    expect(avoidDevDependencies.check(inherited, "Dockerfile")).toHaveLength(0);
+
+    const freshBase = parseDockerfile(`
+      FROM node:22-alpine AS build
+      ENV NPM_CONFIG_OMIT=dev
       FROM node:22-alpine
       RUN npm ci
     `);

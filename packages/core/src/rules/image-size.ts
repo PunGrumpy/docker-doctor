@@ -19,9 +19,18 @@ import { hasAptGetInstall } from "./package-managers";
 
 const IMAGE_SIZE = "Image Size" satisfies RuleCategory;
 
+// What the environment of a RUN says about devDependencies. `NODE_ENV` set to
+// production makes npm and Yarn 1 skip them. npm's own `omit` setting, and
+// its deprecated `production` alias, do the same for npm only. Both reach npm
+// as `npm_config_*` environment variables.
+interface InstallEnv {
+  nodeEnvProduction: boolean;
+  npmOmitsDev: boolean;
+}
+
 interface StageRun {
+  env: InstallEnv;
   inst: DockerfileInstruction;
-  productionEnv: boolean;
 }
 
 interface BuildStage {
@@ -43,9 +52,24 @@ const NODE_ENV_ARG_RE =
 
 const NODE_ENV_REFERENCE_RE = /^\$(?:NODE_ENV|\{NODE_ENV\})$/u;
 
+// npm reads any `npm_config_<name>` variable, whatever the case of the prefix
+// (npm's config docs, "Environment Variables"). `production` is a deprecated
+// alias for `--omit=dev` and `omit` lists the dependency types to leave out.
+const NPM_CONFIG_ENV_RE =
+  /(?:^|\s)npm_config_(?<name>production|omit)(?:=|\s+)["']?(?<value>[^\s"']*)/giu;
+
+const NPM_CONFIG_WORD_RE =
+  /^npm_config_(?<name>production|omit)=(?<value>.*)$/iu;
+
+const npmConfigOmitsDev = (name: string, value: string): boolean =>
+  name.toLowerCase() === "production"
+    ? value.toLowerCase() === "true"
+    : value === "dev";
+
 interface NodeEnvState {
   arg?: string;
   env?: string;
+  npmOmitsDev?: boolean;
 }
 
 // RUN sees both ENV and ARG values. ENV takes precedence over an ARG of the
@@ -73,6 +97,12 @@ const applyNodeEnv = (
       state.env = NODE_ENV_REFERENCE_RE.test(value)
         ? currentNodeEnv(state)
         : value;
+    }
+
+    for (const { groups } of inst.args.matchAll(NPM_CONFIG_ENV_RE)) {
+      if (groups !== undefined) {
+        state.npmOmitsDev = npmConfigOmitsDev(groups.name, groups.value);
+      }
     }
   }
 };
@@ -104,8 +134,11 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       });
     } else if (inst.instruction === "RUN") {
       stages.at(-1)?.runs.push({
+        env: {
+          nodeEnvProduction: currentNodeEnv(state) === "production",
+          npmOmitsDev: state.npmOmitsDev === true,
+        },
         inst,
-        productionEnv: currentNodeEnv(state) === "production",
       });
     } else {
       applyNodeEnv(inst, state, globalScope.arg);
@@ -374,15 +407,45 @@ const NON_DEV_INSTALL_FLAGS = new Set([
   "-p",
 ]);
 
+// The environment after one `NAME=value` word.
+const withAssignment = (env: InstallEnv, word: string): InstallEnv => {
+  const [name, ...rest] = word.split("=");
+
+  if (rest.length === 0) {
+    return env;
+  }
+
+  if (name === "NODE_ENV") {
+    return { ...env, nodeEnvProduction: rest.join("=") === "production" };
+  }
+
+  const npmConfig = NPM_CONFIG_WORD_RE.exec(word)?.groups;
+
+  return npmConfig === undefined
+    ? env
+    : {
+        ...env,
+        npmOmitsDev: npmConfigOmitsDev(npmConfig.name, npmConfig.value),
+      };
+};
+
+const withAssignments = (env: InstallEnv, words: string[]): InstallEnv => {
+  let result = env;
+
+  for (const word of words) {
+    result = withAssignment(result, word);
+  }
+
+  return result;
+};
+
 // One shell command, e.g. `NODE_ENV=production npm ci --omit=dev`. Only a
 // bare project install counts: a positional word after the verb
 // (`npm install express`) installs named packages, not devDependencies.
 const segmentInstallsDevDependencies = (
-  segment: string,
-  productionEnv: boolean
+  tokens: string[],
+  runEnv: InstallEnv
 ): boolean => {
-  const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
-
   const commandStart = tokens.findIndex(
     (token) => !ENV_ASSIGNMENT_RE.test(token)
   );
@@ -397,10 +460,11 @@ const segmentInstallsDevDependencies = (
     return false;
   }
 
+  const env = withAssignments(runEnv, tokens.slice(0, commandStart));
+
   const skipsDevDependencies =
-    MANAGERS_HONORING_NODE_ENV.has(manager) &&
-    (productionEnv ||
-      tokens.slice(0, commandStart).includes("NODE_ENV=production"));
+    (MANAGERS_HONORING_NODE_ENV.has(manager) && env.nodeEnvProduction) ||
+    (manager === "npm" && env.npmOmitsDev);
 
   return (
     !skipsDevDependencies &&
@@ -410,11 +474,30 @@ const segmentInstallsDevDependencies = (
   );
 };
 
-const installsDevDependencies = ({ inst, productionEnv }: StageRun): boolean =>
-  !inst.args.includes("prune") &&
-  maskQuotedText(stripRunFlags(inst.args))
-    .split(SHELL_SEPARATOR_RE)
-    .some((segment) => segmentInstallsDevDependencies(segment, productionEnv));
+// An `export` earlier in the same RUN reaches every install after it. A plain
+// `NODE_ENV=production;` assignment does not, because the shell keeps it to
+// itself.
+const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
+  if (inst.args.includes("prune")) {
+    return false;
+  }
+
+  let exported = env;
+
+  for (const segment of maskQuotedText(stripRunFlags(inst.args)).split(
+    SHELL_SEPARATOR_RE
+  )) {
+    const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
+
+    if (tokens[0] === "export") {
+      exported = withAssignments(exported, tokens.slice(1));
+    } else if (segmentInstallsDevDependencies(tokens, exported)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 export const avoidDevDependencies: DockerfileRule = {
   category: IMAGE_SIZE,
