@@ -236,16 +236,38 @@ const EXACT_SYSTEM_DIRECTORIES = new Set(["/dev", "/var", "/var/lib"]);
 const startsWithDirectory = (hostPath: string, directory: string): boolean =>
   hostPath === directory || hostPath.startsWith(`${directory}/`);
 
+const normalizeHostPath = (hostPath: string): string => {
+  const collapsed = path.posix.normalize(hostPath);
+
+  return collapsed.length > 1
+    ? collapsed.replace(/(?<!\/)\/+$/u, "")
+    : collapsed;
+};
+
+// The time zone files and the CA bundle directory that images routinely ask
+// for. They sit under `/etc`, but a read-only mount of exactly one of them
+// exposes nothing a container could use to reach the host. A writable
+// `/etc/ssl/certs` would let the container plant a CA the host then trusts.
+const READ_ONLY_EXEMPT_HOST_PATHS = new Set([
+  "/etc/localtime",
+  "/etc/timezone",
+  "/etc/ssl/certs",
+]);
+
+export const isReadOnlyExemptHostPath = (
+  mount: VolumeMount,
+  hostPath: string
+): boolean =>
+  mount.readOnly &&
+  READ_ONLY_EXEMPT_HOST_PATHS.has(normalizeHostPath(hostPath));
+
 /**
  * Classifies where on the host a bind-mount source points. `project` is a
  * relative path that stays inside the Compose project directory; everything
  * else reaches outside it.
  */
 export const classifyHostPath = (hostPath: string): HostPathScope => {
-  const collapsed = path.posix.normalize(hostPath);
-
-  const normalized =
-    collapsed.length > 1 ? collapsed.replace(/(?<!\/)\/+$/u, "") : collapsed;
+  const normalized = normalizeHostPath(hostPath);
 
   if (normalized === "~") {
     return "home";

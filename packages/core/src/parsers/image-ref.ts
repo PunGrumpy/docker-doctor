@@ -85,6 +85,21 @@ export const isHardenedRuntimeImage = (imagePart: string): boolean => {
   return !(tag === "dev" || tag?.endsWith("-dev") === true);
 };
 
+const DOCKER_HUB_REGISTRIES = new Set(["docker.io", "index.docker.io"]);
+
+/**
+ * Docker's agent sandbox templates default to `USER agent`. Registry reads on
+ * 2026-11-08 found every `docker/sandbox-templates` tag running non-root.
+ */
+export const isDockerSandboxTemplate = (imagePart: string): boolean => {
+  const { name, registry } = parseImageRef(imagePart);
+
+  return (
+    (registry === undefined || DOCKER_HUB_REGISTRIES.has(registry)) &&
+    name.toLowerCase() === "docker/sandbox-templates"
+  );
+};
+
 const DISTROLESS_NONROOT_TAG_RE = /(?:^|-)nonroot(?:-|$)/u;
 
 /**
