@@ -17,7 +17,7 @@ npx @docker-doctor/cli@latest [dir]
 | `--score` | `-s` | Print only the numeric health score. Prints nothing when no file was analyzed. |
 | `--json` | `-j` | Output the full report as JSON |
 | `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
-| `--no-config` |  | Skip config lookup and use the defaults. Use it on a repository you did not write, because a JavaScript or TypeScript config in the scanned directory runs as code. Cannot be combined with `--config`. |
+| `--no-config` |  | Skip config lookup and [inline ignore comments](/docs/reference/configuration#inline-ignore-comments), and use the defaults. Use it on a repository you did not write, because a JavaScript or TypeScript config in the scanned directory runs as code, and its comments can hide findings. Cannot be combined with `--config`. |
 | `--version` | `-V` | Print the CLI version |
 | `--help` | `-h` | Print usage for the command |
 
@@ -63,7 +63,7 @@ The CLI doesn't read `NO_COLOR`. Set `FORCE_COLOR=0` instead.
 | `score`, `label` | The health score and its label. Both are `null` when no file was analyzed, including when no Dockerfile or Compose file was found. |
 | `analyzedFiles` | How many Dockerfiles and Compose files the score covers. |
 | `diagnostics` | One entry per finding, with `rule`, `category`, `severity`, `file`, `message` and `help`, plus `line` when known. |
-| `suppressed` | Findings an inline ignore comment hid. Each has the fields of a `diagnostics` entry plus `reason`, the text after `--` in the comment, or `null`. They count toward neither the score nor the exit code. |
+| `suppressed` | Findings an inline ignore comment hid. Each has the fields of a `diagnostics` entry plus `reason`, the text after `--` in the comment, or `null`. They count toward neither the score nor the exit code. See [Inline ignore comments](/docs/reference/configuration#inline-ignore-comments). |
 | `failures` | Files docker-doctor found but could not read or parse, each with its error `message`. |
 | `project` | The Dockerfiles, Compose files and `.dockerignore` files docker-doctor found. |
 | `timestamp` | When the scan ran, in ISO 8601. |

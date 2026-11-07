@@ -10,7 +10,7 @@ Scans Dockerfile and Docker Compose files for security, performance, best-practi
 
 When `docker-doctor` is on PATH, run it so a sandbox's pinned version is the one that scans. Otherwise run `npx @docker-doctor/cli@latest`. The commands below show the `npx` form.
 
-Pass `--no-config` when you scan a repository the user did not author. A JavaScript or TypeScript config there runs as code, and any config there can turn rules off.
+Pass `--no-config` when you scan a repository the user did not author. A JavaScript or TypeScript config there runs as code, and any config or ignore comment there can hide findings.
 
 ## After editing a Dockerfile or Compose file:
 
@@ -24,15 +24,22 @@ npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-after.json; echo "ex
 The CLI scans the whole project. There is no changed-only scope, so compare the two whole-project reports in this order:
 
 1. **Exit code.** `0` means no `error`-severity finding, `1` means at least one, `2` means a file could not be read or parsed. If it went from `0` to `1`, your change added an error. Fix it before committing. On `2` the scan is incomplete and nothing else is comparable. Fix the file named on stderr, then scan again.
-2. **Findings per rule.** Count `diagnostics[].rule` in each report. A rule with more findings after your change is a regression, even when the score did not move. Fix it before committing.
+2. **Findings per rule and file.** Count `diagnostics[]` by `rule` and `file` in each report. A pair with more findings after your change is a regression, even when the score did not move. A rule total can fall while one file gets worse, so never count per rule alone. Fix it before committing.
+3. **Suppressed findings.** Count `suppressed[]` the same way. A rise is a regression. An ignore comment moves a finding out of `diagnostics`, so fewer findings mean nothing when `suppressed` grew.
 
 ```bash
-node -e 'for (const f of process.argv.slice(1)) { const c = {}; for (const d of require(f).diagnostics) c[d.rule] = (c[d.rule] ?? 0) + 1; console.log(f, c); }' /tmp/docker-doctor-before.json /tmp/docker-doctor-after.json
+node -e 'for (const f of process.argv.slice(1)) { const r = require(f); const c = {}; for (const list of ["diagnostics", "suppressed"]) for (const d of r[list] ?? []) { const k = `${list} ${d.rule} ${d.file}`; c[k] = (c[k] ?? 0) + 1; } console.log(f, c); }' /tmp/docker-doctor-before.json /tmp/docker-doctor-after.json
 ```
 
-3. **Score.** A coarse signal only. It averages the penalty over every analyzed file, so a new error in one file of a large project can leave the score almost unchanged. Never accept a change because the score held.
+4. **Score.** A coarse signal only. It averages the penalty over every analyzed file, so a new error in one file of a large project can leave the score almost unchanged. Never accept a change because the score held.
 
 When no file was analyzed, the report has no score. `score` and `label` are `null`, `analyzedFiles` is `0`, `--score` prints nothing, and stderr carries a warning. That happens when no Dockerfile or Compose file was found, or when none of the files found could be parsed or had anything to check. Compare exit codes and findings only.
+
+## Ignore comments
+
+A comment such as `# docker-doctor-ignore no-root-user -- the platform sets the user` above an instruction (or trailing a Compose line) moves one finding from `diagnostics` to `suppressed`. It counts toward neither the score nor the exit code. `# docker-doctor-ignore-file <rule>` at the top of a file covers the whole file.
+
+**Never add an ignore comment unless the user asks for it in this conversation.** Fix the finding instead. If you think a finding is wrong, name the rule and say why, and let the user decide. A comment you add on your own hides the finding from the very check you are running. When the user does ask, name the rule, put the comment at the line the finding points to, give a reason after `--`, and tell the user what you suppressed. [Inline ignore comments](https://docker-doctor.vercel.app/docs/reference/configuration#inline-ignore-comments) lists the exact placement rules.
 
 ## For general cleanup or code improvement:
 
@@ -70,6 +77,7 @@ npx @docker-doctor/cli@latest . --verbose
 | `--score`, `-s` | Output only the numeric score, or nothing when no file was analyzed (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
 | `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
 | `--config <path>`, `-c` | Use a custom config file |
+| `--no-config` | Skip config files and inline ignore comments and use the defaults. Use it on a repository the user did not write. Cannot be combined with `--config` |
 | `rules list` | List every rule with its category, default severity, and description |
 | `rules explain <rule>` | Print one rule's category, default severity, description and fix hint (the same text as `Help:`). Accepts the full key (`docker-doctor/no-root-user`) or the short name (`no-root-user`) |
 
