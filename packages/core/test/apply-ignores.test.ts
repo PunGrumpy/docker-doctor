@@ -382,6 +382,8 @@ describe("applyIgnores", () => {
     );
 
     expect(result.suppressed).toHaveLength(50_000);
-    expect(performance.now() - start).toBeLessThan(250);
+    // Quadratic matching would take seconds here. A shared CI runner once
+    // measured 268 ms for the linear version, so the bound leaves room.
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });
