@@ -4351,6 +4351,118 @@ describe("Best Practices Rules", () => {
     }
   );
 
+  const useraddHeredocCases = [
+    {
+      expected: 1,
+      name: "a plain body line",
+      run: ["RUN <<EOF", "set -e", "useradd -u 123456 app", "EOF"],
+    },
+    {
+      expected: 1,
+      name: "a body line continued with a backslash",
+      run: ["RUN <<EOF", "useradd \\", "  -u 123456 app", "EOF"],
+    },
+    {
+      expected: 1,
+      name: "a RUN flag before the opener",
+      run: [
+        "RUN --mount=type=cache,target=/var/cache <<EOF",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 1,
+      name: "a quoted delimiter",
+      run: ["RUN <<'EOT'", "useradd -u 123456 app", "EOT"],
+    },
+    {
+      expected: 1,
+      name: "an indented body with <<-",
+      run: ["RUN <<-EOF", "\tuseradd -u 123456 app", "\tEOF"],
+    },
+    {
+      expected: 1,
+      name: "a useradd after a command in the same body",
+      run: [
+        "RUN <<EOF",
+        "groupadd -g 123456 app",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 1,
+      name: "a -l on another body line",
+      run: [
+        "RUN <<EOF",
+        "useradd -l -u 123457 other",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 0,
+      name: "-l after a backslash continuation",
+      run: ["RUN <<EOF", "useradd -l \\", "  -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "--no-log-init in the body",
+      run: ["RUN <<EOF", "useradd --no-log-init -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a small UID",
+      run: ["RUN <<EOF", "useradd -u 1000 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "no -u",
+      run: ["RUN <<EOF", "set -e", "useradd app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "useradd named in an echo",
+      run: ["RUN <<EOF", 'echo "useradd -u 123456 app"', "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a comment line",
+      run: ["RUN <<EOF", "# useradd -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a heredoc that feeds a file, not the shell",
+      run: ["RUN cat <<EOF > /etc/motd", "useradd -u 123456 app", "EOF"],
+    },
+  ];
+
+  test.each(useraddHeredocCases)(
+    "useradd-no-log-init: heredoc RUN with $name reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(["FROM debian:12", ...run].join("\n")),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("useradd-no-log-init: a heredoc body reports the line of its RUN", () => {
+    const diagnostics = useraddNoLogInit.check(
+      parseDockerfile(
+        ["FROM debian:12", "RUN <<EOF", "useradd -u 123456 app", "EOF"].join(
+          "\n"
+        )
+      ),
+      "Dockerfile"
+    );
+
+    expect(diagnostics.map((d) => d.line)).toEqual([2]);
+  });
+
   test("useradd-no-log-init: a useradd inside a multi-line RUN is found", () => {
     const withoutFlag = parseDockerfile(`
       RUN set -eux; \\
@@ -4393,6 +4505,20 @@ describe("Best Practices Rules", () => {
       expect(Math.min(...timings)).toBeLessThan(50);
     }
   );
+
+  test("useradd-no-log-init: a 200,000 character heredoc body is scanned in under 50 ms", () => {
+    const body = "echo useradd -u 12345\n".repeat(9000);
+    const instructions = parseDockerfile(`RUN <<EOF\n${body}EOF`);
+    const timings: number[] = [];
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const startedAt = performance.now();
+      useraddNoLogInit.check(instructions, "Dockerfile");
+      timings.push(performance.now() - startedAt);
+    }
+
+    expect(Math.min(...timings)).toBeLessThan(50);
+  });
 
   test("require-healthcheck", () => {
     const withoutHealth = parseDockerfile(`

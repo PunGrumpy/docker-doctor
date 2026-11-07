@@ -21,8 +21,9 @@ const continuationLength = (text: string, index: number): number => {
  * Splits shell text into the simple commands it runs, cutting at the
  * separators `;`, `&`, `|`, `(`, `)`, a backtick and a newline that no
  * backslash continues. Separators inside quotes do not cut. It does not
- * understand heredoc bodies, `case` patterns or `$(( ))`, so each line of a
- * heredoc reads as a command of its own.
+ * understand heredoc bodies, `case` patterns or `$(( ))`. The lines of a
+ * heredoc body split into commands only while the text keeps its line breaks,
+ * as an instruction's `raw` does and its `args` does not.
  */
 export const splitShellCommands = (text: string): string[] => {
   const masked = maskQuotedText(text);

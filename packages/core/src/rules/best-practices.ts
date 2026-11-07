@@ -5,7 +5,12 @@ import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
 import { splitShellCommands, splitShellWords } from "../parsers/shell-words";
 import { hasText } from "../text";
-import type { Diagnostic, DockerfileRule, RuleCategory } from "../types/index";
+import type {
+  Diagnostic,
+  DockerfileInstruction,
+  DockerfileRule,
+  RuleCategory,
+} from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
 
@@ -711,19 +716,49 @@ const useraddCandidates = (script: string): string[][] => {
   return candidates;
 };
 
-// The simple commands of one RUN. Exec form is its own argv, and a shell
-// started with -c runs the script in its next argument.
-const runCommandWords = (args: string): string[][] => {
-  const argv = parseExecForm(args);
+// `RUN <<EOF`: the shell runs the heredoc body as its script. The parser joins
+// the body lines with spaces into `args`, which hides the line breaks, so the
+// body is read from `raw`, where each line stands as written.
+const HEREDOC_SCRIPT_RE =
+  /^<<-?(?<quote>['"]?)(?<delimiter>[^\s'"<>;&|()]+)\k<quote>(?:\s|$)/u;
 
-  if (argv === null) {
-    return useraddCandidates(stripRunFlags(args));
+const heredocScript = (inst: DockerfileInstruction): string | null => {
+  const delimiter = HEREDOC_SCRIPT_RE.exec(stripRunFlags(inst.args))?.groups
+    ?.delimiter;
+
+  if (delimiter === undefined) {
+    return null;
   }
 
-  const [, flag, script] = argv;
+  const lines = inst.raw.split("\n");
+  const opener = lines.findIndex((line) => line.includes("<<"));
 
-  if (flag !== undefined && SHELL_COMMAND_FLAG_RE.test(flag) && script) {
+  const closer = lines.findIndex(
+    (line, index) => index > opener && line.trim() === delimiter
+  );
+
+  return lines.slice(opener + 1, closer === -1 ? undefined : closer).join("\n");
+};
+
+// The simple commands of one RUN. Exec form is its own argv, and a shell
+// started with -c runs the script in its next argument.
+const runCommandWords = (inst: DockerfileInstruction): string[][] => {
+  const script = heredocScript(inst);
+
+  if (script !== null) {
     return useraddCandidates(script);
+  }
+
+  const argv = parseExecForm(inst.args);
+
+  if (argv === null) {
+    return useraddCandidates(stripRunFlags(inst.args));
+  }
+
+  const [, flag, commandScript] = argv;
+
+  if (flag !== undefined && SHELL_COMMAND_FLAG_RE.test(flag) && commandScript) {
+    return useraddCandidates(commandScript);
   }
 
   return [argv];
@@ -732,9 +767,9 @@ const runCommandWords = (args: string): string[][] => {
 // True when a `useradd` in this RUN sets a large UID without `-l`. The flag
 // must belong to the same command as `useradd`, so `useradd app && ls -l`
 // has none.
-const useraddWritesLoginLogs = (args: string): boolean =>
-  args.includes("useradd") &&
-  runCommandWords(args).some(([command, ...words]) => {
+const useraddWritesLoginLogs = (inst: DockerfileInstruction): boolean =>
+  inst.args.includes("useradd") &&
+  runCommandWords(inst).some(([command, ...words]) => {
     if (command === undefined || !USERADD_COMMAND_RE.test(command)) {
       return false;
     }
@@ -750,7 +785,7 @@ export const useraddNoLogInit: DockerfileRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const inst of instructions) {
-      if (inst.instruction === "RUN" && useraddWritesLoginLogs(inst.args)) {
+      if (inst.instruction === "RUN" && useraddWritesLoginLogs(inst)) {
         diagnostics.push(
           createDiagnostic(
             file,
