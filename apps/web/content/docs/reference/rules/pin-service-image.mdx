@@ -43,6 +43,8 @@ services:
 
 A version tag (`nginx:1.27-alpine`) is the practical default: readable, and mutated rarely enough for most services. For supply-chain-sensitive deployments, pin the digest (`nginx:1.27-alpine@sha256:…`). A digest is immutable by construction, and the tag next to it stays as documentation. Renovate and Dependabot both understand Compose files, so pinned versions don't have to mean stale versions. The same reasoning for Dockerfile base images lives in `pin-image-version`.
 
+The rule reads each Compose file on its own, so an override's `image:` is checked in the override, at its own line. An image that the override removes with `image: !reset null`, or replaces with an empty `!override`, names no image and is not checked.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/pin-service-image`
