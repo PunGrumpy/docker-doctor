@@ -3429,6 +3429,41 @@ describe("Image Size Rules", () => {
     { expected: 1, run: "NPM_CONFIG_PRODUCTION=true yarn install" },
     { expected: 1, run: "NPM_CONFIG_OMIT=dev pnpm install" },
     { expected: 1, run: "MY_NPM_CONFIG_OMIT=dev npm ci" },
+    // Command-line flags outrank the environment. A type in include is never
+    // omitted, and a command-line omit or production replaces the
+    // environment's.
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --include=dev" },
+    { expected: 1, run: "npm_config_omit=dev npm ci --include=dev" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=true npm ci --include=dev" },
+    {
+      expected: 1,
+      run: "NPM_CONFIG_PRODUCTION=true npm ci --production=false",
+    },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --omit=optional" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev npm ci" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --production=false" },
+    { expected: 1, run: "export NPM_CONFIG_OMIT=dev && npm ci --include=dev" },
+    { expected: 1, run: "export NODE_ENV=production && npm ci --include=dev" },
+    { expected: 1, run: "NODE_ENV=production npm ci --omit=optional" },
+    { expected: 1, run: "NODE_ENV=production npm ci --production=false" },
+    { expected: 1, run: "npm ci --omit=dev --include=dev" },
+    { expected: 1, run: "npm ci --production --include=dev" },
+    { expected: 1, run: "npm ci --production=false" },
+    { expected: 0, run: "npm ci --omit=dev" },
+    { expected: 0, run: "npm ci --omit=optional --omit=dev" },
+    { expected: 0, run: "npm ci --production" },
+    { expected: 0, run: "npm ci --production=true" },
+    { expected: 0, run: "npm ci --only=prod" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci --ignore-scripts" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci --omit=dev" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=optional npm ci --omit=dev" },
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=false npm ci --production" },
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=false npm ci --omit=dev" },
+    {
+      expected: 0,
+      run: "NPM_CONFIG_OMIT=dev npm ci --include=optional --omit=dev",
+    },
+    { expected: 0, run: "NPM_CONFIG_INCLUDE=dev npm ci --omit=dev" },
     // An export reaches the installs after it, a plain assignment does not.
     { expected: 0, run: "export NODE_ENV=production && npm ci" },
     { expected: 0, run: "export NODE_ENV=production; yarn install" },
@@ -3494,6 +3529,92 @@ describe("Image Size Rules", () => {
       expected: 1,
     },
     { dockerfile: "RUN npm ci\nENV NPM_CONFIG_OMIT=dev", expected: 1 },
+    // Command-line flags outrank the environment.
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --omit=optional",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --production=false",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev\nENV NPM_CONFIG_INCLUDE=dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev\nENV npm_config_include dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev\nENV NPM_CONFIG_INCLUDE=optional\nRUN npm ci",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN npm ci --omit=optional",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NODE_ENV=production\nENV NPM_CONFIG_OMIT=optional\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --ignore-scripts",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --omit=dev",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=optional\nRUN npm ci --omit=dev",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=false\nRUN npm ci --production",
+      expected: 0,
+    },
+    {
+      dockerfile:
+        'ENV NPM_CONFIG_LOGLEVEL=warn NPM_CONFIG_OMIT="dev"\nRUN npm ci',
+      expected: 0,
+    },
+    // A quoted value that mentions a setting does not set it.
+    { dockerfile: 'ENV FOO="a npm_config_omit=dev"\nRUN npm ci', expected: 1 },
+    {
+      dockerfile: "ENV FOO='x NPM_CONFIG_PRODUCTION=true'\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: 'ENV FOO="a npm_config_omit=dev" BAR=1\nRUN npm ci',
+      expected: 1,
+    },
+    {
+      dockerfile:
+        'ENV FOO="a npm_config_omit=dev" NPM_CONFIG_OMIT=dev\nRUN npm ci',
+      expected: 0,
+    },
     { dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN pnpm install", expected: 1 },
     {
       dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN yarn install",
@@ -3543,6 +3664,8 @@ describe("Image Size Rules", () => {
     `ENV ${" ".repeat(200_000)}`,
     `ENV ${"npm_config_omit ".repeat(14_000)}`,
     `ENV ${"npm_config_omit=".repeat(13_000)}`,
+    `ENV ${'A="npm_config_omit=dev" '.repeat(8000)}`,
+    `RUN npm ci ${"--omit=dev ".repeat(18_000)}`,
     `RUN ${"export ".repeat(28_000)}`,
     `RUN ${"NPM_CONFIG_OMIT=dev ".repeat(10_000)}npm ci`,
   ];

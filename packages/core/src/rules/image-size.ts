@@ -8,6 +8,7 @@ import {
 } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
+import { splitShellWords } from "../parsers/shell-words";
 import { hasText } from "../text";
 import type {
   Diagnostic,
@@ -20,13 +21,25 @@ import { hasAptGetInstall } from "./package-managers";
 
 const IMAGE_SIZE = "Image Size" satisfies RuleCategory;
 
+// What one source of npm configuration (the environment, the command line)
+// says about devDependencies through `omit`, `include` and the deprecated
+// `production`. An empty list and an unset `production` mean the source does
+// not name that setting.
+interface NpmDevSwitches {
+  include: string[];
+  omit: string[];
+  production?: boolean;
+}
+
+const NO_NPM_SWITCHES: NpmDevSwitches = { include: [], omit: [] };
+
 // What the environment of a RUN says about devDependencies. `NODE_ENV` set to
 // production makes npm and Yarn 1 skip them. npm's own `omit` setting, and
 // its deprecated `production` alias, do the same for npm only. Both reach npm
 // as `npm_config_*` environment variables.
 interface InstallEnv {
   nodeEnvProduction: boolean;
-  npmOmitsDev: boolean;
+  npmEnv: NpmDevSwitches;
 }
 
 interface StageRun {
@@ -55,28 +68,114 @@ const NODE_ENV_REFERENCE_RE = /^\$(?:NODE_ENV|\{NODE_ENV\})$/u;
 
 // npm reads any `npm_config_<name>` variable, whatever the case of the prefix
 // (npm's config docs, "Environment Variables"). `production` is a deprecated
-// alias for `--omit=dev` and `omit` lists the dependency types to leave out.
-const NPM_CONFIG_ENV_RE =
-  /(?:^|\s)npm_config_(?<name>production|omit)(?:=|\s+)["']?(?<value>[^\s"']*)/giu;
-
+// alias for `--omit=dev`, `omit` lists the dependency types to leave out and
+// `include` lists the ones to keep.
 const NPM_CONFIG_WORD_RE =
-  /^npm_config_(?<name>production|omit)=(?<value>.*)$/iu;
+  /^npm_config_(?<name>production|omit|include)=(?<value>.*)$/iu;
 
-const npmConfigOmitsDev = (name: string, value: string): boolean =>
-  name.toLowerCase() === "production"
-    ? value.toLowerCase() === "true"
-    : value === "dev";
+const withNpmConfig = (
+  switches: NpmDevSwitches,
+  name: string,
+  value: string
+): NpmDevSwitches => {
+  switch (name.toLowerCase()) {
+    case "omit": {
+      return { ...switches, omit: [value] };
+    }
+
+    case "include": {
+      return { ...switches, include: [value] };
+    }
+
+    default: {
+      return { ...switches, production: value.toLowerCase() === "true" };
+    }
+  }
+};
+
+// Whether one source of npm configuration omits devDependencies, or undefined
+// when it names none of the three settings. npm flattens each source on its
+// own, so the highest source that names any of them decides alone. A command
+// line `--omit=optional` replaces an environment `NPM_CONFIG_OMIT=dev`, a
+// type listed in `include` is never omitted, and `production=false` includes
+// dev (docs.npmjs.com/cli/using-npm/config, "include", "omit" and
+// "production"; buildOmitList in npm's lib/definitions/definitions.js).
+const sourceOmitsDev = ({
+  include,
+  omit,
+  production,
+}: NpmDevSwitches): boolean | undefined => {
+  if (include.length === 0 && omit.length === 0 && production === undefined) {
+    return undefined;
+  }
+
+  if (include.includes("dev") || production === false) {
+    return false;
+  }
+
+  return omit.includes("dev") || production === true;
+};
+
+// The command line outranks the environment, and an npm_config variable
+// outranks the default that `NODE_ENV=production` sets.
+const npmOmitsDev = (commandLine: NpmDevSwitches, env: InstallEnv): boolean =>
+  sourceOmitsDev(commandLine) ??
+  sourceOmitsDev(env.npmEnv) ??
+  env.nodeEnvProduction;
+
+const ONLY_PRODUCTION_VALUES = new Set(["prod", "production"]);
+
+// The install options that npm reads as `omit`, `include` and `production`.
+// `--only=prod` is the legacy spelling of `--omit=dev`.
+const npmCommandLineSwitches = (options: string[]): NpmDevSwitches => {
+  const include: string[] = [];
+  const omit: string[] = [];
+  let production: boolean | undefined;
+
+  for (const option of options) {
+    const equals = option.indexOf("=");
+    const name = equals === -1 ? option : option.slice(0, equals);
+    const value = equals === -1 ? undefined : option.slice(equals + 1);
+
+    if (name === "--omit" && value !== undefined) {
+      omit.push(value);
+    } else if (name === "--include" && value !== undefined) {
+      include.push(value);
+    } else if (name === "--production") {
+      production = value?.toLowerCase() !== "false";
+    } else if (name === "--only" && ONLY_PRODUCTION_VALUES.has(value ?? "")) {
+      production = true;
+    }
+  }
+
+  return { include, omit, production };
+};
 
 interface NodeEnvState {
   arg?: string;
   env?: string;
-  npmOmitsDev?: boolean;
+  npmEnv?: NpmDevSwitches;
 }
 
 // RUN sees both ENV and ARG values. ENV takes precedence over an ARG of the
 // same name.
 const currentNodeEnv = (state: NodeEnvState): string | undefined =>
   state.env ?? state.arg;
+
+// The `NAME=value` words of one ENV. The legacy `ENV NAME value` form has a
+// single variable whose value is the rest of the line. Splitting the words
+// the way a shell does keeps a quoted value, such as
+// `FOO="a npm_config_omit=dev"`, in the one word of the variable it belongs to.
+const envAssignments = (args: string): string[] => {
+  const words = splitShellWords(args);
+  const [first, ...rest] = words;
+
+  if (first === undefined || first.includes("=")) {
+    return words;
+  }
+
+  return [`${first}=${rest.join(" ")}`];
+};
 
 // An `ARG NODE_ENV` with no default of its own takes the default of the ARG
 // declared before the first FROM.
@@ -100,9 +199,15 @@ const applyNodeEnv = (
         : value;
     }
 
-    for (const { groups } of inst.args.matchAll(NPM_CONFIG_ENV_RE)) {
-      if (groups !== undefined) {
-        state.npmOmitsDev = npmConfigOmitsDev(groups.name, groups.value);
+    for (const word of envAssignments(inst.args)) {
+      const npmConfig = NPM_CONFIG_WORD_RE.exec(word)?.groups;
+
+      if (npmConfig !== undefined) {
+        state.npmEnv = withNpmConfig(
+          state.npmEnv ?? NO_NPM_SWITCHES,
+          npmConfig.name,
+          npmConfig.value
+        );
       }
     }
   }
@@ -137,7 +242,7 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       stages.at(-1)?.runs.push({
         env: {
           nodeEnvProduction: currentNodeEnv(state) === "production",
-          npmOmitsDev: state.npmOmitsDev === true,
+          npmEnv: state.npmEnv ?? NO_NPM_SWITCHES,
         },
         inst,
       });
@@ -401,18 +506,21 @@ const INSTALL_VERBS = new Set(["install", "ci", "i"]);
 // Flags that mean the install leaves devDependencies out of the image.
 // `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
 // production flag and `-p` is bun's.
-const NON_DEV_INSTALL_FLAGS = new Set([
-  "-g",
-  "--global",
+const NON_DEV_INSTALL_FLAGS = new Set(["-g", "--global", "--prod", "-P", "-p"]);
+
+// The same meaning for Yarn, pnpm and Bun. npm weighs these against its
+// environment instead, in npmOmitsDev.
+const PRODUCTION_INSTALL_FLAGS = new Set([
   "--production",
   "--production=true",
   "--omit=dev",
   "--only=prod",
   "--only=production",
-  "--prod",
-  "-P",
-  "-p",
 ]);
+
+const flagLeavesDevOut = (manager: string, option: string): boolean =>
+  NON_DEV_INSTALL_FLAGS.has(option) ||
+  (manager !== "npm" && PRODUCTION_INSTALL_FLAGS.has(option));
 
 // The environment after one `NAME=value` word.
 const withAssignment = (env: InstallEnv, word: string): InstallEnv => {
@@ -432,7 +540,7 @@ const withAssignment = (env: InstallEnv, word: string): InstallEnv => {
     ? env
     : {
         ...env,
-        npmOmitsDev: npmConfigOmitsDev(npmConfig.name, npmConfig.value),
+        npmEnv: withNpmConfig(env.npmEnv, npmConfig.name, npmConfig.value),
       };
 };
 
@@ -470,13 +578,14 @@ const segmentInstallsDevDependencies = (
   const env = withAssignments(runEnv, tokens.slice(0, commandStart));
 
   const skipsDevDependencies =
-    (MANAGERS_HONORING_NODE_ENV.has(manager) && env.nodeEnvProduction) ||
-    (manager === "npm" && env.npmOmitsDev);
+    manager === "npm"
+      ? npmOmitsDev(npmCommandLineSwitches(options), env)
+      : MANAGERS_HONORING_NODE_ENV.has(manager) && env.nodeEnvProduction;
 
   return (
     !skipsDevDependencies &&
     options.every(
-      (option) => option.startsWith("-") && !NON_DEV_INSTALL_FLAGS.has(option)
+      (option) => option.startsWith("-") && !flagLeavesDevOut(manager, option)
     )
   );
 };
