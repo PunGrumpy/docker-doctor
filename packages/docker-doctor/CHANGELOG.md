@@ -1,5 +1,19 @@
 # @docker-doctor/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- af17870: Add `--no-config` to scan a repository you did not write without running its `docker-doctor.config.*` file or reading its rule overrides. The bundled skill now tells agents to use the `docker-doctor` on PATH when there is one, so a pinned version runs, and to pass `--no-config` on repositories the user did not author.
+- 2f9659d: New rule `no-exposed-unauthenticated-service` warns when a Compose service runs Ollama, Qdrant, or the Docker MCP gateway and publishes a port on all host interfaces without authentication. Bind the port to `127.0.0.1` or reach the service over an internal network.
+- e4c5ca7: New Compose rules `no-host-namespaces` and `no-weakened-confinement` report `pid`, `ipc`, `uts`, `cgroup` or `userns_mode` set to `host`, capabilities such as `SYS_ADMIN`, and `unconfined` security options. `no-privileged-service` now reports `cap_add: [ALL]` as an error, and `no-broad-bind-mount` reports `/dev`, `/var`, `/var/lib`, `/var/lib/docker` and `/var/lib/containerd`.
+- 45dd097: Add the `no-unsafe-build-features` rule. It reports a `# syntax=` directive that selects a BuildKit frontend other than the official `docker/dockerfile` (a third-party frontend pinned by digest passes), and `RUN --security=insecure` or `RUN --network=host`.
+- 0d1831c: `no-docker-socket-mount` now reports services that set `use_api_socket: true`, because Compose mounts the Docker socket and copies your registry credentials into the container. Those services now get an error, so a CI gate fails until you decide, and the rule no longer recommends `use_api_socket`. Socket proxy images such as `tecnativa/docker-socket-proxy` may still mount the socket.
+
+### Patch Changes
+
+- dd5a33a: `no-plaintext-secrets` and `no-secrets-in-env` now report AI provider keys such as `OPENAI_KEY` and `LITELLM_MASTER_KEY`, token-shaped values under any key name, and literal secrets in Compose `build.args`. Reports mask token-shaped values. These new detections can lower the score of a project that scored clean before.
+
 ## 0.9.1
 
 ### Patch Changes
