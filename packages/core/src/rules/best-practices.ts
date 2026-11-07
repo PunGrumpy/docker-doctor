@@ -689,17 +689,156 @@ const readUseraddOptions = (words: string[]): UseraddOptions => {
   return options;
 };
 
-// The words of `command` once leading `NAME=value` assignments and `sudo` are
-// dropped, so a `useradd` there counts as running.
-const commandWords = (command: string): string[] => {
-  const words = splitShellWords(command);
-  const first = words.findIndex((word) => !ENV_ASSIGNMENT_WORD_RE.test(word));
+// Words that open a command without being the command. In POSIX grammar the
+// word after one of them is in command position.
+const SHELL_KEYWORDS = new Set([
+  "!",
+  "{",
+  "do",
+  "elif",
+  "else",
+  "if",
+  "then",
+  "until",
+  "while",
+]);
 
-  if (first === -1) {
-    return [];
+// Commands that run the command in their next non-option word, with the
+// options that take a value as their own next word. A short option written
+// with its value attached (`-n1`, `-I{}`) needs no entry.
+const COMMAND_WRAPPERS = new Map<string, ReadonlySet<string>>([
+  ["command", new Set<string>()],
+  ["env", new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"])],
+  ["exec", new Set(["-a"])],
+  ["nice", new Set(["-n", "--adjustment"])],
+  [
+    "sudo",
+    new Set([
+      "-C",
+      "-D",
+      "-g",
+      "-h",
+      "-p",
+      "-R",
+      "-r",
+      "-t",
+      "-T",
+      "-U",
+      "-u",
+      "-c",
+      "--chdir",
+      "--chroot",
+      "--close-from",
+      "--command-timeout",
+      "--group",
+      "--host",
+      "--login-class",
+      "--other-user",
+      "--prompt",
+      "--role",
+      "--type",
+      "--user",
+    ]),
+  ],
+  ["time", new Set(["-f", "--format", "-o", "--output"])],
+  [
+    "xargs",
+    new Set([
+      "-a",
+      "-d",
+      "-E",
+      "-I",
+      "-L",
+      "-n",
+      "-P",
+      "-s",
+      "--arg-file",
+      "--delimiter",
+      "--max-args",
+      "--max-chars",
+      "--max-procs",
+    ]),
+  ],
+]);
+
+// `command -v useradd` and `command -V useradd` look the name up and run
+// nothing.
+const COMMAND_LOOKUP_OPTION_RE = /^-[^-]*[vV]/u;
+
+const baseName = (word: string): string =>
+  word.slice(word.lastIndexOf("/") + 1);
+
+// How many words the option at `word` takes: itself, plus the next word when
+// the option wants a separate value.
+const optionWordCount = (
+  word: string,
+  valueOptions: ReadonlySet<string>
+): number => {
+  if (word.startsWith("--")) {
+    return !word.includes("=") && valueOptions.has(word) ? 2 : 1;
   }
 
-  return words[first] === "sudo" ? words.slice(first + 1) : words.slice(first);
+  for (let index = 1; index < word.length; index += 1) {
+    if (valueOptions.has(`-${word[index]}`)) {
+      return index === word.length - 1 ? 2 : 1;
+    }
+  }
+
+  return 1;
+};
+
+// The index of the first word after the wrapper's options, or the word count
+// when the wrapper runs nothing.
+const skipWrapperOptions = (
+  words: string[],
+  start: number,
+  wrapper: string
+): number => {
+  const valueOptions = COMMAND_WRAPPERS.get(wrapper) ?? new Set<string>();
+  let index = start;
+
+  while (index < words.length) {
+    const word = words[index];
+
+    if (word === "--") {
+      return index + 1;
+    }
+
+    if (!word.startsWith("-") || word === "-") {
+      break;
+    }
+
+    if (wrapper === "command" && COMMAND_LOOKUP_OPTION_RE.test(word)) {
+      return words.length;
+    }
+
+    index += optionWordCount(word, valueOptions);
+  }
+
+  return index;
+};
+
+// The words of `command` from the one that names the command it runs.
+// Leading `NAME=value` assignments, a shell keyword such as `then` or `!`,
+// and a wrapper such as `sudo -E` or `env NAME=value` come before it.
+const commandWords = (command: string): string[] => {
+  const words = splitShellWords(command);
+  let index = 0;
+
+  while (index < words.length) {
+    const word = words[index];
+    const wrapper = baseName(word);
+
+    if (ENV_ASSIGNMENT_WORD_RE.test(word) || SHELL_KEYWORDS.has(word)) {
+      index += 1;
+    } else if (COMMAND_WRAPPERS.has(wrapper)) {
+      index = skipWrapperOptions(words, index + 1, wrapper);
+    } else {
+      break;
+    }
+  }
+
+  return words.slice(index);
 };
 
 // Only a command that names useradd can be one, so the rest skip word

@@ -4351,6 +4351,84 @@ describe("Best Practices Rules", () => {
     }
   );
 
+  const useraddCommandPositionCases = [
+    { expected: 1, run: "if ! id app; then useradd -u 123456 app; fi" },
+    { expected: 1, run: "set -e; if ! id app; then useradd -u 123456 app; fi" },
+    {
+      expected: 1,
+      run: "if ! getent passwd app; then \\\n  useradd -u 123456 app; \\\nfi",
+    },
+    { expected: 1, run: "if useradd -u 123456 app; then echo ok; fi" },
+    { expected: 1, run: "if id app; then :; else useradd -u 123456 app; fi" },
+    {
+      expected: 1,
+      run: "if id a; then :; elif useradd -u 123456 app; then :; fi",
+    },
+    { expected: 1, run: "{ useradd -u 123456 app; }" },
+    { expected: 1, run: "! useradd -u 123456 app" },
+    { expected: 1, run: "for u in a b; do useradd -u 123456 $u; done" },
+    { expected: 1, run: "while read u; do useradd -u 123456 $u; done" },
+    { expected: 1, run: "until useradd -u 123456 app; do sleep 1; done" },
+    { expected: 1, run: "exec useradd -u 123456 app" },
+    { expected: 1, run: "exec -a name useradd -u 123456 app" },
+    { expected: 1, run: "env useradd -u 123456 app" },
+    { expected: 1, run: "env NAME=value useradd -u 123456 app" },
+    { expected: 1, run: "env -i -u HOME useradd -u 123456 app" },
+    { expected: 1, run: "/usr/bin/env useradd -u 123456 app" },
+    { expected: 1, run: "command useradd -u 123456 app" },
+    { expected: 1, run: "command -p useradd -u 123456 app" },
+    { expected: 1, run: "sudo -E useradd -u 123456 app" },
+    { expected: 1, run: "sudo -u root useradd -u 123456 app" },
+    { expected: 1, run: "sudo -Eu root useradd -u 123456 app" },
+    { expected: 1, run: "sudo --user=root useradd -u 123456 app" },
+    { expected: 1, run: "sudo --user root -- useradd -u 123456 app" },
+    { expected: 1, run: "sudo env NAME=value useradd -u 123456 app" },
+    { expected: 1, run: "time useradd -u 123456 app" },
+    { expected: 1, run: "time -p useradd -u 123456 app" },
+    { expected: 1, run: "nice useradd -u 123456 app" },
+    { expected: 1, run: "nice -n 10 useradd -u 123456 app" },
+    { expected: 1, run: "nice -10 useradd -u 123456 app" },
+    { expected: 1, run: "xargs useradd -u 123456 < /dev/null" },
+    { expected: 1, run: "xargs -n1 useradd -u 123456" },
+    { expected: 1, run: "xargs -I {} useradd -u 123456 {}" },
+    { expected: 0, run: "if ! id app; then useradd -l -u 123456 app; fi" },
+    { expected: 0, run: "if ! id app; then useradd -u 1000 app; fi" },
+    { expected: 0, run: "{ useradd -u 123456 --no-log-init app; }" },
+    { expected: 0, run: "for u in a b; do useradd -l -u 123456 $u; done" },
+    { expected: 0, run: "exec useradd -l -u 123456 app" },
+    { expected: 0, run: "env NAME=value useradd -l -u 123456 app" },
+    { expected: 0, run: "sudo -E useradd -l -u 123456 app" },
+    { expected: 0, run: "time useradd -l -u 123456 app" },
+    { expected: 0, run: "xargs useradd -l -u 123456" },
+    { expected: 0, run: 'echo "useradd -u 123456"' },
+    { expected: 0, run: "if true; then echo useradd -u 123456 app; fi" },
+    { expected: 0, run: "adduser -u 123456 app" },
+    { expected: 0, run: "adduser --uid 123456 app" },
+    { expected: 0, run: "command -v useradd" },
+    { expected: 0, run: "command -V useradd" },
+    { expected: 0, run: "if command -v useradd; then echo yes; fi" },
+    { expected: 0, run: "which useradd" },
+    { expected: 0, run: "type useradd" },
+    { expected: 0, run: "exec echo useradd -u 123456 app" },
+    { expected: 0, run: "env NAME=useradd echo -u 123456 app" },
+    { expected: 0, run: "sudo -u useradd ls -u 123456" },
+    { expected: 0, run: "nice -n 10 echo useradd -u 123456 app" },
+    { expected: 0, run: "xargs -I useradd echo -u 123456" },
+    { expected: 0, run: "time echo useradd -u 123456 app" },
+  ];
+
+  test.each(useraddCommandPositionCases)(
+    "useradd-no-log-init: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
   const useraddHeredocCases = [
     {
       expected: 1,
