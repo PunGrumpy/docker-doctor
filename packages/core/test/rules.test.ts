@@ -2166,6 +2166,76 @@ describe("Compose Security Rules", () => {
     );
   });
 
+  const readOnlySystemMountCases = [
+    { broad: 0, volume: "/etc/localtime:/etc/localtime:ro" },
+    { broad: 0, volume: "/etc/timezone:/etc/timezone:ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:ro" },
+    { broad: 0, volume: "/etc/ssl/certs/:/etc/ssl/certs:ro" },
+    { broad: 0, volume: "/etc/localtime:/etc/localtime:z,ro" },
+    { broad: 1, volume: "/etc/localtime:/etc/localtime" },
+    { broad: 1, volume: "/etc/timezone:/etc/timezone:rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs" },
+    { broad: 1, volume: "/etc/ssl/certs/ca-certificates.crt:/ca.crt:ro" },
+    { broad: 1, volume: "/etc/ssl/private:/etc/ssl/private:ro" },
+    { broad: 1, volume: "/etc/localtime-old:/etc/localtime:ro" },
+    {
+      broad: 1,
+      volume: "/run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro",
+    },
+    { broad: 1, volume: "/var/run/dbus:/var/run/dbus:ro" },
+    { broad: 1, volume: "/proc:/host/proc:ro" },
+    { broad: 1, volume: "/sys:/host/sys:ro" },
+    { broad: 1, volume: "/etc:/host-etc:ro" },
+    { broad: 1, volume: "/var/lib/docker:/var/lib/docker:ro" },
+  ];
+
+  test.each(readOnlySystemMountCases)(
+    "no-broad-bind-mount: $volume reports $broad",
+    ({ broad, volume }) => {
+      const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - ${volume}
+`;
+
+      expect(
+        noBroadBindMount.check(
+          parseCompose(source, "compose.yaml"),
+          "compose.yaml"
+        )
+      ).toHaveLength(broad);
+    }
+  );
+
+  test("no-broad-bind-mount: the long syntax exempts a read-only time zone mount and reports a writable one", () => {
+    const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+      - type: bind
+        source: /etc/ssl/certs
+        target: /etc/ssl/certs
+        read_only: false
+`;
+
+    const diags = noBroadBindMount.check(
+      parseCompose(source, "compose.yaml"),
+      "compose.yaml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([9, 12]);
+    expect(diags[0].message).toContain("'/etc/localtime', a host system");
+  });
+
   test("compose mount rules skip a volume entry written as a sequence", () => {
     const source = `services:
   agent:

@@ -15,6 +15,7 @@ import type { HostPathScope } from "./compose-mounts";
 import {
   bindMountSource,
   classifyHostPath,
+  isReadOnlyExemptHostPath,
   mountsDockerSocket,
   volumeMount,
 } from "./compose-mounts";
@@ -317,7 +318,7 @@ const broadBindMount = (volume: ComposeValue): BroadMount | null => {
 
   const source = bindMountSource(mount);
 
-  if (source === undefined) {
+  if (source === undefined || isReadOnlyExemptHostPath(mount, source)) {
     return null;
   }
 

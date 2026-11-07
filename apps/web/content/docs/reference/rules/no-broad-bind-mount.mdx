@@ -6,7 +6,7 @@ description: >-
   Bind-mounting /, $HOME, ~/.ssh, or a parent directory into a Compose service exposes far more of the host than the service needs. Mount the narrowest path, read-only.
 ---
 
-`- ~:/home/agent` is the fastest way to give a container access to _something_ under your home directory, and it also gives it everything else: SSH keys, cloud credentials, browser profiles, every other project. This rule flags bind mounts whose host source is the root filesystem (`/`, `C:\`), the home directory (`~`, `$HOME`), a hidden directory under it (`~/.ssh`, `~/.aws`, `~/.docker`, …), a parent of the Compose project (`../`), or a host system directory (`/etc`, `/proc`, `/run`, `/home`, `/dev`, `/var`, `/var/lib/docker`, …). `/dev`, `/var` and `/var/lib` are reported only as the whole directory, so `/dev/dri`, `/var/www` and `/var/lib/app` pass. `/var/run`, `/var/lib/docker` and `/var/lib/containerd` are reported along with everything under them. Relative paths inside the project and narrow absolute paths like `/opt/models` pass. It understands both the short and long `volumes` syntax and resolves `${VAR:-default}` interpolation to its default.
+`- ~:/home/agent` is the fastest way to give a container access to _something_ under your home directory, and it also gives it everything else: SSH keys, cloud credentials, browser profiles, every other project. This rule flags bind mounts whose host source is the root filesystem (`/`, `C:\`), the home directory (`~`, `$HOME`), a hidden directory under it (`~/.ssh`, `~/.aws`, `~/.docker`, …), a parent of the Compose project (`../`), or a host system directory (`/etc`, `/proc`, `/run`, `/home`, `/dev`, `/var`, `/var/lib/docker`, …). `/dev`, `/var` and `/var/lib` are reported only as the whole directory, so `/dev/dri`, `/var/www` and `/var/lib/app` pass. `/var/run`, `/var/lib/docker` and `/var/lib/containerd` are reported along with everything under them. Relative paths inside the project and narrow absolute paths like `/opt/models` pass. A read-only mount of exactly `/etc/localtime`, `/etc/timezone` or `/etc/ssl/certs` also passes, because images ask for the host time zone and CA bundle. The same paths mounted writable are still reported, since a container that can write `/etc/ssl/certs` can plant a CA the host then trusts. It understands both the short and long `volumes` syntax and resolves `${VAR:-default}` interpolation to its default.
 
 ## What the rule catches
 
@@ -34,13 +34,14 @@ A bind mount is a hole in the container boundary by design, and its size is what
 
 Mount the narrowest directory the service actually reads (`./data`, not `~` or `/`), and add `:ro` unless the service must write to it. Host paths the service only needs at build time belong in the image instead.
 
-```yaml title="compose.yaml — one project directory, credentials read-only"
+```yaml title="compose.yaml — one project directory, credentials and the time zone read-only"
 services:
   agent:
     image: my-agent:1.2.0
     volumes:
       - ./workspace:/home/agent/workspace
       - ./config/aws:/root/.aws:ro
+      - /etc/localtime:/etc/localtime:ro
 ```
 
 Two things usually fix a broad mount:
