@@ -9,6 +9,7 @@ import type {
 import { findRule, redactSecrets } from "@docker-doctor/core";
 import chalk from "chalk";
 
+import { sanitizeMessage } from "../agents/sanitize";
 import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
 import { hasText } from "../text";
 
@@ -227,7 +228,10 @@ const printSuppressed = (
 
   for (const d of suppressed) {
     const location = isLineNumber(d.line) ? `${d.file}:${d.line}` : d.file;
-    const reason = hasText(d.reason) ? `  ${chalk.dim(d.reason)}` : "";
+
+    const reason = hasText(d.reason)
+      ? `  ${chalk.dim(sanitizeMessage(d.reason))}`
+      : "";
 
     console.log(`    ${chalk.cyan(d.rule)}  ${location}${reason}`);
   }

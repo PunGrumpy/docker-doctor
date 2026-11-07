@@ -85,6 +85,7 @@ export const writeDiagnosticsDirectory = async (
       ...d,
       file: sanitizePath(d.file),
       message: sanitizeMessage(d.message),
+      reason: d.reason === null ? null : sanitizeMessage(d.reason),
     })),
   };
 
