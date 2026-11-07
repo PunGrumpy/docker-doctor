@@ -605,6 +605,36 @@ const adversarialProxies = [
     },
   },
   {
+    name: "repeated -allowPUT flags with an empty pattern",
+    service: {
+      command: "-allowPUT '' ".repeat(ADVERSARIAL_LENGTH / 13),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long list of empty tokens",
+    service: {
+      command: Array.from({ length: ADVERSARIAL_LENGTH / 2 }, () => ""),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long POST value with a swarm section",
+    service: {
+      environment: { POST: "1", SERVICES: "0".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long SP_ALLOW_DELETE_ key",
+    service: {
+      environment: {
+        [`SP_ALLOW_DELETE_${"_".repeat(ADVERSARIAL_LENGTH)}`]: "",
+      },
+      image: WOLLOMATIC,
+    },
+  },
+  {
     name: "a long SP_ALLOW_POST_ key",
     service: {
       environment: { [`SP_ALLOW_POST_${"_".repeat(ADVERSARIAL_LENGTH)}`]: "" },

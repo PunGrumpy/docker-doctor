@@ -2255,14 +2255,47 @@ describe("Compose Security Rules", () => {
       reason: "build images",
     },
     {
-      extra: { environment: { AUTH: 1 } },
-      name: "AUTH alone",
-      reason: "AUTH",
+      extra: { environment: { AUTH: 1, POST: 1 } },
+      name: "POST with AUTH",
+      reason: "registry login",
     },
     {
-      extra: { environment: ["SECRETS=1"] },
-      name: "SECRETS alone",
-      reason: "SECRETS",
+      extra: { environment: ["POST=1", "SECRETS=1"] },
+      name: "POST with SECRETS, in list form",
+      reason: "swarm secrets",
+    },
+    {
+      extra: { environment: { POST: 1, SERVICES: 1 } },
+      name: "POST with SERVICES",
+      reason: "swarm services",
+    },
+    {
+      extra: { environment: { PLUGINS: 1, POST: 1 } },
+      name: "POST with PLUGINS",
+      reason: "install plugins",
+    },
+    {
+      extra: { environment: { POST: 1, SWARM: 1 } },
+      name: "POST with SWARM",
+      reason: "change the swarm",
+    },
+    {
+      extra: { environment: { LIBPOD_CONTAINERS: 1, POST: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "POST with LIBPOD_CONTAINERS on the linuxserver proxy",
+      reason: "Podman containers",
+    },
+    {
+      extra: { environment: { ALLOW_ARCHIVE: 1, POST: 1 } },
+      image: "linuxserver/socket-proxy:latest",
+      name: "POST with ALLOW_ARCHIVE on the linuxserver proxy",
+      reason: "copy files into containers",
+    },
+    {
+      extra: { environment: { POST: 1, SERVICES: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "POST with SERVICES on the linuxserver proxy",
+      reason: "swarm services",
     },
     {
       extra: { environment: { CONTAINERS: 1, POST: `\${POST:-1}` } },
@@ -2296,6 +2329,36 @@ describe("Compose Security Rules", () => {
       reason: "-allowPOST",
     },
     {
+      extra: { command: ["-allowPOST", "/v1.*/containers/create"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST with its pattern in the next token",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { command: "-allowPUT=/containers/.*/archive" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPUT",
+      reason: "allows PUT requests",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik", "--allowDELETE=.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "--allowDELETE",
+      reason: "allows DELETE requests",
+    },
+    {
+      extra: { environment: { SP_ALLOW_PUT: ".*" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_PUT",
+      reason: "SP_ALLOW_PUT",
+    },
+    {
+      extra: { environment: ["SP_ALLOW_DELETE_1=/containers/.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a numbered SP_ALLOW_DELETE",
+      reason: "SP_ALLOW_DELETE",
+    },
+    {
       extra: { environment: { SP_ALLOW_POST: ".*" } },
       image: "wollomatic/socket-proxy:1.8",
       name: "SP_ALLOW_POST",
@@ -2310,33 +2373,33 @@ describe("Compose Security Rules", () => {
     {
       extra: { environment: { CONTAINERS: 1 }, ports: ["2375:2375"] },
       name: "a port published with a host port",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
     {
       extra: { ports: ["2375"] },
       name: "a port published with no host port",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
     {
       extra: { ports: [2375] },
       name: "a numeric port",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
     {
       extra: { ports: ["0.0.0.0:2375:2375"] },
       name: "a port bound to 0.0.0.0",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
     {
       extra: { ports: [{ published: 2375, target: 2375 }] },
       name: "a port in long syntax",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
     {
       extra: { command: ["-allowfrom=traefik"], ports: ["2375:2375"] },
       image: "wollomatic/socket-proxy:1.8",
       name: "a wollomatic proxy that publishes its port",
-      reason: "all host interfaces",
+      reason: "publishes its port on every interface",
     },
   ];
 
@@ -2359,6 +2422,24 @@ describe("Compose Security Rules", () => {
   const readOnlyProxyCases = [
     { extra: {}, name: "no settings" },
     { extra: { environment: { POST: 1 } }, name: "POST alone" },
+    {
+      extra: { environment: { AUTH: 1 } },
+      name: "AUTH alone, which accepts only POST",
+    },
+    {
+      extra: { environment: ["SECRETS=1"] },
+      name: "SECRETS alone, which returns no secret data to a GET",
+    },
+    {
+      extra: { environment: { AUTH: 1, SECRETS: 1, SERVICES: 1, SWARM: 1 } },
+      name: "swarm sections with POST off",
+    },
+    {
+      extra: {
+        environment: { ALLOW_ARCHIVE: 1, LIBPOD_CONTAINERS: 1, POST: 1 },
+      },
+      name: "linuxserver sections on a Tecnativa proxy, which ignores them",
+    },
     {
       extra: { environment: { CONTAINERS: 1, INFO: 1, POST: 0 } },
       name: "CONTAINERS with POST off",
@@ -2410,6 +2491,31 @@ describe("Compose Security Rules", () => {
       name: "an empty -allowPOST",
     },
     {
+      extra: { command: ["-allowPOST", ""] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "an empty pattern in the token after -allowPOST",
+    },
+    {
+      extra: { command: "-allowfrom=traefik -allowPOST ''" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a quoted empty pattern after -allowPOST",
+    },
+    {
+      extra: { command: "-allowPOST=''" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST set to empty shell quotes",
+    },
+    {
+      extra: { command: ['--allowPUT=""', "-allowDELETE="] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "empty -allowPUT and -allowDELETE",
+    },
+    {
+      extra: { environment: { SP_ALLOW_DELETE: "", SP_ALLOW_PUT: " " } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "empty SP_ALLOW_PUT and SP_ALLOW_DELETE",
+    },
+    {
       extra: { environment: { SP_ALLOW_GET: ".*", SP_ALLOW_POST: "" } },
       image: "wollomatic/socket-proxy:1.8",
       name: "SP_ALLOW_GET and an empty SP_ALLOW_POST",
@@ -2437,11 +2543,32 @@ describe("Compose Security Rules", () => {
     }
   );
 
-  test("no-docker-socket-mount: help names why a proxy stops counting as read-only", () => {
+  test("no-docker-socket-mount: help names the common write paths and says the list is not complete", () => {
     expect(noDockerSocketMount.help).toContain("POST together with CONTAINERS");
+    expect(noDockerSocketMount.help).toContain("SERVICES, PLUGINS, SWARM");
     expect(noDockerSocketMount.help).toContain("AUTH or SECRETS");
-    expect(noDockerSocketMount.help).toContain("-allowPOST");
-    expect(noDockerSocketMount.help).toContain("all interfaces");
+    expect(noDockerSocketMount.help).toContain(
+      "-allowPOST, -allowPUT or -allowDELETE"
+    );
+    expect(noDockerSocketMount.help).toContain("every interface");
+    expect(noDockerSocketMount.help).toContain("not complete");
+  });
+
+  test("no-docker-socket-mount: the message names the condition, then says the exemption does not apply", () => {
+    const messages = [
+      proxyWith({ environment: { CONTAINERS: 1, POST: 1 } }),
+      proxyWith({ command: "-allowPOST=.*" }, "wollomatic/socket-proxy:1.8"),
+      proxyWith({ ports: ["2375:2375"] }),
+    ].map(
+      (composeContent) =>
+        noDockerSocketMount.check(composeContent, "compose.yml")[0].message
+    );
+
+    expect(messages).toEqual([
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy can create containers (POST and CONTAINERS are on). The exemption for read-only socket proxies does not apply.",
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy allows POST requests (-allowPOST or SP_ALLOW_POST). The exemption for read-only socket proxies does not apply.",
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy publishes its port on every interface. The exemption for read-only socket proxies does not apply.",
+    ]);
   });
 
   test("no-docker-socket-mount: a writable proxy is reported at its mount, a plain service by the old message", () => {
@@ -2472,7 +2599,7 @@ describe("Compose Security Rules", () => {
     );
 
     expect(diags.map((d) => d.line)).toEqual([8, 18]);
-    expect(diags[0].message).toContain("socket proxy lets clients create");
+    expect(diags[0].message).toContain("socket proxy can create containers");
     expect(diags[1].message).toStartWith(
       "Service 'plain' bind-mounts the Docker socket. Anything running"
     );

@@ -31,7 +31,7 @@ The Docker daemon runs as root and its API has no notion of partial trust. Any c
 
 ## How to fix it
 
-Prefer a read-only filtering socket proxy and reach it over an internal network. A proxy stops counting as read-only when it allows POST together with CONTAINERS, EXEC or BUILD, turns on AUTH or SECRETS, passes -allowPOST, or publishes its port on all interfaces. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.
+Prefer a read-only filtering socket proxy and reach it over an internal network. The rule treats a proxy as read-only until it finds a common write path, such as POST together with CONTAINERS, EXEC, BUILD, SERVICES, PLUGINS, SWARM, AUTH or SECRETS, a wollomatic -allowPOST, -allowPUT or -allowDELETE, or a port published on every interface. That list is not complete, so turn on only the API sections the service needs. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.
 
 ```yaml title="compose.yaml — a read-only log viewer behind a socket proxy"
 services:
@@ -69,10 +69,9 @@ If the service genuinely needs the Docker API, put a filtering socket proxy betw
 
 The rule does not report a raw socket mount on those three proxy images when they come from Docker Hub, `ghcr.io`, or `lscr.io` and the proxy is read-only, because a proxy has to mount the socket. It still reports a service with `build:`, and the same image name on any other registry, so a private mirror needs its own ignore entry.
 
-A proxy stops counting as read-only, and the rule reports its mount again with the reason, in any of these cases:
+The rule treats a proxy as read-only until it finds a common write path. It then reports the mount again and names the reason. The paths below are the common ones, not a complete list, so a proxy that matches none of them can still be wider than the service needs.
 
-- **It can change things.** A Tecnativa or linuxserver proxy sets `POST=1` together with `CONTAINERS=1`, `EXEC=1` or `BUILD=1`. A client can then start a privileged container, run commands in any container, or build images, which is root-equivalent. A wollomatic proxy passes any `-allowPOST` flag or sets `SP_ALLOW_POST`, because it allows no `POST` call until you ask for one. The Tecnativa README marks `POST` as security-critical, and the proxy reads a value as an integer, so `true` does not turn a section on.
-- **It turns on a security-critical section.** A Tecnativa or linuxserver proxy sets `AUTH=1` or `SECRETS=1`, which the README marks as security-critical along with `POST`.
+- **It can change things.** A Tecnativa or linuxserver proxy sets `POST=1` together with `CONTAINERS=1`, `EXEC=1`, `BUILD=1`, `SERVICES=1`, `PLUGINS=1`, `SWARM=1`, `AUTH=1` or `SECRETS=1`. A client can then start a privileged container, run commands in any container, build images, create a swarm service that bind-mounts the host root, or install a plugin, which is root-equivalent. `AUTH` and `SECRETS` count only with `POST`, because the Tecnativa README says that with `POST` off every section is read-only, `/auth` accepts only `POST`, and `GET /secrets` returns no secret data. The linuxserver proxy adds `LIBPOD_CONTAINERS=1` and `ALLOW_ARCHIVE=1`, which count together with `POST=1`. A wollomatic proxy passes any `-allowPOST`, `-allowPUT` or `-allowDELETE` flag, or sets `SP_ALLOW_POST`, `SP_ALLOW_PUT` or `SP_ALLOW_DELETE`, because it allows no such call until you ask for one. An empty pattern allows nothing, so it does not count. The Tecnativa README marks `POST` as security-critical, and the proxy reads a value as an integer, so `true` does not turn a section on.
 - **It is reachable from the network.** The proxy service publishes its own port on all interfaces, in the short or the long syntax. A port bound to `127.0.0.1` or `::1` is fine.
 
 The rule reads `environment` in map and list form and `command`. It does not read `env_file`, so a proxy configured there keeps the exemption. It does not read `network_mode: host` or the per-container labels of the wollomatic proxy.

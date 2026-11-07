@@ -248,7 +248,7 @@ export const noDockerSocketMount: ComposeRule = {
               this.defaultSeverity,
               proxyRisk === undefined
                 ? `Service '${name}' bind-mounts the Docker socket. Anything running in this container can control the Docker daemon: start privileged containers, read every volume, and escape to the host.`
-                : `Service '${name}' bind-mounts the Docker socket, and its socket proxy ${proxyRisk}. A proxy like that is not a read-only filter, so the exemption for socket proxies does not apply.`,
+                : `Service '${name}' bind-mounts the Docker socket, and its socket proxy ${proxyRisk}. The exemption for read-only socket proxies does not apply.`,
               this.help,
               context?.locate?.(["services", name, "volumes", index])
             )
@@ -260,7 +260,7 @@ export const noDockerSocketMount: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "error",
-  help: "Prefer a read-only filtering socket proxy and reach it over an internal network. A proxy stops counting as read-only when it allows POST together with CONTAINERS, EXEC or BUILD, turns on AUTH or SECRETS, passes -allowPOST, or publishes its port on all interfaces. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.",
+  help: "Prefer a read-only filtering socket proxy and reach it over an internal network. The rule treats a proxy as read-only until it finds a common write path, such as POST together with CONTAINERS, EXEC, BUILD, SERVICES, PLUGINS, SWARM, AUTH or SECRETS, a wollomatic -allowPOST, -allowPUT or -allowDELETE, or a port published on every interface. That list is not complete, so turn on only the API sections the service needs. use_api_socket is the same socket plus your registry credentials, so it is not a safer option.",
   key: "docker-doctor/no-docker-socket-mount",
   message: "Do not bind-mount the Docker socket into services",
 };
