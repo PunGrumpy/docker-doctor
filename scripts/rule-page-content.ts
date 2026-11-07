@@ -44,6 +44,11 @@ const APT_CLEAN_LAYER =
 const NODE_APP_AS_ROOT =
   'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]';
 
+// Shared by the rules that report a setting a service lacks, which judge the
+// service after its override merges in.
+const OVERRIDE_PAIRING_NOTE =
+  "Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`), this rule judges each service after the override merges over the base, the way `docker compose` does without `-f`. A setting in either file counts, and `!reset` in the override removes one the base set. A finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. Files passed with `-f`, `extends` and `include` are not followed.";
+
 export const rulePageContent: RulePages = {
   "docker-doctor/absolute-workdir": {
     bad: {
@@ -502,8 +507,10 @@ export const rulePageContent: RulePages = {
     intro:
       // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally
       '`image: nginx` and `image: redis:latest` both mean "whatever the registry serves today". In a Compose file that\'s worse than in a Dockerfile, because the file _is_ the deployment: two hosts running the same file can silently run different software, and so can one host after a reboot pulls fresh. This rule flags service images with no tag or with the mutable `latest` tag. Services built from a local `build:` context are skipped, as are `${VAR}`-templated references.',
-    notes:
+    notes: [
       "A version tag (`nginx:1.27-alpine`) is the practical default: readable, and mutated rarely enough for most services. For supply-chain-sensitive deployments, pin the digest (`nginx:1.27-alpine@sha256:…`). A digest is immutable by construction, and the tag next to it stays as documentation. Renovate and Dependabot both understand Compose files, so pinned versions don't have to mean stale versions. The same reasoning for Dockerfile base images lives in `pin-image-version`.",
+      "The rule reads each Compose file on its own, so an override's `image:` is checked in the override, at its own line. An image that the override removes with `image: !reset null`, or replaces with an empty `!override`, names no image and is not checked.",
+    ].join("\n\n"),
     why: "Unpinned images break the two properties a deployment file exists to provide. Reproducibility: \"works on staging\" means nothing if production pulled a different `latest` an hour later. Rollback: re-deploying yesterday's compose file after a bad release still pulls today's image, so the rollback undoes nothing. Pinning makes the file's git history an accurate record of what actually ran, which is also what an incident review needs.",
   },
 
@@ -623,8 +630,11 @@ export const rulePageContent: RulePages = {
     },
     intro:
       "By default a Compose service can use every byte of memory and every CPU cycle the host has. One service with a memory leak doesn't just die — it drags the whole machine down first, taking every co-located service with it. This rule flags services that define no resource limits.",
-    notes:
+    notes: [
       "`docker compose` applies `deploy.resources.limits` directly (no Swarm required). Size limits from observed usage plus real headroom — a limit that's too tight turns normal traffic spikes into OOM kills. Note that Java and Node runtimes size their heaps from the container limit only in recent versions; older runtimes may need explicit flags (`-Xmx`, `--max-old-space-size`) to match.\n\nThe service-level `mem_limit`, `cpus`, and `cpu_quota` keys are the older spelling of the same limits and satisfy the rule too.",
+      "A one-shot job, such as a migration that another service waits on with `condition: service_completed_successfully`, still needs a limit. Only [require-restart-policy](/docs/reference/rules/require-restart-policy) exempts it.",
+      OVERRIDE_PAIRING_NOTE,
+    ].join("\n\n"),
     why: "Limits are the isolation part of running containers. With a memory limit, a leaking service is OOM-killed at its cap and restarts — see [require-restart-policy](/docs/reference/rules/require-restart-policy) — while its neighbors keep serving; without one, the _host_ OOM killer picks a victim, and it often picks wrong (your database, for instance). CPU limits likewise keep one busy-looping service from starving everything else. Setting limits also forces the question every production service should answer: how much is this supposed to use?",
   },
 
@@ -643,8 +653,11 @@ export const rulePageContent: RulePages = {
     },
     intro:
       "The default restart policy is `no`: when a service crashes at 3 a.m. — or the host reboots after a power cut or kernel update — the container simply stays down until a human notices. This rule flags Compose services with no restart policy.",
-    notes:
+    notes: [
       "`on-failure[:max-retries]` restarts only on non-zero exits, useful for one-shot jobs that should retry a bounded number of times. Restart policies handle a _dead_ process; they can't see a process that's alive but broken — pair them with a [HEALTHCHECK](/docs/reference/rules/require-healthcheck) so unhealthy states are visible too. Docker restarts with exponential backoff, so a crash-looping service won't peg the host.",
+      "A service that another service names under `depends_on` with `condition: service_completed_successfully` is a one-shot job, such as a database migration or a bucket setup. The rule skips it, because `restart: always` would run the job again every time it finishes. Give such a job `restart: on-failure` if it should retry, or nothing. A service under `profiles:` is optional, not one-shot, so it is still checked.",
+      OVERRIDE_PAIRING_NOTE,
+    ].join("\n\n"),
     why: "Crashes are normal operation: OOM kills, unhandled exceptions, dropped database connections, host reboots. A restart policy is the difference between a 10-second blip and an outage that lasts until someone checks. `unless-stopped` is the policy that matches operational intent — it restarts on any crash and after reboot, but stays down when you _deliberately_ stopped the service (whereas `always` will resurrect it at the next daemon restart, surprising whoever stopped it for maintenance).",
   },
 
@@ -681,8 +694,10 @@ export const rulePageContent: RulePages = {
     },
     intro:
       "With Docker Model Runner, a service consumes a model in two steps: the top-level `models:` element declares it under a name and maps it to an OCI artifact, and the service's own `models:` section references that name, either as a plain list or as a map with `endpoint_var`/`model_var` bindings. The names must match exactly. A typo, or a model renamed in one place but not the other, leaves a reference with nothing to resolve to. This rule flags every service-level model reference that no top-level declaration satisfies.",
-    notes:
+    notes: [
       "The binding is how connection details reach your app: Compose starts the declared model via Model Runner and injects its URL and identifier into the service's environment, using either the default variables or the names you chose with `endpoint_var`/`model_var`. That's also why this error can surface confusingly late: the symptom is an agent failing to reach its endpoint at startup, several layers away from the one-word mismatch in the compose file. The rule intentionally has no opinion in the other direction; a declared model that no service references yet is fine.",
+      OVERRIDE_PAIRING_NOTE,
+    ].join("\n\n"),
     why: "This is a hard error caught cheap. The mismatch is invisible to a YAML syntax check, because both sections are individually valid. At runtime it appears as environment variables that were never injected, which reads like an app bug, not a compose bug. A linter comparing the two name sets finds it before anything is pulled or started, which is exactly the class of cross-reference mistake static analysis exists for.",
   },
 
