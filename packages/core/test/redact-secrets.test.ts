@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import { allRules } from "../src/rules/index";
 import { redactSecrets } from "../src/rules/redact-secrets";
+import { isSecretKey } from "../src/rules/secret-keywords";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 
 const PLACEHOLDER = "PLACEHOLDER_TOKEN_VALUE";
@@ -416,4 +417,31 @@ describe("provider token masking on a long line", () => {
     expect(redactSecrets(`sk-${text}`)).toBe(`sk-${text}`);
     expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
   });
+});
+
+// The key patterns run on every `ENV`, `ARG` and Compose environment key of
+// a scanned file, so a key built to make them backtrack must stay fast.
+const STRICT_TIME_LIMIT_MS = 50;
+
+const adversarialKeys = [
+  { name: "underscores", text: "_".repeat(ADVERSARIAL_LENGTH) },
+  { name: "repeated a_", text: "a_".repeat(ADVERSARIAL_LENGTH / 2) },
+  { name: "repeated token_", text: "token_".repeat(ADVERSARIAL_LENGTH / 6) },
+  { name: "repeated max_", text: "max_".repeat(ADVERSARIAL_LENGTH / 4) },
+  {
+    name: "repeated descriptor words",
+    text: "_expires_in".repeat(ADVERSARIAL_LENGTH / 11),
+  },
+  { name: "a run of a", text: "a".repeat(ADVERSARIAL_LENGTH) },
+];
+
+describe("isSecretKey on a long key", () => {
+  test.each(adversarialKeys)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ text }) => {
+      const start = performance.now();
+      isSecretKey(text);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
 });
