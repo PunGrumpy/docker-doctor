@@ -538,6 +538,27 @@ services:
     ]);
   });
 
+  test("a one-shot job the override adds and the base waits on needs no restart policy", () => {
+    const results = runComposeFiles([
+      source("compose.yaml", healthyBase),
+      source(
+        "compose.override.yaml",
+        `services:
+  web:
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+  seed:
+    image: app:1.0
+    mem_limit: 256m
+`
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([]);
+  });
+
   test("the configured severity applies to findings on the merged service", () => {
     const results = runComposeFiles(
       [
