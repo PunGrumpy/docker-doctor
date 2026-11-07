@@ -161,6 +161,20 @@ describe("Dockerfile ignores", () => {
     ]);
   });
 
+  test("several unknown names in one comment give one warning", () => {
+    const { diagnostics, ignores } = scanDockerfile(
+      `# docker-doctor-ignore no-root-user # image is run with --user\n${dockerfile}`
+    );
+
+    const result = applyIgnores(diagnostics, ignores);
+
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.message).toBe(
+      'unknown rules "#", "image", "is", "run", "with", "--user" in an ignore comment'
+    );
+    expect(rulesOf(result.suppressed)).toEqual([NO_ROOT_USER]);
+  });
+
   test("warnings from the reader carry the file name", () => {
     const { diagnostics, ignores } = scanDockerfile(
       `# docker-doctor-ignore\n${dockerfile}`

@@ -60,18 +60,26 @@ const indexFile = (
   const fileWarnings = warnings.map((warning) => ({ file, ...warning }));
 
   for (const directive of directives) {
+    const unknown: string[] = [];
+
     for (const name of directive.names) {
       const rule = findRuleByName(name);
 
       if (rule === undefined) {
-        fileWarnings.push({
-          file,
-          line: directive.line,
-          message: `unknown rule "${name}" in an ignore comment`,
-        });
+        unknown.push(`"${name}"`);
       } else {
         addDirective(ignores, directive, rule.key);
       }
+    }
+
+    if (unknown.length > 0) {
+      const noun = unknown.length === 1 ? "rule" : "rules";
+
+      fileWarnings.push({
+        file,
+        line: directive.line,
+        message: `unknown ${noun} ${unknown.join(", ")} in an ignore comment`,
+      });
     }
   }
 
