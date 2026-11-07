@@ -95,8 +95,23 @@ export interface VolumeMount {
   type?: string;
 }
 
-const shortSyntaxReadOnly = (mode: string | undefined): boolean =>
-  mode !== undefined && mode.split(",").includes("ro");
+// compose-go applies the short-syntax options in order and the last of `ro`
+// and `rw` wins: `ro` sets ReadOnly, `rw` clears it, so `ro,rw` is writable
+// and `rw,ro` is read-only (compose-spec/compose-go, format/volume.go lines
+// 101-106 at 29084ee).
+const shortSyntaxReadOnly = (mode: string | undefined): boolean => {
+  let readOnly = false;
+
+  for (const option of mode?.split(",") ?? []) {
+    if (option === "ro") {
+      readOnly = true;
+    } else if (option === "rw") {
+      readOnly = false;
+    }
+  }
+
+  return readOnly;
+};
 
 const stringOrUndefined = (
   value: ComposeValue | undefined

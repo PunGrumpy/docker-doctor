@@ -2274,6 +2274,13 @@ describe("Compose Security Rules", () => {
     { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:ro" },
     { broad: 0, volume: "/etc/ssl/certs/:/etc/ssl/certs:ro" },
     { broad: 0, volume: "/etc/localtime:/etc/localtime:z,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:rw,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:rw,z,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,ro" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,z,rw" },
+    { broad: 1, volume: "/etc/localtime:/etc/localtime:ro,rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:rw" },
     { broad: 1, volume: "/etc/localtime:/etc/localtime" },
     { broad: 1, volume: "/etc/timezone:/etc/timezone:rw" },
     { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs" },
@@ -2388,6 +2395,26 @@ describe("Compose Security Rules", () => {
     expect(diags.map((d) => d.line)).toEqual([5, 8, 10]);
     expect(diags[0].message).toContain("'/opt/certs'");
     expect(diags[0].severity).toBe("info");
+  });
+
+  test("prefer-read-only-bind-mount: the last of ro and rw decides in the short syntax", () => {
+    const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - /opt/certs:/etc/nginx/certs:ro,rw
+      - /opt/certs:/etc/nginx/certs:rw,ro
+      - /opt/certs:/etc/nginx/certs:rw
+      - /opt/certs:/etc/nginx/certs:z,ro
+`;
+
+    const diags = preferReadOnlyBindMount.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([5, 7]);
   });
 
   test("prefer-read-only-bind-mount: project mounts, named volumes, and the socket are clean", () => {
