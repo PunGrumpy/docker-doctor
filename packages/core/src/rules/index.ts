@@ -33,3 +33,7 @@ export const allRules: RuleDefinition[] = [
 
 export const findRule = (key: string): RuleDefinition | undefined =>
   allRules.find((rule) => rule.key === key);
+
+// The one lookup for a rule named by a user: the full key or the short id.
+export const findRuleByName = (name: string): RuleDefinition | undefined =>
+  findRule(name) ?? findRule(`docker-doctor/${name}`);

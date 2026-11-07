@@ -10,6 +10,12 @@ export { readComposeIgnores } from "./parsers/compose-ignores";
 
 export { readDockerfileIgnores } from "./parsers/dockerfile-ignores";
 
+export {
+  applyIgnores,
+  type IgnoreFileWarning,
+  type IgnoreResult,
+} from "./runners/apply-ignores";
+
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 
 export { runComposeRules } from "./runners/compose-runner";
@@ -24,6 +30,7 @@ export {
   allDockerfileRules,
   allComposeRules,
   findRule,
+  findRuleByName,
 } from "./rules/index";
 
 export { defineConfig } from "./config/define-config";
@@ -69,6 +76,7 @@ export type {
   RuleCategory,
   RuleDefinition,
   RuleSeverity,
+  SuppressedDiagnostic,
 } from "./types/index";
 
 export { toJsonReport, type JsonReport } from "./report";
