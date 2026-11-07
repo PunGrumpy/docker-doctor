@@ -6,6 +6,10 @@ export { parseDockerfileDirectives } from "./parsers/dockerfile-directives";
 
 export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
 
+export { readComposeIgnores } from "./parsers/compose-ignores";
+
+export { readDockerfileIgnores } from "./parsers/dockerfile-ignores";
+
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 
 export { runComposeRules } from "./runners/compose-runner";
@@ -57,6 +61,10 @@ export type {
   DockerfileDirectives,
   DockerfileInstruction,
   DockerfileRule,
+  FileIgnores,
+  IgnoreDirective,
+  IgnoreScope,
+  IgnoreWarning,
   ProjectInfo,
   RuleCategory,
   RuleDefinition,
