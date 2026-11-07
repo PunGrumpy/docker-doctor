@@ -8,9 +8,10 @@ import { parseIgnoreComment } from "../src/parsers/ignore-comment";
 const TIME_LIMIT_MS = 50;
 
 // A whole-file read also pays for yaml's own parse, which dominates the Compose
-// case (24 to 48 ms measured). This bound only has to catch work that grows
-// with the square of the input.
-const FILE_TIME_LIMIT_MS = 250;
+// case (24 to 48 ms on a workstation, 318 ms once on a shared CI runner). The
+// bound only has to catch work that grows with the square of the input, which
+// takes seconds here, so it stays well above runner noise.
+const FILE_TIME_LIMIT_MS = 1000;
 const WIDE_MAPPING_KEYS = 100_000;
 const HOSTILE_LENGTH = 200_000;
 
@@ -115,26 +116,25 @@ describe("Dockerfile ignore comments", () => {
     expect(lineScopes(content)).toEqual([[2, { kind: "line", line: 3 }]]);
   });
 
-  test("a # line inside a heredoc body is shell, not a directive", () => {
-    const content =
-      "FROM node\nRUN <<EOF\n# docker-doctor-ignore a\necho hi\nEOF\nCMD x\n";
-
-    expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
-  });
-
-  test("a # line inside a heredoc body is shell after a lone backslash line", () => {
-    const content =
-      "FROM node\n\\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- heredoc body line\nEOT\nCMD x\n";
-
-    expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
-  });
-
-  test("a # line inside a heredoc body is shell after a line that is no instruction", () => {
-    const content =
-      "FROM node\nbogus \\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- from a heredoc body\nEOT\nCMD x\n";
-
-    expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
-  });
+  test.each([
+    [
+      "a plain heredoc",
+      "FROM node\nRUN <<EOF\n# docker-doctor-ignore a\necho hi\nEOF\nCMD x\n",
+    ],
+    [
+      "a heredoc after a lone backslash line",
+      "FROM node\n\\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- heredoc body line\nEOT\nCMD x\n",
+    ],
+    [
+      "a heredoc after a line that is no instruction",
+      "FROM node\nbogus \\\nRUN <<EOT\n# docker-doctor-ignore use-exec-form -- from a heredoc body\nEOT\nCMD x\n",
+    ],
+  ])(
+    "a # line inside a heredoc body is shell, not a directive: %s",
+    (_name, content) => {
+      expect(readDockerfile(content)).toEqual({ directives: [], warnings: [] });
+    }
+  );
 
   test("a comment after such a heredoc still applies to the next instruction", () => {
     const content =
