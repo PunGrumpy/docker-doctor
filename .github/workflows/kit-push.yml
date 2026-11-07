@@ -72,6 +72,12 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --depth=1 origin "$BASE_SHA"
+          # A change to this workflow alone (a comment, a pinned action) needs
+          # no kit release. The build steps below still run for it.
+          if [ -z "$(git diff --name-only "$BASE_SHA" HEAD -- kits/docker-doctor)" ]; then
+            echo "No kit files changed, so no kit changeset is needed."
+            exit 0
+          fi
           base="$(git show "$BASE_SHA:kits/docker-doctor/package.json" 2>/dev/null | jq -r '.version // empty')"
           head="$(jq -r .version "$KIT_DIR/package.json")"
           if [ "$head" != "$base" ]; then
@@ -132,6 +138,11 @@ jobs:
   push:
     if: ${{ github.event_name != 'pull_request' && !inputs.latest_from }}
     runs-on: ubuntu-latest
+    # Both jobs write the latest tag. One group makes a rollback wait for a
+    # release that is still publishing instead of racing it.
+    concurrency:
+      group: kit-publish
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -277,6 +288,9 @@ jobs:
   roll-back-latest:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.latest_from }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: kit-publish
+      cancel-in-progress: false
     steps:
       - name: Require an existing version tag
         env:
