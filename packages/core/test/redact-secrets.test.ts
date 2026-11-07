@@ -40,6 +40,22 @@ describe("redactSecrets", () => {
       output: "NPM_TOKEN=*** npm ci",
     },
     {
+      input: "ENV MAX_SECRET_KEY=FAKEtoken123",
+      output: "ENV MAX_SECRET_KEY=***",
+    },
+    {
+      input: "MIN_IO_ROOT_PASSWORD: FAKEtoken123",
+      output: "MIN_IO_ROOT_PASSWORD: ***",
+    },
+    {
+      input: "MAX_BOT_TOKEN=FAKEtoken123 MAX_API_KEY=FAKEtoken123",
+      output: "MAX_BOT_TOKEN=*** MAX_API_KEY=***",
+    },
+    {
+      input: "MAX_TOKEN=4096 MIN_TOKENS=16",
+      output: "MAX_TOKEN=4096 MIN_TOKENS=16",
+    },
+    {
       input: `export DB_PASSWORD="${PLACEHOLDER} with spaces" && run`,
       output: "export DB_PASSWORD=*** && run",
     },

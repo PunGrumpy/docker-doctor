@@ -101,6 +101,11 @@ const credentialEnvCases = [
   { key: "API_TOKEN_ID", value: "FAKEid" },
   { key: "AUTH_USER", value: "FAKEuser" },
   { key: "AUTH_DSN", value: "FAKEdsn" },
+  { key: "MAX_SECRET_KEY", value: "FAKEtoken123" },
+  { key: "MAX_PASSWORD", value: "FAKEtoken123" },
+  { key: "MAX_API_KEY", value: "FAKEtoken123" },
+  { key: "MAX_BOT_TOKEN", value: "FAKEtoken123" },
+  { key: "MIN_IO_ROOT_PASSWORD", value: "FAKEtoken123" },
 ];
 
 // A URL value under a key that names no secret. A literal password in its
@@ -827,13 +832,33 @@ describe("isSecretKey", () => {
     expect(isSecretKey("api-token-expire-in")).toBe(false);
   });
 
-  test("a MAX_ or MIN_ prefix names a bound, not a secret", () => {
+  test("a MAX_ or MIN_ prefix names a bound only on a count of tokens", () => {
     expect(isSecretKey("MAX_TOKEN")).toBe(false);
     expect(isSecretKey("min-token")).toBe(false);
+    expect(isSecretKey("MIN_TOKENS")).toBe(false);
+    expect(isSecretKey("MAX_INPUT_TOKENS")).toBe(false);
     expect(isSecretKey("MAX_PASSWORD_ATTEMPTS")).toBe(false);
     expect(isSecretKey("SERVICE_MAX_TOKEN")).toBe(true);
     expect(isSecretKey("MAXIMUM_TOKEN")).toBe(true);
   });
+
+  const boundedSecretKeys = [
+    "MAX_SECRET_KEY",
+    "MAX_PASSWORD",
+    "MAX_API_KEY",
+    "MAX_BOT_TOKEN",
+    "MIN_IO_ROOT_PASSWORD",
+    "MAX_TOKEN_SECRET",
+    "min-auth-token",
+    "MIN_PRIVATE_KEY",
+  ];
+
+  test.each(boundedSecretKeys)(
+    "a MAX_ or MIN_ prefix does not clear %s, which holds a secret",
+    (key) => {
+      expect(isSecretKey(key)).toBe(true);
+    }
+  );
 
   test("only the last token counts", () => {
     expect(isSecretKey("DB_NAME_PASSWORD")).toBe(true);

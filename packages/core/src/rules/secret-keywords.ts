@@ -23,12 +23,13 @@ const CREDENTIAL_KEY_WORDS = [
   "hf",
 ] as const;
 
-const SECRET_KEY_PATTERNS: readonly RegExp[] = [
+const TOKEN_WORD = /(?:^|[_-])token(?:[_-]|$)/iu;
+
+const OTHER_SECRET_KEY_PATTERNS: readonly RegExp[] = [
   new RegExp(`(?:^|[_-])(?:${CREDENTIAL_KEY_WORDS.join("|")})[_-]key$`, "iu"),
   // No leading separator, for PGPASSWORD.
   /password(?:[_-]|$)/iu,
   /(?:^|[_-])secret(?:[_-]|$)/iu,
-  /(?:^|[_-])token(?:[_-]|$)/iu,
   /(?:^|[_-])api_key(?:[_-]|$)/iu,
   /(?:^|[_-])apikey(?:[_-]|$)/iu,
   /(?:^|[_-])private_key(?:[_-]|$)/iu,
@@ -66,6 +67,7 @@ const SECRET_DESCRIPTOR_WORDS = [
   "limit",
   "budget",
   "count",
+  "attempts",
   "size",
   // Which one, or which scheme guards it.
   "name",
@@ -86,13 +88,22 @@ const SECRET_DESCRIPTOR_SUFFIX = new RegExp(
   "iu"
 );
 
-// `MAX_TOKEN` and `MIN_TOKENS` name a bound on a count of tokens.
-const BOUND_PREFIX = /^(?:max|min)[_-]/iu;
+// `MAX_TOKEN` and `MIN_TOKENS` name a bound on a count of tokens. The bound
+// applies only while `token` is the one secret word in the key, so
+// `MAX_SECRET_KEY`, `MAX_PASSWORD` and `MAX_BOT_TOKEN` stay secret keys.
+const TOKEN_BOUND = /^(?:max|min)[_-]tokens?(?:[_-]|$)/iu;
 
-export const isSecretKey = (key: string): boolean =>
-  !SECRET_DESCRIPTOR_SUFFIX.test(key) &&
-  !BOUND_PREFIX.test(key) &&
-  SECRET_KEY_PATTERNS.some((regex) => regex.test(key));
+export const isSecretKey = (key: string): boolean => {
+  if (SECRET_DESCRIPTOR_SUFFIX.test(key)) {
+    return false;
+  }
+
+  const hasTokenWord = TOKEN_WORD.test(key) && !TOKEN_BOUND.test(key);
+
+  return (
+    hasTokenWord || OTHER_SECRET_KEY_PATTERNS.some((regex) => regex.test(key))
+  );
+};
 
 const CREDENTIAL_FREE_URL = /^[a-z][a-z0-9+.-]*:\/\/[^@/\s]*(?:\/|$)/iu;
 
