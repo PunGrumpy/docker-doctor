@@ -10,9 +10,16 @@ import type { ComposeValue } from "../types/index";
 import { isComposeTrue } from "./compose-services";
 
 // `${VAR:-default}` resolves to its default; `${VAR}`, `$VAR` and the
-// `?error` forms resolve to nothing.
-const INTERPOLATION_WITH_DEFAULT = /\$\{[^}:?-]+:?-(?<fallback>[^}]*)\}/gu;
-const INTERPOLATION_WITHOUT_DEFAULT = /\$\{[^}]*\}|\$[A-Za-z_]\w*/gu;
+// `?error` forms resolve to nothing. The body of a `${...}` never holds
+// another `${`: `(?:[^}$]|\$(?!\{))*` stops at the nearest `}`, and a start
+// with no `}` before the next `${` fails after scanning only that far. A body
+// that could run across `${` would rescan to the end of the value from every
+// start.
+const INTERPOLATION_WITH_DEFAULT =
+  /\$\{[^}:?$-]+:?-(?<fallback>(?:[^}$]|\$(?!\{))*)\}/gu;
+
+const INTERPOLATION_WITHOUT_DEFAULT =
+  /\$\{(?:[^}$]|\$(?!\{))*\}|\$[A-Za-z_]\w*/gu;
 
 // `$HOME` and `${HOME}` name the same directory `~` does; fold them before
 // the generic interpolation pass would erase them.
