@@ -176,6 +176,24 @@ describe("runComposeRules", () => {
     expect(diagnostics[0].line).toBe(11);
   });
 
+  test("an image removed by !reset or emptied by !override is not asked for a tag", () => {
+    const source = `services:
+  web:
+    image: !reset null
+  worker:
+    image: !override
+`;
+
+    const diagnostics = runComposeRules(
+      parseCompose(source, "compose.override.yaml"),
+      "compose.override.yaml"
+    );
+
+    expect(
+      findByRule(diagnostics, "docker-doctor/pin-service-image")
+    ).toBeUndefined();
+  });
+
   test("forwards a locator so diagnostics carry line numbers", () => {
     const source = 'version: "3.8"\nservices:\n  web:\n    image: node:22\n';
 

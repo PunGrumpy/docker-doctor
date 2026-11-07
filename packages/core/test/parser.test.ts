@@ -378,7 +378,6 @@ services:
           web: {
             deploy: { resources: { limits: { memory: "256M" } } },
             image: "nginx:1.27-alpine",
-            ports: [],
           },
         },
       });
@@ -386,6 +385,71 @@ services:
     } finally {
       emitWarning.mockRestore();
     }
+  });
+
+  test("!reset removes the value from the file, as Compose drops it", () => {
+    const content = `
+services:
+  web:
+    image: !reset null
+    restart: !reset
+    ports: !reset []
+    command: ["serve"]
+    environment:
+      - A=1
+      - !reset B=2
+`;
+
+    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+      services: {
+        web: { command: ["serve"], environment: ["A=1"] },
+      },
+    });
+  });
+
+  test("!override keeps the value it tags", () => {
+    const content = `
+services:
+  web:
+    image: !override nginx:1.27-alpine
+    environment: !override
+      LOG_LEVEL: debug
+    ports: !override ["8080:80"]
+  worker:
+    image: !override
+`;
+
+    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+      services: {
+        web: {
+          environment: { LOG_LEVEL: "debug" },
+          image: "nginx:1.27-alpine",
+          ports: ["8080:80"],
+        },
+        worker: { image: null },
+      },
+    });
+  });
+
+  test("!reset under a merge key removes the value where the anchor is merged", () => {
+    const content = `
+x-base: &base
+  restart: !reset null
+  image: app:1.0
+services:
+  web:
+    <<: *base
+  api:
+    <<: *base
+`;
+
+    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+      services: {
+        api: { image: "app:1.0" },
+        web: { image: "app:1.0" },
+      },
+      "x-base": { image: "app:1.0" },
+    });
   });
 
   test("should parse compose yml content", () => {
