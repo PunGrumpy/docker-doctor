@@ -4,7 +4,7 @@ Static analysis for Dockerfiles and Docker Compose files, preinstalled in your s
 
 ## Usage
 
-The kit needs Docker Sandboxes (`sbx`) 0.51 or later. Pull it from Docker Hub, which `sbx` trusts by default. The tag is required, because `sbx` does not default to `:latest`:
+Kit releases from 0.2.0 on need Docker Sandboxes (`sbx`) 0.51 or later. Pull it from Docker Hub, which `sbx` trusts by default. The tag is required, because `sbx` does not default to `:latest`:
 
 ```console
 $ sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
@@ -36,7 +36,7 @@ The kit is a `mixin`, so it composes with any agent sandbox (`claude`, `codex`, 
 
 The kit is one OCI image in the [Kit Specification v3](https://github.com/docker/sandbox-kit-spec) format. `docker-doctor.yaml` declares what it offers, and `docker-doctor.dockerfile` builds what it ships.
 
-1. **The CLI is in the image.** The kit carries a pinned `@docker-doctor/cli` under `/opt/docker-doctor`, its own Node.js 22 runtime, and a `docker-doctor` launcher in `/usr/local/bin`. The base image needs no Node.js, and the built-in agent images from `sbx` 0.51 on have none. Sandbox creation reaches no network for this kit. npm verifies the tarball against the registry's sha512 integrity metadata when the kit is built, so the version pin also pins content. The kit declares `provides: docker-doctor@<cli version>`, and the build fails unless the installed CLI prints that version.
+1. **The CLI is in the image.** The kit carries a pinned `@docker-doctor/cli` under `/opt/docker-doctor`, its own Node.js 22 runtime, and a `docker-doctor` launcher in `/usr/local/bin`. The base image needs no Node.js, and the built-in agent images from `sbx` 0.51 on have none. Sandbox creation does not download the CLI from npm. npm verifies the tarball against the registry's sha512 integrity metadata when the kit is built, so the version pin also pins content. The kit declares `provides: docker-doctor@<cli version>`, and the build fails unless the installed CLI prints that version.
 2. **The skill comes with it.** The `/docker-doctor` triage skill ships inside the CLI package, and the kit offers it to `sbx` as a bundled skill (`agent-skill@1`). `sbx` exposes it in every skills directory the agent's kit declares. On 2026-11-08 that is `~/.claude/skills` for `claude` and `~/.agents/skills` for `codex`. The other built-in agents declare none, so the agent instructions name the skill's path in the image instead. Nothing is written to your mounted workspace.
 3. **The agent is told to use it.** `docker-doctor-context.md` adds a short instruction. After editing any Dockerfile or Compose file, the agent runs `docker-doctor` and fixes the diagnostics before committing.
 

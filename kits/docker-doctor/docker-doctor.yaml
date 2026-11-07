@@ -21,7 +21,7 @@
 #
 # So the overlay carries a private Node runtime and the pinned CLI under
 # /opt/docker-doctor, the skill is offered through agent-skill@1, and the
-# kit runs no hooks and reaches no network at create.
+# kit runs no hooks at create and downloads nothing beyond its own image.
 schemaVersion: "3"
 kind: mixin
 
