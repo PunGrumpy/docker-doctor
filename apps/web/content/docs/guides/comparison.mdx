@@ -77,5 +77,5 @@ A setup that works well in CI:
 - It does not build, pull or run images. Every finding comes from static analysis of the files.
 - It does not lint shell syntax inside `RUN`.
 - It does not rewrite your files. It explains each fix, and a [coding agent](/docs/guides/coding-agents) can apply them.
-- It has no inline ignore comments. You change severities and ignore files in the [config file](/docs/reference/configuration).
+- It has no baseline file that accepts today's findings. You silence one finding with an [inline ignore comment](/docs/reference/configuration#inline-ignore-comments), and you change severities and ignore files in the [config file](/docs/reference/configuration).
 - It does not write SARIF. Use `--json` for a machine-readable report.

@@ -102,4 +102,29 @@ describe("terminal report", () => {
     expect(plain.stdout).not.toContain("\u001B");
     expect(verbose.stdout).not.toContain("\u001B");
   });
+
+  test("a suppressed finding is counted in one line, and listed with its reason under --verbose", async () => {
+    const plain = await runPlain([fixture("ignore-dockerfile")]);
+
+    expect(plain.stdout).toContain("3 findings suppressed by ignore comments");
+    expect(plain.stdout).not.toContain("local-only placeholder");
+
+    const verbose = await runPlain([fixture("ignore-dockerfile"), "--verbose"]);
+
+    expect(verbose.stdout).toContain(
+      "3 findings suppressed by ignore comments"
+    );
+    expect(verbose.stdout).toMatch(
+      /docker-doctor\/no-secrets-in-env {2}Dockerfile:6 {2}local-only placeholder, never deployed/u
+    );
+    expect(verbose.stdout).toMatch(
+      /docker-doctor\/require-labels {2}Dockerfile:1 {2}labels come from the build pipeline/u
+    );
+  });
+
+  test("a scan with nothing suppressed prints no suppressed line", async () => {
+    const { stdout } = await runPlain([fixture("with-error")]);
+
+    expect(stdout).not.toContain("suppressed");
+  });
 });
