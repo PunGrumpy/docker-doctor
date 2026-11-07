@@ -1,0 +1,4 @@
+services:
+  agent:
+    image: example/agent:1.4.2
+    privileged: true # docker-doctor-ignore no-privileged-service -- builds nested containers in CI

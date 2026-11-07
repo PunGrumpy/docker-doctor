@@ -1,4 +1,5 @@
 import { findRuleByName } from "../rules/index";
+import { redactSecrets } from "../rules/redact-secrets";
 import type {
   Diagnostic,
   FileIgnores,
@@ -126,7 +127,10 @@ export const applyIgnores = (
     if (match === null) {
       live.push(diagnostic);
     } else {
-      suppressed.push({ ...diagnostic, reason: match.reason });
+      suppressed.push({
+        ...diagnostic,
+        reason: match.reason === null ? null : redactSecrets(match.reason),
+      });
     }
   }
 
