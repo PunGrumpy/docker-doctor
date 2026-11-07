@@ -23,6 +23,27 @@ export interface Diagnostic {
   column?: number;
 }
 
+export type IgnoreScope = { kind: "file" } | { kind: "line"; line: number };
+
+export interface IgnoreDirective {
+  // Rule names as written in the comment, before they are resolved.
+  names: string[];
+  reason: string | null;
+  // The line of the comment itself.
+  line: number;
+  scope: IgnoreScope;
+}
+
+export interface IgnoreWarning {
+  line: number;
+  message: string;
+}
+
+export interface FileIgnores {
+  directives: IgnoreDirective[];
+  warnings: IgnoreWarning[];
+}
+
 export interface ProjectInfo {
   dockerfiles: string[];
   composeFiles: string[];
