@@ -130,11 +130,16 @@ export const isLiteralSecretValue = (value: string): boolean => {
 
 // The userinfo of any `scheme://user:password@host` URL. A bare token can
 // sit in the user part (`https://<token>@github.com`), so the redactor masks
-// a user name even without a password. A scheme starts where a run of scheme
-// characters starts, so a long run is tried once, not once per character.
-// The pattern is global, so use it with `matchAll` or `replaceAll`.
+// a user name even without a password. URL parsers split at the last `@`
+// before the path, so `a:FAKE@pw@host` has the password `FAKE@pw`. RFC 3986
+// keeps `/`, `?` and `#` out of userinfo, so `https://host:8443?to=a@b.com`
+// has none. The greedy run backs off once to that last `@`, and `/` ends
+// every run, so a later scheme never starts inside an earlier scan. A
+// scheme starts where a run of scheme characters starts, so a long run is
+// tried once, not once per character. The pattern is global, so use it with
+// `matchAll` or `replaceAll`.
 export const URL_USERINFO_RE =
-  /(?<![a-z0-9+.-])(?<scheme>[0-9+.-]*[a-z][a-z0-9+.-]*:\/\/)(?<userinfo>[^\s/@]+)@/giu;
+  /(?<![a-z0-9+.-])(?<scheme>[0-9+.-]*[a-z][a-z0-9+.-]*:\/\/)(?<userinfo>[^\s/?#]+)@/giu;
 
 // A password that names a variable or a template slot holds no literal:
 // `$PW`, `${PW}`, `#{pw}`, `{{pw}}`, `%s` and `%(pw)s`.

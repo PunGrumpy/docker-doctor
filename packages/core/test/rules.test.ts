@@ -117,8 +117,18 @@ const urlPasswordCases = [
   { reported: true, value: "mongodb://root:FAKEpw@mongo/db?authSource=admin" },
   { reported: true, value: "https://user:FAKEpw@registry.example.com/" },
   { reported: true, value: "postgres://postgres:postgres@db" },
+  { reported: true, value: "postgres://a:FAKE@pw@host" },
+  { reported: true, value: "redis://:FAKE@pw@@redis:6379/0" },
   { reported: false, value: "postgres://db:5432/app" },
   { reported: false, value: "postgres://app@db" },
+  {
+    reported: false,
+    value: "https://hooks.example.com:8443?notify=ops@example.com",
+  },
+  {
+    reported: false,
+    value: "https://docs.example.com:443#contact:me@example.com",
+  },
   { reported: false, value: "postgres://app:@db" },
   { reported: false, value: "ssh://git@github.com:org/repo.git" },
   { reported: false, value: "http://localhost:3000/path?email=a@b.com" },

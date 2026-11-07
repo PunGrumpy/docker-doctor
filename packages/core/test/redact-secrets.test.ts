@@ -40,6 +40,19 @@ describe("redactSecrets", () => {
       output: "NPM_TOKEN=*** npm ci",
     },
     {
+      input: "      DATABASE_URL: postgres://a:FAKE@pw@host:5432/app",
+      output: "      DATABASE_URL: postgres://***@host:5432/app",
+    },
+    {
+      input: "ENV REDIS_URL redis://:FAKE@pw@@redis/0 # cache",
+      output: "ENV REDIS_URL redis://***@redis/0 # cache",
+    },
+    {
+      input:
+        "WEBHOOK_URL=https://hooks.example.com:8443?notify=ops@example.com",
+      output: "WEBHOOK_URL=https://hooks.example.com:8443?***",
+    },
+    {
       input: "ENV MAX_SECRET_KEY=FAKEtoken123",
       output: "ENV MAX_SECRET_KEY=***",
     },
@@ -218,6 +231,8 @@ describe("redactSecrets", () => {
     "Potential secret found in ENV: 'API_TOKEN'.",
     "docker login --password-stdin",
     "curl https://example.com/health && npm install",
+    "https://docs.example.com:443#contact:me@example.com",
+    "a mail to me@example.com about https://example.com:443",
     "ADD https://example.com/pkg(v1).tar.gz /tmp/",
     "docker run -u 1000:1000 app",
     "docker run --user 0:0 app",
@@ -390,6 +405,14 @@ const adversarialInputs = [
     name: "secret lines with comments",
     text: "  PASSWORD: x # c\n".repeat(ADVERSARIAL_LENGTH / 17),
   },
+  {
+    name: "at signs after a scheme",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "repeated schemes with an at sign",
+    text: "a://a@".repeat(ADVERSARIAL_LENGTH / 6),
+  },
   { name: "a run of dashes", text: "-".repeat(ADVERSARIAL_LENGTH) },
   { name: "list markers", text: "- ".repeat(ADVERSARIAL_LENGTH / 2) },
   {
@@ -496,6 +519,22 @@ const adversarialUrls = [
   },
   { name: "colons", text: `http://${":".repeat(ADVERSARIAL_LENGTH)}@h` },
   { name: "at signs", text: `http://${"@".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "user parts that each end in an at sign",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "user parts that each end in an at sign, then a letter",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}a`,
+  },
+  {
+    name: "repeated schemes with an at sign",
+    text: "a://a@".repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  {
+    name: "a query full of at signs",
+    text: `http://h?${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
   {
     name: "a long dollar password",
     text: `http://u:${"$".repeat(ADVERSARIAL_LENGTH)}@h`,
