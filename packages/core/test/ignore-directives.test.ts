@@ -367,6 +367,46 @@ describe("Compose ignore comments", () => {
     ]);
   });
 
+  test("the file form is honored on either side of a leading document marker", () => {
+    const after =
+      "---\n# docker-doctor-ignore-file x -- after\nservices:\n  a:\n    image: x\n";
+
+    const before =
+      "# docker-doctor-ignore-file x -- before\n---\nservices:\n  a:\n    image: x\n";
+
+    expect(readComposeIgnores(after)).toEqual({
+      directives: [
+        { line: 2, names: ["x"], reason: "after", scope: { kind: "file" } },
+      ],
+      warnings: [],
+    });
+    expect(readComposeIgnores(before)).toEqual({
+      directives: [
+        { line: 1, names: ["x"], reason: "before", scope: { kind: "file" } },
+      ],
+      warnings: [],
+    });
+  });
+
+  test("the file form is honored after YAML directives and the document marker", () => {
+    const content =
+      "%YAML 1.2\n%TAG !e! tag:example.com,2026:\n---\n# docker-doctor-ignore-file x\nservices:\n  a:\n    image: x\n";
+
+    expect(readComposeIgnores(content).directives).toEqual([
+      { line: 4, names: ["x"], reason: null, scope: { kind: "file" } },
+    ]);
+  });
+
+  test("a document marker does not let the file form through below the first key", () => {
+    const content =
+      "---\nservices:\n  a:\n    image: x\n---\n# docker-doctor-ignore-file x\n";
+
+    const { directives, warnings } = readComposeIgnores(content);
+
+    expect(directives).toEqual([]);
+    expect(warnings).toHaveLength(1);
+  });
+
   test("the file form anywhere else does nothing and warns", () => {
     const content =
       "services:\n  # docker-doctor-ignore-file x\n  a:\n    image: x # docker-doctor-ignore-file y\n";

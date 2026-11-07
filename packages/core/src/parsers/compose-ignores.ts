@@ -116,9 +116,14 @@ const locateComments = (
 interface LineMap {
   // The first line below line n that holds content, at index n.
   contentAfter: (number | undefined)[];
-  // The first line that holds content.
+  // The first line that holds content, not counting the document prologue.
   firstContent: number;
 }
+
+// A line of the document prologue. `---` and the `%YAML` and `%TAG`
+// directives sit before the first mapping, like the comments in the top
+// block, so they must not end it.
+const PROLOGUE_LINE = /^(?:---|%(?:YAML|TAG)[ \t].*)$/u;
 
 const mapContentLines = (
   lines: string[],
@@ -131,9 +136,14 @@ const mapContentLines = (
   for (let line = lines.length; line >= 1; line -= 1) {
     contentAfter[line] = below;
 
-    if ((lines[line - 1] ?? "").trim() !== "" && !commentOnlyLines.has(line)) {
+    const text = (lines[line - 1] ?? "").trim();
+
+    if (text !== "" && !commentOnlyLines.has(line)) {
       below = line;
-      firstContent = line;
+
+      if (!PROLOGUE_LINE.test(text)) {
+        firstContent = line;
+      }
     }
   }
 

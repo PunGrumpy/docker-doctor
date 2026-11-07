@@ -109,7 +109,7 @@ A comment above `CMD` can never suppress a finding reported at `FROM`. A comment
 
 ### In a Compose file
 
-A comment that trails a line applies to that line. A comment on its own line applies to the next line that holds content, skipping blank lines and other comments. Both match a finding by its `line`. The `-file` form works as in a Dockerfile and must sit in the comment block at the top of the file.
+A comment that trails a line applies to that line. A comment on its own line applies to the next line that holds content, skipping blank lines and other comments. Both match a finding by its `line`. The `-file` form works as in a Dockerfile and must sit in the comment block at the top of the file. A leading `---` marker and any `%YAML` or `%TAG` directives belong to that block, so the comment may sit on either side of them.
 
 Findings on keys that come from a YAML merge key (`<<: *base`) have no line, so only the `-file` form can suppress them.
 
