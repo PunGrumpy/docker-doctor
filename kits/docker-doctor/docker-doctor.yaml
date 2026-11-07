@@ -1,0 +1,116 @@
+# syntax=docker/sandbox-kit:3
+# Docker Doctor as a mixin: the docker-doctor CLI, its agent skill, and a
+# short instruction that tells the agent to lint its own Dockerfile and
+# Compose changes before committing them.
+#
+# MIGRATION NOTE: v2 installed everything at sandbox create, from two
+# lifecycle hooks. This kit ships the CLI as content instead, built by
+# docker-doctor.dockerfile beside this file. Two facts about sbx 0.51 and
+# later made the hooks unsafe to carry across:
+#
+#   - Built-in agent names now resolve to published v3 kits on Docker
+#     Hardened Images. docker.io/sbx/claude:latest (Claude Code 2.1.319,
+#     its layers read on 2026-11-08) ships no node and no npm, so the v2
+#     root hook's `command -v npm` guard would fail sandbox creation on the
+#     very composition the README leads with.
+#   - The claude kit declares agent-skills@1 on /home/agent/.claude/skills
+#     with no mode, and an omitted mode means the host's shared skills store
+#     is mounted there read-only. The v2 agent-user hook copied the skill
+#     into that directory, and `docker-doctor install` exits 1 when any one
+#     agent fails.
+#
+# So the overlay carries a private Node runtime and the pinned CLI under
+# /opt/docker-doctor, the skill is offered through agent-skill@1, and the
+# kit runs no hooks at create and downloads nothing beyond its own image.
+schemaVersion: "3"
+kind: mixin
+
+# The kit versions independently of the CLI it installs (see README
+# "Publishing"). CLI releases auto-bump the patch; bump this by hand for
+# kit-only changes.
+#
+# MIGRATION NOTE: "by hand" means a docker-doctor-kit changeset, and
+# `bun run kit:sync` writes this line from package.json. It stays a quoted
+# literal on its own line because kit-push.yml reads it as the Hub tag.
+version: "0.1.14"
+displayName: Docker Doctor
+description: Static analysis for Dockerfiles and Compose files. Ships the docker-doctor CLI and its agent skill, and tells the agent to lint before committing Docker changes.
+# MIGRATION NOTE: v2 spelled this `sourceURL`. v2's `name: docker-doctor`
+# is gone, because a v3 kit's identity is the reference it is consumed by.
+sourceUrl: https://github.com/PunGrumpy/docker-doctor
+licenses:
+  - MIT
+
+# The @docker-doctor/cli release the overlay installs, declared once. It
+# reaches the recipe as DOCKER_DOCTOR_VERSION and expands into `provides`
+# at publish, so the kit cannot claim a CLI version its layers do not hold.
+# The recipe proves the agreement by running the installed CLI and
+# comparing what it prints. `bun run kit:sync` rewrites the default from
+# the exact pin in package.json.
+args:
+  cliVersion:
+    default: "0.9.1"
+    # SPEC-v3 §5.2 versions: dotted segments, no `v` prefix. The optional
+    # tail admits npm prereleases such as 1.0.0-beta.1.
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+    description: "@docker-doctor/cli release to install"
+    buildArg: DOCKER_DOCTOR_VERSION
+
+# MIGRATION NOTE: v2 declared no provides. Stating one lets another kit
+# require `docker-doctor` with a version constraint, and it carries the CLI
+# pin rather than the kit's own release number.
+provides: ["docker-doctor@${{ kit.args.cliVersion }}"]
+
+# MIGRATION NOTE: no network-policy@1. v2 allowed registry.npmjs.org:443
+# for the install hook:
+#
+#   npm tarballs at install time; npm verifies content against the
+#   registry's sha512 integrity metadata, so the version pin below
+#   pins content too.
+#
+# That download now happens once, at publish, as the builder's traffic,
+# which no sandbox policy governs. The CLI reaches no network when it runs.
+# An install phase with no installer in it would be a grant for nothing.
+#
+# MIGRATION NOTE: no lifecycle@1. v2's root hook, with this comment:
+#
+#   Root: global npm install. Guard mirrors the playwright kit — every
+#   standard agent template ships Node.js except claude-code-minimal.
+#
+# is now the recipe. The guard is gone with it, because the overlay brings
+# its own Node and no longer asks the base for one. v2's agent-user hook is
+# now the agent-skill@1 entry below.
+#
+# No `requires`. The bundled Node binary needs glibc and libstdc++, which
+# every Debian-based workload has, including the built-in agents. Requiring
+# `deb/libstdc++6` would also refuse any workload published without derived
+# provides, so the dependency is stated here and in the README instead.
+capabilities:
+  # Agent user: install the bundled skill into the sandbox home (global
+  # scope), never the workspace — the workspace is the user's host-mounted
+  # repo and must stay clean.
+  #
+  # MIGRATION NOTE: v2 ran `docker-doctor install --global --agent` for
+  # claude-code, codex, cursor, opencode, gemini-cli, github-copilot, droid
+  # and kiro-cli. Now the runtime exposes the skill at every skills
+  # destination the composed agent kits declare with agent-skills@1, so the
+  # list of agents is theirs to keep, not ours. On 2026-11-08 only the
+  # claude and codex built-ins declared one (~/.claude/skills and
+  # ~/.agents/skills). With the other built-ins this entry has no
+  # destination and is skipped, so those agents read the skill from the
+  # path the context file names. Optional for that reason, and because no
+  # published kit used this type yet. A host that does not know the type
+  # skips the entry too (SPEC-v3 §7.3).
+  - type: com.docker.sandbox/agent-skill@1
+    optional: true
+    description: The docker-doctor triage skill from the pinned CLI package
+    config:
+      path: /opt/docker-doctor/lib/node_modules/@docker-doctor/cli/skill/docker-doctor
+
+  # MIGRATION NOTE: v2's `agentInstructions.content` moved into
+  # docker-doctor-context.md. No `filename:`, because the profile belongs to
+  # the workload. The body gained one sentence with the skill's path, for
+  # hosts that skip agent-skill@1.
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      contentFile: ./docker-doctor-context.md

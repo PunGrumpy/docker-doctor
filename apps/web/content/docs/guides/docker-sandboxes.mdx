@@ -15,7 +15,9 @@ Kits extend a sandbox at creation time. The Docker Doctor kit is published to Do
 sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
 ```
 
-The tag is required — sbx does not default to `:latest` for registry kits. Pin a specific kit release instead if you want reproducible sandboxes, e.g. `docker.io/pungrumpy/docker-doctor-kit:0.1.0`. Each kit release installs an exact, pinned CLI version.
+Kit releases from 0.2.0 on need sbx 0.51 or later. The tag is required, because sbx does not default to `:latest` for registry kits. Pin a kit version tag instead if you want reproducible sandboxes. Each kit release ships one exact, pinned CLI version.
+
+On sbx older than 0.51, use `docker.io/pungrumpy/docker-doctor-kit:0.1.14`, the last kit in the v2 format. From 0.51 on, the built-in agents such as `claude` are v3 kits, and sbx refuses to combine them with v1 or v2 kits ([release notes](https://github.com/docker/sbx-releases/releases/tag/v0.51.0)).
 
 It's a `mixin` kit, so it composes with any agent (`claude`, `codex`, `gemini`, `opencode`, …) and stacks with your other kits.
 
@@ -27,11 +29,11 @@ sbx run --kit "git+https://github.com/PunGrumpy/docker-doctor.git#dir=kits/docke
 
 ## What the kit does
 
-At sandbox creation, before the agent starts:
+The kit is a [Kit Specification v3](https://github.com/docker/sandbox-kit-spec) image, so everything it adds is ready before the agent starts:
 
-1. **Installs the CLI** — a pinned `@docker-doctor/cli` from npm. The only network access the kit needs is `registry.npmjs.org`, and npm verifies the tarball against the registry's integrity metadata, so the version pin also pins content.
-2. **Installs the agent skill** — `docker-doctor install --global` places the `/docker-doctor` triage skill in the sandbox home for Claude Code, Codex, Cursor, OpenCode, Gemini CLI, GitHub Copilot, Droid, and Kiro. Nothing is written to your mounted workspace — your `git status` stays clean.
-3. **Injects agent memory** — a short instruction: after editing any Dockerfile or Compose file, run `docker-doctor` and fix the diagnostics before committing.
+1. **The CLI.** A pinned `@docker-doctor/cli` with its own Node.js runtime, and `docker-doctor` on the PATH. The base image needs no Node.js, and sandbox creation does not download the CLI from npm. npm verifies the tarball against the registry's integrity metadata when the kit is built, so the version pin also pins content.
+2. **The agent skill.** The `/docker-doctor` triage skill ships with the CLI. sbx exposes it in every skills directory the agent's kit declares, which today means `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex. With other agents, the agent memory below names the skill's path in the image. Nothing is written to your mounted workspace, so your `git status` stays clean.
+3. **Agent memory.** A short instruction tells the agent to run `docker-doctor` after editing any Dockerfile or Compose file, and to fix the diagnostics before committing.
 
 The result: the agent writes a Dockerfile, lints it, fixes what it finds, and only then commits — without you asking.
 
@@ -59,7 +61,7 @@ Apply the same rule to the sandbox itself: mount the one repository the agent is
 
 ## Requirements
 
-- A base template with Node.js — every standard agent template ships it (`claude-code-minimal` does not).
-- sbx with kits support (kits are marked experimental by Docker; the kit tracks the v2 spec).
+- sbx 0.51 or later for kit 0.2.0 and later. The kit follows Kit Specification v3, and Docker marks kits as experimental. On older sbx, use the `0.1.14` tag.
+- A glibc-based agent image, which every built-in agent has. The bundled Node.js runtime needs glibc and libstdc++.
 
 The kit's source of truth lives at [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) in the monorepo.
