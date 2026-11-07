@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
+import { socketProxyRisk } from "../src/rules/compose-socket-proxy";
 import { allRules } from "../src/rules/index";
 import { redactSecrets } from "../src/rules/redact-secrets";
 import { holdsUrlPassword, isSecretKey } from "../src/rules/secret-keywords";
@@ -507,6 +508,69 @@ describe("holdsUrlPassword on a long line", () => {
     ({ text }) => {
       const start = performance.now();
       holdsUrlPassword("DATABASE_URL", text);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
+});
+
+const TECNATIVA = "tecnativa/docker-socket-proxy:0.3.0";
+const WOLLOMATIC = "wollomatic/socket-proxy:1.8";
+
+const adversarialProxies = [
+  {
+    name: "a long POST value",
+    service: {
+      environment: { CONTAINERS: 1, POST: "0".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long signed POST value",
+    service: {
+      environment: { CONTAINERS: 1, POST: "+".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long -allowPOST regex",
+    service: {
+      command: [`-allowPOST=${"a".repeat(ADVERSARIAL_LENGTH)}`],
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a run of quotes",
+    service: { command: "'".repeat(ADVERSARIAL_LENGTH), image: WOLLOMATIC },
+  },
+  {
+    name: "repeated -allowPOST flags with no value",
+    service: {
+      command: "-allowPOST ".repeat(ADVERSARIAL_LENGTH / 11),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long SP_ALLOW_POST_ key",
+    service: {
+      environment: { [`SP_ALLOW_POST_${"_".repeat(ADVERSARIAL_LENGTH)}`]: "" },
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long list entry",
+    service: {
+      environment: [`POST=${"1".repeat(ADVERSARIAL_LENGTH)}`],
+      image: TECNATIVA,
+    },
+  },
+];
+
+describe("socketProxyRisk on a long service", () => {
+  test.each(adversarialProxies)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ service }) => {
+      const start = performance.now();
+      socketProxyRisk(service);
       expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
     }
   );

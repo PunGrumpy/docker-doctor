@@ -63,6 +63,7 @@ import {
   noSecretsInEnv,
   noAddRemote,
 } from "../src/rules/security";
+import type { ComposeMapping } from "../src/types/index";
 
 // Environment keys that name a secret in part but only describe it: where it
 // lives, how long it lasts, which scheme guards it. Both secrets rules skip
@@ -127,6 +128,16 @@ const urlPasswordCases = [
   { reported: false, value: "postgres://app:%s@db/app" },
   { reported: false, value: "postgres://app:%(pw)s@db/app" },
 ];
+
+const proxyWith = (extra: ComposeMapping, image?: string) => ({
+  services: {
+    proxy: {
+      image: image ?? "tecnativa/docker-socket-proxy:0.3.0",
+      volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"],
+      ...extra,
+    },
+  },
+});
 
 describe("Security Rules", () => {
   test("no-root-user", () => {
@@ -2088,6 +2099,246 @@ describe("Compose Security Rules", () => {
         noDockerSocketMount.check(composeContent, "compose.yml")
       ).toHaveLength(0);
     }
+  });
+
+  const writableProxyCases = [
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      name: "POST with CONTAINERS",
+      reason: "create containers",
+    },
+    {
+      extra: { environment: { EXEC: "1", POST: "1" } },
+      name: "POST with EXEC, as strings",
+      reason: "run commands in containers",
+    },
+    {
+      extra: { environment: ["POST=1", "BUILD=1"] },
+      name: "POST with BUILD, in list form",
+      reason: "build images",
+    },
+    {
+      extra: { environment: { AUTH: 1 } },
+      name: "AUTH alone",
+      reason: "AUTH",
+    },
+    {
+      extra: { environment: ["SECRETS=1"] },
+      name: "SECRETS alone",
+      reason: "SECRETS",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: `\${POST:-1}` } },
+      name: "POST that defaults to 1",
+      reason: "create containers",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "the linuxserver proxy",
+      reason: "create containers",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik", "-allowPOST=.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST in a command list",
+      reason: "-allowPOST",
+    },
+    {
+      extra: {
+        command: "-allowfrom=traefik --allowPOST=^/v1.*/containers/.*$",
+      },
+      image: "ghcr.io/wollomatic/socket-proxy:1.8",
+      name: "--allowPOST in a command string",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { command: "'-allowPOST=.*'" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a quoted -allowPOST",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { environment: { SP_ALLOW_POST: ".*" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_POST",
+      reason: "SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: ["SP_ALLOW_POST_2=/containers/create"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a numbered SP_ALLOW_POST",
+      reason: "SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1 }, ports: ["2375:2375"] },
+      name: "a port published with a host port",
+      reason: "all host interfaces",
+    },
+    {
+      extra: { ports: ["2375"] },
+      name: "a port published with no host port",
+      reason: "all host interfaces",
+    },
+    {
+      extra: { ports: [2375] },
+      name: "a numeric port",
+      reason: "all host interfaces",
+    },
+    {
+      extra: { ports: ["0.0.0.0:2375:2375"] },
+      name: "a port bound to 0.0.0.0",
+      reason: "all host interfaces",
+    },
+    {
+      extra: { ports: [{ published: 2375, target: 2375 }] },
+      name: "a port in long syntax",
+      reason: "all host interfaces",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik"], ports: ["2375:2375"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a wollomatic proxy that publishes its port",
+      reason: "all host interfaces",
+    },
+  ];
+
+  test.each(writableProxyCases)(
+    "no-docker-socket-mount: a socket proxy with $name loses the exemption",
+    ({ extra, image, reason }) => {
+      const diags = noDockerSocketMount.check(
+        proxyWith(extra, image),
+        "compose.yml"
+      );
+
+      expect(diags).toHaveLength(1);
+      expect(diags[0].message).toContain("Service 'proxy' bind-mounts");
+      expect(diags[0].message).toContain("socket proxy");
+      expect(diags[0].message).toContain(reason);
+      expect(diags[0].message).not.toContain("CVE-");
+    }
+  );
+
+  const readOnlyProxyCases = [
+    { extra: {}, name: "no settings" },
+    { extra: { environment: { POST: 1 } }, name: "POST alone" },
+    {
+      extra: { environment: { CONTAINERS: 1, INFO: 1, POST: 0 } },
+      name: "CONTAINERS with POST off",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, EXEC: 1 } },
+      name: "CONTAINERS and EXEC with no POST",
+    },
+    {
+      extra: { environment: { AUTH: 0, POST: 1, SECRETS: "0" } },
+      name: "AUTH and SECRETS off",
+    },
+    {
+      extra: { environment: { CONTAINERS: true, POST: true } },
+      name: "true, which the proxy does not read as on",
+    },
+    {
+      extra: { env_file: ["proxy.env"] },
+      name: "settings only in an env_file",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: `\${PROXY_POST}` } },
+      name: "POST that depends on a variable",
+    },
+    {
+      extra: { environment: ["CONTAINERS=1", "POST"] },
+      name: "a bare POST that passes the host value",
+    },
+    {
+      extra: { ports: ["127.0.0.1:2375:2375"] },
+      name: "a port bound to loopback",
+    },
+    { extra: { ports: ["[::1]:2375:2375"] }, name: "a port bound to ::1" },
+    {
+      extra: {
+        ports: [{ host_ip: "127.0.0.1", published: 2375, target: 2375 }],
+      },
+      name: "a long syntax port bound to loopback",
+    },
+    { extra: { expose: ["2375"] }, name: "an exposed port" },
+    {
+      extra: { command: ["-allowfrom=traefik", "-allowGET=/version"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "only -allowGET",
+    },
+    {
+      extra: { command: ["-allowPOST="] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "an empty -allowPOST",
+    },
+    {
+      extra: { environment: { SP_ALLOW_GET: ".*", SP_ALLOW_POST: "" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_GET and an empty SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "Tecnativa variables on a wollomatic proxy, which ignores them",
+    },
+    {
+      extra: {
+        command: ["-allowPOST=.*"],
+        environment: { SP_ALLOW_POST: ".*" },
+      },
+      name: "wollomatic settings on a Tecnativa proxy, which ignores them",
+    },
+  ];
+
+  test.each(readOnlyProxyCases)(
+    "no-docker-socket-mount: a socket proxy with $name keeps the exemption",
+    ({ extra, image }) => {
+      expect(
+        noDockerSocketMount.check(proxyWith(extra, image), "compose.yml")
+      ).toHaveLength(0);
+    }
+  );
+
+  test("no-docker-socket-mount: help names why a proxy stops counting as read-only", () => {
+    expect(noDockerSocketMount.help).toContain("POST together with CONTAINERS");
+    expect(noDockerSocketMount.help).toContain("AUTH or SECRETS");
+    expect(noDockerSocketMount.help).toContain("-allowPOST");
+    expect(noDockerSocketMount.help).toContain("all interfaces");
+  });
+
+  test("no-docker-socket-mount: a writable proxy is reported at its mount, a plain service by the old message", () => {
+    const source = `services:
+  proxy-rw:
+    image: tecnativa/docker-socket-proxy:0.3
+    environment:
+      CONTAINERS: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  proxy-ro:
+    image: tecnativa/docker-socket-proxy:0.3
+    environment:
+      CONTAINERS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  plain:
+    image: nginx:1.27
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+`;
+
+    const diags = noDockerSocketMount.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([8, 18]);
+    expect(diags[0].message).toContain("socket proxy lets clients create");
+    expect(diags[1].message).toStartWith(
+      "Service 'plain' bind-mounts the Docker socket. Anything running"
+    );
   });
 
   test("no-docker-socket-mount: a look-alike proxy image is still reported", () => {
