@@ -197,7 +197,7 @@ export const rulePageContent: RulePages = {
       code: "services:\n  agent:\n    image: my-agent:1.2.0\n    volumes:\n      - ./workspace:/home/agent/workspace\n      - ./config/aws:/root/.aws:ro\n      - /etc/localtime:/etc/localtime:ro",
       lang: "yaml",
       title:
-        "compose.yaml — one project directory, credentials and the time zone read-only",
+        "A compose.yaml that mounts one project directory and keeps credentials and the time zone read-only",
     },
     intro:
       // oxlint-disable-next-line no-template-curly-in-string -- Compose interpolation syntax, shown literally

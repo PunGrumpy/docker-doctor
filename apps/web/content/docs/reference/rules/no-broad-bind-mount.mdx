@@ -34,7 +34,7 @@ A bind mount is a hole in the container boundary by design, and its size is what
 
 Mount the narrowest directory the service actually reads (`./data`, not `~` or `/`), and add `:ro` unless the service must write to it. Host paths the service only needs at build time belong in the image instead.
 
-```yaml title="compose.yaml — one project directory, credentials and the time zone read-only"
+```yaml title="A compose.yaml that mounts one project directory and keeps credentials and the time zone read-only"
 services:
   agent:
     image: my-agent:1.2.0
