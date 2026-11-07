@@ -1,3 +1,4 @@
+import { parseAddArgs } from "../parsers/add-args";
 import {
   collectStageAliases,
   isDistrolessNonroot,
@@ -211,11 +212,9 @@ export const noAddRemote: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "ADD") {
-        const parts = inst.args.split(/\s+/u);
-        const src = parts.find((p) => !p.startsWith("--"));
-        // BuildKit verifies a download when ADD has `--checksum`, the form
-        // Docker's guidance recommends for remote artifacts.
-        const isVerified = parts.some((p) => p.startsWith("--checksum="));
+        const { hasChecksum: isVerified, source: src } = parseAddArgs(
+          inst.args
+        );
 
         if (!hasText(src) || isVerified) {
           continue;

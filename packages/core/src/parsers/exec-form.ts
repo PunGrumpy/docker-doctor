@@ -9,7 +9,7 @@
 export const parseExecForm = (args: string): string[] | null => {
   const trimmed = args.trim();
 
-  if (!trimmed.startsWith("[")) {
+  if (!(trimmed.startsWith("[") && trimmed.endsWith("]"))) {
     return null;
   }
 

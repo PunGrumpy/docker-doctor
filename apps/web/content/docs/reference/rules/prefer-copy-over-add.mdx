@@ -6,7 +6,7 @@ description: >-
   COPY vs ADD in a Dockerfile: why COPY is the right default and the one case where ADD is actually the correct tool.
 ---
 
-`COPY` and `ADD` both copy files into the image, but `ADD` carries hidden extra behavior: it auto-extracts local tar archives and can fetch remote URLs. Using `ADD` for ordinary file copies means every reader has to stop and ask which of those behaviors you meant. This rule flags `ADD` instructions that are doing plain copies.
+`COPY` and `ADD` both copy files into the image, but `ADD` carries hidden extra behavior: it auto-extracts local tar archives and can fetch remote URLs. Using `ADD` for ordinary file copies means every reader has to stop and ask which of those behaviors you meant. This rule flags `ADD` instructions that are doing plain copies. A quoted or JSON array source is read the way BuildKit reads it, so `ADD "https://…" /dst` is a remote download and not a plain copy.
 
 ## What the rule catches
 

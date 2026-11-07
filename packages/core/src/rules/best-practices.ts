@@ -1,3 +1,4 @@
+import { parseAddArgs } from "../parsers/add-args";
 import { parseExecForm } from "../parsers/exec-form";
 import { isScratch, parseFromArgs } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
@@ -65,8 +66,7 @@ export const preferCopyOverAdd: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "ADD") {
-        const parts = inst.args.split(/\s+/u);
-        const src = parts.find((p) => !p.startsWith("--"));
+        const { source: src } = parseAddArgs(inst.args);
 
         if (!hasText(src)) {
           continue;

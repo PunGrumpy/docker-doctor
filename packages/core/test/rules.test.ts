@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
+import { parseAddArgs } from "../src/parsers/add-args";
 import {
   createComposeLocator,
   parseCompose,
@@ -551,6 +552,81 @@ describe("Security Rules", () => {
 
     expect(noAddRemote.check(verifiedWithChown, "Dockerfile")).toHaveLength(0);
   });
+
+  const addSourceFormCases = [
+    { args: "https://example.com/x.tar.gz /opt/", copy: 0, remote: 1 },
+    { args: '"https://example.com/x.tar.gz" /opt/', copy: 0, remote: 1 },
+    { args: "'https://example.com/x.tar.gz' /opt/", copy: 0, remote: 1 },
+    { args: '["https://example.com/x.tar.gz", "/opt/"]', copy: 0, remote: 1 },
+    { args: '[ "https://example.com/f" , "/opt/f" ]', copy: 0, remote: 1 },
+    { args: '--chown=a:b "https://example.com/f" /opt/', copy: 0, remote: 1 },
+    {
+      args: '--chown=a:b ["https://example.com/f", "/opt/"]',
+      copy: 0,
+      remote: 1,
+    },
+    {
+      args: '--checksum=sha256:0123 "https://example.com/tool" /usr/bin/tool',
+      copy: 0,
+      remote: 0,
+    },
+    {
+      args: '--checksum=sha256:0123 ["https://example.com/tool", "/usr/bin/tool"]',
+      copy: 0,
+      remote: 0,
+    },
+    {
+      args: "--checksum=sha256:0123 https://example.com/tool /bin/t",
+      copy: 0,
+      remote: 0,
+    },
+    { args: "requirements.txt /opt/", copy: 1, remote: 0 },
+    { args: '"requirements.txt" /opt/', copy: 1, remote: 0 },
+    { args: '["requirements.txt", "/opt/"]', copy: 1, remote: 0 },
+    { args: '"rootfs.tar.gz" /', copy: 0, remote: 0 },
+    { args: '["rootfs.tar.gz", "/"]', copy: 0, remote: 0 },
+    { args: '"my files.tar.gz" /opt/', copy: 0, remote: 0 },
+    { args: "ftp://example.com/x.tar.gz /opt/", copy: 0, remote: 0 },
+    { args: "[]", copy: 0, remote: 0 },
+  ];
+
+  test.each(addSourceFormCases)(
+    "ADD $args reports $remote for no-add-remote and $copy for prefer-copy-over-add",
+    ({ args, copy, remote }) => {
+      const instructions = parseDockerfile(`ADD ${args}`);
+
+      expect(noAddRemote.check(instructions, "Dockerfile")).toHaveLength(
+        remote
+      );
+      expect(preferCopyOverAdd.check(instructions, "Dockerfile")).toHaveLength(
+        copy
+      );
+    }
+  );
+
+  const hostileAddArgs = [
+    "--a ".repeat(50_000),
+    "--".repeat(100_000),
+    `${"--a ".repeat(40_000)}"https://example.com/x`,
+    '"'.repeat(200_000),
+    "[".repeat(200_000),
+    `["${"a".repeat(200_000)}`,
+  ];
+
+  test.each(hostileAddArgs)(
+    "ADD arguments of 200,000 hostile characters are split in under 50 ms",
+    (args) => {
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        parseAddArgs(args);
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
 
   test("no-add-remote: remote URL with --chown flag", () => {
     const remoteAddWithChown = parseDockerfile(`
