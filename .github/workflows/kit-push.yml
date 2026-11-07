@@ -4,15 +4,21 @@ name: Kit Push
 # versioned by Changesets. It pins @docker-doctor/cli exactly, so every CLI
 # release bumps the kit's patch version in the same Version Packages PR;
 # kit-only changes ship with their own changeset. `bun run kit:sync` mirrors
-# the version and the CLI pin into spec.yaml, the file that gets published.
+# the version and the CLI pin into docker-doctor.yaml, the Kit Specification
+# v3 descriptor. Its first line, `# syntax=docker/sandbox-kit:3`, makes
+# `docker buildx build` run Docker's kit frontend, which validates the
+# descriptor, builds docker-doctor.dockerfile and publishes both as one OCI
+# image.
 #
 #   - pull_request: fail if the kit changed without a changeset (the Version
-#     Packages PR is exempt — it carries the bump itself) or spec.yaml drifted
-#   - push to main: publish spec.yaml's version if its Docker Hub tag is new,
-#     waiting for the pinned CLI to reach npm first (the Release workflow
-#     publishes it from the same merge), and push latest again if it is
-#     older than that version (a re-run after a failed latest push)
-#   - workflow_dispatch: backfill or deliberately overwrite (force)
+#     Packages PR is exempt, because it carries the bump itself) or the
+#     descriptor drifted, then build the kit without publishing it
+#   - push to main: publish the descriptor's version if its Docker Hub tag
+#     is new, waiting for the pinned CLI to reach npm first (the Release
+#     workflow publishes it from the same merge), and move latest again if
+#     it is older than that version (a re-run after a failed latest push)
+#   - workflow_dispatch: backfill or deliberately overwrite (force), or roll
+#     latest back to an existing tag (latest_from)
 
 on:
   push:
@@ -20,9 +26,11 @@ on:
       - main
     paths:
       - "kits/docker-doctor/**"
+      - ".github/workflows/kit-push.yml"
   pull_request:
     paths:
       - "kits/docker-doctor/**"
+      - ".github/workflows/kit-push.yml"
   workflow_dispatch:
     inputs:
       latest:
@@ -33,13 +41,20 @@ on:
         description: "Overwrite the tag if it already exists on Docker Hub"
         type: boolean
         default: false
+      latest_from:
+        description: "Roll back instead: point :latest at this existing tag (0.1.14 is the last v2 kit) and push nothing else"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
   KIT_DIR: ./kits/docker-doctor
+  KIT_DESCRIPTOR: ./kits/docker-doctor/docker-doctor.yaml
   KIT_REPO: docker.io/pungrumpy/docker-doctor-kit
+  # Docker Desktop on Apple silicon runs sbx on arm64.
+  KIT_PLATFORMS: linux/amd64,linux/arm64
 
 jobs:
   require-changeset:
@@ -50,7 +65,7 @@ jobs:
         uses: actions/checkout@v7
       - name: Install Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      - name: Require spec.yaml to match package.json
+      - name: Require docker-doctor.yaml to match package.json
         run: bun scripts/sync-kit-spec.ts --check
       - name: Require a changeset when the kit changes
         env:
@@ -74,24 +89,63 @@ jobs:
           done
           echo "::error::This PR changes the kit without a changeset — run \`bunx changeset\` and pick docker-doctor-kit (minor for new behavior, patch for fixes)."
           exit 1
+      - name: Read the CLI pin from docker-doctor.yaml
+        id: kit
+        run: |
+          cli="$(awk -F'"' '/^  cliVersion:$/ { getline; print $2; exit }' "$KIT_DESCRIPTOR")"
+          if [ -z "$cli" ]; then
+            echo "::error::Could not read the cliVersion default from $KIT_DESCRIPTOR"
+            exit 1
+          fi
+          echo "cli=$cli" >> "$GITHUB_OUTPUT"
+      # The recipe installs the pinned CLI from npm. On the Version Packages
+      # PR that version is not published yet, because merging the PR is what
+      # publishes it. The push job builds it after the merge.
+      - name: Check that the pinned CLI is on npm
+        id: npm
+        env:
+          CLI_VERSION: ${{ steps.kit.outputs.cli }}
+        run: |
+          if npm view "@docker-doctor/cli@${CLI_VERSION}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::@docker-doctor/cli@${CLI_VERSION} is not on npm yet, so the kit build is skipped. The push job builds it after the merge."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up QEMU
+        if: ${{ steps.npm.outputs.published == 'true' }}
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        if: ${{ steps.npm.outputs.published == 'true' }}
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Building is validating. The sandbox-kit:3 frontend rejects a
+      # malformed descriptor, and the recipe's verify stage fails unless the
+      # CLI runs on a base with no Node and prints the pinned version.
+      - name: Build the kit without publishing it
+        if: ${{ steps.npm.outputs.published == 'true' }}
+        run: |
+          docker buildx build "$KIT_DIR" \
+            -f "$KIT_DESCRIPTOR" \
+            --platform "$KIT_PLATFORMS" \
+            --output type=cacheonly
 
   push:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && !inputs.latest_from }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      - name: Require spec.yaml to match package.json
+      - name: Require docker-doctor.yaml to match package.json
         run: bun scripts/sync-kit-spec.ts --check
-      - name: Read kit version and CLI pin from spec.yaml
+      - name: Read kit version and CLI pin from docker-doctor.yaml
         id: kit
         run: |
-          version="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DIR/spec.yaml")"
-          cli="$(/usr/bin/grep -oE '@docker-doctor/cli@[[:alnum:]._-]+' "$KIT_DIR/spec.yaml" | head -n1 | cut -d@ -f3)"
+          version="$(awk -F'"' '/^version:/ { print $2; exit }' "$KIT_DESCRIPTOR")"
+          cli="$(awk -F'"' '/^  cliVersion:$/ { getline; print $2; exit }' "$KIT_DESCRIPTOR")"
           if [ -z "$version" ] || [ -z "$cli" ]; then
-            echo "::error::Could not read version ($version) or CLI pin ($cli) from $KIT_DIR/spec.yaml"
+            echo "::error::Could not read version ($version) or CLI pin ($cli) from $KIT_DESCRIPTOR"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -102,9 +156,9 @@ jobs:
       #
       # latest is checked as well, so a re-run repairs a run whose version
       # push worked and whose latest push failed. Push times are compared,
-      # not digests. `sbx kit push` is not reproducible. 0.1.11 and latest
-      # were pushed from the same spec four seconds apart, and their digests
-      # differ.
+      # not digests, because a rebuild is not reproducible. That repair
+      # copies the version tag's manifest to latest rather than rebuilding,
+      # so the two tags share a digest.
       - name: Decide what to push
         id: plan
         env:
@@ -152,17 +206,6 @@ jobs:
             echo "push_latest=$push_latest"
             echo "push_any=$push_any"
           } >> "$GITHUB_OUTPUT"
-      - name: Install Docker Sandboxes CLI
-        if: ${{ steps.plan.outputs.push_any == 'true' }}
-        run: |
-          curl -fsSL https://get.docker.com | sudo REPO_ONLY=1 sh
-          # docker-sbx is pinned: 0.39.0 changed `sbx kit push` to read only
-          # the sbx credential store, which `docker login` does not populate
-          # on a headless runner, so every push since 2026-08-19 failed with
-          # "no default account profile set: secret not found". 0.42.0
-          # advertises reading `docker login` credentials again — re-test and
-          # unpin once it reaches the stable apt channel.
-          sudo apt-get install -y "docker-sbx=0.38.0-1~ubuntu.24.04~noble"
       - name: Refuse to overwrite an existing tag
         if: ${{ github.event_name == 'workflow_dispatch' && steps.plan.outputs.push_any != 'true' }}
         run: |
@@ -172,10 +215,10 @@ jobs:
         if: ${{ github.event_name == 'push' && steps.plan.outputs.push_any != 'true' }}
         run: echo "::notice::$KIT_REPO:${{ steps.kit.outputs.version }} and latest are already on Docker Hub; skipping."
       # A CLI release merges the kit bump and the CLI bump in one commit, so
-      # this run races the Release workflow's npm publish. Never ship a kit
-      # whose `npm install -g @docker-doctor/cli@X` cannot resolve.
+      # this run races the Release workflow's npm publish. The recipe's
+      # `npm install @docker-doctor/cli@X` cannot resolve before it lands.
       - name: Wait for the pinned CLI to reach npm
-        if: ${{ steps.plan.outputs.push_any == 'true' }}
+        if: ${{ steps.plan.outputs.push_version == 'true' }}
         env:
           CLI_VERSION: ${{ steps.kit.outputs.cli }}
         run: |
@@ -189,18 +232,82 @@ jobs:
           done
           echo "::error::@docker-doctor/cli@${CLI_VERSION} never appeared on npm — did the Release workflow fail? Re-run this workflow once it has published."
           exit 1
+      - name: Set up QEMU
+        if: ${{ steps.plan.outputs.push_version == 'true' }}
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        if: ${{ steps.plan.outputs.push_any == 'true' }}
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Log in to Docker Hub
         if: ${{ steps.plan.outputs.push_any == 'true' }}
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Validate kit
-        if: ${{ steps.plan.outputs.push_any == 'true' }}
-        run: sbx kit validate "$KIT_DIR"
-      - name: Push kit
+      # One build, both tags, so the version and latest share a digest. A
+      # multi-platform build lets the frontend copy the kit annotations onto
+      # the image index as well as each platform manifest (SPEC-v3 §9.3).
+      # Provenance is requested explicitly, as §9.3 advises, rather than left
+      # to the exporter's default.
+      - name: Build and push the kit
         if: ${{ steps.plan.outputs.push_version == 'true' }}
-        run: sbx kit push "$KIT_DIR" "$KIT_REPO:${{ steps.kit.outputs.version }}"
-      - name: Push latest
-        if: ${{ steps.plan.outputs.push_latest == 'true' }}
-        run: sbx kit push "$KIT_DIR" "$KIT_REPO:latest"
+        env:
+          TAG: ${{ steps.kit.outputs.version }}
+          WITH_LATEST: ${{ steps.plan.outputs.push_latest }}
+        run: |
+          tags=(-t "$KIT_REPO:$TAG")
+          if [ "$WITH_LATEST" = true ]; then
+            tags+=(-t "$KIT_REPO:latest")
+          fi
+          docker buildx build "$KIT_DIR" \
+            -f "$KIT_DESCRIPTOR" \
+            --platform "$KIT_PLATFORMS" \
+            --provenance=mode=min \
+            "${tags[@]}" \
+            --push
+      - name: Point latest at the published version
+        if: ${{ steps.plan.outputs.push_version != 'true' && steps.plan.outputs.push_latest == 'true' }}
+        env:
+          TAG: ${{ steps.kit.outputs.version }}
+        run: docker buildx imagetools create --prefer-index=false -t "$KIT_REPO:latest" "$KIT_REPO:$TAG"
+
+  # Rollback. --prefer-index=false copies the source manifest as it is. The
+  # default would wrap a single manifest in a new index, and the v2 kits
+  # (0.1.14 and older) are single OCI manifests with a kit artifactType.
+  roll-back-latest:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.latest_from }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an existing version tag
+        env:
+          FROM: ${{ inputs.latest_from }}
+        run: |
+          if ! printf '%s' "$FROM" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::latest_from must be a version tag such as 0.1.14 (got '$FROM')."
+            exit 1
+          fi
+          code="$(curl -sS -o /dev/null -w '%{http_code}' "https://hub.docker.com/v2/repositories/${KIT_REPO#docker.io/}/tags/$FROM")"
+          if [ "$code" != 200 ]; then
+            echo "::error::$KIT_REPO:$FROM does not exist on Docker Hub (HTTP $code)."
+            exit 1
+          fi
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Point latest at the chosen tag
+        env:
+          FROM: ${{ inputs.latest_from }}
+        run: |
+          docker buildx imagetools create --prefer-index=false -t "$KIT_REPO:latest" "$KIT_REPO:$FROM"
+          digest() {
+            docker buildx imagetools inspect --raw "$1" | sha256sum | cut -d' ' -f1
+          }
+          if [ "$(digest "$KIT_REPO:$FROM")" != "$(digest "$KIT_REPO:latest")" ]; then
+            echo "::error::$KIT_REPO:latest does not match $KIT_REPO:$FROM byte for byte."
+            exit 1
+          fi
+          echo "::notice::$KIT_REPO:latest now serves the same manifest as $KIT_REPO:$FROM."
