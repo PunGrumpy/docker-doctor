@@ -111,6 +111,8 @@ A comment above `CMD` can never suppress a finding reported at `FROM`. A comment
 
 A comment that trails a line applies to that line. A comment on its own line applies to the next line that holds content, skipping blank lines and other comments. Both match a finding by its `line`. The `-file` form works as in a Dockerfile and must sit in the comment block at the top of the file. A leading `---` marker and any `%YAML` or `%TAG` directives belong to that block, so the comment may sit on either side of them.
 
+[`require-resource-limits`](/docs/reference/rules/require-resource-limits) and [`require-restart-policy`](/docs/reference/rules/require-restart-policy) report at the service key's line, so the comment sits on that line or on its own line above it.
+
 Findings on keys that come from a YAML merge key (`<<: *base`) have no line, so only the `-file` form can suppress them.
 
 A `#` inside a block scalar or a quoted string is text, not a comment.
