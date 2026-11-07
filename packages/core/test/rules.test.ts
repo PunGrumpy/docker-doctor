@@ -236,6 +236,32 @@ describe("Security Rules", () => {
     expect(noRootUser.check(multiStage, "Dockerfile")).toHaveLength(0);
   });
 
+  test("no-root-user: Docker sandbox templates default to a non-root user", () => {
+    for (const base of [
+      "docker/sandbox-templates:claude-code",
+      "docker.io/docker/sandbox-templates:shell",
+      "index.docker.io/docker/sandbox-templates:latest",
+    ]) {
+      const instructions = parseDockerfile(`FROM ${base}\nCOPY . .`);
+
+      expect(noRootUser.check(instructions, "Dockerfile")).toHaveLength(0);
+    }
+
+    const explicitRoot = parseDockerfile(`
+      FROM docker/sandbox-templates:claude-code
+      USER root
+    `);
+
+    expect(noRootUser.check(explicitRoot, "Dockerfile")).toHaveLength(1);
+
+    const wrongName = parseDockerfile(`
+      FROM docker/sandbox-template:x
+      COPY . .
+    `);
+
+    expect(noRootUser.check(wrongName, "Dockerfile")).toHaveLength(1);
+  });
+
   test("pin-image-version: scratch is not an unpinned image", () => {
     const counts = ["scratch", "SCRATCH", "Scratch"].map(
       (base) =>
@@ -3141,6 +3167,21 @@ describe("Image Size Rules", () => {
         preferSlimBase.check(parseDockerfile(`FROM ${base}`), "Dockerfile")
       ).toHaveLength(0);
     }
+  });
+
+  test("prefer-slim-base: Docker sandbox templates are not a full-OS base", () => {
+    for (const base of [
+      "docker/sandbox-templates:claude-code",
+      "docker.io/docker/sandbox-templates:shell",
+    ]) {
+      const instructions = parseDockerfile(`FROM ${base}\nCOPY . .`);
+
+      expect(preferSlimBase.check(instructions, "Dockerfile")).toHaveLength(0);
+    }
+
+    const wrongName = parseDockerfile("FROM docker/sandbox-template:x");
+
+    expect(preferSlimBase.check(wrongName, "Dockerfile")).toHaveLength(1);
   });
 
   test("clean-package-cache", () => {

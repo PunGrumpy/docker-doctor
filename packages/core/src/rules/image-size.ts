@@ -1,5 +1,6 @@
 import {
   collectStageAliases,
+  isDockerSandboxTemplate,
   isHardenedImage,
   isScratch,
   parseFromArgs,
@@ -207,6 +208,12 @@ const fullOsBase = (
   // Docker Hardened Images are minimal by construction (dev variants
   // included), whatever their name and tag say.
   if (isHardenedImage(imagePart)) {
+    return null;
+  }
+
+  // Docker's agent sandbox templates are purpose-built images, not a base
+  // to slim down.
+  if (isDockerSandboxTemplate(imagePart)) {
     return null;
   }
 
