@@ -1,6 +1,8 @@
+import { parseAddArgs } from "../parsers/add-args";
 import {
   collectStageAliases,
   isDistrolessNonroot,
+  isDockerSandboxTemplate,
   isHardenedRuntimeImage,
   isScratch,
   mutableRefIssue,
@@ -28,6 +30,11 @@ const isRootUser = (value: string): boolean => {
   return user === "root" || user === "0";
 };
 
+const defaultsToNonroot = (image: string): boolean =>
+  isHardenedRuntimeImage(image) ||
+  isDistrolessNonroot(image) ||
+  isDockerSandboxTemplate(image);
+
 export const noRootUser: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
@@ -42,14 +49,11 @@ export const noRootUser: DockerfileRule = {
       if (inst.instruction === "FROM") {
         const { base, stage } = parseFromArgs(inst.args);
 
-        // DHI runtime bases and distroless `:nonroot` tags default to a
-        // nonroot user. "nonroot" is a sentinel that isRootUser treats as
+        // DHI runtime bases, distroless `:nonroot` tags and Docker sandbox
+        // templates default to a nonroot user. "nonroot" is a sentinel that isRootUser treats as
         // safe until a USER overrides it.
         const baseDefaultUser =
-          hasText(base) &&
-          (isHardenedRuntimeImage(base) || isDistrolessNonroot(base))
-            ? "nonroot"
-            : "root";
+          hasText(base) && defaultsToNonroot(base) ? "nonroot" : "root";
 
         lastUser = stageUser.get(base?.toLowerCase() ?? "") ?? baseDefaultUser;
         lastUserLine = inst.line;
@@ -211,11 +215,9 @@ export const noAddRemote: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "ADD") {
-        const parts = inst.args.split(/\s+/u);
-        const src = parts.find((p) => !p.startsWith("--"));
-        // BuildKit verifies a download when ADD has `--checksum`, the form
-        // Docker's guidance recommends for remote artifacts.
-        const isVerified = parts.some((p) => p.startsWith("--checksum="));
+        const { hasChecksum: isVerified, source: src } = parseAddArgs(
+          inst.args
+        );
 
         if (!hasText(src) || isVerified) {
           continue;

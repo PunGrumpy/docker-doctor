@@ -56,6 +56,8 @@ Equivalents across ecosystems: `yarn install --production`, `pnpm install --prod
 
 The rule doesn't report an install that runs under `ENV NODE_ENV=production`, because npm and Yarn 1 skip `devDependencies` when it is set. Bun and pnpm 10 and later ignore `NODE_ENV`, so `bun install` and `pnpm install` are still reported there. Use `bun install --production` or `pnpm install --prod` instead. A value set by `ARG NODE_ENV=production` counts too, alone or copied with `ENV NODE_ENV=$NODE_ENV`.
 
+npm has its own switch for the same job. `--omit=dev` has the environment form `NPM_CONFIG_OMIT=dev`, and the deprecated `--production` flag has `NPM_CONFIG_PRODUCTION=true`. The rule honours both for `npm`, as `ENV` lines, as assignments before the command (`NPM_CONFIG_OMIT=dev npm ci`), and as an `export` earlier in the same `RUN`. `export NODE_ENV=production && npm ci` counts the same way. A plain `NODE_ENV=production;` assignment does not, because the shell does not pass it on to `npm`. Flags on the `npm` command line outrank the environment variables and `NODE_ENV`. `--include=dev`, `--production=false` and an `--omit` list without `dev` put the `devDependencies` back, so the rule still reports that install.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/avoid-dev-dependencies`

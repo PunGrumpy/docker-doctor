@@ -11,13 +11,14 @@ import type {
   Diagnostic,
 } from "../types/index";
 import { parseComposeImage } from "./compose-images";
-import { applyFoldsAndDefaults } from "./compose-mounts";
+import { applyFoldsAndDefaults, volumeMount } from "./compose-mounts";
 import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
 const WILDCARD_ADDRESSES = new Set(["", "0.0.0.0", "::"]);
 
 const QDRANT_API_KEY = "QDRANT__SERVICE__API_KEY";
+const QDRANT_CONFIG_DIR = "/qdrant/config";
 const MCP_GATEWAY_NO_AUTH_FLAG = "--allow-unauthenticated";
 const WHITESPACE = /\s+/u;
 const BRACKETED_ADDRESS = /^\[(?<inner>.*)\]$/u;
@@ -114,6 +115,39 @@ const hasEnvironmentKey = (config: ComposeMapping, key: string): boolean => {
   });
 };
 
+// An `env_file` can set `QDRANT__SERVICE__API_KEY`, and Compose reads it
+// after the file list is resolved, so the rule cannot see what it holds.
+const hasEnvFile = (config: ComposeMapping): boolean => {
+  const { env_file: envFile } = config;
+
+  if (isComposeString(envFile)) {
+    return envFile.trim() !== "";
+  }
+
+  return isComposeSequence(envFile) && envFile.length > 0;
+};
+
+// Qdrant reads `service.api_key` from the YAML files in its `config`
+// directory, which the official image keeps at `/qdrant/config`. A mount
+// there can carry the key.
+const mountsQdrantConfig = (config: ComposeMapping): boolean => {
+  const { volumes } = config;
+
+  if (!isComposeSequence(volumes)) {
+    return false;
+  }
+
+  return volumes.some((volume) => {
+    const target = volumeMount(volume)?.target;
+
+    return (
+      target !== undefined &&
+      (target === QDRANT_CONFIG_DIR ||
+        target.startsWith(`${QDRANT_CONFIG_DIR}/`))
+    );
+  });
+};
+
 const commandTokens = (command: ComposeValue | undefined): string[] => {
   if (isComposeString(command)) {
     return command.split(WHITESPACE);
@@ -144,7 +178,10 @@ const UNAUTHENTICATED_SERVICES: readonly UnauthenticatedService[] = [
     repository: "ollama/ollama",
   },
   {
-    hasAuth: (config) => hasEnvironmentKey(config, QDRANT_API_KEY),
+    hasAuth: (config) =>
+      hasEnvironmentKey(config, QDRANT_API_KEY) ||
+      hasEnvFile(config) ||
+      mountsQdrantConfig(config),
     product: "Qdrant",
     repository: "qdrant/qdrant",
   },

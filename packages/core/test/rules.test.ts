@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
+import { parseAddArgs } from "../src/parsers/add-args";
 import {
   createComposeLocator,
   parseCompose,
@@ -233,6 +234,32 @@ describe("Security Rules", () => {
     `);
 
     expect(noRootUser.check(multiStage, "Dockerfile")).toHaveLength(0);
+  });
+
+  test("no-root-user: Docker sandbox templates default to a non-root user", () => {
+    for (const base of [
+      "docker/sandbox-templates:claude-code",
+      "docker.io/docker/sandbox-templates:shell",
+      "index.docker.io/docker/sandbox-templates:latest",
+    ]) {
+      const instructions = parseDockerfile(`FROM ${base}\nCOPY . .`);
+
+      expect(noRootUser.check(instructions, "Dockerfile")).toHaveLength(0);
+    }
+
+    const explicitRoot = parseDockerfile(`
+      FROM docker/sandbox-templates:claude-code
+      USER root
+    `);
+
+    expect(noRootUser.check(explicitRoot, "Dockerfile")).toHaveLength(1);
+
+    const wrongName = parseDockerfile(`
+      FROM docker/sandbox-template:x
+      COPY . .
+    `);
+
+    expect(noRootUser.check(wrongName, "Dockerfile")).toHaveLength(1);
   });
 
   test("pin-image-version: scratch is not an unpinned image", () => {
@@ -551,6 +578,81 @@ describe("Security Rules", () => {
 
     expect(noAddRemote.check(verifiedWithChown, "Dockerfile")).toHaveLength(0);
   });
+
+  const addSourceFormCases = [
+    { args: "https://example.com/x.tar.gz /opt/", copy: 0, remote: 1 },
+    { args: '"https://example.com/x.tar.gz" /opt/', copy: 0, remote: 1 },
+    { args: "'https://example.com/x.tar.gz' /opt/", copy: 0, remote: 1 },
+    { args: '["https://example.com/x.tar.gz", "/opt/"]', copy: 0, remote: 1 },
+    { args: '[ "https://example.com/f" , "/opt/f" ]', copy: 0, remote: 1 },
+    { args: '--chown=a:b "https://example.com/f" /opt/', copy: 0, remote: 1 },
+    {
+      args: '--chown=a:b ["https://example.com/f", "/opt/"]',
+      copy: 0,
+      remote: 1,
+    },
+    {
+      args: '--checksum=sha256:0123 "https://example.com/tool" /usr/bin/tool',
+      copy: 0,
+      remote: 0,
+    },
+    {
+      args: '--checksum=sha256:0123 ["https://example.com/tool", "/usr/bin/tool"]',
+      copy: 0,
+      remote: 0,
+    },
+    {
+      args: "--checksum=sha256:0123 https://example.com/tool /bin/t",
+      copy: 0,
+      remote: 0,
+    },
+    { args: "requirements.txt /opt/", copy: 1, remote: 0 },
+    { args: '"requirements.txt" /opt/', copy: 1, remote: 0 },
+    { args: '["requirements.txt", "/opt/"]', copy: 1, remote: 0 },
+    { args: '"rootfs.tar.gz" /', copy: 0, remote: 0 },
+    { args: '["rootfs.tar.gz", "/"]', copy: 0, remote: 0 },
+    { args: '"my files.tar.gz" /opt/', copy: 0, remote: 0 },
+    { args: "ftp://example.com/x.tar.gz /opt/", copy: 0, remote: 0 },
+    { args: "[]", copy: 0, remote: 0 },
+  ];
+
+  test.each(addSourceFormCases)(
+    "ADD $args reports $remote for no-add-remote and $copy for prefer-copy-over-add",
+    ({ args, copy, remote }) => {
+      const instructions = parseDockerfile(`ADD ${args}`);
+
+      expect(noAddRemote.check(instructions, "Dockerfile")).toHaveLength(
+        remote
+      );
+      expect(preferCopyOverAdd.check(instructions, "Dockerfile")).toHaveLength(
+        copy
+      );
+    }
+  );
+
+  const hostileAddArgs = [
+    "--a ".repeat(50_000),
+    "--".repeat(100_000),
+    `${"--a ".repeat(40_000)}"https://example.com/x`,
+    '"'.repeat(200_000),
+    "[".repeat(200_000),
+    `["${"a".repeat(200_000)}`,
+  ];
+
+  test.each(hostileAddArgs)(
+    "ADD arguments of 200,000 hostile characters are split in under 50 ms",
+    (args) => {
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        parseAddArgs(args);
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
 
   test("no-add-remote: remote URL with --chown flag", () => {
     const remoteAddWithChown = parseDockerfile(`
@@ -2166,6 +2268,83 @@ describe("Compose Security Rules", () => {
     );
   });
 
+  const readOnlySystemMountCases = [
+    { broad: 0, volume: "/etc/localtime:/etc/localtime:ro" },
+    { broad: 0, volume: "/etc/timezone:/etc/timezone:ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:ro" },
+    { broad: 0, volume: "/etc/ssl/certs/:/etc/ssl/certs:ro" },
+    { broad: 0, volume: "/etc/localtime:/etc/localtime:z,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:rw,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:rw,z,ro" },
+    { broad: 0, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,ro" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:ro,z,rw" },
+    { broad: 1, volume: "/etc/localtime:/etc/localtime:ro,rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs:rw" },
+    { broad: 1, volume: "/etc/localtime:/etc/localtime" },
+    { broad: 1, volume: "/etc/timezone:/etc/timezone:rw" },
+    { broad: 1, volume: "/etc/ssl/certs:/etc/ssl/certs" },
+    { broad: 1, volume: "/etc/ssl/certs/ca-certificates.crt:/ca.crt:ro" },
+    { broad: 1, volume: "/etc/ssl/private:/etc/ssl/private:ro" },
+    { broad: 1, volume: "/etc/localtime-old:/etc/localtime:ro" },
+    {
+      broad: 1,
+      volume: "/run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro",
+    },
+    { broad: 1, volume: "/var/run/dbus:/var/run/dbus:ro" },
+    { broad: 1, volume: "/proc:/host/proc:ro" },
+    { broad: 1, volume: "/sys:/host/sys:ro" },
+    { broad: 1, volume: "/etc:/host-etc:ro" },
+    { broad: 1, volume: "/var/lib/docker:/var/lib/docker:ro" },
+  ];
+
+  test.each(readOnlySystemMountCases)(
+    "no-broad-bind-mount: $volume reports $broad",
+    ({ broad, volume }) => {
+      const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - ${volume}
+`;
+
+      expect(
+        noBroadBindMount.check(
+          parseCompose(source, "compose.yaml"),
+          "compose.yaml"
+        )
+      ).toHaveLength(broad);
+    }
+  );
+
+  test("no-broad-bind-mount: the long syntax exempts a read-only time zone mount and reports a writable one", () => {
+    const source = `services:
+  app:
+    image: app:1.0
+    volumes:
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+      - type: bind
+        source: /etc/ssl/certs
+        target: /etc/ssl/certs
+        read_only: false
+`;
+
+    const diags = noBroadBindMount.check(
+      parseCompose(source, "compose.yaml"),
+      "compose.yaml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([9, 12]);
+    expect(diags[0].message).toContain("'/etc/localtime', a host system");
+  });
+
   test("compose mount rules skip a volume entry written as a sequence", () => {
     const source = `services:
   agent:
@@ -2216,6 +2395,26 @@ describe("Compose Security Rules", () => {
     expect(diags.map((d) => d.line)).toEqual([5, 8, 10]);
     expect(diags[0].message).toContain("'/opt/certs'");
     expect(diags[0].severity).toBe("info");
+  });
+
+  test("prefer-read-only-bind-mount: the last of ro and rw decides in the short syntax", () => {
+    const source = `services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - /opt/certs:/etc/nginx/certs:ro,rw
+      - /opt/certs:/etc/nginx/certs:rw,ro
+      - /opt/certs:/etc/nginx/certs:rw
+      - /opt/certs:/etc/nginx/certs:z,ro
+`;
+
+    const diags = preferReadOnlyBindMount.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([5, 7]);
   });
 
   test("prefer-read-only-bind-mount: project mounts, named volumes, and the socket are clean", () => {
@@ -2617,6 +2816,42 @@ describe("Compose Ports Rules", () => {
       environment: "environment:\n      QDRANT__LOG_LEVEL: INFO",
       expected: 1,
     },
+    {
+      environment:
+        "environment:\n      QDRANT__SERVICE__READ_ONLY_API_KEY: from-host",
+      expected: 1,
+    },
+    { environment: "env_file: .env", expected: 0 },
+    {
+      environment:
+        "env_file:\n      - .env\n      - path: .env.local\n        required: false",
+      expected: 0,
+    },
+    { environment: "env_file: []", expected: 1 },
+    { environment: 'env_file: ""', expected: 1 },
+    {
+      environment:
+        "volumes:\n      - ./qdrant.yaml:/qdrant/config/production.yaml",
+      expected: 0,
+    },
+    {
+      environment:
+        "volumes:\n      - type: bind\n        source: ./config\n        target: /qdrant/config",
+      expected: 0,
+    },
+    {
+      environment:
+        "volumes:\n      - type: bind\n        source: ./q.yaml\n        target: /qdrant/config/local.yaml\n        read_only: true",
+      expected: 0,
+    },
+    {
+      environment: "volumes:\n      - qdrant_storage:/qdrant/storage",
+      expected: 1,
+    },
+    {
+      environment: "volumes:\n      - ./qdrant.yaml:/qdrant/configs/q.yaml",
+      expected: 1,
+    },
     { environment: "", expected: 1 },
   ];
 
@@ -2961,6 +3196,21 @@ describe("Image Size Rules", () => {
     }
   });
 
+  test("prefer-slim-base: Docker sandbox templates are not a full-OS base", () => {
+    for (const base of [
+      "docker/sandbox-templates:claude-code",
+      "docker.io/docker/sandbox-templates:shell",
+    ]) {
+      const instructions = parseDockerfile(`FROM ${base}\nCOPY . .`);
+
+      expect(preferSlimBase.check(instructions, "Dockerfile")).toHaveLength(0);
+    }
+
+    const wrongName = parseDockerfile("FROM docker/sandbox-template:x");
+
+    expect(preferSlimBase.check(wrongName, "Dockerfile")).toHaveLength(1);
+  });
+
   test("clean-package-cache", () => {
     const noCleanup = parseDockerfile(`
       RUN apt-get update && apt-get install -y git
@@ -3169,6 +3419,62 @@ describe("Image Size Rules", () => {
     { expected: 0, run: "NODE_ENV=production bun install --production" },
     { expected: 0, run: "NODE_ENV=production yarn install" },
     { expected: 1, run: "NODE_ENV=production pnpm install" },
+    // npm's own switches, set inline before the command.
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=true npm ci" },
+    { expected: 0, run: "npm_config_production=true npm ci" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci" },
+    { expected: 0, run: "npm_config_omit=dev npm install" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=false npm ci" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=optional npm ci" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=true yarn install" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev pnpm install" },
+    { expected: 1, run: "MY_NPM_CONFIG_OMIT=dev npm ci" },
+    // Command-line flags outrank the environment. A type in include is never
+    // omitted, and a command-line omit or production replaces the
+    // environment's.
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --include=dev" },
+    { expected: 1, run: "npm_config_omit=dev npm ci --include=dev" },
+    { expected: 1, run: "NPM_CONFIG_PRODUCTION=true npm ci --include=dev" },
+    {
+      expected: 1,
+      run: "NPM_CONFIG_PRODUCTION=true npm ci --production=false",
+    },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --omit=optional" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev npm ci" },
+    { expected: 1, run: "NPM_CONFIG_OMIT=dev npm ci --production=false" },
+    { expected: 1, run: "export NPM_CONFIG_OMIT=dev && npm ci --include=dev" },
+    { expected: 1, run: "export NODE_ENV=production && npm ci --include=dev" },
+    { expected: 1, run: "NODE_ENV=production npm ci --omit=optional" },
+    { expected: 1, run: "NODE_ENV=production npm ci --production=false" },
+    { expected: 1, run: "npm ci --omit=dev --include=dev" },
+    { expected: 1, run: "npm ci --production --include=dev" },
+    { expected: 1, run: "npm ci --production=false" },
+    { expected: 0, run: "npm ci --omit=dev" },
+    { expected: 0, run: "npm ci --omit=optional --omit=dev" },
+    { expected: 0, run: "npm ci --production" },
+    { expected: 0, run: "npm ci --production=true" },
+    { expected: 0, run: "npm ci --only=prod" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci --ignore-scripts" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=dev npm ci --omit=dev" },
+    { expected: 0, run: "NPM_CONFIG_OMIT=optional npm ci --omit=dev" },
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=false npm ci --production" },
+    { expected: 0, run: "NPM_CONFIG_PRODUCTION=false npm ci --omit=dev" },
+    {
+      expected: 0,
+      run: "NPM_CONFIG_OMIT=dev npm ci --include=optional --omit=dev",
+    },
+    { expected: 0, run: "NPM_CONFIG_INCLUDE=dev npm ci --omit=dev" },
+    // An export reaches the installs after it, a plain assignment does not.
+    { expected: 0, run: "export NODE_ENV=production && npm ci" },
+    { expected: 0, run: "export NODE_ENV=production; yarn install" },
+    { expected: 0, run: "export NPM_CONFIG_OMIT=dev && npm ci" },
+    { expected: 0, run: "export NPM_CONFIG_PRODUCTION=true && npm ci" },
+    { expected: 0, run: "export A=1 NODE_ENV=production && npm ci" },
+    { expected: 1, run: "export NODE_ENV=production && bun install" },
+    { expected: 1, run: "export NODE_ENV=development && npm ci" },
+    { expected: 1, run: "npm ci && export NODE_ENV=production" },
+    { expected: 1, run: "NODE_ENV=production; npm ci" },
+    { expected: 1, run: "export NODE_ENV=production && NODE_ENV=dev npm ci" },
   ];
 
   test.each(devDependencyCases)(
@@ -3208,6 +3514,113 @@ describe("Image Size Rules", () => {
     },
     { dockerfile: "ENV MY_NODE_ENV=production\nRUN npm ci", expected: 1 },
     { dockerfile: "ENV NODE_ENV=production\nRUN bun install", expected: 1 },
+    { dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV npm_config_production=true\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci", expected: 0 },
+    { dockerfile: "ENV NPM_CONFIG_OMIT dev\nRUN npm install", expected: 0 },
+    {
+      dockerfile:
+        'ENV NPM_CONFIG_LOGLEVEL=warn NPM_CONFIG_PRODUCTION="true"\nRUN npm ci',
+      expected: 0,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_PRODUCTION=true\nENV NPM_CONFIG_PRODUCTION=false\nRUN npm ci",
+      expected: 1,
+    },
+    { dockerfile: "RUN npm ci\nENV NPM_CONFIG_OMIT=dev", expected: 1 },
+    // Command-line flags outrank the environment.
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --omit=optional",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --production=false",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev\nENV NPM_CONFIG_INCLUDE=dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev\nENV npm_config_include dev\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NPM_CONFIG_OMIT=dev NPM_CONFIG_INCLUDE=dev\nENV NPM_CONFIG_INCLUDE=optional\nRUN npm ci",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN npm ci --include=dev",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NODE_ENV=production\nRUN npm ci --omit=optional",
+      expected: 1,
+    },
+    {
+      dockerfile:
+        "ENV NODE_ENV=production\nENV NPM_CONFIG_OMIT=optional\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN npm ci --ignore-scripts",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN npm ci --omit=dev",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_OMIT=optional\nRUN npm ci --omit=dev",
+      expected: 0,
+    },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=false\nRUN npm ci --production",
+      expected: 0,
+    },
+    {
+      dockerfile:
+        'ENV NPM_CONFIG_LOGLEVEL=warn NPM_CONFIG_OMIT="dev"\nRUN npm ci',
+      expected: 0,
+    },
+    // A quoted value that mentions a setting does not set it.
+    { dockerfile: 'ENV FOO="a npm_config_omit=dev"\nRUN npm ci', expected: 1 },
+    {
+      dockerfile: "ENV FOO='x NPM_CONFIG_PRODUCTION=true'\nRUN npm ci",
+      expected: 1,
+    },
+    {
+      dockerfile: 'ENV FOO="a npm_config_omit=dev" BAR=1\nRUN npm ci',
+      expected: 1,
+    },
+    {
+      dockerfile:
+        'ENV FOO="a npm_config_omit=dev" NPM_CONFIG_OMIT=dev\nRUN npm ci',
+      expected: 0,
+    },
+    { dockerfile: "ENV NPM_CONFIG_OMIT=dev\nRUN pnpm install", expected: 1 },
+    {
+      dockerfile: "ENV NPM_CONFIG_PRODUCTION=true\nRUN yarn install",
+      expected: 1,
+    },
+    { dockerfile: "ENV MY_NPM_CONFIG_OMIT=dev\nRUN npm ci", expected: 1 },
     {
       dockerfile: "ENV NODE_ENV=production\nRUN bun install --production",
       expected: 0,
@@ -3240,6 +3653,52 @@ describe("Image Size Rules", () => {
     const freshBase = parseDockerfile(`
       FROM node:22-alpine AS build
       ENV NODE_ENV=production
+      FROM node:22-alpine
+      RUN npm ci
+    `);
+
+    expect(avoidDevDependencies.check(freshBase, "Dockerfile")).toHaveLength(1);
+  });
+
+  const hostileInstallRuns = [
+    `ENV ${" ".repeat(200_000)}`,
+    `ENV ${"npm_config_omit ".repeat(14_000)}`,
+    `ENV ${"npm_config_omit=".repeat(13_000)}`,
+    `ENV ${'A="npm_config_omit=dev" '.repeat(8000)}`,
+    `RUN npm ci ${"--omit=dev ".repeat(18_000)}`,
+    `RUN ${"export ".repeat(28_000)}`,
+    `RUN ${"NPM_CONFIG_OMIT=dev ".repeat(10_000)}npm ci`,
+  ];
+
+  test.each(hostileInstallRuns)(
+    "avoid-dev-dependencies: a 200,000 character hostile instruction is scanned in under 50 ms",
+    (line) => {
+      const instructions = parseDockerfile(`FROM node:22\n${line}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        avoidDevDependencies.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
+
+  test("avoid-dev-dependencies: ENV NPM_CONFIG_OMIT follows the FROM chain", () => {
+    const inherited = parseDockerfile(`
+      FROM node:22-alpine AS base
+      ENV NPM_CONFIG_OMIT=dev
+      FROM base
+      RUN npm ci
+    `);
+
+    expect(avoidDevDependencies.check(inherited, "Dockerfile")).toHaveLength(0);
+
+    const freshBase = parseDockerfile(`
+      FROM node:22-alpine AS build
+      ENV NPM_CONFIG_OMIT=dev
       FROM node:22-alpine
       RUN npm ci
     `);
@@ -3537,6 +3996,86 @@ describe("Best Practices Rules", () => {
       expectedRules: ["docker-doctor/use-pipefail"],
       name: "exec-form RUN does not pick up the stage SHELL",
     },
+    {
+      dockerfile: `
+      RUN set -e; case "$x" in a|b) echo ok;; esac
+    `,
+      expectedRules: [],
+      name: "a case pattern separator is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN case "$(uname -m)" in x86_64|amd64) A=amd64;; aarch64|arm64) A=arm64;; esac && echo $A
+    `,
+      expectedRules: [],
+      name: "case patterns after in and after a terminator",
+    },
+    {
+      dockerfile: `
+      RUN case "$ARCH" in \\
+            amd64|x86_64) A=x ;; \\
+            (arm64|aarch64) A=y ;; \\
+          esac
+    `,
+      expectedRules: [],
+      name: "case patterns on continued lines",
+    },
+    {
+      dockerfile: `
+      RUN case "$x" in a|b) curl -fsSL https://x.sh | sh ;; esac
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a real pipe inside a case body still reports",
+    },
+    {
+      dockerfile: `
+      RUN echo $((1|2))
+    `,
+      expectedRules: [],
+      name: "a bitwise or inside arithmetic expansion is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN echo $(( (1|2) + 3 )) && echo $(cat f|sort)
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a pipe in command substitution next to arithmetic still reports",
+    },
+    {
+      dockerfile: `
+      RUN x=\${y:-a|b}; echo $x
+    `,
+      expectedRules: [],
+      name: "a bar inside a parameter expansion is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN sed -i s/a\\|b/c/ file
+    `,
+      expectedRules: [],
+      name: "an escaped bar is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN sed -i s/a\\|b/c/ file | sort
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "an escaped bar does not hide a real pipe",
+    },
+    {
+      dockerfile: `
+      RUN make 2>&1 |& tee log
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a pipe that also carries stderr still reports",
+    },
+    {
+      dockerfile: `
+      RUN true || false
+    `,
+      expectedRules: [],
+      name: "a logical or is not a pipe",
+    },
     // Interior comment lines (stripped from args) must not flip the verdict.
     {
       dockerfile: `
@@ -3569,6 +4108,33 @@ describe("Best Practices Rules", () => {
       expect(diagnostics.map((diagnostic) => diagnostic.rule)).toEqual(
         expectedRules
       );
+    }
+  );
+
+  const hostilePipefailRuns = [
+    "in a|".repeat(40_000),
+    ";;a|".repeat(50_000),
+    `in ${"a|".repeat(100_000)}`,
+    `\${`.repeat(100_000),
+    "$((".repeat(66_000),
+    `\${}`.repeat(66_000),
+    "\\|".repeat(100_000),
+    "case x in a|b) ".repeat(13_000),
+  ];
+
+  test.each(hostilePipefailRuns)(
+    "use-pipefail: a 200,000 character hostile RUN is scanned in under 50 ms",
+    (run) => {
+      const instructions = parseDockerfile(`RUN ${run}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        usePipefail.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
     }
   );
 
@@ -3874,20 +4440,53 @@ describe("Best Practices Rules", () => {
   );
 
   const useraddCases = [
+    { expected: 1, run: "useradd -m -u 4000000 app" },
+    { expected: 1, run: "useradd -u 100000 app" },
+    { expected: 1, run: "useradd -u4000000 app" },
+    { expected: 1, run: "useradd --uid 4000000 app" },
+    { expected: 1, run: "useradd --uid=4000000 app" },
+    { expected: 1, run: 'useradd -u "100000" app' },
+    { expected: 1, run: "useradd -r -u 1234567 -g app app" },
+    { expected: 1, run: "groupadd -r app && useradd -u 100000 -g app app" },
+    { expected: 1, run: "useradd -u 100000 app && ls -l /home" },
+    { expected: 1, run: "/usr/sbin/useradd -u 100000 app" },
+    { expected: 1, run: "sudo useradd -u 100000 app" },
+    { expected: 1, run: "HOME=/x useradd -u 100000 app" },
+    { expected: 1, run: "--mount=type=cache,target=/x useradd -u 100000 app" },
+    { expected: 1, run: "id app || useradd -cl -u 100000 app" },
+    { expected: 1, run: '["useradd", "-u", "100000", "app"]' },
+    { expected: 1, run: '["/bin/sh", "-c", "useradd -u 100000 app"]' },
     { expected: 0, run: "useradd -l -r -u 1001 app" },
-    { expected: 0, run: "useradd -rl -u 1001 app" },
+    { expected: 0, run: "useradd -rl -u 100000 app" },
     {
       expected: 0,
-      run: "groupadd -r app && useradd --no-log-init -r -g app app",
+      run: "groupadd -r app && useradd --no-log-init -r -u 100000 -g app app",
     },
-    { expected: 1, run: "useradd app && ls -l /home" },
-    { expected: 1, run: "useradd --shell /sbin/nologin --system app" },
-    { expected: 0, run: "useradd -lu1000 app" },
-    { expected: 0, run: "useradd -rlu1000 app" },
-    { expected: 0, run: "useradd -lu 1000 app" },
-    { expected: 1, run: "useradd -u1000 app" },
-    { expected: 1, run: "useradd -gwheel app" },
-    { expected: 1, run: "useradd -cl app" },
+    { expected: 0, run: "useradd -lu100000 app" },
+    { expected: 0, run: "useradd -rlu100000 app" },
+    { expected: 0, run: "useradd -lu 100000 app" },
+    { expected: 0, run: '["useradd", "-l", "-u", "100000", "app"]' },
+    { expected: 0, run: "useradd app" },
+    { expected: 0, run: "useradd -r -g app app" },
+    { expected: 0, run: "useradd --shell /sbin/nologin --system app" },
+    { expected: 0, run: "useradd -m app 2>/dev/null || true" },
+    { expected: 0, run: "useradd -u 1000 app" },
+    { expected: 0, run: "useradd -u1000 app" },
+    { expected: 0, run: "useradd -u 99999 app" },
+    { expected: 0, run: "useradd --uid 1000 app" },
+    { expected: 0, run: "useradd -u 65532 app" },
+    { expected: 0, run: "useradd -u $APP_UID app" },
+    { expected: 0, run: `useradd -u "\${APP_UID}" app` },
+    { expected: 0, run: "useradd -u $(id -u) app" },
+    { expected: 0, run: "useradd -gwheel app" },
+    { expected: 0, run: "useradd -c 100000 app" },
+    { expected: 0, run: "useradd app # -u 100000" },
+    { expected: 0, run: 'echo "useradd -u 100000 app"' },
+    { expected: 0, run: "echo 'useradd -u 100000 app'" },
+    { expected: 0, run: "printf '%s\\n' useradd -u 100000" },
+    { expected: 0, run: "userdel -r app" },
+    { expected: 0, run: "apt-get install -y adduser-doc # useradd -u 100000" },
+    { expected: 0, run: "grep useradd -u 100000 /etc/passwd" },
   ];
 
   test.each(useraddCases)(
@@ -3902,21 +4501,251 @@ describe("Best Practices Rules", () => {
     }
   );
 
-  test("useradd-no-log-init", () => {
+  const useraddCommandPositionCases = [
+    { expected: 1, run: "if ! id app; then useradd -u 123456 app; fi" },
+    { expected: 1, run: "set -e; if ! id app; then useradd -u 123456 app; fi" },
+    {
+      expected: 1,
+      run: "if ! getent passwd app; then \\\n  useradd -u 123456 app; \\\nfi",
+    },
+    { expected: 1, run: "if useradd -u 123456 app; then echo ok; fi" },
+    { expected: 1, run: "if id app; then :; else useradd -u 123456 app; fi" },
+    {
+      expected: 1,
+      run: "if id a; then :; elif useradd -u 123456 app; then :; fi",
+    },
+    { expected: 1, run: "{ useradd -u 123456 app; }" },
+    { expected: 1, run: "! useradd -u 123456 app" },
+    { expected: 1, run: "for u in a b; do useradd -u 123456 $u; done" },
+    { expected: 1, run: "while read u; do useradd -u 123456 $u; done" },
+    { expected: 1, run: "until useradd -u 123456 app; do sleep 1; done" },
+    { expected: 1, run: "exec useradd -u 123456 app" },
+    { expected: 1, run: "exec -a name useradd -u 123456 app" },
+    { expected: 1, run: "env useradd -u 123456 app" },
+    { expected: 1, run: "env NAME=value useradd -u 123456 app" },
+    { expected: 1, run: "env -i -u HOME useradd -u 123456 app" },
+    { expected: 1, run: "/usr/bin/env useradd -u 123456 app" },
+    { expected: 1, run: "command useradd -u 123456 app" },
+    { expected: 1, run: "command -p useradd -u 123456 app" },
+    { expected: 1, run: "sudo -E useradd -u 123456 app" },
+    { expected: 1, run: "sudo -u root useradd -u 123456 app" },
+    { expected: 1, run: "sudo -Eu root useradd -u 123456 app" },
+    { expected: 1, run: "sudo --user=root useradd -u 123456 app" },
+    { expected: 1, run: "sudo --user root -- useradd -u 123456 app" },
+    { expected: 1, run: "sudo env NAME=value useradd -u 123456 app" },
+    { expected: 1, run: "time useradd -u 123456 app" },
+    { expected: 1, run: "time -p useradd -u 123456 app" },
+    { expected: 1, run: "nice useradd -u 123456 app" },
+    { expected: 1, run: "nice -n 10 useradd -u 123456 app" },
+    { expected: 1, run: "nice -10 useradd -u 123456 app" },
+    { expected: 1, run: "xargs useradd -u 123456 < /dev/null" },
+    { expected: 1, run: "xargs -n1 useradd -u 123456" },
+    { expected: 1, run: "xargs -I {} useradd -u 123456 {}" },
+    { expected: 0, run: "if ! id app; then useradd -l -u 123456 app; fi" },
+    { expected: 0, run: "if ! id app; then useradd -u 1000 app; fi" },
+    { expected: 0, run: "{ useradd -u 123456 --no-log-init app; }" },
+    { expected: 0, run: "for u in a b; do useradd -l -u 123456 $u; done" },
+    { expected: 0, run: "exec useradd -l -u 123456 app" },
+    { expected: 0, run: "env NAME=value useradd -l -u 123456 app" },
+    { expected: 0, run: "sudo -E useradd -l -u 123456 app" },
+    { expected: 0, run: "time useradd -l -u 123456 app" },
+    { expected: 0, run: "xargs useradd -l -u 123456" },
+    { expected: 0, run: 'echo "useradd -u 123456"' },
+    { expected: 0, run: "if true; then echo useradd -u 123456 app; fi" },
+    { expected: 0, run: "adduser -u 123456 app" },
+    { expected: 0, run: "adduser --uid 123456 app" },
+    { expected: 0, run: "command -v useradd" },
+    { expected: 0, run: "command -V useradd" },
+    { expected: 0, run: "if command -v useradd; then echo yes; fi" },
+    { expected: 0, run: "which useradd" },
+    { expected: 0, run: "type useradd" },
+    { expected: 0, run: "exec echo useradd -u 123456 app" },
+    { expected: 0, run: "env NAME=useradd echo -u 123456 app" },
+    { expected: 0, run: "sudo -u useradd ls -u 123456" },
+    { expected: 0, run: "nice -n 10 echo useradd -u 123456 app" },
+    { expected: 0, run: "xargs -I useradd echo -u 123456" },
+    { expected: 0, run: "time echo useradd -u 123456 app" },
+  ];
+
+  test.each(useraddCommandPositionCases)(
+    "useradd-no-log-init: RUN $run reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(`RUN ${run}`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  const useraddHeredocCases = [
+    {
+      expected: 1,
+      name: "a plain body line",
+      run: ["RUN <<EOF", "set -e", "useradd -u 123456 app", "EOF"],
+    },
+    {
+      expected: 1,
+      name: "a body line continued with a backslash",
+      run: ["RUN <<EOF", "useradd \\", "  -u 123456 app", "EOF"],
+    },
+    {
+      expected: 1,
+      name: "a RUN flag before the opener",
+      run: [
+        "RUN --mount=type=cache,target=/var/cache <<EOF",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 1,
+      name: "a quoted delimiter",
+      run: ["RUN <<'EOT'", "useradd -u 123456 app", "EOT"],
+    },
+    {
+      expected: 1,
+      name: "an indented body with <<-",
+      run: ["RUN <<-EOF", "\tuseradd -u 123456 app", "\tEOF"],
+    },
+    {
+      expected: 1,
+      name: "a useradd after a command in the same body",
+      run: [
+        "RUN <<EOF",
+        "groupadd -g 123456 app",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 1,
+      name: "a -l on another body line",
+      run: [
+        "RUN <<EOF",
+        "useradd -l -u 123457 other",
+        "useradd -u 123456 app",
+        "EOF",
+      ],
+    },
+    {
+      expected: 0,
+      name: "-l after a backslash continuation",
+      run: ["RUN <<EOF", "useradd -l \\", "  -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "--no-log-init in the body",
+      run: ["RUN <<EOF", "useradd --no-log-init -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a small UID",
+      run: ["RUN <<EOF", "useradd -u 1000 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "no -u",
+      run: ["RUN <<EOF", "set -e", "useradd app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "useradd named in an echo",
+      run: ["RUN <<EOF", 'echo "useradd -u 123456 app"', "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a comment line",
+      run: ["RUN <<EOF", "# useradd -u 123456 app", "EOF"],
+    },
+    {
+      expected: 0,
+      name: "a heredoc that feeds a file, not the shell",
+      run: ["RUN cat <<EOF > /etc/motd", "useradd -u 123456 app", "EOF"],
+    },
+  ];
+
+  test.each(useraddHeredocCases)(
+    "useradd-no-log-init: heredoc RUN with $name reports $expected",
+    ({ expected, run }) => {
+      const diagnostics = useraddNoLogInit.check(
+        parseDockerfile(["FROM debian:12", ...run].join("\n")),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(expected);
+    }
+  );
+
+  test("useradd-no-log-init: a heredoc body reports the line of its RUN", () => {
+    const diagnostics = useraddNoLogInit.check(
+      parseDockerfile(
+        ["FROM debian:12", "RUN <<EOF", "useradd -u 123456 app", "EOF"].join(
+          "\n"
+        )
+      ),
+      "Dockerfile"
+    );
+
+    expect(diagnostics.map((d) => d.line)).toEqual([2]);
+  });
+
+  test("useradd-no-log-init: a useradd inside a multi-line RUN is found", () => {
     const withoutFlag = parseDockerfile(`
-      RUN useradd -r -g mygroup myuser
+      RUN set -eux; \\
+        groupadd --gid 100000 app; \\
+        useradd --uid 100000 --gid app app
     `);
 
-    const diags1 = useraddNoLogInit.check(withoutFlag, "Dockerfile");
-    expect(diags1).toHaveLength(1);
-    expect(diags1[0].rule).toBe("docker-doctor/useradd-no-log-init");
+    const diags = useraddNoLogInit.check(withoutFlag, "Dockerfile");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].rule).toBe("docker-doctor/useradd-no-log-init");
+    expect(diags[0].message).toContain("a large UID");
 
     const withFlag = parseDockerfile(`
-      RUN useradd --no-log-init -r -g mygroup myuser
+      RUN groupadd --gid 100000 app && \\
+        useradd --no-log-init --uid 100000 --gid app app
     `);
 
-    const diags2 = useraddNoLogInit.check(withFlag, "Dockerfile");
-    expect(diags2).toHaveLength(0);
+    expect(useraddNoLogInit.check(withFlag, "Dockerfile")).toHaveLength(0);
+  });
+
+  const hostileUseraddRuns = [
+    `${"a ".repeat(50_000)}useradd -u 100000 ${"'\\\\ ".repeat(20_000)}`,
+    "useradd ".repeat(25_000),
+    "useradd;".repeat(25_000),
+    `useradd ${"$(".repeat(100_000)}`,
+  ];
+
+  test.each(hostileUseraddRuns)(
+    "useradd-no-log-init: a 200,000 character hostile RUN is scanned in under 50 ms",
+    (run) => {
+      const instructions = parseDockerfile(`RUN ${run}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        useraddNoLogInit.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
+    }
+  );
+
+  test("useradd-no-log-init: a 200,000 character heredoc body is scanned in under 50 ms", () => {
+    const body = "echo useradd -u 12345\n".repeat(9000);
+    const instructions = parseDockerfile(`RUN <<EOF\n${body}EOF`);
+    const timings: number[] = [];
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const startedAt = performance.now();
+      useraddNoLogInit.check(instructions, "Dockerfile");
+      timings.push(performance.now() - startedAt);
+    }
+
+    expect(Math.min(...timings)).toBeLessThan(50);
   });
 
   test("require-healthcheck", () => {

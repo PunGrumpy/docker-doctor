@@ -6,7 +6,7 @@ description: >-
   useradd with a high UID can add gigabytes to a Docker image via /var/log/faillog. Why useradd needs --no-log-init in Dockerfiles.
 ---
 
-`RUN useradd -u 100000 appuser` can silently add **gigabytes** to an image. `useradd` initializes the `/var/log/faillog` and `/var/log/lastlog` accounting files, which are indexed by UID — creating a high-UID user makes them enormous sparse files, and Docker's layer format stores sparse files at their full apparent size. This rule flags `useradd` calls without `--no-log-init` or its short form `-l`.
+`RUN useradd -u 100000 appuser` can silently add **gigabytes** to an image. `useradd` initializes the `/var/log/faillog` and `/var/log/lastlog` accounting files, which are indexed by UID — creating a high-UID user makes them enormous sparse files, and Docker's layer format stores sparse files at their full apparent size. This rule flags a `useradd` that sets a UID of six or more digits without `--no-log-init` or its short form `-l`, the same cut-off as hadolint's DL3046. A `useradd` with no `-u`, a shorter UID, or a UID that comes from a variable is not reported. The rule reads the commands a `RUN` runs. That includes a `useradd` after `&&`, `;`, `if`, `then`, `do` or `!`, behind `sudo`, `env`, `exec`, `command`, `time`, `nice` or `xargs`, and on a line of a `RUN <<EOF` body. A word that only names `useradd`, as in `echo "useradd -u 100000 app"`, does not count.
 
 ## What the rule catches
 
@@ -20,7 +20,7 @@ Scanning this file reports:
 
 ```text
 ⚠ WARN [docker-doctor/useradd-no-log-init]
-  RUN instruction runs 'useradd' without '--no-log-init'. This can cause excessive disk space usage / exhaustion under Go's sparse tar archive bug when large UIDs are used.
+  RUN instruction runs 'useradd' with a large UID and without '--no-log-init'. A large UID makes useradd write a very large sparse lastlog file, and Go's sparse tar archive bug can then use excessive disk space.
 ```
 
 ## Why it matters
@@ -29,15 +29,17 @@ This is a genuine footgun (docker/docker#5419): the Dockerfile looks completely 
 
 ## How to fix it
 
-Pass `--no-log-init` or its short form `-l` to useradd (e.g., `RUN useradd --no-log-init -r -g mygroup myuser`).
+Pass `--no-log-init` or its short form `-l` to useradd when it sets a large UID (e.g., `RUN useradd --no-log-init -r -u 1000000 -g mygroup myuser`).
 
 ```dockerfile title="Dockerfile — accounting files never created"
 FROM debian:12-slim
-RUN useradd --no-log-init -r appuser
+RUN useradd --no-log-init -u 100000 appuser
 USER appuser
 ```
 
 `-r` creates a system account (no home directory, UID from the system range), which is usually what a service container wants. On Alpine the equivalent tool is `adduser -S`, which doesn't have this problem. Creating a non-root user in the first place is the subject of [no-root-user](/docs/reference/rules/no-root-user).
+
+The rule misses a few real cases on purpose. `lastlog` keeps a 292-byte record for each UID, so UID 65532 (the usual `nonroot` user) already makes a sparse file of about 19 MB, and a UID under 100000 is never reported. That size is small next to the gigabytes of a UID in the millions. A UID read from a variable is also skipped, because the rule cannot know its value. Add `-l` to those `useradd` calls if the extra layer size matters to you.
 
 ## Rule details
 
