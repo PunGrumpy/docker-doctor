@@ -3607,6 +3607,86 @@ describe("Best Practices Rules", () => {
       expectedRules: ["docker-doctor/use-pipefail"],
       name: "exec-form RUN does not pick up the stage SHELL",
     },
+    {
+      dockerfile: `
+      RUN set -e; case "$x" in a|b) echo ok;; esac
+    `,
+      expectedRules: [],
+      name: "a case pattern separator is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN case "$(uname -m)" in x86_64|amd64) A=amd64;; aarch64|arm64) A=arm64;; esac && echo $A
+    `,
+      expectedRules: [],
+      name: "case patterns after in and after a terminator",
+    },
+    {
+      dockerfile: `
+      RUN case "$ARCH" in \\
+            amd64|x86_64) A=x ;; \\
+            (arm64|aarch64) A=y ;; \\
+          esac
+    `,
+      expectedRules: [],
+      name: "case patterns on continued lines",
+    },
+    {
+      dockerfile: `
+      RUN case "$x" in a|b) curl -fsSL https://x.sh | sh ;; esac
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a real pipe inside a case body still reports",
+    },
+    {
+      dockerfile: `
+      RUN echo $((1|2))
+    `,
+      expectedRules: [],
+      name: "a bitwise or inside arithmetic expansion is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN echo $(( (1|2) + 3 )) && echo $(cat f|sort)
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a pipe in command substitution next to arithmetic still reports",
+    },
+    {
+      dockerfile: `
+      RUN x=\${y:-a|b}; echo $x
+    `,
+      expectedRules: [],
+      name: "a bar inside a parameter expansion is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN sed -i s/a\\|b/c/ file
+    `,
+      expectedRules: [],
+      name: "an escaped bar is not a pipe",
+    },
+    {
+      dockerfile: `
+      RUN sed -i s/a\\|b/c/ file | sort
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "an escaped bar does not hide a real pipe",
+    },
+    {
+      dockerfile: `
+      RUN make 2>&1 |& tee log
+    `,
+      expectedRules: ["docker-doctor/use-pipefail"],
+      name: "a pipe that also carries stderr still reports",
+    },
+    {
+      dockerfile: `
+      RUN true || false
+    `,
+      expectedRules: [],
+      name: "a logical or is not a pipe",
+    },
     // Interior comment lines (stripped from args) must not flip the verdict.
     {
       dockerfile: `
@@ -3639,6 +3719,33 @@ describe("Best Practices Rules", () => {
       expect(diagnostics.map((diagnostic) => diagnostic.rule)).toEqual(
         expectedRules
       );
+    }
+  );
+
+  const hostilePipefailRuns = [
+    "in a|".repeat(40_000),
+    ";;a|".repeat(50_000),
+    `in ${"a|".repeat(100_000)}`,
+    `\${`.repeat(100_000),
+    "$((".repeat(66_000),
+    `\${}`.repeat(66_000),
+    "\\|".repeat(100_000),
+    "case x in a|b) ".repeat(13_000),
+  ];
+
+  test.each(hostilePipefailRuns)(
+    "use-pipefail: a 200,000 character hostile RUN is scanned in under 50 ms",
+    (run) => {
+      const instructions = parseDockerfile(`RUN ${run}`);
+      const timings: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const startedAt = performance.now();
+        usePipefail.check(instructions, "Dockerfile");
+        timings.push(performance.now() - startedAt);
+      }
+
+      expect(Math.min(...timings)).toBeLessThan(50);
     }
   );
 

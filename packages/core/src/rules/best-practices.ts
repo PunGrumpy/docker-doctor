@@ -215,6 +215,67 @@ export const PIPEFAIL_SETTING_RE = /(?:^|\s)-[A-Za-z]*o\s+pipefail\b/u;
 
 const HAS_PIPE_RE = /(?<!\|)\|(?!\|)/u;
 
+// Shell text where a `|` is not a pipe:
+// - A backslash escapes the next character, so `s/a\|b/c/` holds no pipe.
+// - `$(( ))` and `${ }` hold arithmetic and parameter words.
+// - A `case` pattern list ends in `)` and follows `in` or a `;;` terminator,
+//   so the bar in `x86_64|amd64)` separates alternatives. `$(a|b)` has no such
+//   lead, so it still reads as a pipe.
+const ESCAPED_CHAR_RE = /\\[\s\S]/gu;
+
+const CASE_PATTERN_RE = /(?:(?<![\w-])in\s|;;&?|;&)\s*\(?[^\s()&;]+\)/gu;
+
+interface ExpansionSpan {
+  close: string;
+  depth: number;
+  open: string;
+  start: string;
+}
+
+const EXPANSION_SPANS: readonly ExpansionSpan[] = [
+  { close: ")", depth: 2, open: "(", start: "$((" },
+  { close: "}", depth: 1, open: "{", start: "${" },
+];
+
+// Replaces each balanced span with a space. An unterminated span runs to the
+// end of the text.
+const blankSpans = (text: string, span: ExpansionSpan): string => {
+  let result = "";
+  let index = 0;
+  let found = text.indexOf(span.start, index);
+
+  while (found !== -1) {
+    result += text.slice(index, found);
+    let { depth } = span;
+    index = found + span.start.length;
+
+    while (index < text.length && depth > 0) {
+      if (text[index] === span.open) {
+        depth += 1;
+      } else if (text[index] === span.close) {
+        depth -= 1;
+      }
+
+      index += 1;
+    }
+
+    result += " ";
+    found = text.indexOf(span.start, index);
+  }
+
+  return result + text.slice(index);
+};
+
+const withoutNonPipeBars = (text: string): string => {
+  let result = text.replace(ESCAPED_CHAR_RE, " ");
+
+  for (const span of EXPANSION_SPANS) {
+    result = blankSpans(result, span);
+  }
+
+  return result.replace(CASE_PATTERN_RE, " ");
+};
+
 // `cd` only where a command can start: line start, or after a list/pipe
 // separator or a subshell open. Path segments (/opt/cd) and words never sit
 // in command position.
@@ -240,8 +301,9 @@ const pipesWithoutPipefail = (
 ): boolean => {
   const execArgv = parseExecForm(args);
 
-  const pipeText =
-    execArgv === null ? maskQuotedText(args) : execArgv.join(" ");
+  const pipeText = withoutNonPipeBars(
+    execArgv === null ? maskQuotedText(args) : execArgv.join(" ")
+  );
 
   if (!HAS_PIPE_RE.test(pipeText)) {
     return false;
