@@ -7,9 +7,11 @@ import { parseIgnoreComment } from "../src/parsers/ignore-comment";
 
 const TIME_LIMIT_MS = 50;
 
-// A whole-file read also pays for yaml's parser and a loaded CI machine, so
-// this bound only has to catch work that grows with the square of the input.
-const FILE_TIME_LIMIT_MS = 1000;
+// A whole-file read also pays for yaml's own parse, which dominates the Compose
+// case (24 to 48 ms measured). This bound only has to catch work that grows
+// with the square of the input.
+const FILE_TIME_LIMIT_MS = 250;
+const WIDE_MAPPING_KEYS = 100_000;
 const HOSTILE_LENGTH = 200_000;
 
 const readDockerfile = (content: string) =>
@@ -432,6 +434,15 @@ describe("Compose ignore comments", () => {
     );
 
     expect(warnings).toHaveLength(1);
+  });
+
+  test("a mapping with many keys is read without overflowing the stack", () => {
+    const keys = Array.from(
+      { length: WIDE_MAPPING_KEYS },
+      (_, index) => `  k${index}: v`
+    ).join("\n");
+
+    expect(() => readComposeIgnores(`x:\n${keys}\n`)).not.toThrow();
   });
 
   test("a file with many stacked comments is read in linear time", () => {

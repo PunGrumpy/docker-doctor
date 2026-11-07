@@ -83,8 +83,17 @@ const collectComments = (
   for (let token = pending.pop(); token; token = pending.pop()) {
     const { children, trivia } = branchOf(token);
 
-    comments.push(...trivia.filter(({ type }) => type === "comment"));
-    pending.push(...children);
+    for (const trivium of trivia) {
+      if (trivium.type === "comment") {
+        comments.push(trivium);
+      }
+    }
+
+    // A loop, not a spread. Spreading hundreds of thousands of children into
+    // one call overflows the stack.
+    for (const child of children) {
+      pending.push(child);
+    }
   }
 
   return comments.toSorted((a, b) => a.offset - b.offset);
