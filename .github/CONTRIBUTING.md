@@ -26,7 +26,7 @@ Docker Doctor is a monorepo managed with [Bun](https://bun.sh) workspaces and [T
   - `src/formatters/`: the terminal report
 - `packages/videos` (private): Remotion release videos
 - `apps/web` (private): Next.js + fumadocs documentation site
-- `kits/docker-doctor` (private): Docker Sandboxes kit; `spec.yaml` is synced by `bun run kit:sync`
+- `kits/docker-doctor` (private): Docker Sandboxes kit (Kit Specification v3); `docker-doctor.yaml` is synced by `bun run kit:sync`
 - `skills/`: `docker-doctor` (bundled into the npm package), `docker-author`, `improve-docker`
 - `scripts/`: rule docs generator, kit spec sync, GitHub Action comment renderer
 - `action.yml`: composite GitHub Action

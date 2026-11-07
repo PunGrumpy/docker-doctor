@@ -94,10 +94,13 @@ capabilities:
   # claude-code, codex, cursor, opencode, gemini-cli, github-copilot, droid
   # and kiro-cli. Now the runtime exposes the skill at every skills
   # destination the composed agent kits declare with agent-skills@1, so the
-  # list of agents is theirs to keep, not ours. Optional, because no
-  # published kit used this type when this was written. A host that does
-  # not know it skips the entry (SPEC-v3 §7.3), and the context file below
-  # still points the agent at the skill's path.
+  # list of agents is theirs to keep, not ours. On 2026-11-08 only the
+  # claude and codex built-ins declared one (~/.claude/skills and
+  # ~/.agents/skills). With the other built-ins this entry has no
+  # destination and is skipped, so those agents read the skill from the
+  # path the context file names. Optional for that reason, and because no
+  # published kit used this type yet. A host that does not know the type
+  # skips the entry too (SPEC-v3 §7.3).
   - type: com.docker.sandbox/agent-skill@1
     optional: true
     description: The docker-doctor triage skill from the pinned CLI package

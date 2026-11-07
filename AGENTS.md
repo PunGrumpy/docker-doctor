@@ -157,7 +157,7 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 ├── apps/
 │   └── web/                         PRIVATE    Next.js + fumadocs site (app/, components/, content/, lib/, scripts/)
 ├── kits/
-│   └── docker-doctor/               PRIVATE    Docker Sandboxes kit; spec.yaml is synced by `bun run kit:sync`
+│   └── docker-doctor/               PRIVATE    Docker Sandboxes kit (spec v3); docker-doctor.yaml is synced by `bun run kit:sync`
 ├── skills/                          docker-doctor (bundled into the npm package), docker-author, improve-docker
 ├── scripts/                         generate-rules-doc.ts + rule-page-content.ts, sync-kit-spec.ts, render-github-action-comment.mjs
 └── action.yml                       composite GitHub Action
@@ -168,5 +168,5 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 - **Rules and parsers are plain synchronous functions**: `packages/core/src/rules/` and `packages/core/src/parsers/` return values directly. No async, no generators, no wrapper types. Keep them that way.
 - **Diagnostics come from one factory**: every rule builds its findings with `packages/core/src/rules/create-diagnostic.ts`. The runners in `packages/core/src/runners/` then apply the configured severity.
 - **Rule docs pages are generated**: author the prose in `scripts/rule-page-content.ts`, then run `bun run docs:rules`. Generation fails when a rule has no authored entry, and the Format CI job diffs the output.
-- **Two artifacts are copied at release time**: `skills/docker-doctor` is copied into the npm package at build, and `kits/docker-doctor/spec.yaml` is synced by `bun run kit:sync`.
+- **Two artifacts are copied at release time**: `skills/docker-doctor` is copied into the npm package at build, and the version and CLI pin in `kits/docker-doctor/docker-doctor.yaml` are synced by `bun run kit:sync`.
 - **User-visible CLI changes need a changeset**: that includes edits to the bundled skill, since it ships inside `@docker-doctor/cli`.
