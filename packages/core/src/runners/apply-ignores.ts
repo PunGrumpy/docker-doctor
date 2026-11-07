@@ -19,6 +19,26 @@ export interface IgnoreResult {
   warnings: IgnoreFileWarning[];
 }
 
+const MAX_UNKNOWN_NAME_LENGTH = 80;
+
+// Controls, format characters (zero-width, bidi, tag characters) and the line
+// and paragraph separators. The warning goes to a terminal, and the name is
+// whatever the comment's author typed.
+const HIDDEN_CHARS_RE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u{E0000}-\u{E007F}]+/gu;
+
+// Hidden characters go first so they cannot split a credential that
+// redactSecrets would otherwise mask.
+const describeUnknownName = (name: string): string => {
+  const safe = redactSecrets(name.replaceAll(HIDDEN_CHARS_RE, ""));
+
+  const shown =
+    safe.length > MAX_UNKNOWN_NAME_LENGTH
+      ? `${safe.slice(0, MAX_UNKNOWN_NAME_LENGTH)}…`
+      : safe;
+
+  return `"${shown}"`;
+};
+
 interface Reason {
   reason: string | null;
 }
@@ -66,7 +86,7 @@ const indexFile = (
       const rule = findRuleByName(name);
 
       if (rule === undefined) {
-        unknown.push(`"${name}"`);
+        unknown.push(describeUnknownName(name));
       } else {
         addDirective(ignores, directive, rule.key);
       }

@@ -14,6 +14,9 @@ import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 import type { Diagnostic, FileIgnores } from "../src/types/index";
 
 const NO_ROOT_USER = "docker-doctor/no-root-user";
+const UNKNOWN_NAME_TAIL = 500;
+const UNKNOWN_NAME_CAP = 80;
+const GITHUB_TOKEN_PAIRS = 18;
 
 const scanDockerfile = (content: string, file = "Dockerfile") => {
   const instructions = parseDockerfile(content);
@@ -173,6 +176,25 @@ describe("Dockerfile ignores", () => {
       'unknown rules "#", "image", "is", "run", "with", "--user" in an ignore comment'
     );
     expect(rulesOf(result.suppressed)).toEqual([NO_ROOT_USER]);
+  });
+
+  test("an unknown name is masked, stripped of escapes and capped in the warning", () => {
+    const token = `ghp_${"a1".repeat(GITHUB_TOKEN_PAIRS)}`;
+    const long = "n".repeat(UNKNOWN_NAME_TAIL);
+
+    const { diagnostics, ignores } = scanDockerfile(
+      `# docker-doctor-ignore GITHUB_TOKEN=${token}, \u001B[31mred\u200B, ${long}\n${dockerfile}`
+    );
+
+    const [warning] = applyIgnores(diagnostics, ignores).warnings;
+
+    expect(warning?.message).not.toContain(token);
+    expect(warning?.message).toContain('"GITHUB_TOKEN=***"');
+    expect(warning?.message).not.toContain("\u001B");
+    expect(warning?.message).not.toContain("\u200B");
+    expect(warning?.message).toContain('"[31mred"');
+    expect(warning?.message).toContain(`"${"n".repeat(UNKNOWN_NAME_CAP)}…"`);
+    expect(warning?.message).not.toContain("n".repeat(UNKNOWN_NAME_CAP + 1));
   });
 
   test("warnings from the reader carry the file name", () => {
