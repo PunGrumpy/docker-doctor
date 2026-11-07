@@ -1,0 +1,6 @@
+services:
+  web:
+    environment:
+      LOG_LEVEL: debug
+  adminer:
+    image: adminer:4.8.1

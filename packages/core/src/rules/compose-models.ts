@@ -33,7 +33,12 @@ export const undefinedModelReference: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
-    const defined = new Set(Object.keys(topLevelModels(composeContent)));
+
+    // With an override, a model the base declares can be referenced from
+    // the override and the other way round.
+    const defined = new Set(
+      Object.keys(topLevelModels(context?.project ?? composeContent))
+    );
 
     const flag = (
       serviceName: string,
@@ -47,7 +52,8 @@ export const undefinedModelReference: ComposeRule = {
           this.defaultSeverity,
           `Service '${serviceName}' references model '${modelName}', which is not declared in the top-level models section. Compose cannot resolve it.`,
           this.help,
-          context?.locate?.(["services", serviceName, "models", pathTail])
+          context?.locate?.(["services", serviceName, "models", pathTail]) ??
+            context?.locate?.(["services", serviceName])
         )
       );
     };

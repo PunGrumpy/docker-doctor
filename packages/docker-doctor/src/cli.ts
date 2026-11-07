@@ -6,6 +6,7 @@ import readline from "node:readline";
 import { setTimeout } from "node:timers/promises";
 
 import type {
+  ComposeSource,
   Diagnostic,
   DockerDoctorConfig,
   JsonReport,
@@ -18,9 +19,9 @@ import {
   parseDockerfile,
   parseDockerfileDirectives,
   createComposeLocator,
-  parseCompose,
+  readComposeFile,
   runDockerfileRules,
-  runComposeRules,
+  runComposeFiles,
   calculateScore,
   loadConfig,
   allRules,
@@ -624,36 +625,51 @@ const runRulesEngine = async (
     await setTimeout(100);
   }
 
-  const composeResults = await Promise.all(
-    project.composeFiles.map(async (cf): Promise<FileResult> => {
-      const fullPath = path.join(rootDir, cf);
+  const composeReads = await Promise.all(
+    project.composeFiles.map(
+      async (cf): Promise<ComposeSource | ScanFailure> => {
+        const fullPath = path.join(rootDir, cf);
 
-      try {
-        const content = await fs.readFile(fullPath, "utf-8");
-        fileContents[cf] = content;
-        const composeObj = parseCompose(content, cf);
+        try {
+          const content = await fs.readFile(fullPath, "utf-8");
+          fileContents[cf] = content;
 
-        return {
-          analyzed: isAnalyzableCompose(composeObj),
-          diagnostics: runComposeRules(
-            composeObj,
-            cf,
-            rulesConfig,
-            categoriesConfig,
-            createComposeLocator(content)
-          ),
-        };
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+          return {
+            compose: readComposeFile(content, cf),
+            file: cf,
+            locate: createComposeLocator(content),
+          };
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
 
-        return {
-          analyzed: false,
-          diagnostics: [],
-          failure: { file: cf, message: msg },
-        };
+          return { file: cf, message: msg };
+        }
       }
-    })
+    )
+  );
+
+  // A base file and its override are judged together, so the rules run
+  // once every Compose file is parsed.
+  const composeSources = composeReads.filter(
+    (read): read is ComposeSource => "compose" in read
+  );
+
+  const composeDiagnostics = runComposeFiles(
+    composeSources,
+    { categoriesConfig, rulesConfig },
+    (message) => {
+      console.error(`Warning: ${message}`);
+    }
+  );
+
+  const composeResults = composeReads.map((read): FileResult =>
+    "compose" in read
+      ? {
+          analyzed: isAnalyzableCompose(read.compose.document),
+          diagnostics: composeDiagnostics.get(read.file) ?? [],
+        }
+      : { analyzed: false, diagnostics: [], failure: read }
   );
 
   return summarizeFileResults([...dockerfileResults, ...composeResults]);
