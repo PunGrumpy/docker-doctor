@@ -29,7 +29,7 @@ Crashes are normal operation: OOM kills, unhandled exceptions, dropped database 
 
 ## How to fix it
 
-Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot.
+Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot. A one-shot job that another service waits on with `condition: service_completed_successfully` is exempt.
 
 ```yaml title="compose.yaml — restarts on crash and after reboot"
 services:

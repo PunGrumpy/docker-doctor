@@ -1240,6 +1240,12 @@ describe("Performance Rules", () => {
   );
 });
 
+const SERVICE_NAME_RE = /'(?<name>[^']+)'/u;
+
+// The service each finding names, in report order.
+const servicesNamed = (diags: { message: string }[]) =>
+  diags.map((d) => SERVICE_NAME_RE.exec(d.message)?.groups?.name);
+
 describe("Compose Rules", () => {
   test("no-version-key", () => {
     const composeContent = {
@@ -1431,6 +1437,82 @@ services:
     const composeContent = parseCompose(content, "compose.yml");
     const diags = requireRestartPolicy.check(composeContent, "compose.yml");
     expect(diags).toHaveLength(0);
+  });
+
+  test("a one-shot job another service waits on is not asked for a restart policy", () => {
+    // The fixture from the round 7 audit (A/l23). web waits for migrate to
+    // finish. Nothing waits on createbuckets, and debug is only profiled.
+    const source = `services:
+  web:
+    image: app:1.0
+    restart: unless-stopped
+    deploy: {resources: {limits: {cpus: "1", memory: 1g}}}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    image: app:1.0
+    command: ["./migrate"]
+  createbuckets:
+    image: minio/mc:RELEASE.2024-11-17T19-35-25Z
+    entrypoint: ["/bin/sh","-c","mc mb local/data || true"]
+  debug:
+    image: busybox:1.37
+    profiles: ["tools"]
+    command: sleep infinity
+`;
+
+    const composeContent = parseCompose(source, "compose.yaml");
+
+    expect(
+      servicesNamed(requireRestartPolicy.check(composeContent, "compose.yaml"))
+    ).toEqual(["createbuckets", "debug"]);
+
+    // A limit on a migration job is still sound advice.
+    expect(
+      servicesNamed(requireResourceLimits.check(composeContent, "compose.yaml"))
+    ).toEqual(["migrate", "createbuckets", "debug"]);
+  });
+
+  test("a dependency named in the short depends_on form still needs a restart policy", () => {
+    const composeContent = {
+      services: {
+        db: { image: "postgres:17" },
+        web: {
+          depends_on: { db: { condition: "service_started" } },
+          image: "app:1.0",
+          restart: "always",
+        },
+        worker: { depends_on: ["db"], image: "app:1.0", restart: "always" },
+      },
+    };
+
+    expect(
+      requireRestartPolicy.check(composeContent, "compose.yaml")
+    ).toHaveLength(1);
+  });
+
+  test("a one-shot job is recognised from the whole project", () => {
+    const project = {
+      services: {
+        migrate: { image: "app:1.0" },
+        web: {
+          depends_on: {
+            migrate: { condition: "service_completed_successfully" },
+          },
+          image: "app:1.0",
+          restart: "always",
+        },
+      },
+    };
+
+    const overrideOnly = { services: { migrate: { image: "app:1.0" } } };
+
+    expect(
+      requireRestartPolicy.check(overrideOnly, "compose.override.yaml", {
+        project,
+      })
+    ).toEqual([]);
   });
 
   test("a service with a null body is still checked", () => {
