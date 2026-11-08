@@ -1,5 +1,25 @@
 # docker-doctor-kit
 
+## 0.2.0
+
+### Minor Changes
+
+- 5470203: The kit now publishes as a Kit Specification v3 image, so it composes with the built-in agents of Docker Sandboxes 0.51 and later. It ships the pinned CLI with its own Node runtime, so the base image no longer needs Node and sandbox creation no longer reaches npm. Docker Sandboxes now places the bundled skill for the agents whose kits declare a skills directory, which today means Claude Code and Codex. Other agents are pointed at the skill's file. On sbx older than 0.51, use `docker.io/pungrumpy/docker-doctor-kit:0.1.14`.
+
+### Patch Changes
+
+- Updated dependencies [a554274]
+- Updated dependencies [53e911e]
+- Updated dependencies [dd5a33a]
+- Updated dependencies [af17870]
+- Updated dependencies [2f9659d]
+- Updated dependencies [e4c5ca7]
+- Updated dependencies [45dd097]
+- Updated dependencies [d69e199]
+- Updated dependencies [09721ae]
+- Updated dependencies [0d1831c]
+  - @docker-doctor/cli@0.10.0
+
 ## 0.1.14
 
 ### Patch Changes
