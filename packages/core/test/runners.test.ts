@@ -464,6 +464,21 @@ describe("runComposeFiles", () => {
     expect(findingsOf(results, "compose.override.yaml")).toEqual([]);
   });
 
+  test("a setting the override resets through a merge key is reported", () => {
+    const results = runComposeFiles([
+      source("compose.yaml", healthyBase),
+      source(
+        "compose.override.yaml",
+        "x-common: &common\n  restart: !reset\nservices:\n  web:\n    <<: *common\n"
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([
+      "docker-doctor/require-restart-policy:2",
+    ]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([]);
+  });
+
   test("a base service missing a setting is reported once, on the base", () => {
     const results = runComposeFiles([
       source(

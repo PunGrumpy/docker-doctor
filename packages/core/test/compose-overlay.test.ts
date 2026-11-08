@@ -155,6 +155,65 @@ describe("overlayCompose", () => {
     expect(merged).toEqual({ services: { web: { deploy: { replicas: 2 } } } });
   });
 
+  test("!reset through a merge key removes the base value at each service that merges it", () => {
+    const merged = overlay(
+      `services:
+  web:
+    image: app:1.0
+    restart: always
+  api:
+    image: app:1.0
+    restart: always
+`,
+      `x-common: &common
+  restart: !reset
+services:
+  web:
+    <<: *common
+  api:
+    <<: *common
+`
+    );
+
+    expect(merged).toEqual({
+      services: { api: { image: "app:1.0" }, web: { image: "app:1.0" } },
+      "x-common": {},
+    });
+  });
+
+  test("!override through a merge key replaces the base value", () => {
+    const merged = overlay(
+      `services:
+  web:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+`,
+      `x-dev: &dev
+  deploy: !override
+    replicas: 1
+services:
+  web:
+    <<: *dev
+`
+    );
+
+    expect(merged).toEqual({
+      services: { web: { deploy: { replicas: 1 } } },
+      "x-dev": { deploy: { replicas: 1 } },
+    });
+  });
+
+  test("!reset in an inline merge mapping removes the base value", () => {
+    const merged = overlay(
+      "services:\n  web:\n    image: app:1.0\n    restart: always\n",
+      "services:\n  web:\n    <<: {restart: !reset null}\n"
+    );
+
+    expect(merged).toEqual({ services: { web: { image: "app:1.0" } } });
+  });
+
   test("depends_on merges the short and long forms by service", () => {
     const merged = overlay(
       "services:\n  web:\n    depends_on: [db, migrate]\n",

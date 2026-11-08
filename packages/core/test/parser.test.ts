@@ -1,7 +1,7 @@
 import { describe, test, expect, spyOn } from "bun:test";
 
 import { ParseError } from "../src/errors";
-import { parseCompose } from "../src/parsers/compose-parser";
+import { parseCompose, readComposeFile } from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 
 describe("Dockerfile Parser", () => {
@@ -443,12 +443,43 @@ services:
     <<: *base
 `;
 
-    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+    const { document, replacedPaths } = readComposeFile(
+      content,
+      "compose.override.yaml"
+    );
+
+    expect(document).toEqual({
       services: {
         api: { image: "app:1.0" },
         web: { image: "app:1.0" },
       },
       "x-base": { image: "app:1.0" },
+    });
+    // compose-go records the tag at each service that merges the anchor,
+    // without the `<<` (loader/reset.go:106-109 and :164-170).
+    expect(replacedPaths).toEqual([
+      ["x-base", "restart"],
+      ["services", "web", "restart"],
+      ["services", "api", "restart"],
+    ]);
+  });
+
+  test("a tag in an inline merge mapping counts at the service that merges it", () => {
+    const content = `
+services:
+  web:
+    <<: {restart: !reset null, deploy: !override {replicas: 1}}
+    image: app:1.0
+`;
+
+    expect(readComposeFile(content, "compose.override.yaml")).toEqual({
+      document: {
+        services: { web: { deploy: { replicas: 1 }, image: "app:1.0" } },
+      },
+      replacedPaths: [
+        ["services", "web", "restart"],
+        ["services", "web", "deploy"],
+      ],
     });
   });
 

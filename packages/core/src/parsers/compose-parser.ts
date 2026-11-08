@@ -106,8 +106,17 @@ const dropResetValues = (container: YAMLMap | YAMLSeq, doc: Document) => {
   );
 };
 
-const keyOf = (pair: Pair): string =>
-  isScalar(pair.key) ? String(pair.key.value) : "";
+// With `merge: true`, yaml stores the value of a merge key as a symbol. Its
+// source text is still `<<`.
+const MERGE_KEY = "<<";
+
+const keyOf = (pair: Pair): string => {
+  if (!isScalar(pair.key)) {
+    return "";
+  }
+
+  return pair.key.source === MERGE_KEY ? MERGE_KEY : String(pair.key.value);
+};
 
 // The keys whose values carry a merge tag. Paths below a sequence never
 // match a base value (`loader/reset.go:307-316`), so a sequence has none.
@@ -171,7 +180,7 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
     // compose-go drops the `<<` of a merge key from the path
     // (`loader/reset.go:106-109`).
     for (const path of below) {
-      record(scan, paths, key === "<<" ? path : [key, ...path]);
+      record(scan, paths, key === MERGE_KEY ? path : [key, ...path]);
     }
   }
 
