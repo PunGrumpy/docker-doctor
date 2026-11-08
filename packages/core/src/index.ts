@@ -4,7 +4,12 @@ export { parseDockerfile } from "./parsers/dockerfile-parser";
 
 export { parseDockerfileDirectives } from "./parsers/dockerfile-directives";
 
-export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
+export {
+  type ComposeFile,
+  createComposeLocator,
+  parseCompose,
+  readComposeFile,
+} from "./parsers/compose-parser";
 
 export { readComposeIgnores } from "./parsers/compose-ignores";
 
@@ -18,7 +23,11 @@ export {
 
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 
-export { runComposeRules } from "./runners/compose-runner";
+export {
+  type ComposeSource,
+  runComposeFiles,
+  runComposeRules,
+} from "./runners/compose-runner";
 
 export {
   isAnalyzableCompose,

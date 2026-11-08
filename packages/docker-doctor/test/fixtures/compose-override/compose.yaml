@@ -1,0 +1,13 @@
+services:
+  web:
+    image: nginx:1.27.3@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    restart: unless-stopped
+    read_only: true
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD", "true"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M

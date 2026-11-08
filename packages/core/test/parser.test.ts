@@ -1,7 +1,7 @@
 import { describe, test, expect, spyOn } from "bun:test";
 
 import { ParseError } from "../src/errors";
-import { parseCompose } from "../src/parsers/compose-parser";
+import { parseCompose, readComposeFile } from "../src/parsers/compose-parser";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 
 describe("Dockerfile Parser", () => {
@@ -378,7 +378,6 @@ services:
           web: {
             deploy: { resources: { limits: { memory: "256M" } } },
             image: "nginx:1.27-alpine",
-            ports: [],
           },
         },
       });
@@ -386,6 +385,149 @@ services:
     } finally {
       emitWarning.mockRestore();
     }
+  });
+
+  test("!reset removes the value from the file, as Compose drops it", () => {
+    const content = `
+services:
+  web:
+    image: !reset null
+    restart: !reset
+    ports: !reset []
+    command: ["serve"]
+    environment:
+      - A=1
+      - !reset B=2
+`;
+
+    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+      services: {
+        web: { command: ["serve"], environment: ["A=1"] },
+      },
+    });
+  });
+
+  test("!override keeps the value it tags", () => {
+    const content = `
+services:
+  web:
+    image: !override nginx:1.27-alpine
+    environment: !override
+      LOG_LEVEL: debug
+    ports: !override ["8080:80"]
+  worker:
+    image: !override
+`;
+
+    expect(parseCompose(content, "compose.override.yaml")).toEqual({
+      services: {
+        web: {
+          environment: { LOG_LEVEL: "debug" },
+          image: "nginx:1.27-alpine",
+          ports: ["8080:80"],
+        },
+        worker: { image: null },
+      },
+    });
+  });
+
+  test("!reset under a merge key removes the value where the anchor is merged", () => {
+    const content = `
+x-base: &base
+  restart: !reset null
+  image: app:1.0
+services:
+  web:
+    <<: *base
+  api:
+    <<: *base
+`;
+
+    const { document, replacedPaths } = readComposeFile(
+      content,
+      "compose.override.yaml"
+    );
+
+    expect(document).toEqual({
+      services: {
+        api: { image: "app:1.0" },
+        web: { image: "app:1.0" },
+      },
+      "x-base": { image: "app:1.0" },
+    });
+    // compose-go records the tag at each service that merges the anchor,
+    // without the `<<` (loader/reset.go:106-109 and :164-170).
+    expect(replacedPaths).toEqual([
+      ["x-base", "restart"],
+      ["services", "web", "restart"],
+      ["services", "api", "restart"],
+    ]);
+  });
+
+  test("a tag in an inline merge mapping counts at the service that merges it", () => {
+    const content = `
+services:
+  web:
+    <<: {restart: !reset null, deploy: !override {replicas: 1}}
+    image: app:1.0
+`;
+
+    expect(readComposeFile(content, "compose.override.yaml")).toEqual({
+      document: {
+        services: { web: { deploy: { replicas: 1 }, image: "app:1.0" } },
+      },
+      replacedPaths: [
+        ["services", "web", "restart"],
+        ["services", "web", "deploy"],
+      ],
+    });
+  });
+
+  test("tagged values deep in a file count once each, not once per enclosing key", () => {
+    const depth = 20;
+
+    const keys = Array.from(
+      { length: depth },
+      (_, level) => `${"  ".repeat(level + 1)}l${level}:`
+    );
+
+    const resets = Array.from(
+      { length: 5001 },
+      (_, index) => `${"  ".repeat(depth + 1)}K${index}: !reset`
+    );
+
+    const { replacedPaths } = readComposeFile(
+      [
+        "services:",
+        "  web:",
+        "    image: app:1.0",
+        "x-deep:",
+        ...keys,
+        ...resets,
+      ].join("\n"),
+      "compose.override.yaml"
+    );
+
+    expect(replacedPaths).toHaveLength(5001);
+  });
+
+  test("a tower of aliases over tagged values is refused quickly", () => {
+    const levels = Array.from(
+      { length: 24 },
+      (_, index) =>
+        `x${index + 1}: &a${index + 1} {p: *a${index}, q: *a${index}}`
+    );
+
+    const content = [
+      "x0: &a0 {r: !reset 1, s: !override 2}",
+      ...levels,
+      "services:\n  web:\n    image: nginx:1.27.3\n    v: *a24",
+    ].join("\n");
+
+    const start = performance.now();
+
+    expect(() => readComposeFile(content, "compose.yaml")).toThrow(ParseError);
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 
   test("should parse compose yml content", () => {

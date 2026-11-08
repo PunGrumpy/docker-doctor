@@ -5,7 +5,7 @@ import {
   isComposeString,
 } from "../parsers/compose-value";
 import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
-import type { ComposeRule, Diagnostic } from "../types/index";
+import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
 import { composeServices } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
@@ -78,12 +78,42 @@ export const requireResourceLimits: ComposeRule = {
   message: "Define resource limits for services",
 };
 
+// The services some service waits on to finish (`condition:
+// service_completed_successfully`). They are one-shot jobs, and a restart
+// policy such as `restart: always` would run them again forever.
+const oneShotServices = (project: ComposeValue): Set<string> => {
+  const oneShot = new Set<string>();
+
+  for (const [, config] of composeServices(project)) {
+    const { depends_on: dependsOn } = config;
+
+    if (!isComposeMapping(dependsOn)) {
+      continue;
+    }
+
+    for (const [dependency, spec] of Object.entries(dependsOn)) {
+      if (
+        composeField(spec, "condition") === "service_completed_successfully"
+      ) {
+        oneShot.add(dependency);
+      }
+    }
+  }
+
+  return oneShot;
+};
+
 export const requireRestartPolicy: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
+    const oneShot = oneShotServices(context?.project ?? composeContent);
 
     for (const [name, config] of composeServices(composeContent)) {
+      if (oneShot.has(name)) {
+        continue;
+      }
+
       const hasRestart = "restart" in config;
 
       const hasDeployRestart =
@@ -106,7 +136,7 @@ export const requireRestartPolicy: ComposeRule = {
     return diagnostics;
   },
   defaultSeverity: "warning",
-  help: "Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot.",
+  help: "Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot. A one-shot job that another service waits on with `condition: service_completed_successfully` is exempt.",
   key: "docker-doctor/require-restart-policy",
   message: "Set restart policy for services",
 };

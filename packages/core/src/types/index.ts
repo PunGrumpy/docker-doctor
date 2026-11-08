@@ -121,7 +121,12 @@ export interface ComposeRule extends RuleDefinition {
   check: (
     composeContent: ComposeValue,
     file: string,
-    context?: { locate?: ComposeLocator }
+    context?: {
+      locate?: ComposeLocator;
+      // The whole project when `composeContent` holds only some of its
+      // services, as for a base file merged with its override.
+      project?: ComposeValue;
+    }
   ) => Diagnostic[];
 }
 

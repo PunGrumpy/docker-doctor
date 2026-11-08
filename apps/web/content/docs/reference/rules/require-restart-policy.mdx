@@ -29,7 +29,7 @@ Crashes are normal operation: OOM kills, unhandled exceptions, dropped database 
 
 ## How to fix it
 
-Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot.
+Define `restart: always` or `restart: unless-stopped` (or `deploy.restart_policy`) so services restart on crashes or host reboot. A one-shot job that another service waits on with `condition: service_completed_successfully` is exempt.
 
 ```yaml title="compose.yaml — restarts on crash and after reboot"
 services:
@@ -39,6 +39,10 @@ services:
 ```
 
 `on-failure[:max-retries]` restarts only on non-zero exits, useful for one-shot jobs that should retry a bounded number of times. Restart policies handle a _dead_ process; they can't see a process that's alive but broken — pair them with a [HEALTHCHECK](/docs/reference/rules/require-healthcheck) so unhealthy states are visible too. Docker restarts with exponential backoff, so a crash-looping service won't peg the host.
+
+A service that another service names under `depends_on` with `condition: service_completed_successfully` is a one-shot job, such as a database migration or a bucket setup. The rule skips it, because `restart: always` would run the job again every time it finishes. Give such a job `restart: on-failure` if it should retry, or nothing. A service under `profiles:` is optional, not one-shot, so it is still checked.
+
+Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`), this rule judges each service after the override merges over the base, the way `docker compose` does without `-f`. A setting in either file counts. When the base sets one and the override takes it away with `!reset` or `!override`, the finding lands on the override at that tag, because only the override can give it back. Any other finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. Files passed with `-f`, `extends` and `include` are not followed.
 
 ## Rule details
 

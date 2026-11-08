@@ -46,6 +46,10 @@ services:
 
 The service-level `mem_limit`, `cpus`, and `cpu_quota` keys are the older spelling of the same limits and satisfy the rule too.
 
+A one-shot job, such as a migration that another service waits on with `condition: service_completed_successfully`, still needs a limit. Only [require-restart-policy](/docs/reference/rules/require-restart-policy) exempts it.
+
+Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`), this rule judges each service after the override merges over the base, the way `docker compose` does without `-f`. A setting in either file counts. When the base sets one and the override takes it away with `!reset` or `!override`, the finding lands on the override at that tag, because only the override can give it back. Any other finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. Files passed with `-f`, `extends` and `include` are not followed.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/require-resource-limits`

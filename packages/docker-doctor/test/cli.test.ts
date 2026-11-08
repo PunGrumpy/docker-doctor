@@ -209,6 +209,80 @@ describe("Compose merge tags", () => {
   });
 });
 
+describe("Compose override files", () => {
+  test("judges the service Compose runs from the base and its override", async () => {
+    const { exitCode, stderr, stdout } = await runCli([
+      fixture("compose-override"),
+      "--json",
+    ]);
+
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+
+    // web takes its limits and restart policy from compose.yaml. Only
+    // adminer, which compose.override.yaml alone defines, lacks them.
+    const report = parseReport(stdout);
+    expect(
+      report.diagnostics.map((d) => `${d.file}:${d.line}:${d.rule}`)
+    ).toEqual([
+      "compose.override.yaml:5:docker-doctor/require-resource-limits",
+      "compose.override.yaml:5:docker-doctor/require-restart-policy",
+    ]);
+  });
+
+  test("reports a setting the override resets on the override, at the reset", async () => {
+    const { stdout } = await runCli([
+      fixture("compose-override-reset"),
+      "--json",
+    ]);
+
+    // compose.yaml already sets the restart policy, so only the override
+    // can give it back.
+    const report = parseReport(stdout);
+    expect(
+      report.diagnostics.map((d) => `${d.file}:${d.line}:${d.rule}`)
+    ).toEqual(["compose.override.yaml:3:docker-doctor/require-restart-policy"]);
+  });
+
+  test("reports an undefined model in the override, at the reference", async () => {
+    const { stdout } = await runCli([
+      fixture("compose-override-model"),
+      "--json",
+    ]);
+
+    const report = parseReport(stdout);
+    expect(
+      report.diagnostics
+        .filter((d) => d.rule === "docker-doctor/undefined-model-reference")
+        .map((d) => `${d.file}:${d.line}`)
+    ).toEqual(["compose.override.yaml:4"]);
+  });
+
+  test("warns on stderr when a directory holds several override names", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-overrides-"));
+
+    try {
+      const service = "services:\n  web:\n    image: nginx:1.27\n";
+
+      for (const name of [
+        "compose.yaml",
+        "compose.override.yaml",
+        "docker-compose.override.yml",
+      ]) {
+        fs.writeFileSync(path.join(root, name), service);
+      }
+
+      const { stderr, stdout } = await runCli([root, "--json"]);
+
+      expect(stderr).toContain("Warning: Found several Compose override files");
+      expect(stderr).toContain("Compose uses compose.override.yaml");
+      expect(parseReport(stdout).failures).toEqual([]);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("unreadable directories", () => {
   // chmod 000 does not stop root, and Windows has no POSIX modes.
   const canTestPermissions =

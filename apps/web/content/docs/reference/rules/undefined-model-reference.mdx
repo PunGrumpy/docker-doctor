@@ -51,6 +51,8 @@ models:
 
 The binding is how connection details reach your app: Compose starts the declared model via Model Runner and injects its URL and identifier into the service's environment, using either the default variables or the names you chose with `endpoint_var`/`model_var`. That's also why this error can surface confusingly late: the symptom is an agent failing to reach its endpoint at startup, several layers away from the one-word mismatch in the compose file. The rule intentionally has no opinion in the other direction; a declared model that no service references yet is fine.
 
+Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`), a model that either file declares satisfies a reference in the other, the way `docker compose` resolves them without `-f`. A finding lands in the file that writes the reference, at its line. Files passed with `-f`, `extends` and `include` are not followed.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/undefined-model-reference`
