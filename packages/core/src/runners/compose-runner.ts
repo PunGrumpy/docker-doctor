@@ -19,17 +19,20 @@ interface RuleSettings {
   categoriesConfig?: Record<string, RuleSeverity>;
 }
 
-// What one rule reads for one file: the services to judge, and the project
-// they belong to when that is more than the file.
+// What one rule reads for one file: the services to judge, the locator for
+// their lines, and the project they belong to when that is more than the
+// file.
 interface RuleInput {
   content: ComposeValue;
+  locate?: ComposeLocator;
   project?: ComposeValue;
 }
 
+type InputFor = (rule: ComposeRule) => RuleInput;
+
 const applyRules = (
   file: string,
-  inputFor: (rule: ComposeRule) => RuleInput,
-  locate: ComposeLocator | undefined,
+  inputFor: InputFor,
   { rulesConfig, categoriesConfig }: RuleSettings
 ): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
@@ -41,7 +44,7 @@ const applyRules = (
       continue;
     }
 
-    const { content, project } = inputFor(rule);
+    const { content, locate, project } = inputFor(rule);
     const ruleDiagnostics = rule.check(content, file, { locate, project });
 
     for (const diag of ruleDiagnostics) {
@@ -71,18 +74,23 @@ export const runComposeRules = (
     return [];
   }
 
-  return applyRules(file, () => ({ content: composeContent }), locate, {
+  return applyRules(file, () => ({ content: composeContent, locate }), {
     categoriesConfig,
     rulesConfig,
   });
 };
 
 // The rules that report a setting a service lacks. Compose runs a base file
-// merged with its override, so these judge the merged service. Every other
-// Compose rule reports a risky line and judges each file on its own.
+// merged with its override, so these judge the merged service.
 const EFFECTIVE_SERVICE_RULES: ReadonlySet<ComposeRule> = new Set([
   requireResourceLimits,
   requireRestartPolicy,
+]);
+
+// The rules that report a name a file writes. They judge each file's own
+// lines but look the name up in the merged project, where a model the base
+// declares can serve a reference in the override.
+const PROJECT_LOOKUP_RULES: ReadonlySet<ComposeRule> = new Set([
   undefinedModelReference,
 ]);
 
@@ -93,6 +101,11 @@ export interface ComposeSource {
   locate?: ComposeLocator;
 }
 
+const ownInput = ({ compose, locate }: ComposeSource): RuleInput => ({
+  content: compose.document,
+  locate,
+});
+
 const servicesNamed = (
   project: ComposeValue,
   keep: (name: string) => boolean
@@ -102,15 +115,39 @@ const servicesNamed = (
   ),
 });
 
-// For each paired file, the merged services it answers for. The base answers
-// for every service it defines, because that is where a user adds a missing
-// setting. The override answers for the services only it defines.
-const effectiveInputs = (
+// What each rule reads for one file of a pair. `answersFor` names the merged
+// services whose missing settings this file reports.
+const pairedInput =
+  (
+    source: ComposeSource,
+    project: ComposeValue,
+    answersFor: (name: string) => boolean
+  ): InputFor =>
+  (rule) => {
+    if (EFFECTIVE_SERVICE_RULES.has(rule)) {
+      return {
+        content: servicesNamed(project, answersFor),
+        locate: source.locate,
+        project,
+      };
+    }
+
+    if (PROJECT_LOOKUP_RULES.has(rule)) {
+      return { ...ownInput(source), project };
+    }
+
+    return ownInput(source);
+  };
+
+// What each rule reads for each paired file. The base answers for the
+// missing settings of every service it defines, because that is where a
+// user adds one. The override answers for the services only it defines.
+const pairedInputs = (
   sources: readonly ComposeSource[],
   onWarning?: (message: string) => void
-): Map<string, RuleInput> => {
+): Map<string, InputFor> => {
   const byFile = new Map(sources.map((source) => [source.file, source]));
-  const inputs = new Map<string, RuleInput>();
+  const inputs = new Map<string, InputFor>();
 
   for (const { base, override } of pairComposeFiles(
     sources.map((source) => source.file),
@@ -129,14 +166,14 @@ const effectiveInputs = (
       composeServices(baseSource.compose.document).map(([name]) => name)
     );
 
-    inputs.set(base, {
-      content: servicesNamed(project, (name) => inBase.has(name)),
-      project,
-    });
-    inputs.set(override, {
-      content: servicesNamed(project, (name) => !inBase.has(name)),
-      project,
-    });
+    inputs.set(
+      base,
+      pairedInput(baseSource, project, (name) => inBase.has(name))
+    );
+    inputs.set(
+      override,
+      pairedInput(overrideSource, project, (name) => !inBase.has(name))
+    );
   }
 
   return inputs;
@@ -154,23 +191,18 @@ export const runComposeFiles = (
   settings: RuleSettings = {},
   onWarning?: (message: string) => void
 ): Map<string, Diagnostic[]> => {
-  const effective = effectiveInputs(sources, onWarning);
+  const paired = pairedInputs(sources, onWarning);
   const results = new Map<string, Diagnostic[]>();
 
-  for (const { file, compose, locate } of sources) {
-    const own: RuleInput = { content: compose.document };
-    const merged = effective.get(file);
+  for (const source of sources) {
+    const own = ownInput(source);
 
     results.set(
-      file,
-      isAnalyzableCompose(compose.document)
+      source.file,
+      isAnalyzableCompose(source.compose.document)
         ? applyRules(
-            file,
-            (rule) =>
-              merged !== undefined && EFFECTIVE_SERVICE_RULES.has(rule)
-                ? merged
-                : own,
-            locate,
+            source.file,
+            paired.get(source.file) ?? (() => own),
             settings
           )
         : []

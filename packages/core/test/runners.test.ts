@@ -533,8 +533,58 @@ services:
       ),
     ]);
 
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/undefined-model-reference:3",
+    ]);
+  });
+
+  test("an undefined model the override references is reported on the override, at the reference", () => {
+    const results = runComposeFiles([
+      source(
+        "compose.yaml",
+        "services:\n  agent:\n    image: busybox:1.36\n    restart: always\n    mem_limit: 64m\n"
+      ),
+      source(
+        "compose.override.yaml",
+        "services:\n  agent:\n    models:\n      - nope\n"
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/undefined-model-reference:4",
+    ]);
+  });
+
+  test("an undefined model the base references keeps its line when the override adds another", () => {
+    const results = runComposeFiles([
+      source(
+        "compose.yaml",
+        `services:
+  agent:
+    image: busybox:1.36
+    restart: always
+    mem_limit: 1g
+    models:
+      - llm
+`
+      ),
+      source(
+        "compose.override.yaml",
+        `models:
+  other:
+    model: ai/smollm2:360M-Q4_K_M
+services:
+  agent:
+    models:
+      - other
+`
+      ),
+    ]);
+
     expect(findingsOf(results, "compose.yaml")).toEqual([
-      "docker-doctor/undefined-model-reference:5",
+      "docker-doctor/undefined-model-reference:7",
     ]);
     expect(findingsOf(results, "compose.override.yaml")).toEqual([]);
   });

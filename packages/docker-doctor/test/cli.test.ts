@@ -230,6 +230,20 @@ describe("Compose override files", () => {
     ]);
   });
 
+  test("reports an undefined model in the override, at the reference", async () => {
+    const { stdout } = await runCli([
+      fixture("compose-override-model"),
+      "--json",
+    ]);
+
+    const report = parseReport(stdout);
+    expect(
+      report.diagnostics
+        .filter((d) => d.rule === "docker-doctor/undefined-model-reference")
+        .map((d) => `${d.file}:${d.line}`)
+    ).toEqual(["compose.override.yaml:4"]);
+  });
+
   test("warns on stderr when a directory holds several override names", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-overrides-"));
 

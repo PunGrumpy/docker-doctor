@@ -44,10 +44,17 @@ const APT_CLEAN_LAYER =
 const NODE_APP_AS_ROOT =
   'FROM node:22-slim\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["node", "server.js"]';
 
+const OVERRIDE_PAIRING =
+  "Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`),";
+
+const NOT_FOLLOWED =
+  "Files passed with `-f`, `extends` and `include` are not followed.";
+
 // Shared by the rules that report a setting a service lacks, which judge the
 // service after its override merges in.
-const OVERRIDE_PAIRING_NOTE =
-  "Compose runs a base file merged with its override. When a directory holds a base file (`compose.yaml`, `compose.yml`, `docker-compose.yml` or `docker-compose.yaml`) and an override (`compose.override.yml`, `compose.override.yaml`, `docker-compose.override.yml` or `docker-compose.override.yaml`), this rule judges each service after the override merges over the base, the way `docker compose` does without `-f`. A setting in either file counts, and `!reset` in the override removes one the base set. A finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. Files passed with `-f`, `extends` and `include` are not followed.";
+const OVERRIDE_PAIRING_NOTE = `${OVERRIDE_PAIRING} this rule judges each service after the override merges over the base, the way \`docker compose\` does without \`-f\`. A setting in either file counts, and \`!reset\` in the override removes one the base set. A finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. ${NOT_FOLLOWED}`;
+
+const MODEL_PAIRING_NOTE = `${OVERRIDE_PAIRING} a model that either file declares satisfies a reference in the other, the way \`docker compose\` resolves them without \`-f\`. A finding lands in the file that writes the reference, at its line. ${NOT_FOLLOWED}`;
 
 export const rulePageContent: RulePages = {
   "docker-doctor/absolute-workdir": {
@@ -696,7 +703,7 @@ export const rulePageContent: RulePages = {
       "With Docker Model Runner, a service consumes a model in two steps: the top-level `models:` element declares it under a name and maps it to an OCI artifact, and the service's own `models:` section references that name, either as a plain list or as a map with `endpoint_var`/`model_var` bindings. The names must match exactly. A typo, or a model renamed in one place but not the other, leaves a reference with nothing to resolve to. This rule flags every service-level model reference that no top-level declaration satisfies.",
     notes: [
       "The binding is how connection details reach your app: Compose starts the declared model via Model Runner and injects its URL and identifier into the service's environment, using either the default variables or the names you chose with `endpoint_var`/`model_var`. That's also why this error can surface confusingly late: the symptom is an agent failing to reach its endpoint at startup, several layers away from the one-word mismatch in the compose file. The rule intentionally has no opinion in the other direction; a declared model that no service references yet is fine.",
-      OVERRIDE_PAIRING_NOTE,
+      MODEL_PAIRING_NOTE,
     ].join("\n\n"),
     why: "This is a hard error caught cheap. The mismatch is invisible to a YAML syntax check, because both sections are individually valid. At runtime it appears as environment variables that were never injected, which reads like an app bug, not a compose bug. A linter comparing the two name sets finds it before anything is pulled or started, which is exactly the class of cross-reference mistake static analysis exists for.",
   },
