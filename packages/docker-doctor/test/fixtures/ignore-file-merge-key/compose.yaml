@@ -1,0 +1,7 @@
+# docker-doctor-ignore-file no-privileged-service -- the shared base is privileged on purpose
+x-common: &common
+  privileged: true
+services:
+  a:
+    <<: *common
+    image: redis:7

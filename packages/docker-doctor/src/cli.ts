@@ -8,10 +8,13 @@ import { setTimeout } from "node:timers/promises";
 import type {
   Diagnostic,
   DockerDoctorConfig,
+  FileIgnores,
+  IgnoreFileWarning,
   JsonReport,
   ProjectInfo,
   RuleSeverity,
   ScoreResult,
+  SuppressedDiagnostic,
 } from "@docker-doctor/core";
 import {
   discoverProject,
@@ -19,12 +22,15 @@ import {
   parseDockerfileDirectives,
   createComposeLocator,
   parseCompose,
+  readComposeIgnores,
+  readDockerfileIgnores,
   runDockerfileRules,
   runComposeRules,
+  applyIgnores,
   calculateScore,
   loadConfig,
   allRules,
-  findRule,
+  findRuleByName,
   isAnalyzableCompose,
   isAnalyzableDockerfile,
   toJsonReport,
@@ -52,6 +58,7 @@ import {
   AGENT_BINARIES,
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
+import { sanitizePath } from "./agents/sanitize";
 import {
   getSkillSourceDirectory,
   installSkillForAgents,
@@ -534,12 +541,16 @@ interface FileResult {
   analyzed: boolean;
   diagnostics: Diagnostic[];
   failure?: ScanFailure;
+  file: string;
+  // Only files whose ignore comments were read, so never under --no-config.
+  ignores?: FileIgnores;
 }
 
 interface RulesEngineResult {
   analyzedFileCount: number;
   diagnostics: Diagnostic[];
   failures: ScanFailure[];
+  ignores: Map<string, FileIgnores>;
 }
 
 // The files are read in parallel and finish in any order. Collecting the
@@ -550,10 +561,15 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
     analyzedFileCount: 0,
     diagnostics: [],
     failures: [],
+    ignores: new Map(),
   };
 
   for (const result of results) {
     summary.diagnostics.push(...result.diagnostics);
+
+    if (result.ignores) {
+      summary.ignores.set(result.file, result.ignores);
+    }
 
     if (result.failure) {
       summary.failures.push(result.failure);
@@ -567,6 +583,15 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
   return summary;
 };
 
+// Stderr, like the config warnings, so --json and --score stay parseable.
+const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
+  for (const { file, line, message } of warnings) {
+    // The path comes from the scanned tree, so it is flattened like the
+    // message before it reaches stderr.
+    console.error(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
+  }
+};
+
 const runRulesEngine = async (
   rootDir: string,
   project: { dockerfiles: string[]; composeFiles: string[] },
@@ -575,7 +600,8 @@ const runRulesEngine = async (
   projectFilesList: string[],
   fileContents: Record<string, string>,
   options: { score?: boolean; json?: boolean },
-  setStatus: (text: string) => void
+  setStatus: (text: string) => void,
+  readIgnores: boolean
 ): Promise<RulesEngineResult> => {
   const isSilent = options.score === true || options.json === true;
 
@@ -603,6 +629,10 @@ const runRulesEngine = async (
             categoriesConfig,
             parseDockerfileDirectives(content)
           ),
+          file: df,
+          ignores: readIgnores
+            ? readDockerfileIgnores(content, instructions)
+            : undefined,
         };
       } catch (error: unknown) {
         // A file we could not read or parse has not been checked. The
@@ -614,6 +644,7 @@ const runRulesEngine = async (
           analyzed: false,
           diagnostics: [],
           failure: { file: df, message: msg },
+          file: df,
         };
       }
     })
@@ -642,6 +673,8 @@ const runRulesEngine = async (
             categoriesConfig,
             createComposeLocator(content)
           ),
+          file: cf,
+          ignores: readIgnores ? readComposeIgnores(content) : undefined,
         };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -651,6 +684,7 @@ const runRulesEngine = async (
           analyzed: false,
           diagnostics: [],
           failure: { file: cf, message: msg },
+          file: cf,
         };
       }
     })
@@ -757,6 +791,7 @@ interface ScanOutcome {
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
+  suppressed: SuppressedDiagnostic[];
 }
 
 interface OutputOptions {
@@ -787,7 +822,8 @@ const writeTerminalReport = async (
     project,
     verbose,
     fileContents,
-    failures.length
+    failures.length,
+    scan.suppressed
   );
 
   let wizardOk = true;
@@ -802,7 +838,8 @@ const writeTerminalReport = async (
         label,
         project,
         failures,
-        scan.analyzedFileCount
+        scan.analyzedFileCount,
+        scan.suppressed
       ),
       rootDir,
     });
@@ -833,7 +870,8 @@ const writeMachineReport = (
     label,
     scan.project,
     scan.failures,
-    scan.analyzedFileCount
+    scan.analyzedFileCount,
+    scan.suppressed
   );
 
   console.log(JSON.stringify(report, null, 2));
@@ -988,7 +1026,7 @@ program
   .option("-c, --config <path>", "custom config file path")
   .option(
     "--no-config",
-    "ignore config files and use the defaults, for repositories you did not write"
+    "ignore config files and inline ignore comments and use the defaults, for repositories you did not write"
   )
   .action(async (dir: string, options: ScanOptions) => {
     const isSilent = options.score || options.json;
@@ -1098,17 +1136,28 @@ program
         const scannedFileCount =
           project.dockerfiles.length + project.composeFiles.length;
 
-        const { analyzedFileCount, diagnostics, failures } =
-          await runRulesEngine(
-            rootDir,
-            project,
-            config.rules,
-            config.categories,
-            projectFilesList,
-            fileContents,
-            options,
-            setStatus
-          );
+        const engine = await runRulesEngine(
+          rootDir,
+          project,
+          config.rules,
+          config.categories,
+          projectFilesList,
+          fileContents,
+          options,
+          setStatus,
+          // An ignore comment is as author-controlled as a config file, so
+          // --no-config turns both off.
+          options.config !== false
+        );
+
+        const { analyzedFileCount, failures } = engine;
+
+        const { diagnostics, suppressed, warnings } = applyIgnores(
+          engine.diagnostics,
+          engine.ignores
+        );
+
+        printIgnoreWarnings(warnings);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const concurrency = os.cpus().length;
@@ -1135,6 +1184,7 @@ program
             project,
             rootDir,
             scannedFileCount,
+            suppressed,
           },
           options
         );
@@ -1299,7 +1349,7 @@ rules
   .command("explain <rule>")
   .description("explain a specific rule in detail")
   .action((ruleKey: string) => {
-    const rule = findRule(ruleKey) ?? findRule(`docker-doctor/${ruleKey}`);
+    const rule = findRuleByName(ruleKey);
 
     if (!rule) {
       console.error(`Rule '${ruleKey}' not found.`);

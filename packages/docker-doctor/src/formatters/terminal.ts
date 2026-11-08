@@ -4,10 +4,12 @@ import type {
   Diagnostic,
   ProjectInfo,
   RuleCategory,
+  SuppressedDiagnostic,
 } from "@docker-doctor/core";
 import { findRule, redactSecrets } from "@docker-doctor/core";
 import chalk from "chalk";
 
+import { sanitizeMessage } from "../agents/sanitize";
 import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
 import { hasText } from "../text";
 
@@ -205,6 +207,36 @@ const printDiagnostics = (
   printDiagnosticsByFile(diagnostics, fileContents);
 };
 
+const printSuppressed = (
+  suppressed: SuppressedDiagnostic[],
+  verbose: boolean
+): void => {
+  if (suppressed.length === 0) {
+    return;
+  }
+
+  const summary =
+    suppressed.length === 1
+      ? "1 finding suppressed by an ignore comment"
+      : `${suppressed.length} findings suppressed by ignore comments`;
+
+  console.log(`\n  ${chalk.bold(summary)}`);
+
+  if (!verbose) {
+    return;
+  }
+
+  for (const d of suppressed) {
+    const location = isLineNumber(d.line) ? `${d.file}:${d.line}` : d.file;
+
+    const reason = hasText(d.reason)
+      ? `  ${chalk.dim(sanitizeMessage(d.reason))}`
+      : "";
+
+    console.log(`    ${chalk.cyan(d.rule)}  ${location}${reason}`);
+  }
+};
+
 const getWhaleMascot = (
   score: number,
   border: (text: string) => string
@@ -364,7 +396,8 @@ export const formatTerminal = async (
   project: ProjectInfo,
   verbose = false,
   fileContents: Record<string, string> = {},
-  failedFileCount = 0
+  failedFileCount = 0,
+  suppressed: SuppressedDiagnostic[] = []
 ): Promise<void> => {
   if (verbose) {
     console.log(`\n${chalk.bold("Docker Doctor Diagnostics")}`);
@@ -403,6 +436,8 @@ export const formatTerminal = async (
     categoryIssueCounts,
     failedFileCount
   );
+
+  printSuppressed(suppressed, verbose);
 
   await printScoreBox(
     score,

@@ -38,7 +38,12 @@ ignore:
     - "examples/**"
 ```
 
-docker-doctor has no inline ignore comments.
+To silence one finding and keep the rule on everywhere else, write an [inline ignore comment](/docs/reference/configuration#inline-ignore-comments) at the line it points to. The report still lists the finding under `suppressed`, and it counts toward neither the score nor the exit code. The comment covers every finding of that rule on that instruction, so keep a placeholder and a real value on separate instructions when only one of them should be ignored.
+
+```dockerfile
+# docker-doctor-ignore no-secrets-in-env -- local-only placeholder, never deployed
+ENV DB_PASSWORD=hunter2
+```
 
 ## Will it fail my build?
 

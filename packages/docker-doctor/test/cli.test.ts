@@ -285,15 +285,16 @@ describe("--json contract", () => {
         "project",
         "schemaVersion",
         "score",
+        "suppressed",
         "timestamp",
       ].toSorted()
     );
   });
 
-  test("schemaVersion is 6 and analyzedFiles counts the scanned files", async () => {
+  test("schemaVersion is 7 and analyzedFiles counts the scanned files", async () => {
     const { stdout } = await runCli([fixture("multi-file"), "--json"]);
     const report = parseReport(stdout);
-    expect(report.schemaVersion).toBe(6);
+    expect(report.schemaVersion).toBe(7);
     expect(report.analyzedFiles).toBe(2);
   });
 
@@ -1116,4 +1117,345 @@ describe("install", () => {
       cleanup();
     }
   });
+});
+
+// Each test starts the built CLI one or more times, and the pre-commit hook
+// runs on a busy machine.
+const IGNORE_TEST_TIMEOUT_MS = 30_000;
+const IGNORE_COMMENT = "docker-doctor-ignore";
+
+const withProject = async (
+  files: Record<string, string>,
+  run: (root: string) => Promise<void>
+) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-ignore-"));
+
+  try {
+    for (const [name, source] of Object.entries(files)) {
+      fs.writeFileSync(path.join(root, name), source);
+    }
+
+    await run(root);
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
+  }
+};
+
+// The fixture as it was before anyone wrote an ignore comment.
+const withoutIgnoreComments = async (
+  name: string,
+  run: (root: string) => Promise<void>
+) => {
+  const files: Record<string, string> = {};
+
+  for (const file of fs.readdirSync(fixture(name))) {
+    const source = fs.readFileSync(path.join(fixture(name), file), "utf-8");
+
+    files[file] = source
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith(`# ${IGNORE_COMMENT}`))
+      .map((line) => line.replace(/ # docker-doctor-ignore.*$/u, ""))
+      .join("\n");
+  }
+
+  await withProject(files, run);
+};
+
+const scanJson = async (dir: string, ...flags: string[]) => {
+  const { exitCode, stderr, stdout } = await runCli([dir, "--json", ...flags]);
+
+  return { exitCode, report: parseReport(stdout), stderr };
+};
+
+const rulesIn = (entries: { rule: string }[]): string[] =>
+  entries.map(({ rule }) => rule);
+
+describe("inline ignore comments", () => {
+  const SECRETS = "docker-doctor/no-secrets-in-env";
+  const LABELS = "docker-doctor/require-labels";
+  const ROOT = "docker-doctor/no-root-user";
+  const PRIVILEGED = "docker-doctor/no-privileged-service";
+
+  test(
+    "a Dockerfile finding is live before the comment and suppressed after",
+    async () => {
+      await withoutIgnoreComments("ignore-dockerfile", async (root) => {
+        const before = await scanJson(root);
+
+        expect(rulesIn(before.report.diagnostics)).toContain(SECRETS);
+        expect(rulesIn(before.report.diagnostics)).toContain(LABELS);
+        expect(rulesIn(before.report.diagnostics)).toContain(ROOT);
+        expect(before.report.suppressed).toEqual([]);
+        expect(before.exitCode).toBe(1);
+      });
+
+      const after = await scanJson(fixture("ignore-dockerfile"));
+
+      expect(rulesIn(after.report.diagnostics)).toEqual([]);
+      expect(
+        Object.fromEntries(
+          after.report.suppressed.map(({ reason, rule }) => [rule, reason])
+        )
+      ).toEqual({
+        [LABELS]: "labels come from the build pipeline",
+        [ROOT]: "the platform runs the image with --user",
+        [SECRETS]: "local-only placeholder, never deployed",
+      });
+      expect(
+        after.report.suppressed.find(({ rule }) => rule === SECRETS)
+      ).toMatchObject({
+        category: "Security",
+        file: "Dockerfile",
+        line: 6,
+        severity: "error",
+      });
+      expect(after.stderr).toBe("");
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a suppressed finding counts toward neither the score nor the exit code",
+    async () => {
+      let scoreBefore = 0;
+      let exitBefore = 0;
+
+      await withoutIgnoreComments("ignore-dockerfile", async (root) => {
+        const before = await scanJson(root);
+        scoreBefore = before.report.score ?? 0;
+        exitBefore = before.exitCode;
+      });
+
+      const after = await scanJson(fixture("ignore-dockerfile"));
+
+      expect(exitBefore).toBe(1);
+      expect(after.exitCode).toBe(0);
+      expect(after.report.score).toBe(100);
+      expect(scoreBefore).toBeLessThan(100);
+
+      const { stdout } = await runCli([
+        fixture("ignore-dockerfile"),
+        "--score",
+      ]);
+
+      expect(stdout.trim()).toBe("100");
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "--no-config brings the finding back and reads no comment",
+    async () => {
+      const { exitCode, report, stderr } = await scanJson(
+        fixture("ignore-dockerfile"),
+        "--no-config"
+      );
+
+      expect(exitCode).toBe(1);
+      expect(rulesIn(report.diagnostics)).toContain(SECRETS);
+      expect(report.suppressed).toEqual([]);
+      expect(stderr).toBe("");
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a comment above the instruction a finding is reported on is the one that counts",
+    async () => {
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore no-root-user\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report } = await scanJson(root);
+
+          expect(rulesIn(report.suppressed)).toEqual([ROOT]);
+        }
+      );
+
+      await withProject(
+        {
+          Dockerfile: `FROM node:22.2.0-alpine\nCOPY . .\n# docker-doctor-ignore no-root-user\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report } = await scanJson(root);
+
+          expect(rulesIn(report.diagnostics)).toContain(ROOT);
+          expect(report.suppressed).toEqual([]);
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a Compose comment on the line of the finding suppresses it",
+    async () => {
+      await withoutIgnoreComments("ignore-compose", async (root) => {
+        const before = await scanJson(root);
+
+        expect(rulesIn(before.report.diagnostics)).toContain(PRIVILEGED);
+        expect(before.exitCode).toBe(1);
+      });
+
+      const after = await scanJson(fixture("ignore-compose"));
+
+      expect(rulesIn(after.report.diagnostics)).not.toContain(PRIVILEGED);
+      expect(after.report.suppressed).toHaveLength(1);
+      expect(after.report.suppressed[0]).toMatchObject({
+        file: "compose.yaml",
+        line: 4,
+        reason: "builds nested containers in CI",
+        rule: PRIVILEGED,
+      });
+      expect(after.exitCode).toBe(0);
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a finding with no line takes the file form",
+    async () => {
+      await withoutIgnoreComments("ignore-file-merge-key", async (root) => {
+        const before = await scanJson(root);
+
+        const finding = before.report.diagnostics.find(
+          ({ rule }) => rule === PRIVILEGED
+        );
+
+        expect(finding).toBeDefined();
+        expect(finding?.line).toBeUndefined();
+        expect(before.exitCode).toBe(1);
+      });
+
+      const after = await scanJson(fixture("ignore-file-merge-key"));
+
+      expect(rulesIn(after.report.diagnostics)).not.toContain(PRIVILEGED);
+      expect(rulesIn(after.report.suppressed)).toEqual([PRIVILEGED]);
+      expect(after.report.suppressed[0]?.line).toBeUndefined();
+      expect(after.exitCode).toBe(0);
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "an unknown rule name warns with file and line, and valid names still apply",
+    async () => {
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore no-root-user, no-such-rule\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { exitCode, report, stderr } = await scanJson(root);
+
+          expect(rulesIn(report.suppressed)).toEqual([ROOT]);
+          expect(stderr).toContain(
+            'Warning: Dockerfile:1: unknown rule "no-such-rule"'
+          );
+          expect(exitCode).toBe(0);
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a comment with no rule name warns and suppresses nothing",
+    async () => {
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore -- just because\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report, stderr } = await scanJson(root);
+
+          expect(report.suppressed).toEqual([]);
+          expect(stderr).toContain("Warning: Dockerfile:1:");
+          expect(stderr).toContain("names no rule");
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a file comment above # syntax= warns and does nothing",
+    async () => {
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore-file require-labels\n# syntax=docker/dockerfile:1\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report, stderr } = await scanJson(root);
+
+          expect(report.suppressed).toEqual([]);
+          expect(rulesIn(report.diagnostics)).toContain(LABELS);
+          expect(stderr).toContain("Warning: Dockerfile:1:");
+          expect(stderr).toContain("syntax");
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "--no-config reads no comment, so it prints no comment warning",
+    async () => {
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore no-such-rule\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { stderr } = await scanJson(root, "--no-config");
+
+          expect(stderr).toBe("");
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a reason that holds a secret is masked in the report",
+    async () => {
+      const token = `ghp_${"a1".repeat(18)}`;
+
+      await withProject(
+        {
+          Dockerfile: `# docker-doctor-ignore no-root-user -- ${token}\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report } = await scanJson(root);
+
+          expect(report.suppressed[0]?.reason).not.toContain(token);
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
+
+  test(
+    "a comment in one file leaves the same finding in another file live",
+    async () => {
+      await withProject(
+        {
+          "a.dockerfile": `# docker-doctor-ignore-file require-labels\nFROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+          "b.dockerfile": `FROM node:22.2.0-alpine\nCMD ["node", "x.js"]\n`,
+        },
+        async (root) => {
+          const { report } = await scanJson(root);
+
+          expect(
+            report.diagnostics
+              .filter(({ rule }) => rule === LABELS)
+              .map(({ file }) => file)
+          ).toEqual(["b.dockerfile"]);
+          expect(report.suppressed.map(({ file }) => file)).toEqual([
+            "a.dockerfile",
+          ]);
+        }
+      );
+    },
+    IGNORE_TEST_TIMEOUT_MS
+  );
 });

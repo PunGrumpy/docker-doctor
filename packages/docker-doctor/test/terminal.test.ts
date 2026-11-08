@@ -1,4 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 // Characterization tests for the human-readable report. They assert stable
@@ -6,6 +8,11 @@ import path from "node:path";
 
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
+
+const TAINTED_REASON_TAIL = 1000;
+
+// The rule name, the location and a reason capped at 300 characters.
+const TERMINAL_LINE_BUDGET = 400;
 
 // CI disables the score animation; NO_COLOR and FORCE_COLOR=0 turn off chalk.
 const PLAIN_ENV = { CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
@@ -101,5 +108,61 @@ describe("terminal report", () => {
 
     expect(plain.stdout).not.toContain("\u001B");
     expect(verbose.stdout).not.toContain("\u001B");
+  });
+
+  test("a suppressed finding is counted in one line, and listed with its reason under --verbose", async () => {
+    const plain = await runPlain([fixture("ignore-dockerfile")]);
+
+    expect(plain.stdout).toContain("3 findings suppressed by ignore comments");
+    expect(plain.stdout).not.toContain("local-only placeholder");
+
+    const verbose = await runPlain([fixture("ignore-dockerfile"), "--verbose"]);
+
+    expect(verbose.stdout).toContain(
+      "3 findings suppressed by ignore comments"
+    );
+    expect(verbose.stdout).toMatch(
+      /docker-doctor\/no-secrets-in-env {2}Dockerfile:6 {2}local-only placeholder, never deployed/u
+    );
+    expect(verbose.stdout).toMatch(
+      /docker-doctor\/require-labels {2}Dockerfile:1 {2}labels come from the build pipeline/u
+    );
+  });
+
+  test("a suppressed reason is flattened and capped before it reaches the terminal", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-reason-"));
+
+    try {
+      fs.writeFileSync(
+        path.join(root, "Dockerfile"),
+        [
+          "FROM node:22.11.0-slim",
+          `# docker-doctor-ignore no-root-user -- see\u001B[31m red\r\u{E0041}${"x".repeat(TAINTED_REASON_TAIL)}`,
+          "USER root",
+          "",
+        ].join("\n")
+      );
+
+      const { stdout } = await runPlain([root, "--verbose"]);
+
+      const listed = stdout
+        .split("\n")
+        .find((line) => line.includes("docker-doctor/no-root-user"));
+
+      expect(listed).toContain("Dockerfile:3");
+      expect(listed).toContain("see [31m red");
+      expect(listed).not.toContain("\u001B");
+      expect(listed).not.toContain("\r");
+      expect(listed).not.toContain("\u{E0041}");
+      expect(listed?.length).toBeLessThan(TERMINAL_LINE_BUDGET);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("a scan with nothing suppressed prints no suppressed line", async () => {
+    const { stdout } = await runPlain([fixture("with-error")]);
+
+    expect(stdout).not.toContain("suppressed");
   });
 });

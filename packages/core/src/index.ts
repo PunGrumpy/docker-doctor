@@ -6,6 +6,16 @@ export { parseDockerfileDirectives } from "./parsers/dockerfile-directives";
 
 export { createComposeLocator, parseCompose } from "./parsers/compose-parser";
 
+export { readComposeIgnores } from "./parsers/compose-ignores";
+
+export { readDockerfileIgnores } from "./parsers/dockerfile-ignores";
+
+export {
+  applyIgnores,
+  type IgnoreFileWarning,
+  type IgnoreResult,
+} from "./runners/apply-ignores";
+
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 
 export { runComposeRules } from "./runners/compose-runner";
@@ -20,6 +30,7 @@ export {
   allDockerfileRules,
   allComposeRules,
   findRule,
+  findRuleByName,
 } from "./rules/index";
 
 export { defineConfig } from "./config/define-config";
@@ -57,12 +68,22 @@ export type {
   DockerfileDirectives,
   DockerfileInstruction,
   DockerfileRule,
+  FileIgnores,
+  IgnoreDirective,
+  IgnoreScope,
+  IgnoreWarning,
   ProjectInfo,
   RuleCategory,
   RuleDefinition,
   RuleSeverity,
+  SuppressedDiagnostic,
 } from "./types/index";
 
-export { toJsonReport, type JsonReport } from "./report";
+export {
+  toJsonReport,
+  type JsonReport,
+  type ReportDiagnostic,
+  type ReportSuppressed,
+} from "./report";
 
 export { redactSecrets } from "./rules/redact-secrets";

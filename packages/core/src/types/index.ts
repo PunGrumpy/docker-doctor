@@ -20,7 +20,31 @@ export interface Diagnostic {
   // Set by the runners from the owning rule; rules never fill it themselves.
   category?: RuleCategory;
   line?: number;
-  column?: number;
+}
+
+export interface SuppressedDiagnostic extends Diagnostic {
+  reason: string | null;
+}
+
+export type IgnoreScope = { kind: "file" } | { kind: "line"; line: number };
+
+export interface IgnoreDirective {
+  // Rule names as written in the comment, before they are resolved.
+  names: string[];
+  reason: string | null;
+  // The line of the comment itself.
+  line: number;
+  scope: IgnoreScope;
+}
+
+export interface IgnoreWarning {
+  line: number;
+  message: string;
+}
+
+export interface FileIgnores {
+  directives: IgnoreDirective[];
+  warnings: IgnoreWarning[];
 }
 
 export interface ProjectInfo {

@@ -81,6 +81,12 @@ export const writeDiagnosticsDirectory = async (
         sanitizePath(file)
       ),
     },
+    suppressed: report.suppressed.map((d) => ({
+      ...d,
+      file: sanitizePath(d.file),
+      message: sanitizeMessage(d.message),
+      reason: d.reason === null ? null : sanitizeMessage(d.reason),
+    })),
   };
 
   // The directory ignores itself. When the scanned directory is a
