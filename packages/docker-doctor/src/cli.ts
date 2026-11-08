@@ -58,6 +58,7 @@ import {
   AGENT_BINARIES,
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
+import { sanitizePath } from "./agents/sanitize";
 import {
   getSkillSourceDirectory,
   installSkillForAgents,
@@ -585,7 +586,9 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
 // Stderr, like the config warnings, so --json and --score stay parseable.
 const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
   for (const { file, line, message } of warnings) {
-    console.error(`Warning: ${file}:${line}: ${message}`);
+    // The path comes from the scanned tree, so it is flattened like the
+    // message before it reaches stderr.
+    console.error(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
   }
 };
 

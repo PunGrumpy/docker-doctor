@@ -132,7 +132,7 @@ interface LineMap {
 // A line of the document prologue. `---` and the `%YAML` and `%TAG`
 // directives sit before the first mapping, like the comments in the top
 // block, so they must not end it.
-const PROLOGUE_LINE = /^(?:---|%(?:YAML|TAG)[ \t].*)$/u;
+const PROLOGUE_LINE = /^(?:---(?:[ \t]+#.*)?|%(?:YAML|TAG)[ \t].*)$/u;
 
 const mapContentLines = (
   lines: string[],

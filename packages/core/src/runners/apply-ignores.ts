@@ -143,7 +143,10 @@ export const applyIgnores = (
     const result = indexFile(file, fileIgnores);
 
     indexed.set(file, result.ignores);
-    warnings.push(...result.warnings);
+
+    for (const warning of result.warnings) {
+      warnings.push(warning);
+    }
   }
 
   const live: Diagnostic[] = [];
