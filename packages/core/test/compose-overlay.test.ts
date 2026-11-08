@@ -58,6 +58,7 @@ describe("pairComposeFiles", () => {
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toContain("Compose uses compose.yaml");
     expect(warnings[1]).toContain("Compose uses compose.override.yaml");
+    expect(warnings[1]).toContain("judges docker-compose.override.yml alone");
   });
 
   test("prefers compose.override.yml over compose.override.yaml, as Compose does", () => {

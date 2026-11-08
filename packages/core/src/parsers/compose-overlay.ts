@@ -38,12 +38,13 @@ const pickByPreference = (
 
 const describeChoice = (
   dir: string,
-  kind: string,
+  kind: "base" | "override",
   found: readonly string[]
 ): string => {
   const paths = found.map((name) => posix.join(dir, name));
+  const partner = kind === "base" ? "override" : "base";
 
-  return `Found several Compose ${kind} files with supported names (${paths.join(", ")}). Compose uses ${paths[0]}, and so does Docker Doctor.`;
+  return `Found several Compose ${kind} files with supported names (${paths.join(", ")}). Compose uses ${paths[0]}. Docker Doctor pairs ${paths[0]} with the ${partner} file and still judges ${paths.slice(1).join(", ")} alone.`;
 };
 
 /**

@@ -36,7 +36,7 @@ docker-doctor searches that directory and its subdirectories for these file name
 | Dockerfile | `Dockerfile`, `Dockerfile.*` (such as `Dockerfile.dev`) and `*.dockerfile` |
 | Compose | `compose.yaml`, `docker-compose.yaml` and variants such as `compose.prod.yaml` or `docker-compose.override.yaml`, with `.yaml` or `.yml` |
 
-A base Compose file and the override beside it, such as `compose.yaml` and `compose.override.yaml`, are judged together the way `docker compose` runs them. The rules that report a missing setting, such as a restart policy or resource limits, check each service after the override merges in. Every other rule checks each file's own lines.
+A base Compose file and the override beside it, such as `compose.yaml` and `compose.override.yaml`, are judged together the way `docker compose` runs them. The rules that report a missing setting, such as a restart policy or resource limits, check each service after the override merges in. Such a finding lands on the override, at the tag, when its `!reset` or `!override` took away a setting the base sets. Any other one lands on the base, where you add the setting. Every other rule checks each file's own lines.
 
 docker-doctor doesn't scan files with other names, such as `Containerfile` or `Dockerfile-prod`. When no file matches, it says so instead of printing a score.
 
