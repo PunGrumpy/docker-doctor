@@ -40,9 +40,10 @@ const COMPOSE_TAGS = [
 ];
 
 // compose-go refuses a document past 100,000 node visits
-// (`loader/reset.go:32`). The same cap bounds the replay of tagged paths
-// through aliases here.
-const MAX_REPLACED_PATHS = 100_000;
+// (`loader/reset.go:32` and `:96-103`), and each tagged value is one. An
+// alias repeats the tagged values below its anchor, so each repeat counts
+// again, and a tower of aliases is refused before it expands.
+const MAX_TAGGED_VALUES = 100_000;
 
 export type ComposePath = readonly string[];
 
@@ -64,7 +65,7 @@ interface TagScan {
   found: Map<Node, ComposePath[]>;
   // The containers being scanned. An alias back to one is a cycle.
   open: Set<Node>;
-  total: number;
+  tagged: number;
 }
 
 const resolveNode = (
@@ -78,16 +79,14 @@ const tagOf = (node: Node | undefined, doc: Document): string | undefined =>
 const isMergeTag = (tag: string | undefined): boolean =>
   tag === RESET_TAG || tag === OVERRIDE_TAG;
 
-const record = (scan: TagScan, paths: ComposePath[], path: ComposePath) => {
-  scan.total += 1;
+const countTagged = (scan: TagScan, count: number) => {
+  scan.tagged += count;
 
-  if (scan.total > MAX_REPLACED_PATHS) {
+  if (scan.tagged > MAX_TAGGED_VALUES) {
     throw new Error(
-      `The file expands to more than ${MAX_REPLACED_PATHS} tagged values through aliases`
+      `The file holds more than ${MAX_TAGGED_VALUES} !reset and !override values once its aliases are expanded`
     );
   }
-
-  paths.push(path);
 };
 
 // A `!reset` item leaves its sequence and a `!reset` pair its mapping
@@ -158,6 +157,8 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
   const cached = scan.found.get(target);
 
   if (cached !== undefined) {
+    countTagged(scan, cached.length);
+
     return cached;
   }
 
@@ -165,7 +166,8 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
   const paths: ComposePath[] = [];
 
   for (const key of mergeTaggedKeys(target, scan.doc)) {
-    record(scan, paths, [key]);
+    countTagged(scan, 1);
+    paths.push([key]);
   }
 
   dropResetValues(target, scan.doc);
@@ -180,7 +182,7 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
     // compose-go drops the `<<` of a merge key from the path
     // (`loader/reset.go:106-109`).
     for (const path of below) {
-      record(scan, paths, key === MERGE_KEY ? path : [key, ...path]);
+      paths.push(key === MERGE_KEY ? path : [key, ...path]);
     }
   }
 
@@ -215,7 +217,7 @@ export const readComposeFile = (
       doc,
       found: new Map(),
       open: new Set(),
-      total: 0,
+      tagged: 0,
     });
     document = doc.toJS();
   } catch (error: unknown) {

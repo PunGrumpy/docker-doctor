@@ -483,6 +483,53 @@ services:
     });
   });
 
+  test("tagged values deep in a file count once each, not once per enclosing key", () => {
+    const depth = 20;
+
+    const keys = Array.from(
+      { length: depth },
+      (_, level) => `${"  ".repeat(level + 1)}l${level}:`
+    );
+
+    const resets = Array.from(
+      { length: 5001 },
+      (_, index) => `${"  ".repeat(depth + 1)}K${index}: !reset`
+    );
+
+    const { replacedPaths } = readComposeFile(
+      [
+        "services:",
+        "  web:",
+        "    image: app:1.0",
+        "x-deep:",
+        ...keys,
+        ...resets,
+      ].join("\n"),
+      "compose.override.yaml"
+    );
+
+    expect(replacedPaths).toHaveLength(5001);
+  });
+
+  test("a tower of aliases over tagged values is refused quickly", () => {
+    const levels = Array.from(
+      { length: 24 },
+      (_, index) =>
+        `x${index + 1}: &a${index + 1} {p: *a${index}, q: *a${index}}`
+    );
+
+    const content = [
+      "x0: &a0 {r: !reset 1, s: !override 2}",
+      ...levels,
+      "services:\n  web:\n    image: nginx:1.27.3\n    v: *a24",
+    ].join("\n");
+
+    const start = performance.now();
+
+    expect(() => readComposeFile(content, "compose.yaml")).toThrow(ParseError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
   test("should parse compose yml content", () => {
     const content = `
 services:
