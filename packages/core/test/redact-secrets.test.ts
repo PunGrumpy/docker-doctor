@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
+import { socketProxyRisk } from "../src/rules/compose-socket-proxy";
 import { allRules } from "../src/rules/index";
 import { redactSecrets } from "../src/rules/redact-secrets";
+import { holdsUrlPassword, isSecretKey } from "../src/rules/secret-keywords";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
 
 const PLACEHOLDER = "PLACEHOLDER_TOKEN_VALUE";
@@ -18,6 +20,14 @@ describe("redactSecrets", () => {
       output: "curl -https://***@example.com/a 1.https://***@example.com/b",
     },
     {
+      input: "      DATABASE_URL: postgres://app:FAKEpw@db:5432/app",
+      output: "      DATABASE_URL: postgres://***@db:5432/app",
+    },
+    {
+      input: "ENV REDIS_URL redis://:FAKEpw@redis",
+      output: "ENV REDIS_URL redis://***@redis",
+    },
+    {
       input: `git clone https://${PLACEHOLDER}@github.com/o/r.git`,
       output: "git clone https://***@github.com/o/r.git",
     },
@@ -28,6 +38,35 @@ describe("redactSecrets", () => {
     {
       input: `NPM_TOKEN=${PLACEHOLDER} npm ci`,
       output: "NPM_TOKEN=*** npm ci",
+    },
+    {
+      input: "      DATABASE_URL: postgres://a:FAKE@pw@host:5432/app",
+      output: "      DATABASE_URL: postgres://***@host:5432/app",
+    },
+    {
+      input: "ENV REDIS_URL redis://:FAKE@pw@@redis/0 # cache",
+      output: "ENV REDIS_URL redis://***@redis/0 # cache",
+    },
+    {
+      input:
+        "WEBHOOK_URL=https://hooks.example.com:8443?notify=ops@example.com",
+      output: "WEBHOOK_URL=https://hooks.example.com:8443?***",
+    },
+    {
+      input: "ENV MAX_SECRET_KEY=FAKEtoken123",
+      output: "ENV MAX_SECRET_KEY=***",
+    },
+    {
+      input: "MIN_IO_ROOT_PASSWORD: FAKEtoken123",
+      output: "MIN_IO_ROOT_PASSWORD: ***",
+    },
+    {
+      input: "MAX_BOT_TOKEN=FAKEtoken123 MAX_API_KEY=FAKEtoken123",
+      output: "MAX_BOT_TOKEN=*** MAX_API_KEY=***",
+    },
+    {
+      input: "MAX_TOKEN=4096 MIN_TOKENS=16",
+      output: "MAX_TOKEN=4096 MIN_TOKENS=16",
     },
     {
       input: `export DB_PASSWORD="${PLACEHOLDER} with spaces" && run`,
@@ -192,6 +231,8 @@ describe("redactSecrets", () => {
     "Potential secret found in ENV: 'API_TOKEN'.",
     "docker login --password-stdin",
     "curl https://example.com/health && npm install",
+    "https://docs.example.com:443#contact:me@example.com",
+    "a mail to me@example.com about https://example.com:443",
     "ADD https://example.com/pkg(v1).tar.gz /tmp/",
     "docker run -u 1000:1000 app",
     "docker run --user 0:0 app",
@@ -364,6 +405,14 @@ const adversarialInputs = [
     name: "secret lines with comments",
     text: "  PASSWORD: x # c\n".repeat(ADVERSARIAL_LENGTH / 17),
   },
+  {
+    name: "at signs after a scheme",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "repeated schemes with an at sign",
+    text: "a://a@".repeat(ADVERSARIAL_LENGTH / 6),
+  },
   { name: "a run of dashes", text: "-".repeat(ADVERSARIAL_LENGTH) },
   { name: "list markers", text: "- ".repeat(ADVERSARIAL_LENGTH / 2) },
   {
@@ -416,4 +465,198 @@ describe("provider token masking on a long line", () => {
     expect(redactSecrets(`sk-${text}`)).toBe(`sk-${text}`);
     expect(performance.now() - start).toBeLessThan(TIME_LIMIT_MS);
   });
+});
+
+// The key patterns run on every `ENV`, `ARG` and Compose environment key of
+// a scanned file, so a key built to make them backtrack must stay fast.
+const STRICT_TIME_LIMIT_MS = 50;
+
+const adversarialKeys = [
+  { name: "underscores", text: "_".repeat(ADVERSARIAL_LENGTH) },
+  { name: "repeated a_", text: "a_".repeat(ADVERSARIAL_LENGTH / 2) },
+  { name: "repeated token_", text: "token_".repeat(ADVERSARIAL_LENGTH / 6) },
+  { name: "repeated max_", text: "max_".repeat(ADVERSARIAL_LENGTH / 4) },
+  {
+    name: "repeated descriptor words",
+    text: "_expires_in".repeat(ADVERSARIAL_LENGTH / 11),
+  },
+  { name: "a run of a", text: "a".repeat(ADVERSARIAL_LENGTH) },
+];
+
+describe("isSecretKey on a long key", () => {
+  test.each(adversarialKeys)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ text }) => {
+      const start = performance.now();
+      isSecretKey(text);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
+});
+
+const adversarialUrls = [
+  { name: "a run of a", text: "a".repeat(ADVERSARIAL_LENGTH) },
+  { name: "a scheme-like run", text: "a.".repeat(ADVERSARIAL_LENGTH / 2) },
+  {
+    name: "repeated schemes",
+    text: "http://".repeat(Math.floor(ADVERSARIAL_LENGTH / 7)),
+  },
+  {
+    name: "a long user part",
+    text: `http://${"a:".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "a long user part before the at sign",
+    text: `http://${"a:".repeat(ADVERSARIAL_LENGTH / 2)}@h`,
+  },
+  {
+    name: "repeated user parts",
+    text: "https://a:".repeat(ADVERSARIAL_LENGTH / 10),
+  },
+  {
+    name: "repeated URLs with a password",
+    text: "https://u:p@h ".repeat(ADVERSARIAL_LENGTH / 14),
+  },
+  { name: "colons", text: `http://${":".repeat(ADVERSARIAL_LENGTH)}@h` },
+  { name: "at signs", text: `http://${"@".repeat(ADVERSARIAL_LENGTH)}` },
+  {
+    name: "user parts that each end in an at sign",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "user parts that each end in an at sign, then a letter",
+    text: `http://${"a@".repeat(ADVERSARIAL_LENGTH / 2)}a`,
+  },
+  {
+    name: "repeated schemes with an at sign",
+    text: "a://a@".repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  {
+    name: "a query full of at signs",
+    text: `http://h?${"a@".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
+  {
+    name: "a long dollar password",
+    text: `http://u:${"$".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long percent password",
+    text: `http://u:${"%".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long brace password",
+    text: `http://u:${"{".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "a long hash password",
+    text: `http://u:${"#".repeat(ADVERSARIAL_LENGTH)}@h`,
+  },
+  {
+    name: "spaces after the scheme",
+    text: `http://${" ".repeat(ADVERSARIAL_LENGTH)}`,
+  },
+];
+
+describe("holdsUrlPassword on a long line", () => {
+  test.each(adversarialUrls)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ text }) => {
+      const start = performance.now();
+      holdsUrlPassword("DATABASE_URL", text);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
+});
+
+const TECNATIVA = "tecnativa/docker-socket-proxy:0.3.0";
+const WOLLOMATIC = "wollomatic/socket-proxy:1.8";
+
+const adversarialProxies = [
+  {
+    name: "a long POST value",
+    service: {
+      environment: { CONTAINERS: 1, POST: "0".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long signed POST value",
+    service: {
+      environment: { CONTAINERS: 1, POST: "+".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long -allowPOST regex",
+    service: {
+      command: [`-allowPOST=${"a".repeat(ADVERSARIAL_LENGTH)}`],
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a run of quotes",
+    service: { command: "'".repeat(ADVERSARIAL_LENGTH), image: WOLLOMATIC },
+  },
+  {
+    name: "repeated -allowPOST flags with no value",
+    service: {
+      command: "-allowPOST ".repeat(ADVERSARIAL_LENGTH / 11),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "repeated -allowPUT flags with an empty pattern",
+    service: {
+      command: "-allowPUT '' ".repeat(ADVERSARIAL_LENGTH / 13),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long list of empty tokens",
+    service: {
+      command: Array.from({ length: ADVERSARIAL_LENGTH / 2 }, () => ""),
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long POST value with a swarm section",
+    service: {
+      environment: { POST: "1", SERVICES: "0".repeat(ADVERSARIAL_LENGTH) },
+      image: TECNATIVA,
+    },
+  },
+  {
+    name: "a long SP_ALLOW_DELETE_ key",
+    service: {
+      environment: {
+        [`SP_ALLOW_DELETE_${"_".repeat(ADVERSARIAL_LENGTH)}`]: "",
+      },
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long SP_ALLOW_POST_ key",
+    service: {
+      environment: { [`SP_ALLOW_POST_${"_".repeat(ADVERSARIAL_LENGTH)}`]: "" },
+      image: WOLLOMATIC,
+    },
+  },
+  {
+    name: "a long list entry",
+    service: {
+      environment: [`POST=${"1".repeat(ADVERSARIAL_LENGTH)}`],
+      image: TECNATIVA,
+    },
+  },
+];
+
+describe("socketProxyRisk on a long service", () => {
+  test.each(adversarialProxies)(
+    "finishes 200,000 characters of $name within 50 ms",
+    ({ service }) => {
+      const start = performance.now();
+      socketProxyRisk(service);
+      expect(performance.now() - start).toBeLessThan(STRICT_TIME_LIMIT_MS);
+    }
+  );
 });

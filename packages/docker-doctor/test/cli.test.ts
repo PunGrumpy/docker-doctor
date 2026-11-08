@@ -991,6 +991,7 @@ describe("verbose code frames", () => {
     "FROM node:22-slim",
     "ENV DB_PASSWORD=FAKEenvpw",
     "ENV LEGACY_TOKEN FAKElegacytok",
+    "ENV DATABASE_URL=postgres://app:FAKEurlpw@db:5432/app",
     "ADD https://example.com/a.tgz?token=FAKEtok /opt/",
     "COPY . .",
     'RUN curl -H "Authorization: Bearer FAKE.x.y" https://example.com/ping && npm install',
@@ -1004,6 +1005,7 @@ describe("verbose code frames", () => {
     "    image: postgres:16",
     "    environment:",
     "      POSTGRES_PASSWORD: FAKEcomposepw",
+    "      REDIS_URL: redis://:FAKEurlpw@redis:6379/0",
     "",
   ].join("\n");
 
@@ -1021,12 +1023,62 @@ describe("verbose code frames", () => {
       // The frames are printed, with the values masked.
       expect(stdout).toContain("│ ENV DB_PASSWORD=***");
       expect(stdout).toContain("│ ENV LEGACY_TOKEN ***");
+      expect(stdout).toContain("│ ENV DATABASE_URL=postgres://***@db:5432/app");
+      expect(stdout).toContain("│       REDIS_URL: redis://***@redis:6379/0");
       expect(stdout).toContain("│       POSTGRES_PASSWORD: ***");
       expect(stdout).toContain("│ ADD https://example.com/a.tgz?*** /opt/");
       expect(stdout).toContain('-H "Authorization: ***"');
       expect(stdout).toContain("-u *** https://example.com/pkg");
       expect(stdout).not.toContain("FAKE");
       expect(stderr).not.toContain("FAKE");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("a password in a URL value", () => {
+  const clean = [
+    "FROM node:22-slim",
+    "WORKDIR /app",
+    "USER node",
+    'CMD ["node", "-v"]',
+    "",
+  ].join("\n");
+
+  const withUrlPassword = clean.replace(
+    "CMD",
+    "ENV DATABASE_URL=postgres://app:FAKEurlpw@db:5432/app\nCMD"
+  );
+
+  test("fails a Dockerfile that scanned clean, and no output carries the password", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-url-pw-"));
+    const env = { CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), clean);
+      const baseline = await runCli([root], { env });
+
+      expect(baseline.exitCode).toBe(0);
+
+      fs.writeFileSync(path.join(root, "Dockerfile"), withUrlPassword);
+
+      const json = await runCli([root, "--json"], { env });
+      const verbose = await runCli([root, "--verbose"], { env });
+
+      const finding = parseReport(json.stdout).diagnostics.find(
+        (d) => d.rule === "docker-doctor/no-secrets-in-env"
+      );
+
+      expect(json.exitCode).toBe(1);
+      expect(verbose.exitCode).toBe(1);
+      expect(finding?.severity).toBe("error");
+      expect(finding?.message).toContain("'DATABASE_URL'");
+
+      for (const output of [json, verbose]) {
+        expect(output.stdout).not.toContain("FAKEurlpw");
+        expect(output.stderr).not.toContain("FAKEurlpw");
+      }
     } finally {
       fs.rmSync(root, { force: true, recursive: true });
     }

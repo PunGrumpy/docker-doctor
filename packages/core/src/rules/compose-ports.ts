@@ -87,6 +87,37 @@ export const publishedOnAllInterfaces = (entry: ComposeValue): boolean => {
   return false;
 };
 
+/**
+ * The literal values a service gives its environment variables, in map or
+ * list form. A bare `KEY` or a null value passes the host value through, so
+ * it has no literal here. A later list entry replaces an earlier one, as in
+ * Compose.
+ */
+export const environmentVariables = (
+  config: ComposeMapping
+): Map<string, string> => {
+  const variables = new Map<string, string>();
+  const { environment } = config;
+
+  if (isComposeMapping(environment)) {
+    for (const [key, value] of Object.entries(environment)) {
+      if (isComposeString(value) || isComposeNumber(value)) {
+        variables.set(key, String(value));
+      }
+    }
+  } else if (isComposeSequence(environment)) {
+    for (const entry of environment) {
+      const eqIndex = isComposeString(entry) ? entry.indexOf("=") : -1;
+
+      if (isComposeString(entry) && eqIndex > 0) {
+        variables.set(entry.slice(0, eqIndex), entry.slice(eqIndex + 1));
+      }
+    }
+  }
+
+  return variables;
+};
+
 const isBlank = (value: ComposeValue | undefined): boolean =>
   isComposeString(value) && value.trim() === "";
 
@@ -148,7 +179,7 @@ const mountsQdrantConfig = (config: ComposeMapping): boolean => {
   });
 };
 
-const commandTokens = (command: ComposeValue | undefined): string[] => {
+export const commandTokens = (command: ComposeValue | undefined): string[] => {
   if (isComposeString(command)) {
     return command.split(WHITESPACE);
   }

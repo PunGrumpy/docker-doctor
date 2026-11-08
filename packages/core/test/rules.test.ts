@@ -64,6 +64,7 @@ import {
   noSecretsInEnv,
   noAddRemote,
 } from "../src/rules/security";
+import type { ComposeMapping } from "../src/types/index";
 
 // Environment keys that name a secret in part but only describe it: where it
 // lives, how long it lasts, which scheme guards it. Both secrets rules skip
@@ -78,6 +79,15 @@ const descriptorEnvCases = [
   { key: "PASSWORD_POLICY", value: "strict" },
   { key: "PASSWORD_MIN_LENGTH", value: "12" },
   { key: "POSTGRES_HOST_AUTH_METHOD", value: "trust" },
+  { key: "ACCESS_TOKEN_EXPIRE_MINUTES", value: "30" },
+  { key: "TOKEN_EXPIRY", value: "30m" },
+  { key: "TOKEN_EXPIRES_IN", value: "3600" },
+  { key: "TOKEN_LIMIT", value: "4096" },
+  { key: "TOKEN_BUDGET", value: "1000" },
+  { key: "TOKEN_COUNT", value: "8" },
+  { key: "TOKEN_SIZE", value: "32" },
+  { key: "MAX_TOKEN", value: "4096" },
+  { key: "MIN_TOKENS", value: "16" },
 ];
 
 // Keys that can hold the credential itself. A literal value stays reported.
@@ -91,7 +101,59 @@ const credentialEnvCases = [
   { key: "API_TOKEN_ID", value: "FAKEid" },
   { key: "AUTH_USER", value: "FAKEuser" },
   { key: "AUTH_DSN", value: "FAKEdsn" },
+  { key: "MAX_SECRET_KEY", value: "FAKEtoken123" },
+  { key: "MAX_PASSWORD", value: "FAKEtoken123" },
+  { key: "MAX_API_KEY", value: "FAKEtoken123" },
+  { key: "MAX_BOT_TOKEN", value: "FAKEtoken123" },
+  { key: "MIN_IO_ROOT_PASSWORD", value: "FAKEtoken123" },
 ];
+
+// A URL value under a key that names no secret. A literal password in its
+// userinfo is reported by both secrets rules. The values are synthetic.
+const urlPasswordCases = [
+  { reported: true, value: "postgres://app:FAKEpw@db:5432/app" },
+  { reported: true, value: "redis://:FAKEpw@redis:6379/0" },
+  { reported: true, value: "amqps://guest:FAKEpw@mq" },
+  { reported: true, value: "mongodb://root:FAKEpw@mongo/db?authSource=admin" },
+  { reported: true, value: "https://user:FAKEpw@registry.example.com/" },
+  { reported: true, value: "postgres://postgres:postgres@db" },
+  { reported: true, value: "postgres://a:FAKE@pw@host" },
+  { reported: true, value: "redis://:FAKE@pw@@redis:6379/0" },
+  { reported: false, value: "postgres://db:5432/app" },
+  { reported: false, value: "postgres://app@db" },
+  {
+    reported: false,
+    value: "https://hooks.example.com:8443?notify=ops@example.com",
+  },
+  {
+    reported: false,
+    value: "https://docs.example.com:443#contact:me@example.com",
+  },
+  { reported: false, value: "postgres://app:@db" },
+  { reported: false, value: "ssh://git@github.com:org/repo.git" },
+  { reported: false, value: "http://localhost:3000/path?email=a@b.com" },
+  {
+    reported: false,
+    value: "https://abcdef0123456789abcdef0123456789@o1.example.io/4",
+  },
+  { reported: false, value: `postgres://app:\${DB_PW}@db/app` },
+  { reported: false, value: "postgres://app:$DB_PW@db/app" },
+  { reported: false, value: `postgres://app:\${DB_PW:-FAKEpw}@db/app` },
+  { reported: false, value: "postgres://app:#{pw}@db/app" },
+  { reported: false, value: "postgres://app:{{pw}}@db/app" },
+  { reported: false, value: "postgres://app:%s@db/app" },
+  { reported: false, value: "postgres://app:%(pw)s@db/app" },
+];
+
+const proxyWith = (extra: ComposeMapping, image?: string) => ({
+  services: {
+    proxy: {
+      image: image ?? "tecnativa/docker-socket-proxy:0.3.0",
+      volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"],
+      ...extra,
+    },
+  },
+});
 
 describe("Security Rules", () => {
   test("no-root-user", () => {
@@ -548,6 +610,53 @@ describe("Security Rules", () => {
     expect(noSecretsInEnv.check(dockerfile, "Dockerfile")).toHaveLength(0);
   });
 
+  test.each(urlPasswordCases)(
+    "no-secrets-in-env: ENV DATABASE_URL=$value reports $reported",
+    ({ reported, value }) => {
+      const diagnostics = noSecretsInEnv.check(
+        parseDockerfile(`ENV DATABASE_URL="${value}"`),
+        "Dockerfile"
+      );
+
+      expect(diagnostics).toHaveLength(reported ? 1 : 0);
+    }
+  );
+
+  test("no-secrets-in-env: a URL password is reported in every ENV and ARG form", () => {
+    const dockerfile = parseDockerfile(`
+      FROM node:22-slim
+      ENV DATABASE_URL=postgres://app:FAKEpw@db:5432/app
+      ENV REDIS_URL redis://:FAKEpw@redis
+      ARG NPM_REGISTRY=https://user:FAKEpw@registry.example.com/
+      ENV PORT=3000 AMQP_URI=amqps://guest:FAKEpw@mq
+      ENV OK_URL=postgres://db:5432/app
+    `);
+
+    const diagnostics = noSecretsInEnv.check(dockerfile, "Dockerfile");
+
+    expect(diagnostics.map((d) => d.line)).toEqual([3, 4, 5, 6]);
+    expect(diagnostics.map((d) => d.severity)).toEqual([
+      "error",
+      "error",
+      "error",
+      "error",
+    ]);
+    expect(diagnostics[3].message).toContain("'AMQP_URI'");
+
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.message).not.toContain("FAKEpw");
+      expect(diagnostic.help).not.toContain("FAKEpw");
+    }
+  });
+
+  test("no-secrets-in-env: a *_FILE key that holds a URL is a pointer, not a secret", () => {
+    const dockerfile = parseDockerfile(
+      "ENV DATABASE_URL_FILE=postgres://app:FAKEpw@db/app"
+    );
+
+    expect(noSecretsInEnv.check(dockerfile, "Dockerfile")).toHaveLength(0);
+  });
+
   test("no-add-remote", () => {
     const remoteAdd = parseDockerfile(`
         ADD https://example.com/file.txt /app/
@@ -674,6 +783,17 @@ describe("isSecretKey", () => {
     "timeout",
     "seconds",
     "length",
+    "minutes",
+    "hours",
+    "days",
+    "expire",
+    "expires",
+    "expiry",
+    "expiration",
+    "limit",
+    "budget",
+    "count",
+    "size",
     "name",
     "type",
     "mode",
@@ -714,6 +834,39 @@ describe("isSecretKey", () => {
       expect(isSecretKey(`DB_PASSWORD_${token.toUpperCase()}`)).toBe(true);
       expect(isSecretKey(`api-token-${token}`)).toBe(true);
       expect(isSecretKey(`auth_${token}`)).toBe(true);
+    }
+  );
+
+  test("an expiry written as expires_in describes the secret", () => {
+    expect(isSecretKey("ACCESS_TOKEN_EXPIRES_IN")).toBe(false);
+    expect(isSecretKey("api-token-expire-in")).toBe(false);
+  });
+
+  test("a MAX_ or MIN_ prefix names a bound only on a count of tokens", () => {
+    expect(isSecretKey("MAX_TOKEN")).toBe(false);
+    expect(isSecretKey("min-token")).toBe(false);
+    expect(isSecretKey("MIN_TOKENS")).toBe(false);
+    expect(isSecretKey("MAX_INPUT_TOKENS")).toBe(false);
+    expect(isSecretKey("MAX_PASSWORD_ATTEMPTS")).toBe(false);
+    expect(isSecretKey("SERVICE_MAX_TOKEN")).toBe(true);
+    expect(isSecretKey("MAXIMUM_TOKEN")).toBe(true);
+  });
+
+  const boundedSecretKeys = [
+    "MAX_SECRET_KEY",
+    "MAX_PASSWORD",
+    "MAX_API_KEY",
+    "MAX_BOT_TOKEN",
+    "MIN_IO_ROOT_PASSWORD",
+    "MAX_TOKEN_SECRET",
+    "min-auth-token",
+    "MIN_PRIVATE_KEY",
+  ];
+
+  test.each(boundedSecretKeys)(
+    "a MAX_ or MIN_ prefix does not clear %s, which holds a secret",
+    (key) => {
+      expect(isSecretKey(key)).toBe(true);
     }
   );
 
@@ -2085,6 +2238,373 @@ describe("Compose Security Rules", () => {
     }
   });
 
+  const writableProxyCases = [
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      name: "POST with CONTAINERS",
+      reason: "create containers",
+    },
+    {
+      extra: { environment: { EXEC: "1", POST: "1" } },
+      name: "POST with EXEC, as strings",
+      reason: "run commands in containers",
+    },
+    {
+      extra: { environment: ["POST=1", "BUILD=1"] },
+      name: "POST with BUILD, in list form",
+      reason: "build images",
+    },
+    {
+      extra: { environment: { AUTH: 1, POST: 1 } },
+      name: "POST with AUTH",
+      reason: "registry login",
+    },
+    {
+      extra: { environment: ["POST=1", "SECRETS=1"] },
+      name: "POST with SECRETS, in list form",
+      reason: "swarm secrets",
+    },
+    {
+      extra: { environment: { POST: 1, SERVICES: 1 } },
+      name: "POST with SERVICES",
+      reason: "swarm services",
+    },
+    {
+      extra: { environment: { PLUGINS: 1, POST: 1 } },
+      name: "POST with PLUGINS",
+      reason: "install plugins",
+    },
+    {
+      extra: { environment: { POST: 1, SWARM: 1 } },
+      name: "POST with SWARM",
+      reason: "change the swarm",
+    },
+    {
+      extra: { environment: { LIBPOD_CONTAINERS: 1, POST: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "POST with LIBPOD_CONTAINERS on the linuxserver proxy",
+      reason: "Podman containers",
+    },
+    {
+      extra: { environment: { ALLOW_ARCHIVE: 1, POST: 1 } },
+      image: "linuxserver/socket-proxy:latest",
+      name: "POST with ALLOW_ARCHIVE on the linuxserver proxy",
+      reason: "copy files into containers",
+    },
+    {
+      extra: { environment: { POST: 1, SERVICES: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "POST with SERVICES on the linuxserver proxy",
+      reason: "swarm services",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: `\${POST:-1}` } },
+      name: "POST that defaults to 1",
+      reason: "create containers",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      image: "lscr.io/linuxserver/socket-proxy:1.2",
+      name: "the linuxserver proxy",
+      reason: "create containers",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik", "-allowPOST=.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST in a command list",
+      reason: "-allowPOST",
+    },
+    {
+      extra: {
+        command: "-allowfrom=traefik --allowPOST=^/v1.*/containers/.*$",
+      },
+      image: "ghcr.io/wollomatic/socket-proxy:1.8",
+      name: "--allowPOST in a command string",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { command: "'-allowPOST=.*'" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a quoted -allowPOST",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { command: ["-allowPOST", "/v1.*/containers/create"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST with its pattern in the next token",
+      reason: "-allowPOST",
+    },
+    {
+      extra: { command: "-allowPUT=/containers/.*/archive" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPUT",
+      reason: "allows PUT requests",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik", "--allowDELETE=.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "--allowDELETE",
+      reason: "allows DELETE requests",
+    },
+    {
+      extra: { environment: { SP_ALLOW_PUT: ".*" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_PUT",
+      reason: "SP_ALLOW_PUT",
+    },
+    {
+      extra: { environment: ["SP_ALLOW_DELETE_1=/containers/.*"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a numbered SP_ALLOW_DELETE",
+      reason: "SP_ALLOW_DELETE",
+    },
+    {
+      extra: { environment: { SP_ALLOW_POST: ".*" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_POST",
+      reason: "SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: ["SP_ALLOW_POST_2=/containers/create"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a numbered SP_ALLOW_POST",
+      reason: "SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1 }, ports: ["2375:2375"] },
+      name: "a port published with a host port",
+      reason: "publishes its port on every interface",
+    },
+    {
+      extra: { ports: ["2375"] },
+      name: "a port published with no host port",
+      reason: "publishes its port on every interface",
+    },
+    {
+      extra: { ports: [2375] },
+      name: "a numeric port",
+      reason: "publishes its port on every interface",
+    },
+    {
+      extra: { ports: ["0.0.0.0:2375:2375"] },
+      name: "a port bound to 0.0.0.0",
+      reason: "publishes its port on every interface",
+    },
+    {
+      extra: { ports: [{ published: 2375, target: 2375 }] },
+      name: "a port in long syntax",
+      reason: "publishes its port on every interface",
+    },
+    {
+      extra: { command: ["-allowfrom=traefik"], ports: ["2375:2375"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a wollomatic proxy that publishes its port",
+      reason: "publishes its port on every interface",
+    },
+  ];
+
+  test.each(writableProxyCases)(
+    "no-docker-socket-mount: a socket proxy with $name loses the exemption",
+    ({ extra, image, reason }) => {
+      const diags = noDockerSocketMount.check(
+        proxyWith(extra, image),
+        "compose.yml"
+      );
+
+      expect(diags).toHaveLength(1);
+      expect(diags[0].message).toContain("Service 'proxy' bind-mounts");
+      expect(diags[0].message).toContain("socket proxy");
+      expect(diags[0].message).toContain(reason);
+      expect(diags[0].message).not.toContain("CVE-");
+    }
+  );
+
+  const readOnlyProxyCases = [
+    { extra: {}, name: "no settings" },
+    { extra: { environment: { POST: 1 } }, name: "POST alone" },
+    {
+      extra: { environment: { AUTH: 1 } },
+      name: "AUTH alone, which accepts only POST",
+    },
+    {
+      extra: { environment: ["SECRETS=1"] },
+      name: "SECRETS alone, which returns no secret data to a GET",
+    },
+    {
+      extra: { environment: { AUTH: 1, SECRETS: 1, SERVICES: 1, SWARM: 1 } },
+      name: "swarm sections with POST off",
+    },
+    {
+      extra: {
+        environment: { ALLOW_ARCHIVE: 1, LIBPOD_CONTAINERS: 1, POST: 1 },
+      },
+      name: "linuxserver sections on a Tecnativa proxy, which ignores them",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, INFO: 1, POST: 0 } },
+      name: "CONTAINERS with POST off",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, EXEC: 1 } },
+      name: "CONTAINERS and EXEC with no POST",
+    },
+    {
+      extra: { environment: { AUTH: 0, POST: 1, SECRETS: "0" } },
+      name: "AUTH and SECRETS off",
+    },
+    {
+      extra: { environment: { CONTAINERS: true, POST: true } },
+      name: "true, which the proxy does not read as on",
+    },
+    {
+      extra: { env_file: ["proxy.env"] },
+      name: "settings only in an env_file",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: `\${PROXY_POST}` } },
+      name: "POST that depends on a variable",
+    },
+    {
+      extra: { environment: ["CONTAINERS=1", "POST"] },
+      name: "a bare POST that passes the host value",
+    },
+    {
+      extra: { ports: ["127.0.0.1:2375:2375"] },
+      name: "a port bound to loopback",
+    },
+    { extra: { ports: ["[::1]:2375:2375"] }, name: "a port bound to ::1" },
+    {
+      extra: {
+        ports: [{ host_ip: "127.0.0.1", published: 2375, target: 2375 }],
+      },
+      name: "a long syntax port bound to loopback",
+    },
+    { extra: { expose: ["2375"] }, name: "an exposed port" },
+    {
+      extra: { command: ["-allowfrom=traefik", "-allowGET=/version"] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "only -allowGET",
+    },
+    {
+      extra: { command: ["-allowPOST="] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "an empty -allowPOST",
+    },
+    {
+      extra: { command: ["-allowPOST", ""] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "an empty pattern in the token after -allowPOST",
+    },
+    {
+      extra: { command: "-allowfrom=traefik -allowPOST ''" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "a quoted empty pattern after -allowPOST",
+    },
+    {
+      extra: { command: "-allowPOST=''" },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "-allowPOST set to empty shell quotes",
+    },
+    {
+      extra: { command: ['--allowPUT=""', "-allowDELETE="] },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "empty -allowPUT and -allowDELETE",
+    },
+    {
+      extra: { environment: { SP_ALLOW_DELETE: "", SP_ALLOW_PUT: " " } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "empty SP_ALLOW_PUT and SP_ALLOW_DELETE",
+    },
+    {
+      extra: { environment: { SP_ALLOW_GET: ".*", SP_ALLOW_POST: "" } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "SP_ALLOW_GET and an empty SP_ALLOW_POST",
+    },
+    {
+      extra: { environment: { CONTAINERS: 1, POST: 1 } },
+      image: "wollomatic/socket-proxy:1.8",
+      name: "Tecnativa variables on a wollomatic proxy, which ignores them",
+    },
+    {
+      extra: {
+        command: ["-allowPOST=.*"],
+        environment: { SP_ALLOW_POST: ".*" },
+      },
+      name: "wollomatic settings on a Tecnativa proxy, which ignores them",
+    },
+  ];
+
+  test.each(readOnlyProxyCases)(
+    "no-docker-socket-mount: a socket proxy with $name keeps the exemption",
+    ({ extra, image }) => {
+      expect(
+        noDockerSocketMount.check(proxyWith(extra, image), "compose.yml")
+      ).toHaveLength(0);
+    }
+  );
+
+  test("no-docker-socket-mount: help names the common write paths and says the list is not complete", () => {
+    expect(noDockerSocketMount.help).toContain("POST together with CONTAINERS");
+    expect(noDockerSocketMount.help).toContain("SERVICES, PLUGINS, SWARM");
+    expect(noDockerSocketMount.help).toContain("AUTH or SECRETS");
+    expect(noDockerSocketMount.help).toContain(
+      "-allowPOST, -allowPUT or -allowDELETE"
+    );
+    expect(noDockerSocketMount.help).toContain("every interface");
+    expect(noDockerSocketMount.help).toContain("not complete");
+  });
+
+  test("no-docker-socket-mount: the message names the condition, then says the exemption does not apply", () => {
+    const messages = [
+      proxyWith({ environment: { CONTAINERS: 1, POST: 1 } }),
+      proxyWith({ command: "-allowPOST=.*" }, "wollomatic/socket-proxy:1.8"),
+      proxyWith({ ports: ["2375:2375"] }),
+    ].map(
+      (composeContent) =>
+        noDockerSocketMount.check(composeContent, "compose.yml")[0].message
+    );
+
+    expect(messages).toEqual([
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy can create containers (POST and CONTAINERS are on). The exemption for read-only socket proxies does not apply.",
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy allows POST requests (-allowPOST or SP_ALLOW_POST). The exemption for read-only socket proxies does not apply.",
+      "Service 'proxy' bind-mounts the Docker socket, and its socket proxy publishes its port on every interface. The exemption for read-only socket proxies does not apply.",
+    ]);
+  });
+
+  test("no-docker-socket-mount: a writable proxy is reported at its mount, a plain service by the old message", () => {
+    const source = `services:
+  proxy-rw:
+    image: tecnativa/docker-socket-proxy:0.3
+    environment:
+      CONTAINERS: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  proxy-ro:
+    image: tecnativa/docker-socket-proxy:0.3
+    environment:
+      CONTAINERS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  plain:
+    image: nginx:1.27
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+`;
+
+    const diags = noDockerSocketMount.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([8, 18]);
+    expect(diags[0].message).toContain("socket proxy can create containers");
+    expect(diags[1].message).toStartWith(
+      "Service 'plain' bind-mounts the Docker socket. Anything running"
+    );
+  });
+
   test("no-docker-socket-mount: a look-alike proxy image is still reported", () => {
     const composeContent = {
       services: {
@@ -2538,6 +3058,86 @@ describe("Compose Security Rules", () => {
       expect.stringContaining("'OPENAI_APIKEY'"),
       expect.stringContaining("'PGPASSWORD'"),
     ]);
+  });
+
+  test.each(urlPasswordCases)(
+    "no-plaintext-secrets: DATABASE_URL=$value reports $reported",
+    ({ reported, value }) => {
+      const composeContent = {
+        services: {
+          app: {
+            build: { args: { REGISTRY_URL: value }, context: "." },
+            environment: { DATABASE_URL: value },
+          },
+          worker: {
+            environment: [`DATABASE_URL=${value}`],
+          },
+        },
+      };
+
+      const diags = noPlaintextSecrets.check(composeContent, "compose.yml");
+
+      expect(diags).toHaveLength(reported ? 3 : 0);
+    }
+  );
+
+  test("no-plaintext-secrets: a URL password is reported at its line, as a warning, without the password", () => {
+    const source = `services:
+  app:
+    image: app:1.0
+    environment:
+      DATABASE_URL: postgres://app:FAKEpw@db:5432/app
+      REDIS_URL: redis://:FAKEpw@redis:6379/0
+      SENTRY_DSN: https://abcdef0123456789abcdef0123456789@o123.ingest.sentry.io/45
+      OK_URL: postgres://db:5432/app
+      INTERP: postgres://app:\${DB_PW}@db/app
+  app2:
+    image: app:1.0
+    environment:
+      - DATABASE_URL=postgres://app:FAKEpw@db:5432/app
+  app3:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: https://user:FAKEpw@registry.example.com/
+`;
+
+    const diags = noPlaintextSecrets.check(
+      parseCompose(source, "compose.yml"),
+      "compose.yml",
+      { locate: createComposeLocator(source) }
+    );
+
+    expect(diags.map((d) => d.line)).toEqual([5, 6, 13, 18]);
+    expect(diags.map((d) => d.severity)).toEqual([
+      "warning",
+      "warning",
+      "warning",
+      "warning",
+    ]);
+    expect(diags[0].message).toContain("'DATABASE_URL'");
+    expect(diags[3].message).toContain("build args: 'NPM_REGISTRY'");
+
+    for (const diagnostic of diags) {
+      expect(diagnostic.message).not.toContain("FAKEpw");
+      expect(diagnostic.help).not.toContain("FAKEpw");
+    }
+  });
+
+  test("no-plaintext-secrets: a *_FILE key that holds a URL is a pointer, not a secret", () => {
+    const composeContent = {
+      services: {
+        app: {
+          environment: {
+            DATABASE_URL_FILE: "postgres://app:FAKEpw@db/app",
+          },
+        },
+      },
+    };
+
+    expect(
+      noPlaintextSecrets.check(composeContent, "compose.yml")
+    ).toHaveLength(0);
   });
 
   const scalarSecretCases = [
