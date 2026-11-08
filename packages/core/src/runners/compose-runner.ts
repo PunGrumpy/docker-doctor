@@ -1,5 +1,6 @@
 import { overlayCompose, pairComposeFiles } from "../parsers/compose-overlay";
-import type { ComposeFile } from "../parsers/compose-parser";
+import type { ComposeFile, ComposePath } from "../parsers/compose-parser";
+import { composeField } from "../parsers/compose-value";
 import { requireResourceLimits, requireRestartPolicy } from "../rules/compose";
 import { undefinedModelReference } from "../rules/compose-models";
 import { composeServices } from "../rules/compose-services";
@@ -80,11 +81,24 @@ export const runComposeRules = (
   });
 };
 
-// The rules that report a setting a service lacks. Compose runs a base file
-// merged with its override, so these judge the merged service.
-const EFFECTIVE_SERVICE_RULES: ReadonlySet<ComposeRule> = new Set([
-  requireResourceLimits,
-  requireRestartPolicy,
+// The rules that report a setting a service lacks, each with the settings
+// it looks for in a service. Compose runs a base file merged with its
+// override, so these judge the merged service.
+const EFFECTIVE_SERVICE_RULES: ReadonlyMap<
+  ComposeRule,
+  readonly ComposePath[]
+> = new Map([
+  [
+    requireResourceLimits,
+    [
+      ["deploy", "resources", "limits", "cpus"],
+      ["deploy", "resources", "limits", "memory"],
+      ["mem_limit"],
+      ["cpus"],
+      ["cpu_quota"],
+    ],
+  ],
+  [requireRestartPolicy, [["restart"], ["deploy", "restart_policy"]]],
 ]);
 
 // The rules that report a name a file writes. They judge each file's own
@@ -115,33 +129,166 @@ const servicesNamed = (
   ),
 });
 
-// What each rule reads for one file of a pair. `answersFor` names the merged
-// services whose missing settings this file reports.
-const pairedInput =
+const valueAt = (
+  value: ComposeValue | undefined,
+  path: ComposePath
+): ComposeValue | undefined => {
+  let node = value;
+
+  for (const key of path) {
+    node = composeField(node, key);
+  }
+
+  return node;
+};
+
+const isPrefix = (prefix: ComposePath, path: ComposePath): boolean =>
+  prefix.length <= path.length &&
+  prefix.every((key, index) => path[index] === key);
+
+// For each base service that set one of `settings`, the first `!reset` or
+// `!override` path of the override that takes it away. Compose deletes the
+// base value at that path before the merge (compose-go
+// `loader/reset.go:285-324`), so setting it again in the base cannot help.
+const removedByOverride = (
+  settings: readonly ComposePath[],
+  base: ComposeValue,
+  replacedPaths: readonly ComposePath[]
+): Map<string, ComposePath> => {
+  const onServices: ComposePath[] = [];
+  const byService = new Map<string, ComposePath[]>();
+
+  for (const path of replacedPaths) {
+    const [root, name] = path;
+
+    if (root !== "services") {
+      continue;
+    }
+
+    // A tag on `services` itself reaches every service.
+    if (name === undefined) {
+      onServices.push(path);
+    } else {
+      const tags = byService.get(name) ?? [];
+      tags.push(path);
+      byService.set(name, tags);
+    }
+  }
+
+  const removed = new Map<string, ComposePath>();
+
+  for (const [name, config] of composeServices(base)) {
+    const held = settings.flatMap((setting) =>
+      valueAt(config, setting) === undefined
+        ? []
+        : [["services", name, ...setting]]
+    );
+
+    const removal = [...onServices, ...(byService.get(name) ?? [])].find(
+      (path) => held.some((setting) => isPrefix(path, setting))
+    );
+
+    if (removal !== undefined) {
+      removed.set(name, removal);
+    }
+  }
+
+  return removed;
+};
+
+// The override's locator, with each service whose setting it removed placed
+// at the tag that removed it. A tag reached through a merge key has no node
+// at the service, so the nearest enclosing node the file writes stands in.
+const locateRemovals = (
+  locate: ComposeLocator | undefined,
+  removed: ReadonlyMap<string, ComposePath>
+): ComposeLocator | undefined => {
+  if (locate === undefined) {
+    return undefined;
+  }
+
+  return (path) => {
+    const [root, name] = path;
+
+    const removal =
+      path.length === 2 && root === "services"
+        ? removed.get(String(name))
+        : undefined;
+
+    if (removal === undefined) {
+      return locate(path);
+    }
+
+    return removal
+      .map((_, index) => locate(removal.slice(0, removal.length - index)))
+      .find((line) => line !== undefined);
+  };
+};
+
+const inputsFor =
   (
     source: ComposeSource,
     project: ComposeValue,
-    answersFor: (name: string) => boolean
+    merged: ReadonlyMap<ComposeRule, RuleInput>
   ): InputFor =>
   (rule) => {
-    if (EFFECTIVE_SERVICE_RULES.has(rule)) {
-      return {
-        content: servicesNamed(project, answersFor),
-        locate: source.locate,
-        project,
-      };
+    const input = merged.get(rule);
+
+    if (input !== undefined) {
+      return input;
     }
 
-    if (PROJECT_LOOKUP_RULES.has(rule)) {
-      return { ...ownInput(source), project };
-    }
-
-    return ownInput(source);
+    return PROJECT_LOOKUP_RULES.has(rule)
+      ? { ...ownInput(source), project }
+      : ownInput(source);
   };
 
-// What each rule reads for each paired file. The base answers for the
-// missing settings of every service it defines, because that is where a
-// user adds one. The override answers for the services only it defines.
+// What each rule reads for the base and the override of one pair. The base
+// answers for a missing setting of a service it defines, at the service's
+// line, because that is where a user adds one. When the override took the
+// setting away with `!reset` or `!override`, the override answers for it, at
+// that tag, because only the override can give it back. The override also
+// answers for the services only it defines.
+const pairInputs = (
+  base: ComposeSource,
+  override: ComposeSource
+): [InputFor, InputFor] => {
+  const project = overlayCompose(base.compose, override.compose);
+
+  const inBase = new Set<string>(
+    composeServices(base.compose.document).map(([name]) => name)
+  );
+
+  const baseInputs = new Map<ComposeRule, RuleInput>();
+  const overrideInputs = new Map<ComposeRule, RuleInput>();
+
+  for (const [rule, settings] of EFFECTIVE_SERVICE_RULES) {
+    const removed = removedByOverride(
+      settings,
+      base.compose.document,
+      override.compose.replacedPaths
+    );
+
+    const onBase = (name: string) => inBase.has(name) && !removed.has(name);
+
+    baseInputs.set(rule, {
+      content: servicesNamed(project, onBase),
+      locate: base.locate,
+      project,
+    });
+    overrideInputs.set(rule, {
+      content: servicesNamed(project, (name) => !onBase(name)),
+      locate: locateRemovals(override.locate, removed),
+      project,
+    });
+  }
+
+  return [
+    inputsFor(base, project, baseInputs),
+    inputsFor(override, project, overrideInputs),
+  ];
+};
+
 const pairedInputs = (
   sources: readonly ComposeSource[],
   onWarning?: (message: string) => void
@@ -160,20 +307,9 @@ const pairedInputs = (
       continue;
     }
 
-    const project = overlayCompose(baseSource.compose, overrideSource.compose);
-
-    const inBase = new Set<string>(
-      composeServices(baseSource.compose.document).map(([name]) => name)
-    );
-
-    inputs.set(
-      base,
-      pairedInput(baseSource, project, (name) => inBase.has(name))
-    );
-    inputs.set(
-      override,
-      pairedInput(overrideSource, project, (name) => !inBase.has(name))
-    );
+    const [baseInput, overrideInput] = pairInputs(baseSource, overrideSource);
+    inputs.set(base, baseInput);
+    inputs.set(override, overrideInput);
   }
 
   return inputs;

@@ -230,6 +230,20 @@ describe("Compose override files", () => {
     ]);
   });
 
+  test("reports a setting the override resets on the override, at the reset", async () => {
+    const { stdout } = await runCli([
+      fixture("compose-override-reset"),
+      "--json",
+    ]);
+
+    // compose.yaml already sets the restart policy, so only the override
+    // can give it back.
+    const report = parseReport(stdout);
+    expect(
+      report.diagnostics.map((d) => `${d.file}:${d.line}:${d.rule}`)
+    ).toEqual(["compose.override.yaml:3:docker-doctor/require-restart-policy"]);
+  });
+
   test("reports an undefined model in the override, at the reference", async () => {
     const { stdout } = await runCli([
       fixture("compose-override-model"),

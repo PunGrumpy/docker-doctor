@@ -52,7 +52,7 @@ const NOT_FOLLOWED =
 
 // Shared by the rules that report a setting a service lacks, which judge the
 // service after its override merges in.
-const OVERRIDE_PAIRING_NOTE = `${OVERRIDE_PAIRING} this rule judges each service after the override merges over the base, the way \`docker compose\` does without \`-f\`. A setting in either file counts, and \`!reset\` in the override removes one the base set. A finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. ${NOT_FOLLOWED}`;
+const OVERRIDE_PAIRING_NOTE = `${OVERRIDE_PAIRING} this rule judges each service after the override merges over the base, the way \`docker compose\` does without \`-f\`. A setting in either file counts. When the base sets one and the override takes it away with \`!reset\` or \`!override\`, the finding lands on the override at that tag, because only the override can give it back. Any other finding lands on the base at the service's line, because that is where you add the setting. A service that only the override defines is reported on the override. ${NOT_FOLLOWED}`;
 
 const MODEL_PAIRING_NOTE = `${OVERRIDE_PAIRING} a model that either file declares satisfies a reference in the other, the way \`docker compose\` resolves them without \`-f\`. A finding lands in the file that writes the reference, at its line. ${NOT_FOLLOWED}`;
 

@@ -449,12 +449,67 @@ describe("runComposeFiles", () => {
     ]);
   });
 
-  test("a setting the override resets is reported on the base, at the service", () => {
+  test("a setting the override resets is reported on the override, at the reset", () => {
     const results = runComposeFiles([
       source("compose.yaml", healthyBase),
       source(
         "compose.override.yaml",
         "services:\n  web:\n    restart: !reset null\n"
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/require-restart-policy:3",
+    ]);
+  });
+
+  test("limits the override replaces with !override are reported at that tag", () => {
+    const results = runComposeFiles([
+      source("compose.yaml", healthyBase),
+      source(
+        "compose.override.yaml",
+        `services:
+  web:
+    ports: !override
+      - "8080:80"
+    deploy: !override
+      replicas: 2
+`
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/require-resource-limits:5",
+    ]);
+  });
+
+  test("a service the override replaces whole is reported on the override, at the service", () => {
+    const results = runComposeFiles([
+      source("compose.yaml", healthyBase),
+      source(
+        "compose.override.yaml",
+        "services:\n  web: !override\n    image: nginx:1.27-alpine\n"
+      ),
+    ]);
+
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/require-resource-limits:2",
+      "docker-doctor/require-restart-policy:2",
+    ]);
+  });
+
+  test("a reset of a setting the base never had leaves the finding on the base", () => {
+    const results = runComposeFiles([
+      source(
+        "compose.yaml",
+        "services:\n  web:\n    image: nginx:1.27-alpine\n    mem_limit: 256m\n"
+      ),
+      source(
+        "compose.override.yaml",
+        "services:\n  web:\n    restart: !reset\n"
       ),
     ]);
 
@@ -473,10 +528,11 @@ describe("runComposeFiles", () => {
       ),
     ]);
 
-    expect(findingsOf(results, "compose.yaml")).toEqual([
-      "docker-doctor/require-restart-policy:2",
+    // The tag sits in the anchor, so the service that merges it stands in.
+    expect(findingsOf(results, "compose.yaml")).toEqual([]);
+    expect(findingsOf(results, "compose.override.yaml")).toEqual([
+      "docker-doctor/require-restart-policy:4",
     ]);
-    expect(findingsOf(results, "compose.override.yaml")).toEqual([]);
   });
 
   test("a base service missing a setting is reported once, on the base", () => {
@@ -636,6 +692,6 @@ services:
       { rulesConfig: { "docker-doctor/require-restart-policy": "error" } }
     );
 
-    expect(results.get("compose.yaml")?.[0]?.severity).toBe("error");
+    expect(results.get("compose.override.yaml")?.[0]?.severity).toBe("error");
   });
 });
