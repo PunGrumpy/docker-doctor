@@ -54,11 +54,6 @@ interface BuildStage {
   runs: StageRun[];
 }
 
-// `ENV NODE_ENV=production` and the legacy `ENV NODE_ENV production`, quoted
-// or not, anywhere in a multi-variable ENV.
-const NODE_ENV_ASSIGNMENT_RE =
-  /(?:^|\s)NODE_ENV(?:=|\s+)["']?(?<value>[^\s"']*)/u;
-
 // `ARG NODE_ENV` or `ARG NODE_ENV=production`, quoted or not, anywhere in a
 // multi-variable ARG.
 const NODE_ENV_ARG_RE =
@@ -191,7 +186,9 @@ const applyNodeEnv = (
       state.arg = match.groups?.value ?? globalArg;
     }
   } else if (inst.instruction === "ENV") {
-    const value = NODE_ENV_ASSIGNMENT_RE.exec(inst.args)?.groups?.value;
+    const value = envAssignments(inst.args)
+      .findLast((word) => word.startsWith("NODE_ENV="))
+      ?.slice("NODE_ENV=".length);
 
     if (value !== undefined) {
       state.env = NODE_ENV_REFERENCE_RE.test(value)
