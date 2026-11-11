@@ -278,7 +278,12 @@ export const createComposeLocator = (content: string): ComposeLocator => {
         offset = pair.key.range?.[0] ?? null;
         node = pair.value;
       } else if (isSeq(node) && isSequenceIndex(segment)) {
-        const item = node.items[segment];
+        // The parsed document has no `!reset` items, so they take no index.
+        // A `!reset` pair stays findable: the runner reports a reset setting
+        // at its key.
+        const item = node.items.filter(
+          (entry) => !(isNode(entry) && tagOf(entry, doc) === RESET_TAG)
+        )[segment];
 
         if (item === undefined || item === null) {
           return null;
