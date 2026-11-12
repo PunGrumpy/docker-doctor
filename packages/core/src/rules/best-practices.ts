@@ -616,6 +616,7 @@ const USERADD_COMMAND_RE = /^(?:.*\/)?useradd$/u;
 const SHORT_OPTION_CLUSTER_RE = /^-[^-]/u;
 const ENV_ASSIGNMENT_WORD_RE = /^[A-Za-z_]\w*=/u;
 const SHELL_COMMAND_FLAG_RE = /^-\w*c$/u;
+const SHELL_NAME_RE = /(?:^|\/)(?:ba|da|a|z|k)?sh$/u;
 
 // hadolint's DL3046 reads a UID of six or more digits as large. Docker's own
 // guidance names no cut-off, only "large UIDs". A smaller UID such as 65532
@@ -894,10 +895,20 @@ const runCommandWords = (inst: DockerfileInstruction): string[][] => {
     return useraddCandidates(stripRunFlags(inst.args));
   }
 
-  const [, flag, commandScript] = argv;
+  const [shell, ...rest] = argv;
 
-  if (flag !== undefined && SHELL_COMMAND_FLAG_RE.test(flag) && commandScript) {
-    return useraddCandidates(commandScript);
+  // Options such as `-o pipefail` or `-e` can come before `-c`. Only a real
+  // shell reads the next word as a script, so `useradd -c comment` stays argv.
+  if (shell !== undefined && SHELL_NAME_RE.test(shell)) {
+    const flagIndex = rest.findIndex((word) =>
+      SHELL_COMMAND_FLAG_RE.test(word)
+    );
+
+    const commandScript = flagIndex === -1 ? undefined : rest[flagIndex + 1];
+
+    if (commandScript !== undefined && commandScript !== "") {
+      return useraddCandidates(commandScript);
+    }
   }
 
   return [argv];

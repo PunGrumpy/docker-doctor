@@ -17,6 +17,20 @@ const continuationLength = (text: string, index: number): number => {
   return text[index + 1] === "\r" && text[index + 2] === "\n" ? 3 : 0;
 };
 
+// Whether the newline at `index` follows an unescaped backslash: an odd run of
+// backslashes, as each pair escapes itself.
+const isContinued = (text: string, index: number): boolean => {
+  let end = text[index - 1] === "\r" ? index - 1 : index;
+  let slashes = 0;
+
+  while (end > 0 && text[end - 1] === "\\") {
+    slashes += 1;
+    end -= 1;
+  }
+
+  return slashes % 2 === 1;
+};
+
 /**
  * Splits shell text into the simple commands it runs, cutting at the
  * separators `;`, `&`, `|`, `(`, `)`, a backtick and a newline that no
@@ -32,8 +46,7 @@ export const splitShellCommands = (text: string): string[] => {
 
   for (let index = 0; index < masked.length; index += 1) {
     const char = masked[index];
-    const before = masked[index - 1] === "\r" ? index - 2 : index - 1;
-    const isNewline = char === "\n" && masked[before] !== "\\";
+    const isNewline = char === "\n" && !isContinued(masked, index);
 
     if (isNewline || COMMAND_BOUNDARY_CHARS.has(char)) {
       commands.push(text.slice(start, index));
