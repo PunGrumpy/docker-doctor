@@ -32,7 +32,7 @@ kind: mixin
 # MIGRATION NOTE: "by hand" means a docker-doctor-kit changeset, and
 # `bun run kit:sync` writes this line from package.json. It stays a quoted
 # literal on its own line because kit-push.yml reads it as the Hub tag.
-version: "0.2.0"
+version: "0.2.1"
 displayName: Docker Doctor
 description: Static analysis for Dockerfiles and Compose files. Ships the docker-doctor CLI and its agent skill, and tells the agent to lint before committing Docker changes.
 # MIGRATION NOTE: v2 spelled this `sourceURL`. v2's `name: docker-doctor`
@@ -49,7 +49,7 @@ licenses:
 # the exact pin in package.json.
 args:
   cliVersion:
-    default: "0.10.0"
+    default: "0.11.0"
     # SPEC-v3 §5.2 versions: dotted segments, no `v` prefix. The optional
     # tail admits npm prereleases such as 1.0.0-beta.1.
     pattern: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'

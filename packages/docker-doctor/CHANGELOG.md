@@ -1,5 +1,20 @@
 # @docker-doctor/cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 0fe184e: Add `--fail-on <error|warning|info|none>` to choose which findings make a scan exit `1`. The default, `error`, keeps the current behavior. `none` reports findings without failing, and an incomplete scan still exits `2`.
+
+### Patch Changes
+
+- 858e10e: A backslash before a newline inside double quotes is now dropped from the word, as a POSIX shell does, instead of staying in it.
+- 3b9a31f: An escaped backslash (`\\`) at the end of a line no longer joins the next line into the same shell command, so rules see `rm -rf x` on its own line.
+- 91164dd: A quoted environment prefix such as `NODE_ENV="development" npm ci` no longer hides the install from `avoid-dev-dependencies`.
+- 1c126e6: Stop a quoted `NODE_ENV=production` inside another `ENV` value from silencing `avoid-dev-dependencies`.
+- 7da50a3: Diagnostics on a Compose list item or key that follows a `!reset` entry now point at the right line instead of the `!reset` line.
+- 2bb31b6: Detect `useradd` with a large UID in exec-form `RUN` shells that pass options before `-c`, such as `["bash", "-o", "pipefail", "-c", "..."]`.
+
 ## 0.10.0
 
 ### Minor Changes
