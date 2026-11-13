@@ -11,11 +11,11 @@ A scan without a terminal attached prints the report and exits. It shows no spin
 
 | Exit code | Meaning |
 | --- | --- |
-| `0` | No `error`-severity finding. |
-| `1` | At least one `error`-severity finding. Also returned when the scan cannot start, for example on an invalid config file. |
+| `0` | No finding at or above the `--fail-on` severity, which defaults to `error`. |
+| `1` | At least one finding at or above the `--fail-on` severity. Also returned when the scan cannot start, for example on an invalid config file. |
 | `2` | A discovered file could not be read or parsed, so the scan is incomplete. |
 
-Warnings and info findings never fail the command. To fail on a warning, raise that rule to `error` in your [config file](/docs/reference/configuration). The [CLI reference](/docs/reference/cli#exit-codes) has the full table.
+By default warnings and info findings never fail the command. `--fail-on warning` fails on any warning or error, and `--fail-on info` on any finding. To fail on one rule's warnings only, raise that rule to `error` in your [config file](/docs/reference/configuration). `--fail-on none` reports findings without failing, so you can try docker-doctor in a pipeline before you enforce it. An incomplete scan still exits `2`. The [CLI reference](/docs/reference/cli#exit-codes) has the full table.
 
 ## GitLab CI
 

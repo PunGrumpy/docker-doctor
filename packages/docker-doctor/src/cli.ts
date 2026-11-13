@@ -8,6 +8,7 @@ import { setTimeout } from "node:timers/promises";
 import type {
   ComposeSource,
   Diagnostic,
+  DiagnosticSeverity,
   DockerDoctorConfig,
   FileIgnores,
   IgnoreFileWarning,
@@ -44,7 +45,7 @@ import {
   isSkillAgentType,
 } from "agent-install";
 import chalk from "chalk";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import packageJson from "../package.json" with { type: "json" };
 import { copyToClipboard } from "./agents/clipboard";
@@ -727,6 +728,17 @@ const WHITESPACE_RUN = /\s+/gu;
 const flattenMessage = (message: string): string =>
   message.replaceAll(WHITESPACE_RUN, " ").trim();
 
+const FAIL_ON_VALUES = ["error", "warning", "info", "none"] as const;
+
+type FailOn = (typeof FAIL_ON_VALUES)[number];
+
+const FAILING_SEVERITIES: Record<FailOn, ReadonlySet<DiagnosticSeverity>> = {
+  error: new Set(["error"]),
+  info: new Set(["error", "warning", "info"]),
+  none: new Set(),
+  warning: new Set(["error", "warning"]),
+};
+
 const scanExitCode = (scanIncomplete: boolean, failing: boolean): number => {
   if (scanIncomplete) {
     return SCAN_FAILURE_EXIT_CODE;
@@ -813,6 +825,7 @@ interface ScanOutcome {
 }
 
 interface OutputOptions {
+  failOn: FailOn;
   json?: boolean;
   score?: boolean;
   verbose?: boolean;
@@ -906,8 +919,9 @@ const writeScanOutput = async (
 
   // Every output mode gates on the same condition, so the same
   // project cannot pass in one mode and fail in another.
-  const hasErrors = diagnostics.some((d) => d.severity === "error");
-  const exitCode = scanExitCode(failures.length > 0, hasErrors);
+  const failingSeverities = FAILING_SEVERITIES[options.failOn];
+  const failing = diagnostics.some((d) => failingSeverities.has(d.severity));
+  const exitCode = scanExitCode(failures.length > 0, failing);
 
   if (options.score === true || options.json === true) {
     if (scoreResult.score === null) {
@@ -1019,6 +1033,7 @@ program
 
 interface ScanOptions {
   config?: string | false;
+  failOn: FailOn;
   json: boolean;
   score: boolean;
   verbose: boolean;
@@ -1042,6 +1057,14 @@ program
   .option("-s, --score", "only output numeric health score", false)
   .option("-j, --json", "output results as JSON report", false)
   .option("-c, --config <path>", "custom config file path")
+  .addOption(
+    new Option(
+      "--fail-on <severity>",
+      "lowest diagnostic severity that makes the scan exit 1; none never fails on findings"
+    )
+      .choices(FAIL_ON_VALUES)
+      .default("error")
+  )
   .option(
     "--no-config",
     "ignore config files and inline ignore comments and use the defaults, for repositories you did not write"
