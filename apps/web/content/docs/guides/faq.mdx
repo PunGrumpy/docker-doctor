@@ -47,7 +47,7 @@ ENV DB_PASSWORD=hunter2
 
 ## Will it fail my build?
 
-A finding fails the build only when it has `error` severity. Out of the box four rules have it: secrets in `ENV` or `ARG`, privileged Compose services, Docker socket mounts and references to an undeclared model. Warnings and info findings lower the score and never change the exit code. The CLI also exits `2` when it cannot read or parse a file it found. The [GitHub Action](/docs/guides/github-actions) is advisory by default and fails a pull request only after you raise its `blocking` input.
+By default a finding fails the build only when it has `error` severity. `--fail-on warning`, `--fail-on info` and `--fail-on none` move that threshold. Out of the box four rules have `error` severity: secrets in `ENV` or `ARG`, privileged Compose services, Docker socket mounts and references to an undeclared model. Under the default, warnings and info findings lower the score and never change the exit code. The CLI also exits `2` when it cannot read or parse a file it found. The [GitHub Action](/docs/guides/github-actions) is advisory by default and fails a pull request only after you raise its `blocking` input.
 
 ## Does a repository with many Docker files score lower?
 

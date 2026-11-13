@@ -91,6 +91,79 @@ describe("exit codes", () => {
   });
 });
 
+describe("--fail-on", () => {
+  test("warning fails a project that has only warnings", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("low-score-no-errors"),
+      "--json",
+      "--fail-on",
+      "warning",
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(
+      parseReport(stdout).diagnostics.every((d) => d.severity === "warning")
+    ).toBe(true);
+  });
+
+  test("info fails a project that has only info findings, and warning passes it", async () => {
+    const info = await runCli([
+      fixture("clean"),
+      "--score",
+      "--fail-on",
+      "info",
+    ]);
+
+    const warning = await runCli([
+      fixture("clean"),
+      "--score",
+      "--fail-on",
+      "warning",
+    ]);
+
+    expect(info.exitCode).toBe(1);
+    expect(Number.isInteger(Number(info.stdout.trim()))).toBe(true);
+    expect(warning.exitCode).toBe(0);
+  });
+
+  test("none passes a project with error-severity findings", async () => {
+    const { exitCode, stdout } = await runCli([
+      fixture("with-error"),
+      "--json",
+      "--fail-on",
+      "none",
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(
+      parseReport(stdout).diagnostics.some((d) => d.severity === "error")
+    ).toBe(true);
+  });
+
+  test("none still exits 2 when a file could not be analyzed", async () => {
+    const { exitCode } = await runCli([
+      fixture("partly-broken"),
+      "--json",
+      "--fail-on",
+      "none",
+    ]);
+
+    expect(exitCode).toBe(2);
+  });
+
+  test("rejects an unknown severity", async () => {
+    const { exitCode, stderr } = await runCli([
+      fixture("clean"),
+      "--json",
+      "--fail-on",
+      "critical",
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Allowed choices are error, warning, info, none");
+  });
+});
+
 describe("rules subcommands", () => {
   test("rules explain accepts the short rule name", async () => {
     const { exitCode, stdout } = await runCli([

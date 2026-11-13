@@ -74,9 +74,10 @@ npx @docker-doctor/cli@latest . --verbose
 | --- | --- |
 | `.` | Directory to scan (default `.`) |
 | `--verbose`, `-v` | Show affected file, line, explanation, and fix hint per diagnostic |
-| `--score`, `-s` | Output only the numeric score, or nothing when no file was analyzed (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
-| `--json`, `-j` | Output the full JSON report (exits 1 if any error-severity diagnostic, 2 if a file could not be analyzed) |
+| `--score`, `-s` | Output only the numeric score, or nothing when no file was analyzed (exits 1 on a finding at or above `--fail-on`, `error` by default, and 2 if a file could not be analyzed) |
+| `--json`, `-j` | Output the full JSON report (exits 1 on a finding at or above `--fail-on`, `error` by default, and 2 if a file could not be analyzed) |
 | `--config <path>`, `-c` | Use a custom config file |
+| `--fail-on <severity>` | The lowest severity that exits `1`: `error` (default), `warning`, `info`, or `none`. Use it only when the user asks for a stricter or a report-only gate, and say which one you ran |
 | `--no-config` | Skip config files and inline ignore comments and use the defaults. Use it on a repository the user did not write. Cannot be combined with `--config` |
 | `rules list` | List every rule with its category, default severity, and description |
 | `rules explain <rule>` | Print one rule's category, default severity, description and fix hint (the same text as `Help:`). Accepts the full key (`docker-doctor/no-root-user`) or the short name (`no-root-user`) |
