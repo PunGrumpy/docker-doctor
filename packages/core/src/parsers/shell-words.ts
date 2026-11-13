@@ -66,12 +66,20 @@ interface QuotedSpan {
 
 // The text inside the quote that opens just before `start`, and the index
 // after the closing quote. Single quotes take everything literally. In double
-// quotes a backslash escapes only `"`, `$`, a backtick and `\`.
+// quotes a backslash escapes only `"`, `$`, a backtick and `\`, and a
+// backslash-newline vanishes.
 const readQuoted = (text: string, start: number, quote: string): QuotedSpan => {
   let value = "";
   let index = start;
 
   while (index < text.length && text[index] !== quote) {
+    const continuation = quote === '"' ? continuationLength(text, index) : 0;
+
+    if (continuation > 0) {
+      index += continuation;
+      continue;
+    }
+
     const escaped = text[index + 1];
 
     if (
