@@ -8,7 +8,7 @@ import {
 } from "../parsers/image-ref";
 import { stripRunFlags } from "../parsers/run-flags";
 import { maskQuotedText } from "../parsers/shell-quotes";
-import { splitShellWords } from "../parsers/shell-words";
+import { splitShellCommands, splitShellWords } from "../parsers/shell-words";
 import { hasText } from "../text";
 import type {
   Diagnostic,
@@ -488,8 +488,6 @@ export const cleanPackageCache: DockerfileRule = {
   message: "Clean up package manager cache in the same RUN layer",
 };
 
-const SHELL_SEPARATOR_RE = /(?:(?<!\s)|(?!\s))\s*(?:&&|\|\||;|\|)\s*/u;
-const WHITESPACE_RE = /\s+/u;
 const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
 const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
 
@@ -597,10 +595,8 @@ const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
 
   let exported = env;
 
-  for (const segment of maskQuotedText(stripRunFlags(inst.args)).split(
-    SHELL_SEPARATOR_RE
-  )) {
-    const tokens = segment.split(WHITESPACE_RE).filter(Boolean);
+  for (const segment of splitShellCommands(stripRunFlags(inst.args))) {
+    const tokens = splitShellWords(segment);
 
     if (tokens[0] === "export") {
       exported = withAssignments(exported, tokens.slice(1));
