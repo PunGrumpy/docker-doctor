@@ -613,7 +613,6 @@ const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
   let exported = env;
 
   for (const tokens of segments) {
-
     if (tokens[0] === "export") {
       exported = withAssignments(exported, tokens.slice(1));
     } else if (segmentInstallsDevDependencies(tokens, exported)) {
