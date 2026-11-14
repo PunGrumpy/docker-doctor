@@ -35,9 +35,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --filter @docker-doctor/cli
       - name: Build CLI
-        run: bun run build --filter @docker-doctor/cli
+        run: bun run --filter @docker-doctor/cli build
       - name: Publish preview to pkg.pr.new
         run: |
           max_attempts=4
