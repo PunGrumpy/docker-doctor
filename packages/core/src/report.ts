@@ -67,15 +67,25 @@ const toReportDiagnostic = (d: Diagnostic): ReportDiagnostic => ({
   severity: d.severity,
 });
 
-export const toJsonReport = (
-  diagnostics: Diagnostic[],
-  score: number | null,
-  label: string | null,
-  project: ProjectInfo,
-  failures: ReportFailure[],
-  analyzedFiles: number,
-  suppressed: SuppressedDiagnostic[]
-): JsonReport => ({
+export interface ReportInput {
+  analyzedFiles: number;
+  diagnostics: readonly Diagnostic[];
+  failures: readonly ReportFailure[];
+  label: string | null;
+  project: ProjectInfo;
+  score: number | null;
+  suppressed: readonly SuppressedDiagnostic[];
+}
+
+export const toJsonReport = ({
+  analyzedFiles,
+  diagnostics,
+  failures,
+  label,
+  project,
+  score,
+  suppressed,
+}: ReportInput): JsonReport => ({
   analyzedFiles,
   diagnostics: diagnostics.map(toReportDiagnostic),
   failures: failures.map(({ file, message }) => ({ file, message })),

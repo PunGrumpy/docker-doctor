@@ -863,15 +863,15 @@ const writeTerminalReport = async (
     wizardOk = await runInteractiveWizard({
       diagnostics,
       ignoredConfig,
-      report: toJsonReport(
+      report: toJsonReport({
+        analyzedFiles: scan.analyzedFileCount,
         diagnostics,
-        score,
+        failures,
         label,
         project,
-        failures,
-        scan.analyzedFileCount,
-        scan.suppressed
-      ),
+        score,
+        suppressed: scan.suppressed,
+      }),
       rootDir,
     });
   }
@@ -895,15 +895,15 @@ const writeMachineReport = (
     return;
   }
 
-  const report = toJsonReport(
-    scan.diagnostics,
-    score,
+  const report = toJsonReport({
+    analyzedFiles: scan.analyzedFileCount,
+    diagnostics: scan.diagnostics,
+    failures: scan.failures,
     label,
-    scan.project,
-    scan.failures,
-    scan.analyzedFileCount,
-    scan.suppressed
-  );
+    project: scan.project,
+    score,
+    suppressed: scan.suppressed,
+  });
 
   console.log(JSON.stringify(report, null, 2));
 };

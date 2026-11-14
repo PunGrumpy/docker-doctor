@@ -59,15 +59,15 @@ const buildReport = (
   analyzedFiles: number,
   suppressed: SuppressedDiagnostic[] = []
 ) =>
-  toJsonReport(
+  toJsonReport({
+    analyzedFiles,
     diagnostics,
-    score,
+    failures,
     label,
     project,
-    failures,
-    analyzedFiles,
-    suppressed
-  );
+    score,
+    suppressed,
+  });
 
 const diagnostic = (
   rule: string,
