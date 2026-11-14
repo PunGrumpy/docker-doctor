@@ -585,18 +585,34 @@ const segmentInstallsDevDependencies = (
   );
 };
 
+// A real `npm prune` or `pnpm prune` removes devDependencies after an install,
+// wherever it sits in the RUN. The word "prune" elsewhere (a script path, an
+// echo, another tool's subcommand) does not.
+const PRUNING_MANAGERS = new Set(["npm", "pnpm"]);
+
+const isPruneCommand = (tokens: string[]): boolean => {
+  const [manager, verb] = tokens.slice(
+    tokens.findIndex((token) => !ENV_ASSIGNMENT_RE.test(token))
+  );
+
+  return PRUNING_MANAGERS.has(manager) && verb === "prune";
+};
+
 // An `export` earlier in the same RUN reaches every install after it. A plain
 // `NODE_ENV=production;` assignment does not, because the shell keeps it to
 // itself.
 const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
-  if (inst.args.includes("prune")) {
+  const segments = splitShellCommands(stripRunFlags(inst.args)).map(
+    splitShellWords
+  );
+
+  if (segments.some(isPruneCommand)) {
     return false;
   }
 
   let exported = env;
 
-  for (const segment of splitShellCommands(stripRunFlags(inst.args))) {
-    const tokens = splitShellWords(segment);
+  for (const tokens of segments) {
 
     if (tokens[0] === "export") {
       exported = withAssignments(exported, tokens.slice(1));
