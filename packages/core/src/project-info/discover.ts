@@ -67,6 +67,43 @@ interface WalkOptions {
   rootDir: string;
 }
 
+const isDockerfileName = (base: string): boolean =>
+  base === "dockerfile" ||
+  base.startsWith("dockerfile.") ||
+  base.endsWith(".dockerfile");
+
+const COMPOSE_FILE_NAMES = new Set([
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yml",
+  "compose.yaml",
+]);
+
+const hasComposePrefix = (base: string): boolean =>
+  base.startsWith("docker-compose.") || base.startsWith("compose.");
+
+const hasYamlExtension = (base: string): boolean =>
+  base.endsWith(".yml") || base.endsWith(".yaml");
+
+// docker-compose.yml, docker-compose.*.yml, compose.yml, compose.*.yml and
+// their .yaml spellings.
+const isComposeFileName = (base: string): boolean =>
+  COMPOSE_FILE_NAMES.has(base) ||
+  (hasComposePrefix(base) && hasYamlExtension(base));
+
+// Only these files are ever read from the tree, so the walk keeps nothing
+// else. A large tree then costs one name test per file, not a path and an
+// ignore match.
+const isDiscoverableName = (name: string): boolean => {
+  const base = name.toLowerCase();
+
+  return (
+    base.endsWith(".dockerignore") ||
+    isDockerfileName(base) ||
+    isComposeFileName(base)
+  );
+};
+
 const isPermissionError = (cause: unknown): boolean =>
   cause instanceof Error &&
   "code" in cause &&
@@ -96,17 +133,12 @@ const walk = async (
 
   await Promise.all(
     files.map(async (file) => {
-      const filePath = path.join(dir, file.name);
-
-      if (file.isSymbolicLink()) {
-        // Never traverse a symlinked directory (cycles, trees outside the
-        // root). A symlinked file is listed and later read through the link.
-        fileList.push(filePath);
-
-        return;
-      }
-
+      // A Dirent describes the link itself, so a symlinked directory is
+      // never traversed (cycles, trees outside the root). It is listed like
+      // a file and later read through the link.
       if (file.isDirectory()) {
+        const filePath = path.join(dir, file.name);
+
         if (
           PRUNED.has(file.name) ||
           options.isPrunedByConfig(toPosixRelative(options.rootDir, filePath))
@@ -115,38 +147,14 @@ const walk = async (
         }
 
         await walk(filePath, options, fileList);
-      } else {
-        fileList.push(filePath);
+      } else if (isDiscoverableName(file.name)) {
+        fileList.push(path.join(dir, file.name));
       }
     })
   );
 
   return fileList;
 };
-
-const isDockerfileName = (base: string): boolean =>
-  base === "dockerfile" ||
-  base.startsWith("dockerfile.") ||
-  base.endsWith(".dockerfile");
-
-const COMPOSE_FILE_NAMES = new Set([
-  "docker-compose.yml",
-  "docker-compose.yaml",
-  "compose.yml",
-  "compose.yaml",
-]);
-
-const hasComposePrefix = (base: string): boolean =>
-  base.startsWith("docker-compose.") || base.startsWith("compose.");
-
-const hasYamlExtension = (base: string): boolean =>
-  base.endsWith(".yml") || base.endsWith(".yaml");
-
-// docker-compose.yml, docker-compose.*.yml, compose.yml, compose.*.yml and
-// their .yaml spellings.
-const isComposeFileName = (base: string): boolean =>
-  COMPOSE_FILE_NAMES.has(base) ||
-  (hasComposePrefix(base) && hasYamlExtension(base));
 
 export const discoverProject = async (
   rootDir: string,
@@ -157,7 +165,7 @@ export const discoverProject = async (
     onSkippedDirectory?: (relativeDir: string) => void;
   }
 ): Promise<ProjectInfo> => {
-  const allFiles = await walk(rootDir, {
+  const candidates = await walk(rootDir, {
     isPrunedByConfig: createPrunedDirectoryMatcher(options?.ignoreFiles),
     onSkippedDirectory: options?.onSkippedDirectory,
     rootDir,
@@ -170,7 +178,7 @@ export const discoverProject = async (
   // and `examples/*` are only applied here.
   const isIgnored = createIgnoreMatcher(options?.ignoreFiles);
 
-  for (const file of allFiles) {
+  for (const file of candidates) {
     const relative = toPosixRelative(rootDir, file);
 
     if (isIgnored(relative)) {
