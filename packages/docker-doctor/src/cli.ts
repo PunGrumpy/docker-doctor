@@ -29,7 +29,9 @@ import {
   runComposeFiles,
   applyIgnores,
   calculateScore,
+  compareWithBaseline,
   fingerprintDiagnostics,
+  isNewFinding,
   loadConfig,
   allRules,
   findRuleByName,
@@ -55,6 +57,8 @@ import {
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
 import { sanitizePath } from "./agents/sanitize";
+import { readBaseline } from "./baseline";
+import type { SavedBaseline } from "./baseline";
 import { formatTerminal } from "./formatters/terminal";
 import {
   CLEAR_TO_LINE_END,
@@ -827,6 +831,9 @@ interface ScanOutcome {
 }
 
 interface OutputOptions {
+  // Only findings whose fingerprint is missing from the saved report can
+  // fail the scan.
+  baseline: SavedBaseline | null;
   failOn: FailOn;
   json?: boolean;
   score?: boolean;
@@ -836,7 +843,7 @@ interface OutputOptions {
 const writeTerminalReport = async (
   scan: ScanOutcome,
   { label, score }: { label: string; score: number },
-  verbose: boolean,
+  { baseline, verbose }: OutputOptions,
   exitCode: number
 ): Promise<number> => {
   const {
@@ -853,10 +860,13 @@ const writeTerminalReport = async (
     score,
     label,
     project,
-    verbose,
+    verbose === true,
     fileContents,
     failures.length,
-    scan.suppressed
+    scan.suppressed,
+    baseline === null
+      ? null
+      : compareWithBaseline(diagnostics, baseline.fingerprints)
   );
 
   let wizardOk = true;
@@ -867,6 +877,7 @@ const writeTerminalReport = async (
       ignoredConfig,
       report: toJsonReport({
         analyzedFiles: scan.analyzedFileCount,
+        baseline: baseline?.fingerprints ?? null,
         diagnostics,
         failures,
         label,
@@ -887,9 +898,9 @@ const writeTerminalReport = async (
 const writeMachineReport = (
   scan: ScanOutcome,
   { label, score }: ScoreResult,
-  scoreOnly: boolean
+  { baseline, score: scoreOnly }: OutputOptions
 ): void => {
-  if (scoreOnly) {
+  if (scoreOnly === true) {
     if (score !== null) {
       console.log(score);
     }
@@ -899,6 +910,7 @@ const writeMachineReport = (
 
   const report = toJsonReport({
     analyzedFiles: scan.analyzedFileCount,
+    baseline: baseline?.fingerprints ?? null,
     diagnostics: scan.diagnostics,
     failures: scan.failures,
     label,
@@ -908,6 +920,25 @@ const writeMachineReport = (
   });
 
   console.log(JSON.stringify(report, null, 2));
+};
+
+// Findings match by their path from the scan root, so a report saved from
+// another directory shares no path with this scan. A report whose files are
+// scanned here is from the right directory, however many of its findings
+// were fixed since.
+const warnIfBaselineIsFromAnotherDirectory = (
+  baseline: SavedBaseline,
+  { dockerfiles, composeFiles }: ProjectInfo
+): void => {
+  const scanned = [...dockerfiles, ...composeFiles];
+
+  if (baseline.files.size === 0 || scanned.some((f) => baseline.files.has(f))) {
+    return;
+  }
+
+  printWarning(
+    "Warning: no finding matches the --baseline report. Save the report and run the scan from the same directory, because findings match by their path from it."
+  );
 };
 
 const writeScanOutput = async (
@@ -922,8 +953,19 @@ const writeScanOutput = async (
   // Every output mode gates on the same condition, so the same
   // project cannot pass in one mode and fail in another.
   const failingSeverities = FAILING_SEVERITIES[options.failOn];
-  const failing = diagnostics.some((d) => failingSeverities.has(d.severity));
+
+  const failing = diagnostics.some(
+    (d) =>
+      failingSeverities.has(d.severity) &&
+      (options.baseline === null ||
+        isNewFinding(d, options.baseline.fingerprints))
+  );
+
   const exitCode = scanExitCode(failures.length > 0, failing);
+
+  if (options.baseline !== null) {
+    warnIfBaselineIsFromAnotherDirectory(options.baseline, scan.project);
+  }
 
   if (options.score === true || options.json === true) {
     if (scoreResult.score === null) {
@@ -935,7 +977,7 @@ const writeScanOutput = async (
       console.error(`Warning: ${message}`);
     }
 
-    writeMachineReport(scan, scoreResult, options.score === true);
+    writeMachineReport(scan, scoreResult, options);
 
     return exitCode;
   }
@@ -950,12 +992,7 @@ const writeScanOutput = async (
     return exitCode;
   }
 
-  return await writeTerminalReport(
-    scan,
-    scoreResult,
-    options.verbose === true,
-    exitCode
-  );
+  return await writeTerminalReport(scan, scoreResult, options, exitCode);
 };
 
 const statOrNull = async (filePath: string): Promise<Stats | null> => {
@@ -1039,6 +1076,7 @@ program
   .showHelpAfterError("(add --help for additional information)");
 
 interface ScanOptions {
+  baseline?: string;
   config?: string | false;
   failOn: FailOn;
   json: boolean;
@@ -1071,6 +1109,10 @@ program
     )
       .choices(FAIL_ON_VALUES)
       .default("error")
+  )
+  .option(
+    "--baseline <report.json>",
+    "a saved --json report; only findings it does not have can fail the scan"
   )
   .option(
     "--no-config",
@@ -1126,6 +1168,12 @@ program
 
         return;
       }
+
+      // Read before the scan, so a missing or stale report fails at once.
+      const baseline =
+        options.baseline === undefined
+          ? null
+          : await readBaseline(options.baseline);
 
       const startTime = Date.now();
 
@@ -1241,7 +1289,7 @@ program
             scannedFileCount,
             suppressed,
           },
-          options
+          { ...options, baseline }
         );
       } finally {
         if (spinnerInterval !== null) {

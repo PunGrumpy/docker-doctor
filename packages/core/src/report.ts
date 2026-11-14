@@ -1,3 +1,5 @@
+import { compareWithBaseline, isNewFinding } from "./baseline";
+import type { BaselineCounts } from "./baseline";
 import { findRule } from "./rules/index";
 import type {
   Diagnostic,
@@ -24,6 +26,9 @@ export interface ReportDiagnostic {
   help: string;
   line?: number;
   message: string;
+  // Present only on a scan run with --baseline: true when the saved report
+  // does not have this finding.
+  new?: boolean;
   rule: string;
   severity: "error" | "warning" | "info";
 }
@@ -37,6 +42,8 @@ export interface ReportSuppressed extends ReportDiagnostic {
 
 export interface JsonReport {
   analyzedFiles: number;
+  // null unless the scan ran with --baseline.
+  baseline: BaselineCounts | null;
   diagnostics: ReportDiagnostic[];
   failures: ReportFailure[];
   label: string | null;
@@ -74,6 +81,9 @@ const toReportDiagnostic = (d: FingerprintedDiagnostic): ReportDiagnostic => ({
 
 export interface ReportInput {
   analyzedFiles: number;
+  // The fingerprints of the saved report's findings, or null without
+  // --baseline.
+  baseline: ReadonlySet<string> | null;
   diagnostics: readonly FingerprintedDiagnostic[];
   failures: readonly ReportFailure[];
   label: string | null;
@@ -84,6 +94,7 @@ export interface ReportInput {
 
 export const toJsonReport = ({
   analyzedFiles,
+  baseline,
   diagnostics,
   failures,
   label,
@@ -92,7 +103,13 @@ export const toJsonReport = ({
   suppressed,
 }: ReportInput): JsonReport => ({
   analyzedFiles,
-  diagnostics: diagnostics.map(toReportDiagnostic),
+  baseline:
+    baseline === null ? null : compareWithBaseline(diagnostics, baseline),
+  diagnostics: diagnostics.map((d) =>
+    baseline === null
+      ? toReportDiagnostic(d)
+      : { ...toReportDiagnostic(d), new: isNewFinding(d, baseline) }
+  ),
   failures: failures.map(({ file, message }) => ({ file, message })),
   label,
   project,

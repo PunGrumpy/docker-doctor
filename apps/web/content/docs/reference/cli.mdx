@@ -18,6 +18,7 @@ npx @docker-doctor/cli@latest [dir]
 | `--json` | `-j` | Output the full report as JSON |
 | `--config <path>` | `-c` | Use a custom config file; the path is relative to the current directory (or absolute) |
 | `--fail-on <severity>` |  | The lowest severity that makes the scan exit `1`: `error` (the default), `warning`, `info`, or `none`. `none` reports findings and exits `0` on them, so a pipeline can run docker-doctor before it enforces it. It does not change exit code `2`. |
+| `--baseline <report.json>` |  | Compare with a report saved earlier by `--json`, and let only the findings it does not have make the scan exit `1`. The report and the score still list every finding. See [Baseline](#baseline). |
 | `--no-config` |  | Skip config lookup and [inline ignore comments](/docs/reference/configuration#inline-ignore-comments), and use the defaults. Use it on a repository you did not write, because a JavaScript or TypeScript config in the scanned directory runs as code, and its comments can hide findings. Cannot be combined with `--config`. |
 | `--version` | `-V` | Print the CLI version |
 | `--help` | `-h` | Print usage for the command |
@@ -41,9 +42,29 @@ The same rules apply to the default scan, `--score`, and `--json`. `--fail-on no
 | Code | Meaning |
 | --- | --- |
 | `0` | Scan complete, no diagnostic at or above the `--fail-on` severity (`error` by default). Also returned when docker-doctor finds no Dockerfile or Compose file, or finds only files with nothing to check. Such a scan has no score. The terminal output says so, and `--json` and `--score` print a warning on stderr. |
-| `1` | Scan complete, at least one diagnostic at or above the `--fail-on` severity (`error` by default). In interactive mode, also returned when docker-doctor can't write the workflow scaffold, the `.docker-doctor/` handoff files or the `.gitignore` entry for them. |
+| `1` | Scan complete, at least one diagnostic at or above the `--fail-on` severity (`error` by default). With `--baseline`, only a diagnostic the saved report does not have counts. Also returned when the `--baseline` report cannot be read or has no fingerprints. In interactive mode, also returned when docker-doctor can't write the workflow scaffold, the `.docker-doctor/` handoff files or the `.gitignore` entry for them. |
 | `2` | Scan incomplete: one or more discovered files could not be read or parsed. The report and score cover only the files that were analyzed; the failures are listed on stderr. `2` wins over `1`. In `--json` output the affected files are listed under `failures`. When no file could be analyzed there is no score. See [JSON report](#json-report). |
 | `130` / `143` | Interrupted (SIGINT / SIGTERM) |
+
+### Baseline
+
+`--baseline` lets a project with findings turn on a strict gate today. Save a report once (`--fail-on none` keeps that step from failing on today's findings), then gate every later scan on it:
+
+```bash
+npx @docker-doctor/cli@latest . --json --fail-on none > docker-doctor-baseline.json
+npx @docker-doctor/cli@latest . --fail-on warning --baseline docker-doctor-baseline.json
+```
+
+The second command exits `1` only for a finding at or above the `--fail-on` severity that the saved report does not have. It exits `0` for the findings you accepted when you saved it, and still exits `2` when a file could not be analyzed. The terminal report prints one line with the `new`, `existing` and `resolved` counts.
+
+Findings are matched by their `fingerprint`, so adding lines above a finding or a new release rewording its message keeps it existing. What else a fingerprint covers depends on the file:
+
+- In a Dockerfile, the whole instruction at the finding's line, continuation lines included. Any edit to that instruction makes its findings new. A finding about the whole file, such as `no-root-user` or `require-healthcheck`, keeps its fingerprint until it is fixed.
+- In a Compose file, the key path at the finding's line, plus the value of a list item. Editing a list item, such as a `volumes` or `environment` entry, makes its findings new, and a comment inside the item does not. Changing the value of a key keeps them, so a `pin-service-image` finding stays existing when the image changes. Renaming a service or a key makes the findings under it new.
+
+Identical findings, such as two copies of one instruction, are told apart by their order in the file. If you add a copy above an existing one, the `new` flag lands on the lower one, which is the older finding.
+
+Scan the same directory both times, because fingerprints include each file's path from the scanned directory. Pass the same config flags, such as `--config` or `--no-config`, when you save the report and when you gate on it, because the config and ignore comments decide which findings the scan reports. Findings hidden by an ignore comment never count. A report from a release before schema 8 has no fingerprints, and docker-doctor refuses it with exit `1`. Save it again with the current release.
 
 ### Environment variables
 
@@ -62,6 +83,7 @@ The same rules apply to the default scan, `--score`, and `--json`. `--fail-on no
 | `schemaVersion` | The report format version. See the table below. |
 | `score`, `label` | The health score and its label. Both are `null` when no file was analyzed, including when no Dockerfile or Compose file was found. |
 | `analyzedFiles` | How many Dockerfiles and Compose files the score covers. |
+| `baseline` | `null`, unless the scan ran with `--baseline`. Then it holds three counts: `new` findings the saved report does not have, `existing` findings it has, and `resolved` findings it has that this scan no longer finds. Each `diagnostics` entry then also has `new`, which is `true` when the saved report does not have that finding. |
 | `diagnostics` | One entry per finding, with `rule`, `category`, `severity`, `file`, `message`, `help` and `fingerprint`, plus `line` when known. `fingerprint` is a 16-character key that stays the same from scan to scan while the code the finding points at is unchanged, even when lines above it move or a new release rewords the message. |
 | `suppressed` | Findings an inline ignore comment hid. Each has the fields of a `diagnostics` entry plus `reason`, the text after `--` in the comment, or `null`. They count toward neither the score nor the exit code. See [Inline ignore comments](/docs/reference/configuration#inline-ignore-comments). |
 | `failures` | Files docker-doctor found but could not read or parse, each with its error `message`. |
@@ -78,7 +100,7 @@ The same rules apply to the default scan, `--score`, and `--json`. `--fail-on no
 | 5 | 0.7.0 | The score averages the penalty over the analyzed files. Scores are not comparable with version 4. |
 | 6 | 0.8.0 | Added `analyzedFiles`. `score` and `label` are `null` when no file was analyzed. Empty files and files with nothing to check no longer count toward the average. |
 | 7 | 0.10.0 | Added `suppressed`. Removed `diagnostics[].column`, which was never set. |
-| 8 | next release | Added `fingerprint` to every `diagnostics` and `suppressed` entry. |
+| 8 | next release | Added `fingerprint` to every `diagnostics` and `suppressed` entry, and `baseline`. |
 
 Reports from before 0.3.0 have no `schemaVersion` field. Treat them as version 1.
 

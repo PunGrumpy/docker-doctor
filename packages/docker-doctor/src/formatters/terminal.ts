@@ -1,6 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 
 import type {
+  BaselineCounts,
   Diagnostic,
   ProjectInfo,
   RuleCategory,
@@ -240,6 +241,18 @@ const printSuppressed = (
   }
 };
 
+// Only the new findings can fail a scan run with --baseline, so the
+// summary says how many there are.
+const printBaseline = (baseline: BaselineCounts | null): void => {
+  if (baseline === null) {
+    return;
+  }
+
+  console.log(
+    `\n  ${chalk.bold("Baseline:")} ${baseline.new} new, ${baseline.existing} existing, ${baseline.resolved} resolved`
+  );
+};
+
 const getWhaleMascot = (
   score: number,
   border: (text: string) => string
@@ -400,7 +413,8 @@ export const formatTerminal = async (
   verbose = false,
   fileContents: Record<string, string> = {},
   failedFileCount = 0,
-  suppressed: SuppressedDiagnostic[] = []
+  suppressed: SuppressedDiagnostic[] = [],
+  baseline: BaselineCounts | null = null
 ): Promise<void> => {
   if (verbose) {
     console.log(`\n${chalk.bold("Docker Doctor Diagnostics")}`);
@@ -441,6 +455,7 @@ export const formatTerminal = async (
   );
 
   printSuppressed(suppressed, verbose);
+  printBaseline(baseline);
 
   await printScoreBox(
     score,

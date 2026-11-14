@@ -60,6 +60,7 @@ const makeReport = (
   failures: JsonReport["failures"] = []
 ): JsonReport => ({
   analyzedFiles: 1,
+  baseline: null,
   diagnostics: diagnostics.map(toReportDiagnostic),
   failures,
   label: "Good ✅",

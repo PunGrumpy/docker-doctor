@@ -94,6 +94,12 @@ export type {
 } from "./types/index";
 
 export {
+  type BaselineCounts,
+  compareWithBaseline,
+  isNewFinding,
+} from "./baseline";
+
+export {
   toJsonReport,
   type JsonReport,
   type ReportDiagnostic,

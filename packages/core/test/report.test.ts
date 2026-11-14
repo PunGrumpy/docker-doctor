@@ -25,6 +25,7 @@ const ALL_CATEGORIES: RuleCategory[] = [
 
 const TOP_LEVEL_KEYS = [
   "analyzedFiles",
+  "baseline",
   "diagnostics",
   "failures",
   "label",
@@ -64,6 +65,7 @@ const buildReport = (
 ) =>
   toJsonReport({
     analyzedFiles,
+    baseline: null,
     diagnostics,
     failures,
     label,
@@ -263,5 +265,45 @@ describe("JSON report contract", () => {
       label: "Excellent 🏆",
       score: ONE_INFO_SCORE,
     });
+  });
+});
+
+const findingWith = (fingerprint: string): FingerprintedDiagnostic => ({
+  ...diagnostic("docker-doctor/no-root-user", "warning"),
+  fingerprint,
+});
+
+describe("JSON report with a baseline", () => {
+  test("has no baseline counts and no new field without one", () => {
+    const report = buildReport(
+      [findingWith("aaaaaaaaaaaaaaaa")],
+      0,
+      "Critical 🚨",
+      EMPTY_PROJECT,
+      [],
+      1
+    );
+
+    expect(report.baseline).toBeNull();
+    expect(Object.keys(report.diagnostics[0] ?? {})).not.toContain("new");
+  });
+
+  test("marks the findings the baseline lacks and counts the ones it lost", () => {
+    const report = toJsonReport({
+      analyzedFiles: 1,
+      baseline: new Set(["aaaaaaaaaaaaaaaa", "cccccccccccccccc"]),
+      diagnostics: [
+        findingWith("aaaaaaaaaaaaaaaa"),
+        findingWith("bbbbbbbbbbbbbbbb"),
+      ],
+      failures: [],
+      label: "Critical 🚨",
+      project: EMPTY_PROJECT,
+      score: 0,
+      suppressed: [],
+    });
+
+    expect(report.baseline).toEqual({ existing: 1, new: 1, resolved: 1 });
+    expect(report.diagnostics.map((d) => d.new)).toEqual([false, true]);
   });
 });
