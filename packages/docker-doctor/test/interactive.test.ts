@@ -185,3 +185,19 @@ describe("agent handoff", () => {
     TEST_TIMEOUT_MS
   );
 });
+
+describe("warnings while the spinner runs", () => {
+  test(
+    "start on a clear line, not after the spinner text",
+    async () => {
+      const output = await runOnTerminal(
+        [fixture("with-unknown-config-keys")],
+        SCAN_SUMMARY
+      );
+
+      expect(output).toContain("Warning: Unknown rule");
+      expect(output).not.toMatch(/[a-z.]Warning:/u);
+    },
+    TEST_TIMEOUT_MS
+  );
+});

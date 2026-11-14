@@ -585,12 +585,24 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
   return summary;
 };
 
+// While the spinner runs it owns the current line, so a warning written to
+// stderr would land after the frame text. Clear the line first.
+let spinnerOwnsLine = false;
+
+const printWarning = (message: string): void => {
+  if (spinnerOwnsLine) {
+    process.stdout.write(`\r${CLEAR_TO_LINE_END}`);
+  }
+
+  console.error(message);
+};
+
 // Stderr, like the config warnings, so --json and --score stay parseable.
 const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
   for (const { file, line, message } of warnings) {
     // The path comes from the scanned tree, so it is flattened like the
     // message before it reaches stderr.
-    console.error(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
+    printWarning(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
   }
 };
 
@@ -634,7 +646,7 @@ const runRulesEngine = async (
         // A file we could not read or parse has not been checked. The
         // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
+        printWarning(`Failed to analyze Dockerfile ${df}: ${msg}`);
 
         return {
           analyzed: false,
@@ -664,7 +676,7 @@ const runRulesEngine = async (
         };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+        printWarning(`Failed to analyze Compose file ${cf}: ${msg}`);
 
         return { file: cf, message: msg };
       }
@@ -681,7 +693,7 @@ const runRulesEngine = async (
     composeSources,
     { categoriesConfig, rulesConfig },
     (message) => {
-      console.error(`Warning: ${message}`);
+      printWarning(`Warning: ${message}`);
     }
   );
 
@@ -1112,6 +1124,7 @@ program
       };
 
       if (showProgress) {
+        spinnerOwnsLine = true;
         process.stdout.write(HIDE_CURSOR);
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
         spinnerInterval = setInterval(() => {
@@ -1133,7 +1146,7 @@ program
           const configPath = await resolveConfigPath(options.config, rootDir);
 
           config = await loadConfig(rootDir, configPath, (message) => {
-            console.error(`Warning: ${message}`);
+            printWarning(`Warning: ${message}`);
           });
         }
 
@@ -1142,7 +1155,7 @@ program
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
           onSkippedDirectory: (skippedDir) => {
-            console.error(
+            printWarning(
               `Warning: skipped unreadable directory ${skippedDir} (permission denied)`
             );
           },
@@ -1187,6 +1200,7 @@ program
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
           spinnerInterval = null;
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
 
@@ -1215,6 +1229,7 @@ program
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
       }
