@@ -1,10 +1,57 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import type { JsonReport } from "@docker-doctor/core";
 import { allRules } from "@docker-doctor/core";
+
+// bunfig.toml runs this file's tests concurrently, and bun starts up to 20 at
+// once. Each test waits for a CLI process slot, so the burst stays below the
+// CPU count. Twenty Node processes at once starve the timing-bounded core
+// tests that turbo runs beside this package. The wait counts toward the test
+// timeout, and the default 5 s is too short on a one or two core machine.
+const CLI_TEST_TIMEOUT_MS = 30_000;
+
+// A Bun test timeout does not kill the processes a test started. A hung CLI
+// would keep its slot forever and every test queued behind it would time out.
+// Bun kills the child itself when it outlives this, which is below the test
+// timeout, so the slot is free before the test gives up.
+const CLI_PROCESS_TIMEOUT_MS = 20_000;
+
+const MAX_CLI_PROCESSES = Math.max(
+  1,
+  Math.floor(os.availableParallelism() / 2)
+);
+
+setDefaultTimeout(CLI_TEST_TIMEOUT_MS);
+
+let runningCliProcesses = 0;
+
+const waitingForSlot: ((granted: boolean) => void)[] = [];
+
+const acquireCliSlot = async () => {
+  if (runningCliProcesses < MAX_CLI_PROCESSES) {
+    runningCliProcesses += 1;
+
+    return;
+  }
+
+  // A released slot passes straight to the first waiter, so the count stays.
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  waitingForSlot.push(resolve);
+  await promise;
+};
+
+const releaseCliSlot = () => {
+  const waiter = waitingForSlot.shift();
+
+  if (waiter) {
+    waiter(true);
+  } else {
+    runningCliProcesses -= 1;
+  }
+};
 
 const CLI = path.join(import.meta.dir, "..", "dist", "cli.mjs");
 const fixture = (name: string) => path.join(import.meta.dir, "fixtures", name);
@@ -31,18 +78,25 @@ const runCli = async (
   args: string[],
   options: { cwd?: string; env?: Record<string, string> } = {}
 ) => {
-  const proc = Bun.spawn(["node", CLI, ...args], {
-    cwd: options.cwd,
-    env: options.env ? { ...process.env, ...options.env } : undefined,
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  await acquireCliSlot();
 
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  const exitCode = await proc.exited;
+  try {
+    const proc = Bun.spawn(["node", CLI, ...args], {
+      cwd: options.cwd,
+      env: options.env ? { ...process.env, ...options.env } : undefined,
+      stderr: "pipe",
+      stdout: "pipe",
+      timeout: CLI_PROCESS_TIMEOUT_MS,
+    });
 
-  return { exitCode, stderr, stdout };
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+
+    return { exitCode, stderr, stdout };
+  } finally {
+    releaseCliSlot();
+  }
 };
 
 beforeAll(async () => {
@@ -1274,21 +1328,34 @@ describe("piped --json output is not truncated", () => {
     // Cross-check against a non-piped (file-redirected) run: the
     // diagnostics count must match exactly -- a truncated pipe write
     // would either fail JSON.parse or yield a shorter diagnostics array.
-    const outFile = path.join(import.meta.dir, ".large-out.json");
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "dd-large-out-"));
 
-    const redirected = Bun.spawn(
-      ["node", CLI, fixture("many-diagnostics"), "--json"],
-      {
-        stderr: "pipe",
-        stdout: Bun.file(outFile),
+    try {
+      const outFile = path.join(outDir, "report.json");
+
+      await acquireCliSlot();
+
+      try {
+        const redirected = Bun.spawn(
+          ["node", CLI, fixture("many-diagnostics"), "--json"],
+          {
+            stderr: "pipe",
+            stdout: Bun.file(outFile),
+            timeout: CLI_PROCESS_TIMEOUT_MS,
+          }
+        );
+
+        await redirected.exited;
+      } finally {
+        releaseCliSlot();
       }
-    );
 
-    await redirected.exited;
-    const fileReport = parseReport(await Bun.file(outFile).text());
-    await Bun.file(outFile).delete();
+      const fileReport = parseReport(await Bun.file(outFile).text());
 
-    expect(fileReport.diagnostics).toHaveLength(report.diagnostics.length);
+      expect(fileReport.diagnostics).toHaveLength(report.diagnostics.length);
+    } finally {
+      fs.rmSync(outDir, { force: true, recursive: true });
+    }
   });
 });
 
