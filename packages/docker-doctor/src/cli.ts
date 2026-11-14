@@ -1,9 +1,7 @@
 import type { Stats } from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { setTimeout } from "node:timers/promises";
 
 import type {
   ComposeSource,
@@ -605,16 +603,10 @@ const runRulesEngine = async (
   categoriesConfig: Record<string, RuleSeverity> | undefined,
   projectFilesList: string[],
   fileContents: Record<string, string>,
-  options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void,
   readIgnores: boolean
 ): Promise<RulesEngineResult> => {
-  const isSilent = options.score === true || options.json === true;
-
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
 
   const dockerfileResults = await Promise.all(
     project.dockerfiles.map(async (df): Promise<FileResult> => {
@@ -656,10 +648,7 @@ const runRulesEngine = async (
     })
   );
 
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
 
   const composeReads = await Promise.all(
     project.composeFiles.map(async (cf): Promise<ComposeRead | ScanFailure> => {
@@ -1136,10 +1125,6 @@ program
       }
 
       try {
-        if (showProgress) {
-          await setTimeout(150);
-        }
-
         // A config file can be code, so --no-config never reads one.
         let config: DockerDoctorConfig = {};
 
@@ -1184,7 +1169,6 @@ program
           config.categories,
           projectFilesList,
           fileContents,
-          options,
           setStatus,
           // An ignore comment is as author-controlled as a config file, so
           // --no-config turns both off.
@@ -1201,7 +1185,6 @@ program
         printIgnoreWarnings(warnings);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-        const concurrency = os.cpus().length;
 
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
@@ -1210,8 +1193,10 @@ program
         }
 
         if (showProgress) {
+          const fileWord = scannedFileCount === 1 ? "file" : "files";
+
           console.log(
-            `${chalk.green("✔")} Scanned ${scannedFileCount} files in ${duration}s [~${concurrency} workers]`
+            `${chalk.green("✔")} Scanned ${scannedFileCount} ${fileWord} in ${duration}s`
           );
         }
 
