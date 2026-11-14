@@ -585,15 +585,79 @@ const segmentInstallsDevDependencies = (
   );
 };
 
-// An `export` earlier in the same RUN reaches every install after it. A plain
-// `NODE_ENV=production;` assignment does not, because the shell keeps it to
-// itself.
-const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
-  if (inst.args.includes("prune")) {
+// `--omit dev` and `--omit=dev` mean the same to npm; the switch reader only
+// knows the `=` spelling.
+const joinSpacedOmit = (options: string[]): string[] =>
+  options.flatMap((option, index) =>
+    options[index - 1] === "--omit"
+      ? []
+      : [
+          option === "--omit" && index + 1 < options.length
+            ? `--omit=${options[index + 1]}`
+            : option,
+        ]
+  );
+
+// One shell command that removes devDependencies from node_modules: `npm
+// prune` that omits dev (by flag, or NODE_ENV=production or npm_config_*), or
+// `pnpm prune --prod`. A bare `npm prune` only removes extraneous packages,
+// and `--dry-run` removes nothing. pnpm's prune takes its production setting
+// from the flag, as pnpm's install ignores NODE_ENV. The word "prune" in a
+// script path, an echo or another tool's subcommand does not count.
+const segmentPrunesDevDependencies = (
+  tokens: string[],
+  runEnv: InstallEnv
+): boolean => {
+  const commandStart = tokens.findIndex(
+    (token) => !ENV_ASSIGNMENT_RE.test(token)
+  );
+
+  if (commandStart === -1) {
     return false;
   }
 
+  const [manager, ...rest] = tokens.slice(commandStart);
+
+  if (manager !== "npm" && manager !== "pnpm") {
+    return false;
+  }
+
+  const verbAt = rest.findIndex((token) => !token.startsWith("-"));
+
+  if (verbAt === -1 || rest[verbAt] !== "prune") {
+    return false;
+  }
+
+  const options = joinSpacedOmit([
+    ...rest.slice(0, verbAt),
+    ...rest.slice(verbAt + 1),
+  ]);
+
+  if (
+    options.some(
+      (option) => option === "--dry-run" || option === "--dry-run=true"
+    )
+  ) {
+    return false;
+  }
+
+  if (manager === "pnpm") {
+    return options.some((option) => flagLeavesDevOut(manager, option));
+  }
+
+  return npmOmitsDev(
+    npmCommandLineSwitches(options),
+    withAssignments(runEnv, tokens.slice(0, commandStart))
+  );
+};
+
+// An `export` earlier in the same RUN reaches every install after it. A plain
+// `NODE_ENV=production;` assignment does not, because the shell keeps it to
+// itself. A prune only removes what the installs before it brought in, so an
+// install after it counts again.
+const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
   let exported = env;
+  let installed = false;
 
   for (const segment of splitShellCommands(stripRunFlags(inst.args))) {
     const tokens = splitShellWords(segment);
@@ -601,11 +665,13 @@ const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
     if (tokens[0] === "export") {
       exported = withAssignments(exported, tokens.slice(1));
     } else if (segmentInstallsDevDependencies(tokens, exported)) {
-      return true;
+      installed = true;
+    } else if (segmentPrunesDevDependencies(tokens, exported)) {
+      installed = false;
     }
   }
 
-  return false;
+  return installed;
 };
 
 export const avoidDevDependencies: DockerfileRule = {
