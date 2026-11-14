@@ -1,50 +1,106 @@
 #!/bin/sh
 set -e
 
-# ultracite
-# Format only the staged files and stage only them again. Paths are read
-# NUL-separated so a name with spaces or non-ASCII characters is not skipped.
-STAGED_LIST="$(mktemp)"
-trap 'rm -f "$STAGED_LIST"' EXIT
-git diff -z --cached --name-only --diff-filter=ACMR >"$STAGED_LIST"
-if [ ! -s "$STAGED_LIST" ]; then
-  echo "No staged files to format"
+if git diff --cached --quiet; then
+  echo "Nothing staged, so no checks to run"
   exit 0
 fi
 
-# Adding a file again after formatting stages all of it, which would
-# commit its unstaged changes too. Putting them back after formatting
-# conflicts whenever the formatter touched the staged lines.
-PARTIAL="$(xargs -0 git --literal-pathspecs diff --name-only -- <"$STAGED_LIST")"
-if [ -n "$PARTIAL" ]; then
-  echo "These staged files also have unstaged changes:"
-  echo "$PARTIAL"
-  echo "Stage them fully with git add. To commit only the staged part, run"
-  echo "bun run fix, stage the hunks again, and commit with"
-  echo "  git stash push --keep-index && git commit && git stash pop"
-  exit 1
+# ultracite
+# Format only the staged files and stage only them again. Paths are read
+# NUL-separated so a name with spaces or non-ASCII characters is not skipped.
+# A commit that only deletes files has nothing to format but still gets the
+# checks below.
+STAGED_LIST="$(mktemp)"
+trap 'rm -f "$STAGED_LIST"' EXIT
+git diff -z --cached --name-only --diff-filter=ACMR >"$STAGED_LIST"
+if [ -s "$STAGED_LIST" ]; then
+  # Adding a file again after formatting stages all of it, which would
+  # commit its unstaged changes too. Putting them back after formatting
+  # conflicts whenever the formatter touched the staged lines.
+  PARTIAL="$(xargs -0 git --literal-pathspecs diff --name-only -- <"$STAGED_LIST")"
+  if [ -n "$PARTIAL" ]; then
+    echo "These staged files also have unstaged changes:"
+    echo "$PARTIAL"
+    echo "Stage them fully with git add. To commit only the staged part, run"
+    echo "bun run fix, stage the hunks again, and commit with"
+    echo "  git stash push --keep-index && git commit && git stash pop"
+    exit 1
+  fi
+
+  # The same two tools ultracite fix runs. ultracite fix itself fails when no
+  # staged file is one they handle, such as bun.lock alone.
+  FORMAT_EXIT_CODE=0
+  xargs -0 bun x oxlint --fix --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
+  xargs -0 bun x oxfmt --write --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
+  xargs -0 git --literal-pathspecs add -- <"$STAGED_LIST"
+
+  if [ $FORMAT_EXIT_CODE -ne 0 ]; then
+    echo "Ultracite found issues that could not be auto-fixed."
+    exit $FORMAT_EXIT_CODE
+  fi
+
+  echo "✨ Files formatted by Ultracite"
 fi
-
-# The same two tools ultracite fix runs. ultracite fix itself fails when no
-# staged file is one they handle, such as bun.lock alone.
-FORMAT_EXIT_CODE=0
-xargs -0 bun x oxlint --fix --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
-xargs -0 bun x oxfmt --write --no-error-on-unmatched-pattern -- <"$STAGED_LIST" || FORMAT_EXIT_CODE=$?
-xargs -0 git --literal-pathspecs add -- <"$STAGED_LIST"
-
-if [ $FORMAT_EXIT_CODE -ne 0 ]; then
-  echo "Ultracite found issues that could not be auto-fixed."
-  exit $FORMAT_EXIT_CODE
-fi
-
-echo "✨ Files formatted by Ultracite"
 # ultracite end
 
 # CI builds the website with this set. Without it, a worktree that has no
-# apps/web/.env fails the build. Turbo passes it to build tasks only, and
-# bun run test builds again, so it is exported rather than set on one line.
+# apps/web/.env fails the build. Only the website's build reads it, but the
+# hook exports it so any build turbo starts for the checks below matches CI.
 # Set it to an empty value to run the validation.
 export SKIP_ENV_VALIDATION="${SKIP_ENV_VALIDATION-1}"
-bun run build
+
+# The Format job runs three generators and fails on any file they changed.
+# They read and write the working tree, not the commit. With unstaged or
+# untracked work under the paths below, a run would report files that this
+# commit is not responsible for, and the generator deletes any file it does
+# not expect in the rule pages directory. So the hook skips the generator
+# checks in that case and leaves them to CI's Format job. Otherwise the
+# working tree is the commit, and a generated file that differs from the
+# index is missing from it.
+#   GENERATOR_INPUTS    what docs:rules, kit:sync and check:rule-count read
+#   GENERATED_PATHS     what docs:rules and kit:sync write
+GENERATOR_INPUTS="packages/core/src scripts kits/docker-doctor README.md packages/docker-doctor/README.md apps/web/content/docs apps/web/components/architecture-diagram.tsx"
+GENERATED_PATHS="apps/web/content/docs/reference/rules kits/docker-doctor/docker-doctor.yaml"
+
+DIRTY="$({
+  git diff --name-only -- $GENERATOR_INPUTS
+  git ls-files --others --exclude-standard -- $GENERATOR_INPUTS
+} | sort -u)"
+
+if [ -n "$DIRTY" ]; then
+  DIRTY_COUNT="$(echo "$DIRTY" | wc -l)"
+  DIRTY_SHOWN="$(echo "$DIRTY" | head -n 3 | paste -sd, - | sed 's/,/, /g')"
+  if [ "$DIRTY_COUNT" -gt 3 ]; then
+    DIRTY_SHOWN="$DIRTY_SHOWN and $((DIRTY_COUNT - 3)) more"
+  fi
+  echo "Skipping the generator checks because these paths have unstaged or untracked changes: $DIRTY_SHOWN. CI's Format job will check them." >&2
+else
+  bun run docs:rules
+  bun run kit:sync
+
+  CHANGED="$(git diff --name-only -- $GENERATED_PATHS)"
+  NEW="$(git ls-files --others --exclude-standard -- $GENERATED_PATHS)"
+  if [ -n "$CHANGED" ] || [ -n "$NEW" ]; then
+    echo "The generators wrote files that this commit does not include, so the"
+    echo "Format job would fail. To keep them in this commit, run:"
+    {
+      echo "$CHANGED"
+      echo "$NEW"
+    } | sed '/^$/d; s/^/  git add -- /'
+    echo "To discard them, run:"
+    {
+      [ -z "$CHANGED" ] || echo "  git restore -- $(echo "$CHANGED" | paste -sd' ' -)"
+      [ -z "$NEW" ] || echo "  rm -- $(echo "$NEW" | paste -sd' ' -)"
+    }
+    exit 1
+  fi
+
+  bun run check:rule-count
+fi
+
+# Turbo builds the packages these need. A full bun run build would also build
+# the website and the videos, which none of them reads.
+bun run test:scripts
 bun run test
 bun run typecheck
