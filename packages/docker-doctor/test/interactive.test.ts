@@ -15,8 +15,19 @@ const TEST_TIMEOUT_MS = 15_000;
 // CI skips the score animation so the output settles at once.
 const STILL_ENV = { CI: "1" };
 
+// Each test sets the color variables it means, so the shell's own do not leak in.
+const COLOR_VARIABLES = new Set(["NO_COLOR", "FORCE_COLOR"]);
+
+const BASE_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !COLOR_VARIABLES.has(name))
+);
+
 const SCAN_SUMMARY =
   /Scanned (?<count>\d+) (?<noun>files?) in \d+\.\ds(?<rest>.*)/u;
+
+const SCORE_BOX = /\/ 100/u;
+const ESCAPE = String.fromCodePoint(0x1b);
+const COLOR_SEQUENCE = new RegExp(`${ESCAPE}\\[[\\d;]*m`, "u");
 
 const decoder = new TextDecoder();
 
@@ -31,7 +42,7 @@ const runOnTerminal = async (
   const matched = Promise.withResolvers<boolean>();
 
   const proc = Bun.spawn(["node", CLI, ...args], {
-    env: { ...process.env, ...STILL_ENV, ...env },
+    env: { ...BASE_ENV, ...STILL_ENV, ...env },
     terminal: {
       cols: TERMINAL_COLUMNS,
       data: (_terminal, data) => {
@@ -87,6 +98,50 @@ describe("interactive scan summary", () => {
 
       expect(summary?.count).toBe("1");
       expect(summary?.noun).toBe("file");
+    },
+    TEST_TIMEOUT_MS
+  );
+});
+
+const colorFor = async (env: Record<string, string>): Promise<boolean> => {
+  const output = await runOnTerminal([fixture("multi-file")], SCORE_BOX, env);
+
+  // Without a rendered report there is nothing to judge, so fail instead of
+  // reporting "no color".
+  expect(output).toMatch(SCORE_BOX);
+
+  return COLOR_SEQUENCE.test(output);
+};
+
+describe("interactive color", () => {
+  test(
+    "FORCE_COLOR alone colors the report",
+    async () => {
+      expect(await colorFor({ FORCE_COLOR: "1" })).toBe(true);
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  test(
+    "NO_COLOR turns color off even when FORCE_COLOR asks for it",
+    async () => {
+      expect(await colorFor({ FORCE_COLOR: "1", NO_COLOR: "1" })).toBe(false);
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  test(
+    "NO_COLOR counts whatever its value is",
+    async () => {
+      expect(await colorFor({ FORCE_COLOR: "1", NO_COLOR: "0" })).toBe(false);
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  test(
+    "an empty NO_COLOR is ignored",
+    async () => {
+      expect(await colorFor({ FORCE_COLOR: "1", NO_COLOR: "" })).toBe(true);
     },
     TEST_TIMEOUT_MS
   );

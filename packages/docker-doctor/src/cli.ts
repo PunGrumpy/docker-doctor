@@ -76,6 +76,12 @@ import {
   WORKFLOW_RELATIVE_PATH,
 } from "./workflow-scaffold";
 
+// chalk reads FORCE_COLOR but not NO_COLOR. Per https://no-color.org any
+// non-empty NO_COLOR turns color off, and here it wins over FORCE_COLOR.
+if (hasText(process.env.NO_COLOR)) {
+  chalk.level = 0;
+}
+
 interface KeypressKey {
   name?: string;
   ctrl?: boolean;
