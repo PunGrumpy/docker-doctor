@@ -598,8 +598,6 @@ const joinSpacedOmit = (options: string[]): string[] =>
         ]
   );
 
-const PRUNE_DEV_FLAGS = new Set(["--prod", "-P", "--production"]);
-
 // One shell command that removes devDependencies from node_modules: `npm
 // prune` that omits dev (by flag, or NODE_ENV=production or npm_config_*), or
 // `pnpm prune --prod`. A bare `npm prune` only removes extraneous packages,
@@ -644,7 +642,7 @@ const segmentPrunesDevDependencies = (
   }
 
   if (manager === "pnpm") {
-    return options.some((option) => PRUNE_DEV_FLAGS.has(option));
+    return options.some((option) => flagLeavesDevOut(manager, option));
   }
 
   return npmOmitsDev(
