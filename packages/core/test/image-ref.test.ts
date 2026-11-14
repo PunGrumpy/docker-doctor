@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import {
-  collectStageAliases,
+  createStageLookup,
   isScratch,
   parseFromArgs,
   parseImageRef,
@@ -76,42 +76,60 @@ describe("parseImageRef", () => {
   });
 });
 
-describe("collectStageAliases", () => {
-  test("collects an alias from a two-stage build", () => {
-    const instructions = parseDockerfile(`
+describe("createStageLookup", () => {
+  test("finds a stage declared on an earlier line", () => {
+    const isEarlierStage = createStageLookup(
+      parseDockerfile(`
       FROM node:22-alpine AS build
       FROM build
-    `);
+    `)
+    );
 
-    expect(collectStageAliases(instructions)).toEqual(new Set(["build"]));
+    expect(isEarlierStage("build", 3)).toBe(true);
   });
 
-  test("returns an empty set when no AS clause is present", () => {
-    const instructions = parseDockerfile(`
+  test("knows no stage when no FROM has an AS clause", () => {
+    const isEarlierStage = createStageLookup(
+      parseDockerfile(`
       FROM node:22-alpine
-    `);
-
-    expect(collectStageAliases(instructions)).toEqual(new Set());
-  });
-
-  test("collects only the stages declared before a line", () => {
-    const instructions = parseDockerfile(
-      "FROM node:22-alpine AS build\nFROM golang AS golang\nFROM build AS final"
+    `)
     );
 
-    expect(collectStageAliases(instructions, 2)).toEqual(new Set(["build"]));
-    expect(collectStageAliases(instructions, 3)).toEqual(
-      new Set(["build", "golang"])
-    );
+    expect(isEarlierStage("node", Number.POSITIVE_INFINITY)).toBe(false);
   });
 
-  test("collects a lowercase as clause", () => {
-    const instructions = parseDockerfile(`
-      FROM node:22-alpine as build
+  test("sees only the stages declared before a line", () => {
+    const isEarlierStage = createStageLookup(
+      parseDockerfile(
+        "FROM node:22-alpine AS build\nFROM golang AS golang\nFROM build AS final"
+      )
+    );
+
+    expect(isEarlierStage("build", 2)).toBe(true);
+    expect(isEarlierStage("golang", 2)).toBe(false);
+    expect(isEarlierStage("golang", 3)).toBe(true);
+    expect(isEarlierStage("final", 3)).toBe(false);
+  });
+
+  test("keeps the first declaration of a repeated name", () => {
+    const isEarlierStage = createStageLookup(
+      parseDockerfile("FROM a AS x\nFROM b AS x\nFROM c")
+    );
+
+    expect(isEarlierStage("x", 2)).toBe(true);
+    expect(isEarlierStage("x", 1)).toBe(false);
+  });
+
+  test("matches names without regard to case", () => {
+    const isEarlierStage = createStageLookup(
+      parseDockerfile(`
+      FROM node:22-alpine as Build
       FROM build
-    `);
+    `)
+    );
 
-    expect(collectStageAliases(instructions)).toEqual(new Set(["build"]));
+    expect(isEarlierStage("BUILD", 3)).toBe(true);
+    expect(isEarlierStage("build", 3)).toBe(true);
   });
 });
 
