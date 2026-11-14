@@ -17,6 +17,7 @@ import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
 const BEST_PRACTICES = "Best Practices" satisfies RuleCategory;
 
 export const requireHealthcheck: DockerfileRule = {
+  anchor: "file",
   category: BEST_PRACTICES,
   check(instructions, file) {
     const hasHealthcheck = instructions.some(
@@ -141,6 +142,7 @@ export const useExecForm: DockerfileRule = {
 };
 
 export const requireLabels: DockerfileRule = {
+  anchor: "file",
   category: BEST_PRACTICES,
   check(instructions, file) {
     const hasLabel = instructions.some((inst) => inst.instruction === "LABEL");

@@ -517,11 +517,28 @@ describe("--json contract", () => {
     );
   });
 
-  test("schemaVersion is 7 and analyzedFiles counts the scanned files", async () => {
+  test("schemaVersion is 8 and analyzedFiles counts the scanned files", async () => {
     const { stdout } = await runCli([fixture("multi-file"), "--json"]);
     const report = parseReport(stdout);
-    expect(report.schemaVersion).toBe(7);
+    expect(report.schemaVersion).toBe(8);
     expect(report.analyzedFiles).toBe(2);
+  });
+
+  test("every finding, suppressed or not, carries a distinct fingerprint", async () => {
+    const { stdout } = await runCli([fixture("ignore-compose"), "--json"]);
+    const { diagnostics, suppressed } = parseReport(stdout);
+
+    const fingerprints = [...diagnostics, ...suppressed].map(
+      (d) => d.fingerprint
+    );
+
+    expect(diagnostics.length).toBeGreaterThan(0);
+    expect(suppressed.length).toBeGreaterThan(0);
+    expect(new Set(fingerprints).size).toBe(fingerprints.length);
+
+    for (const fingerprint of fingerprints) {
+      expect(fingerprint).toMatch(/^[0-9a-f]{16}$/u);
+    }
   });
 
   test("a complete scan reports an empty failures list", async () => {

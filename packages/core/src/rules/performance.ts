@@ -168,6 +168,7 @@ const runsBuild = (args: string): boolean =>
   BUILD_TOOL_COMMAND_RE.test(maskQuotedText(stripRunFlags(args)));
 
 export const useMultiStage: DockerfileRule = {
+  anchor: "file",
   category: "Performance",
   check(instructions, file) {
     const fromCount = instructions.filter(
@@ -323,6 +324,7 @@ const hasDockerignoreFor = (
 };
 
 export const useDockerignore: DockerfileRule = {
+  anchor: "file",
   category: "Performance",
   check(instructions, file, context) {
     const hasCopyAll = instructions.some((inst) => {

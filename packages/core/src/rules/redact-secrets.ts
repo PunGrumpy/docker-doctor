@@ -60,7 +60,7 @@ const WHITESPACE_RE = /\s+/u;
 // The secret-key patterns expect `api_key` and an `_` before each word.
 const CAMEL_BOUNDARY_RE = /(?<=[a-z0-9])(?=[A-Z])/gu;
 
-const looksSecret = (key: string): boolean =>
+export const looksSecret = (key: string): boolean =>
   isSecretKey(key.replaceAll(CAMEL_BOUNDARY_RE, "_").replaceAll("-", "_"));
 
 // `Authorization` and `Proxy-Authorization` carry a credential under a name

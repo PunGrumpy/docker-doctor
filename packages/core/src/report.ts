@@ -1,13 +1,14 @@
 import { findRule } from "./rules/index";
 import type {
   Diagnostic,
+  FingerprintedDiagnostic,
   ProjectInfo,
   RuleCategory,
   SuppressedDiagnostic,
 } from "./types/index";
 
 // Bump whenever the JSON report shape or the score formula/weights change.
-export const REPORT_SCHEMA_VERSION = 7;
+export const REPORT_SCHEMA_VERSION = 8;
 
 export interface ReportFailure {
   file: string;
@@ -17,6 +18,9 @@ export interface ReportFailure {
 export interface ReportDiagnostic {
   category: RuleCategory;
   file: string;
+  // Stays the same across scans while the code the finding points at is
+  // unchanged. See runners/fingerprint.ts.
+  fingerprint: string;
   help: string;
   line?: number;
   message: string;
@@ -57,9 +61,10 @@ const resolveCategory = (diagnostic: Diagnostic): RuleCategory => {
   return category;
 };
 
-const toReportDiagnostic = (d: Diagnostic): ReportDiagnostic => ({
+const toReportDiagnostic = (d: FingerprintedDiagnostic): ReportDiagnostic => ({
   category: resolveCategory(d),
   file: d.file,
+  fingerprint: d.fingerprint,
   help: d.help,
   line: d.line,
   message: d.message,
@@ -69,12 +74,12 @@ const toReportDiagnostic = (d: Diagnostic): ReportDiagnostic => ({
 
 export interface ReportInput {
   analyzedFiles: number;
-  diagnostics: readonly Diagnostic[];
+  diagnostics: readonly FingerprintedDiagnostic[];
   failures: readonly ReportFailure[];
   label: string | null;
   project: ProjectInfo;
   score: number | null;
-  suppressed: readonly SuppressedDiagnostic[];
+  suppressed: readonly (FingerprintedDiagnostic & SuppressedDiagnostic)[];
 }
 
 export const toJsonReport = ({

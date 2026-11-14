@@ -3,9 +3,11 @@ import { describe, test, expect } from "bun:test";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import { REPORT_SCHEMA_VERSION, toJsonReport } from "../src/report";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
+import { fingerprintDiagnostics } from "../src/runners/fingerprint";
 import { calculateScore } from "../src/scoring";
 import type {
   Diagnostic,
+  FingerprintedDiagnostic,
   ProjectInfo,
   RuleCategory,
   SuppressedDiagnostic,
@@ -36,6 +38,7 @@ const TOP_LEVEL_KEYS = [
 const DIAGNOSTIC_KEYS = [
   "category",
   "file",
+  "fingerprint",
   "help",
   "line",
   "message",
@@ -51,13 +54,13 @@ const ONE_INFO_SCORE = 99;
 const SUPPRESSED_KEYS = [...DIAGNOSTIC_KEYS, "reason"].toSorted();
 
 const buildReport = (
-  diagnostics: Diagnostic[],
+  diagnostics: FingerprintedDiagnostic[],
   score: number | null,
   label: string | null,
   project: ProjectInfo,
   failures: { file: string; message: string }[],
   analyzedFiles: number,
-  suppressed: SuppressedDiagnostic[] = []
+  suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[] = []
 ) =>
   toJsonReport({
     analyzedFiles,
@@ -72,8 +75,9 @@ const buildReport = (
 const diagnostic = (
   rule: string,
   severity: Diagnostic["severity"]
-): Diagnostic => ({
+): FingerprintedDiagnostic => ({
   file: "Dockerfile",
+  fingerprint: "0123456789abcdef",
   help: "",
   message: "",
   rule,
@@ -86,12 +90,12 @@ const diagnostic = (
 // commit, because external consumers (the GitHub Action renderer, the
 // benchmarks scanner, the improve-docker skill) key off that number.
 describe("JSON report contract", () => {
-  test("schemaVersion is 7", () => {
-    expect(REPORT_SCHEMA_VERSION).toBe(7);
+  test("schemaVersion is 8", () => {
+    expect(REPORT_SCHEMA_VERSION).toBe(8);
     expect(
       buildReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT, [], 1)
         .schemaVersion
-    ).toBe(7);
+    ).toBe(8);
   });
 
   test("top-level keys are exactly the documented set", () => {
@@ -133,10 +137,11 @@ describe("JSON report contract", () => {
   });
 
   test("every diagnostic carries exactly the documented keys", () => {
-    const diagnostics = runDockerfileRules(
-      parseDockerfile("FROM node\nCOPY . .\n"),
-      "Dockerfile",
-      []
+    const content = "FROM node\nCOPY . .\n";
+
+    const diagnostics = fingerprintDiagnostics(
+      runDockerfileRules(parseDockerfile(content), "Dockerfile", []),
+      { Dockerfile: content }
     );
 
     const { score, label } = calculateScore(diagnostics, 1);
@@ -168,7 +173,7 @@ describe("JSON report contract", () => {
   });
 
   test("every suppressed finding carries the diagnostic keys and a reason", () => {
-    const suppressed: SuppressedDiagnostic[] = [
+    const suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[] = [
       {
         ...diagnostic("docker-doctor/no-root-user", "warning"),
         line: 1,

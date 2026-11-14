@@ -9,6 +9,7 @@ import type {
   DiagnosticSeverity,
   DockerDoctorConfig,
   FileIgnores,
+  FingerprintedDiagnostic,
   IgnoreFileWarning,
   JsonReport,
   ProjectInfo,
@@ -28,6 +29,7 @@ import {
   runComposeFiles,
   applyIgnores,
   calculateScore,
+  fingerprintDiagnostics,
   loadConfig,
   allRules,
   findRuleByName,
@@ -814,14 +816,14 @@ const printNothingScanned = (rootDir: string): void => {
 
 interface ScanOutcome {
   analyzedFileCount: number;
-  diagnostics: Diagnostic[];
+  diagnostics: FingerprintedDiagnostic[];
   failures: ScanFailure[];
   fileContents: Record<string, string>;
   ignoredConfig: boolean;
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
-  suppressed: SuppressedDiagnostic[];
+  suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[];
 }
 
 interface OutputOptions {
@@ -1201,8 +1203,10 @@ program
 
         const { analyzedFileCount, failures } = engine;
 
+        // Fingerprinted before the ignore comments split the list, so an
+        // ignore on one of two identical findings renumbers neither.
         const { diagnostics, suppressed, warnings } = applyIgnores(
-          engine.diagnostics,
+          fingerprintDiagnostics(engine.diagnostics, fileContents),
           engine.ignores
         );
 
