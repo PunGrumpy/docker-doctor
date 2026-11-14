@@ -4,7 +4,6 @@ import { ThemeProvider } from "next-themes";
 import type { PropsWithChildren } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const DesignSystemProvider = ({ children }: PropsWithChildren) => (
   <ThemeProvider
@@ -13,9 +12,7 @@ export const DesignSystemProvider = ({ children }: PropsWithChildren) => (
     disableTransitionOnChange
     enableSystem
   >
-    <TooltipProvider delay={0}>
-      {children}
-      <Toaster />
-    </TooltipProvider>
+    {children}
+    <Toaster />
   </ThemeProvider>
 );
