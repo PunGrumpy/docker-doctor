@@ -3,8 +3,6 @@
 import { ThemeProvider } from "next-themes";
 import type { PropsWithChildren } from "react";
 
-import { Toaster } from "@/components/ui/sonner";
-
 export const DesignSystemProvider = ({ children }: PropsWithChildren) => (
   <ThemeProvider
     attribute="class"
@@ -13,6 +11,5 @@ export const DesignSystemProvider = ({ children }: PropsWithChildren) => (
     enableSystem
   >
     {children}
-    <Toaster />
   </ThemeProvider>
 );
