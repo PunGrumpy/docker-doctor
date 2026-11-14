@@ -1,4 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 // Runs the built CLI on a pseudo-terminal, the way a person starts it. The
@@ -25,6 +27,8 @@ const BASE_ENV = Object.fromEntries(
 const SCAN_SUMMARY =
   /Scanned (?<count>\d+) (?<noun>files?) in \d+\.\ds(?<rest>.*)/u;
 
+const WORKFLOW_PROMPT = /Add Docker Doctor to GitHub Actions\?/u;
+const HANDOFF_MENU = /Claude Code/u;
 const SCORE_BOX = /\/ 100/u;
 const ESCAPE = String.fromCodePoint(0x1b);
 const COLOR_SEQUENCE = new RegExp(`${ESCAPE}\\[[\\d;]*m`, "u");
@@ -36,9 +40,11 @@ const decoder = new TextDecoder();
 const runOnTerminal = async (
   args: string[],
   until: RegExp,
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  reply?: { keys: string; when: RegExp }
 ): Promise<string> => {
   let output = "";
+  let replied = false;
   const matched = Promise.withResolvers<boolean>();
 
   const proc = Bun.spawn(["node", CLI, ...args], {
@@ -47,6 +53,11 @@ const runOnTerminal = async (
       cols: TERMINAL_COLUMNS,
       data: (_terminal, data) => {
         output += decoder.decode(data, { stream: true });
+
+        if (reply && !replied && reply.when.test(output)) {
+          replied = true;
+          proc.terminal?.write(reply.keys);
+        }
 
         if (until.test(output)) {
           matched.resolve(true);
@@ -142,6 +153,34 @@ describe("interactive color", () => {
     "an empty NO_COLOR is ignored",
     async () => {
       expect(await colorFor({ FORCE_COLOR: "1", NO_COLOR: "" })).toBe(true);
+    },
+    TEST_TIMEOUT_MS
+  );
+});
+
+describe("agent handoff", () => {
+  test(
+    "names a detected agent in the menu after the scan",
+    async () => {
+      const bin = fs.mkdtempSync(path.join(os.tmpdir(), "dd-handoff-bin-"));
+
+      try {
+        fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\n", {
+          mode: 0o755,
+        });
+
+        const output = await runOnTerminal(
+          [fixture("with-error")],
+          HANDOFF_MENU,
+          { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
+          { keys: "\r", when: WORKFLOW_PROMPT }
+        );
+
+        expect(output).toContain("What would you like to do next?");
+        expect(output).toContain("Claude Code");
+      } finally {
+        fs.rmSync(bin, { force: true, recursive: true });
+      }
     },
     TEST_TIMEOUT_MS
   );

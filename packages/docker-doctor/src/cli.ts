@@ -36,12 +36,6 @@ import {
   toJsonReport,
 } from "@docker-doctor/core";
 import type { SkillAgentType } from "agent-install";
-import {
-  detectInstalledSkillAgents,
-  getSkillAgentConfig,
-  getSkillAgentTypes,
-  isSkillAgentType,
-} from "agent-install";
 import chalk from "chalk";
 import { Command, Option } from "commander";
 
@@ -59,10 +53,6 @@ import {
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
 import { sanitizePath } from "./agents/sanitize";
-import {
-  getSkillSourceDirectory,
-  installSkillForAgents,
-} from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
 import {
   CLEAR_TO_LINE_END,
@@ -396,13 +386,15 @@ interface WizardContext {
   rootDir: string;
 }
 
-const agentDisplayName = (agent: SkillAgentType): string =>
-  getSkillAgentConfig(agent).displayName;
+// agent-install is only needed by `install` and the handoff, so a scan loads
+// it on demand rather than at startup.
+const loadSkillInstall = async () => await import("./agents/skill-install");
 
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
 // prompt for any other agent. Only reached when the scan found something.
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
+  const { agentDisplayName, installSkillForAgents } = await loadSkillInstall();
   const launchable = detectLaunchableAgents();
 
   const options = [
@@ -1247,6 +1239,13 @@ const CURATED_INSTALL_AGENTS: SkillAgentType[] = [
 const resolveInstallAgents = async (
   requested: string[] | undefined
 ): Promise<SkillAgentType[] | null> => {
+  const {
+    agentDisplayName,
+    detectInstalledSkillAgents,
+    getSkillAgentTypes,
+    isSkillAgentType,
+  } = await loadSkillInstall();
+
   if (requested && requested.length > 0) {
     const invalid = requested.filter((agent) => !isSkillAgentType(agent));
 
@@ -1300,7 +1299,8 @@ program
     "install into each agent's global skills directory (e.g. ~/.claude/skills) instead of the current project"
   )
   .action(async (options: { agent?: string[]; global?: boolean }) => {
-    const source = getSkillSourceDirectory();
+    const skills = await loadSkillInstall();
+    const source = skills.getSkillSourceDirectory();
 
     if (source === null) {
       console.error(
@@ -1325,7 +1325,7 @@ program
       return;
     }
 
-    const result = await installSkillForAgents(agents, {
+    const result = await skills.installSkillForAgents(agents, {
       global: options.global,
       projectRoot: process.cwd(),
     });
@@ -1339,13 +1339,13 @@ program
 
     for (const installed of result.installed) {
       console.log(
-        `  ${chalk.green("✔")} ${agentDisplayName(installed.agent)} → ${installed.path}`
+        `  ${chalk.green("✔")} ${skills.agentDisplayName(installed.agent)} → ${installed.path}`
       );
     }
 
     for (const failed of result.failed) {
       console.log(
-        `  ${chalk.red("✖")} ${agentDisplayName(failed.agent)}: ${failed.error}`
+        `  ${chalk.red("✖")} ${skills.agentDisplayName(failed.agent)}: ${failed.error}`
       );
     }
 
