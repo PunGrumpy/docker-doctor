@@ -188,6 +188,31 @@ describe("rules subcommands", () => {
     expect(stdout).toContain("Help / Fix");
   });
 
+  test.each([
+    [["rules", "list", "--json"], "--json"],
+    [["rules", "explain", "no-root-user", "--score"], "--score"],
+    [["install", "--json"], "--json"],
+    [["install", "--version"], "--version"],
+  ])("%j rejects a scan flag instead of ignoring it", async (args, flag) => {
+    const { exitCode, stderr, stdout } = await runCli(args);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain(`unknown option '${flag}'`);
+    expect(stderr).toContain("(add --help for additional information)");
+    expect(stdout).toBe("");
+  });
+
+  test("a scan flag still works on either side of the directory", async () => {
+    const before = await runCli(["--json", fixture("clean")]);
+    const after = await runCli([fixture("clean"), "--json"]);
+
+    expect(before.exitCode).toBe(0);
+    expect(after.exitCode).toBe(0);
+    expect(parseReport(before.stdout).diagnostics).toEqual(
+      parseReport(after.stdout).diagnostics
+    );
+  });
+
   test("rules list prints every rule", async () => {
     const { exitCode, stdout } = await runCli(["rules", "list"]);
     expect(exitCode).toBe(0);

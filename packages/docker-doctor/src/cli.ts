@@ -1030,7 +1030,11 @@ const program = new Command();
 program
   .name("docker-doctor")
   .description("Static analysis for Dockerfile and Docker Compose files")
-  .version(packageJson.version, "-V, --version", "display the version number");
+  .version(packageJson.version, "-V, --version", "display the version number")
+  // Without this, a scan flag after a subcommand is accepted and ignored, as
+  // in `rules list --json`.
+  .enablePositionalOptions()
+  .showHelpAfterError("(add --help for additional information)");
 
 interface ScanOptions {
   config?: string | false;
