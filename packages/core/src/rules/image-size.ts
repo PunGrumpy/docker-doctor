@@ -1,5 +1,4 @@
 import {
-  collectStageAliases,
   isDockerSandboxTemplate,
   isHardenedImage,
   isScratch,
@@ -51,6 +50,8 @@ interface BuildStage {
   base: string;
   from: DockerfileInstruction;
   name: string | null;
+  // Index of the earlier stage this one builds FROM, or -1 for a fresh base.
+  parent: number;
   runs: StageRun[];
 }
 
@@ -212,6 +213,9 @@ const applyNodeEnv = (
 
 const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   const stages: BuildStage[] = [];
+  // Where each name was first declared. A later stage with the same name
+  // does not take it over.
+  const firstIndexByName = new Map<string, number>();
   // A stage built FROM this one inherits its ENV and its ARGs.
   const nodeEnv: NodeEnvState[] = [];
   // An ARG before the first FROM is not visible inside a stage.
@@ -224,17 +228,16 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       const { base, stage } = parseFromArgs(inst.args);
       const baseKey = base?.toLowerCase() ?? "";
 
-      const parent = stages.findIndex(
-        (s) => s.name !== null && s.name === baseKey
-      );
+      const parent = firstIndexByName.get(baseKey) ?? -1;
+      const name = stage?.toLowerCase() ?? null;
 
       nodeEnv.push(parent === -1 ? {} : { ...nodeEnv[parent] });
-      stages.push({
-        base: baseKey,
-        from: inst,
-        name: stage?.toLowerCase() ?? null,
-        runs: [],
-      });
+
+      if (name !== null && !firstIndexByName.has(name)) {
+        firstIndexByName.set(name, stages.length);
+      }
+
+      stages.push({ base: baseKey, from: inst, name, parent, runs: [] });
     } else if (inst.instruction === "RUN") {
       stages.at(-1)?.runs.push({
         env: {
@@ -258,14 +261,11 @@ const shippedStages = (stages: BuildStage[]): BuildStage[] => {
   let index = stages.length - 1;
 
   while (index >= 0) {
-    shipped.unshift(stages[index]);
-    const { base } = stages[index];
-    index = stages
-      .slice(0, index)
-      .findIndex((s) => s.name !== null && s.name === base);
+    shipped.push(stages[index]);
+    index = stages[index].parent;
   }
 
-  return shipped;
+  return shipped.toReversed();
 };
 
 // Minimal bases identify themselves either in the name (alpine, busybox,
@@ -290,10 +290,7 @@ const MINIMAL_BASE_SEGMENT_RE = /(?:^|[/_. -])(?:minimal|micro)(?:$|[/_. -])/u;
 
 // The base image of a shipped stage when it may be a full-OS distribution,
 // or null when it is exempt or already minimal.
-const fullOsBase = (
-  from: DockerfileInstruction,
-  instructions: DockerfileInstruction[]
-): string | null => {
+const fullOsBase = ({ from, parent }: BuildStage): string | null => {
   const imagePart = parseFromArgs(from.args).base;
 
   if (!hasText(imagePart) || isScratch(imagePart)) {
@@ -301,9 +298,8 @@ const fullOsBase = (
   }
 
   const ref = parseImageRef(imagePart);
-  const stageAliases = collectStageAliases(instructions, from.line);
 
-  if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+  if (ref.isVariable || parent !== -1) {
     return null;
   }
 
@@ -343,8 +339,9 @@ export const preferSlimBase: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
-    for (const { from } of shippedStages(collectStages(instructions))) {
-      const imagePart = fullOsBase(from, instructions);
+    for (const stage of shippedStages(collectStages(instructions))) {
+      const { from } = stage;
+      const imagePart = fullOsBase(stage);
 
       if (imagePart !== null) {
         diagnostics.push(

@@ -1,6 +1,6 @@
 import { parseAddArgs } from "../parsers/add-args";
 import {
-  collectStageAliases,
+  createStageLookup,
   isDistrolessNonroot,
   isDockerSandboxTemplate,
   isHardenedRuntimeImage,
@@ -10,11 +10,7 @@ import {
   parseImageRef,
 } from "../parsers/image-ref";
 import { hasText } from "../text";
-import type {
-  Diagnostic,
-  DockerfileInstruction,
-  DockerfileRule,
-} from "../types/index";
+import type { Diagnostic, DockerfileRule } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
 import {
   containsProviderToken,
@@ -159,14 +155,11 @@ export const noSecretsInEnv: DockerfileRule = {
 // pinned, scratch, a variable, or an earlier stage of the same file.
 const basePinIssue = (
   imagePart: string,
-  instructions: DockerfileInstruction[],
+  isEarlierStage: ReturnType<typeof createStageLookup>,
   line: number
 ): ReturnType<typeof mutableRefIssue> => {
   const ref = parseImageRef(imagePart);
-
-  const isStage = collectStageAliases(instructions, line).has(
-    imagePart.toLowerCase()
-  );
+  const isStage = isEarlierStage(imagePart, line);
 
   return isScratch(imagePart) || ref.isVariable || isStage
     ? undefined
@@ -177,13 +170,14 @@ export const pinImageVersion: DockerfileRule = {
   category: "Security",
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+    const isEarlierStage = createStageLookup(instructions);
 
     for (const inst of instructions) {
       if (inst.instruction === "FROM") {
         const imagePart = parseFromArgs(inst.args).base;
 
         const issue = hasText(imagePart)
-          ? basePinIssue(imagePart, instructions, inst.line)
+          ? basePinIssue(imagePart, isEarlierStage, inst.line)
           : undefined;
 
         if (issue !== undefined) {
