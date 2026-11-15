@@ -48,8 +48,10 @@ export { loadConfig } from "./config/loader";
 
 export {
   collectUnknownConfigKeys,
-  type UnknownConfigKeys,
+  type UnknownConfigKey,
 } from "./config/unknown-keys";
+
+export { closestMatch } from "./suggest";
 
 export {
   calculateScore,

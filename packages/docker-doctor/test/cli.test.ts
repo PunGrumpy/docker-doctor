@@ -188,6 +188,31 @@ describe("rules subcommands", () => {
     expect(stdout).toContain("Help / Fix");
   });
 
+  test.each([
+    [["rules", "list", "--json"], "--json"],
+    [["rules", "explain", "no-root-user", "--score"], "--score"],
+    [["install", "--json"], "--json"],
+    [["install", "--version"], "--version"],
+  ])("%j rejects a scan flag instead of ignoring it", async (args, flag) => {
+    const { exitCode, stderr, stdout } = await runCli(args);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain(`unknown option '${flag}'`);
+    expect(stderr).toContain("(add --help for additional information)");
+    expect(stdout).toBe("");
+  });
+
+  test("a scan flag still works on either side of the directory", async () => {
+    const before = await runCli(["--json", fixture("clean")]);
+    const after = await runCli([fixture("clean"), "--json"]);
+
+    expect(before.exitCode).toBe(0);
+    expect(after.exitCode).toBe(0);
+    expect(parseReport(before.stdout).diagnostics).toEqual(
+      parseReport(after.stdout).diagnostics
+    );
+  });
+
   test("rules list prints every rule", async () => {
     const { exitCode, stdout } = await runCli(["rules", "list"]);
     expect(exitCode).toBe(0);
@@ -747,6 +772,29 @@ describe("--config resolution", () => {
   });
 });
 
+describe("--config on a directory", () => {
+  test("exits 1 with a one-line error that names the path", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-configdir-"));
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+
+      const { exitCode, stderr, stdout } = await runCli(
+        [root, "--json", "--config", root],
+        { cwd: root }
+      );
+
+      expect(exitCode).toBe(1);
+      expect(stderr.trim().split("\n")).toHaveLength(1);
+      expect(stderr).toContain(`The config path ${root} is a directory`);
+      expect(stderr).not.toContain("ERR_");
+      expect(stdout).toBe("");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("scan target validation", () => {
   test("a nonexistent path exits 1 with a plain error", async () => {
     const { exitCode, stderr, stdout } = await runCli([
@@ -769,6 +817,71 @@ describe("scan target validation", () => {
     expect(stderr).toContain("is not a directory");
     expect(stdout).toBe("");
   });
+});
+
+describe("mistyped commands", () => {
+  test.each([
+    ["init", undefined],
+    ["help", "docker-doctor --help"],
+    ["list", "docker-doctor rules list"],
+    ["rule", "docker-doctor rules"],
+    ["instal", "docker-doctor install"],
+  ])("%s exits 1 with an unknown command message", async (word, suggestion) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-empty-"));
+
+    try {
+      const { exitCode, stderr, stdout } = await runCli([word], { cwd: root });
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain(`Unknown command "${word}"`);
+      expect(stderr).toContain("docker-doctor --help");
+      expect(stderr).not.toContain("Directory not found");
+      expect(stdout).toBe("");
+
+      if (suggestion !== undefined) {
+        expect(stderr).toContain(`Did you mean "${suggestion}"?`);
+      }
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("a real directory with a command's name is still scanned", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-dir-"));
+
+    try {
+      const target = path.join(root, "init");
+      fs.mkdirSync(target);
+      fs.writeFileSync(path.join(target, "Dockerfile"), "FROM alpine:3.20\n");
+
+      const { exitCode, stderr, stdout } = await runCli(["init", "--json"], {
+        cwd: root,
+      });
+
+      expect(stderr).not.toContain("Unknown command");
+      expect(exitCode).toBe(0);
+      expect(parseReport(stdout).diagnostics).toBeInstanceOf(Array);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test.each(["./init", "services", "sub/init"])(
+    "the missing path %s keeps the directory error",
+    async (target) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-path-"));
+
+      try {
+        const { exitCode, stderr } = await runCli([target], { cwd: root });
+
+        expect(exitCode).toBe(1);
+        expect(stderr).toContain("Directory not found");
+        expect(stderr).not.toContain("Unknown command");
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
 });
 
 describe("ignore.files config", () => {
@@ -894,6 +1007,84 @@ describe("JavaScript config", () => {
     expect(stderr).toBe("");
     expect(exitCode).toBe(0);
     expect(reportsRequireLabels(stdout)).toBe(false);
+  });
+});
+
+describe("config errors", () => {
+  test("a null rules section names the file and the real type", async () => {
+    const { exitCode, stderr, stdout } = await scanWithConfig(
+      "dd-badrules-",
+      "docker-doctor.config.json",
+      '{"rules": null}'
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("docker-doctor.config.json");
+    expect(stderr).toContain('"rules" must be an object, got null');
+    expect(stdout).toBe("");
+  });
+
+  test("a bad severity lists the valid values", async () => {
+    const { exitCode, stderr } = await scanWithConfig(
+      "dd-badseverity-",
+      "docker-doctor.config.json",
+      '{"rules": {"docker-doctor/no-root-user": "loud"}}'
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('Invalid severity "loud"');
+    expect(stderr).toContain("Use error, warning, info, off.");
+  });
+});
+
+describe("unknown config keys in the config file", () => {
+  const MISTYPED =
+    '{"rule": {"docker-doctor/no-root-user": "off"}, "ignore": {"file": ["x"]}}';
+
+  test("warn on stderr and leave the --json report as if the keys were absent", async () => {
+    const clean = await scanWithConfig(
+      "dd-nounknown-",
+      "docker-doctor.config.json",
+      "{}"
+    );
+
+    const mistyped = await scanWithConfig(
+      "dd-unknown-",
+      "docker-doctor.config.json",
+      MISTYPED
+    );
+
+    expect(mistyped.exitCode).toBe(clean.exitCode);
+    expect(parseReport(mistyped.stdout).diagnostics).toEqual(
+      parseReport(clean.stdout).diagnostics
+    );
+    expect(parseReport(mistyped.stdout).score).toEqual(
+      parseReport(clean.stdout).score
+    );
+    expect(clean.stderr).toBe("");
+    expect(mistyped.stderr).toContain("docker-doctor.config.json");
+    expect(mistyped.stderr).toContain('Unknown config key "rule"');
+    expect(mistyped.stderr).toContain('Did you mean "rules"?');
+    expect(mistyped.stderr).toContain('Unknown config key "ignore.file"');
+    expect(mistyped.stderr).toContain('Did you mean "ignore.files"?');
+  });
+
+  test("leave the --score stdout alone", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-unknown-score-"));
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+      const before = await runCli([root, "--score"]);
+
+      fs.writeFileSync(path.join(root, "docker-doctor.config.json"), MISTYPED);
+      const after = await runCli([root, "--score"]);
+
+      expect(after.stdout).toBe(before.stdout);
+      expect(after.exitCode).toBe(before.exitCode);
+      expect(after.stderr).toContain('Unknown config key "rule"');
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
   });
 });
 

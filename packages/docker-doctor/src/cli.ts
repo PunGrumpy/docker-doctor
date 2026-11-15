@@ -61,6 +61,7 @@ import {
   SHOW_CURSOR,
 } from "./terminal-control";
 import { hasText } from "./text";
+import { describeUnknownCommand } from "./unknown-command";
 import {
   scaffoldActionWorkflow,
   WORKFLOW_RELATIVE_PATH,
@@ -1008,12 +1009,13 @@ const resolveConfigPath = async (
 // Project discovery would otherwise fail with a raw ENOENT or ENOTDIR from
 // scandir.
 const findScanTargetProblem = async (
-  rootDir: string
+  rootDir: string,
+  unknownCommand: string | null
 ): Promise<string | null> => {
   const rootStat = await statOrNull(rootDir);
 
   if (rootStat === null) {
-    return `Directory not found: ${rootDir}`;
+    return unknownCommand ?? `Directory not found: ${rootDir}`;
   }
 
   if (!rootStat.isDirectory()) {
@@ -1028,7 +1030,11 @@ const program = new Command();
 program
   .name("docker-doctor")
   .description("Static analysis for Dockerfile and Docker Compose files")
-  .version(packageJson.version, "-V, --version", "display the version number");
+  .version(packageJson.version, "-V, --version", "display the version number")
+  // Without this, a scan flag after a subcommand is accepted and ignored, as
+  // in `rules list --json`.
+  .enablePositionalOptions()
+  .showHelpAfterError("(add --help for additional information)");
 
 interface ScanOptions {
   config?: string | false;
@@ -1101,9 +1107,16 @@ program
       }
 
       const rootDir = path.resolve(dir);
+
       // Checked before the spinner starts, so the error path never hides
       // the cursor.
-      const scanTargetProblem = await findScanTargetProblem(rootDir);
+      const scanTargetProblem = await findScanTargetProblem(
+        rootDir,
+        describeUnknownCommand(
+          dir,
+          program.commands.map((command) => command.name())
+        )
+      );
 
       if (scanTargetProblem !== null) {
         console.error(`Error: ${scanTargetProblem}`);
