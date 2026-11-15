@@ -15,8 +15,7 @@
         "!.next/dev/**",
         "dist/**",
         "skill/**"
-      ],
-      "env": ["SKIP_ENV_VALIDATION"]
+      ]
     },
     "dev": {
       "cache": false,

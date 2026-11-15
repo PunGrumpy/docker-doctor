@@ -1,0 +1,2 @@
+[test]
+concurrentTestGlob = ["**/cli.test.ts"]
