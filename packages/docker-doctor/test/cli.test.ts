@@ -897,6 +897,33 @@ describe("JavaScript config", () => {
   });
 });
 
+describe("config errors", () => {
+  test("a null rules section names the file and the real type", async () => {
+    const { exitCode, stderr, stdout } = await scanWithConfig(
+      "dd-badrules-",
+      "docker-doctor.config.json",
+      '{"rules": null}'
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("docker-doctor.config.json");
+    expect(stderr).toContain('"rules" must be an object, got null');
+    expect(stdout).toBe("");
+  });
+
+  test("a bad severity lists the valid values", async () => {
+    const { exitCode, stderr } = await scanWithConfig(
+      "dd-badseverity-",
+      "docker-doctor.config.json",
+      '{"rules": {"docker-doctor/no-root-user": "loud"}}'
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('Invalid severity "loud"');
+    expect(stderr).toContain("Use error, warning, info, off.");
+  });
+});
+
 const MARKER_FILE = "config-ran.txt";
 
 const RUNNING_CONFIG = `import fs from "node:fs";

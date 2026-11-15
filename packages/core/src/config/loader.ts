@@ -47,9 +47,17 @@ const findFirstConfigFile = async (
 const describeError = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
+const invalidConfig = (source: string, cause: unknown): ConfigError =>
+  new ConfigError({
+    message: `Invalid configuration in ${source}: ${describeError(cause)}`,
+  });
+
 // A config source holds nothing (a falsy value) or an object to validate.
 // Anything else fails with the message validation has always given it.
-const isConfigExport = (exported: unknown): exported is ConfigInput => {
+const isConfigExport = (
+  exported: unknown,
+  source: string
+): exported is ConfigInput => {
   const present = Boolean(exported);
 
   if (!present) {
@@ -59,9 +67,7 @@ const isConfigExport = (exported: unknown): exported is ConfigInput => {
   try {
     return isConfigObject(exported);
   } catch (error: unknown) {
-    throw new ConfigError({
-      message: `Invalid configuration format: ${describeError(error)}`,
-    });
+    throw invalidConfig(source, error);
   }
 };
 
@@ -76,11 +82,11 @@ const parseConfigFile = async (
     parsed = format === "JSON" ? JSON.parse(content) : parseYaml(content);
   } catch (error: unknown) {
     throw new ConfigError({
-      message: `Failed to parse config ${format}: ${describeError(error)}`,
+      message: `Failed to parse config ${format} in ${filePath}: ${describeError(error)}`,
     });
   }
 
-  return isConfigExport(parsed) ? parsed : null;
+  return isConfigExport(parsed, filePath) ? parsed : null;
 };
 
 const TYPESCRIPT_CONFIG_PATTERN = /\.[cm]?ts$/u;
@@ -156,8 +162,11 @@ const importConfig = async (filePath: string): Promise<ConfigInput | null> => {
   const hasDefaultExport = Boolean(defaultExport);
   const exported = hasDefaultExport ? defaultExport : configModule;
 
-  return isConfigExport(exported) ? exported : null;
+  return isConfigExport(exported, filePath) ? exported : null;
 };
+
+const packageConfigSource = (pkgPath: string): string =>
+  `${pkgPath} ("dockerDoctor")`;
 
 const readPackageConfig = async (
   rootDir: string
@@ -178,7 +187,9 @@ const readPackageConfig = async (
     return null;
   }
 
-  return isConfigExport(dockerDoctor) ? dockerDoctor : null;
+  return isConfigExport(dockerDoctor, packageConfigSource(pkgPath))
+    ? dockerDoctor
+    : null;
 };
 
 const warnUnknownKeys = (
@@ -206,6 +217,7 @@ export const loadConfig = async (
   onWarning?: (message: string) => void
 ): Promise<DockerDoctorConfig> => {
   let configObject: ConfigInput | null = null;
+  let source = "";
 
   if (hasText(customPath)) {
     const fullPath = path.resolve(rootDir, customPath);
@@ -216,15 +228,20 @@ export const loadConfig = async (
       });
     }
 
+    source = fullPath;
     configObject = await importConfig(fullPath);
   } else {
     const configPath = await findFirstConfigFile(rootDir);
 
     if (configPath !== undefined) {
+      source = configPath;
       configObject = await importConfig(configPath);
     }
 
-    configObject ??= await readPackageConfig(rootDir);
+    if (configObject === null) {
+      source = packageConfigSource(path.join(rootDir, "package.json"));
+      configObject = await readPackageConfig(rootDir);
+    }
   }
 
   if (configObject === null) {
@@ -240,8 +257,6 @@ export const loadConfig = async (
 
     return config;
   } catch (error: unknown) {
-    throw new ConfigError({
-      message: `Invalid configuration format: ${describeError(error)}`,
-    });
+    throw invalidConfig(source, error);
   }
 };

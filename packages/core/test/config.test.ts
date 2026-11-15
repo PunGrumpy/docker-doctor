@@ -6,6 +6,23 @@ import path from "node:path";
 import { loadConfig, typeStrippingFailure } from "../src/config/loader";
 import { ConfigError } from "../src/errors";
 
+const failureMessage = async (
+  configDir: string,
+  customPath?: string
+): Promise<string> => {
+  try {
+    await loadConfig(configDir, customPath);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      return error.message;
+    }
+
+    throw error;
+  }
+
+  throw new Error("loadConfig should have thrown a ConfigError");
+};
+
 describe("loadConfig", () => {
   let dir: string;
 
@@ -162,6 +179,130 @@ describe("loadConfig", () => {
     }
 
     expect(caught).toBeInstanceOf(ConfigError);
+  });
+
+  test.each([
+    ["null", "null", "null"],
+    ["a list", '["a"]', "array"],
+    ["a string", '"loud"', "string"],
+  ])("names the real type when rules is %s", async (_name, value, type) => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    await fs.writeFile(file, `{"rules": ${value}}`);
+
+    expect(await failureMessage(dir)).toBe(
+      `Invalid configuration in ${file}: "rules" must be an object, got ${type}`
+    );
+  });
+
+  test("names the config file and lists the valid severities", async () => {
+    const file = path.join(dir, "docker-doctor.config.yaml");
+    await fs.writeFile(file, 'rules:\n  "no-latest-tag": loud\n');
+
+    expect(await failureMessage(dir)).toBe(
+      `Invalid configuration in ${file}: Invalid severity "loud" for rule "no-latest-tag". Use error, warning, info, off.`
+    );
+  });
+
+  test("lists the valid severities for a category", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ categories: { Security: "loud" } })
+    );
+
+    expect(await failureMessage(dir)).toContain(
+      'for category "Security". Use error, warning, info, off.'
+    );
+  });
+
+  test("quotes a short invalid severity", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: { "no-latest-tag": "a".repeat(20) } })
+    );
+
+    expect(await failureMessage(dir)).toContain(
+      `Invalid severity "${"a".repeat(20)}" for rule "no-latest-tag".`
+    );
+  });
+
+  test.each([
+    [
+      "a long string",
+      JSON.stringify("ghp_tokenvalue12345abcdefghijklmnop"),
+      "a 35-character string",
+    ],
+    ["a list", '["ghp_tokenvalue12345abcdefghijklmnop"]', "array"],
+    ["an object", '{"token": "ghp_tokenvalue12345abcdefghijklmnop"}', "object"],
+    ["null", "null", "null"],
+    ["a number", "5", "number"],
+  ])(
+    "names the type, not the value, of a long or structured severity (%s)",
+    async (_name, value, got) => {
+      await fs.writeFile(
+        path.join(dir, "docker-doctor.config.json"),
+        `{"rules": {"no-latest-tag": ${value}}}`
+      );
+
+      const message = await failureMessage(dir);
+
+      expect(message).toContain(
+        `Invalid severity for rule "no-latest-tag", got ${got}. Use error, warning, info, off.`
+      );
+      expect(message).not.toContain("ghp_");
+    }
+  );
+
+  test("names the type of a bad category severity", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      '{"categories": {"Security": {"token": "ghp_tokenvalue12345abcdefghijklmnop"}}}'
+    );
+
+    const message = await failureMessage(dir);
+
+    expect(message).toContain(
+      'Invalid severity for category "Security", got object.'
+    );
+    expect(message).not.toContain("ghp_");
+  });
+
+  test("names the config file when the whole config is not an object", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    await fs.writeFile(file, "[1]");
+
+    expect(await failureMessage(dir)).toBe(
+      `Invalid configuration in ${file}: The config must be an object, got array`
+    );
+  });
+
+  test("names the config file when it cannot be parsed", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    await fs.writeFile(file, "{ nope");
+
+    expect(await failureMessage(dir)).toContain(
+      `Failed to parse config JSON in ${file}:`
+    );
+  });
+
+  test("names package.json when its dockerDoctor key is invalid", async () => {
+    const file = path.join(dir, "package.json");
+    await fs.writeFile(
+      file,
+      JSON.stringify({ dockerDoctor: { rules: null }, name: "fixture" })
+    );
+
+    expect(await failureMessage(dir)).toBe(
+      `Invalid configuration in ${file} ("dockerDoctor"): "rules" must be an object, got null`
+    );
+  });
+
+  test("names the file given to a custom path", async () => {
+    const file = path.join(dir, "custom.yaml");
+    await fs.writeFile(file, "rules: []\n");
+
+    expect(await failureMessage(dir, "custom.yaml")).toBe(
+      `Invalid configuration in ${file}: "rules" must be an object, got array`
+    );
   });
 
   test("prefers .ts config over .json when both exist", async () => {
