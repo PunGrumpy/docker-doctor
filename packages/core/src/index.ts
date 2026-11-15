@@ -23,6 +23,8 @@ export {
 
 export { runDockerfileRules } from "./runners/dockerfile-runner";
 
+export { fingerprintDiagnostics } from "./runners/fingerprint";
+
 export {
   type ComposeSource,
   runComposeFiles,
@@ -80,6 +82,7 @@ export type {
   DockerfileInstruction,
   DockerfileRule,
   FileIgnores,
+  FingerprintedDiagnostic,
   IgnoreDirective,
   IgnoreScope,
   IgnoreWarning,
@@ -91,9 +94,16 @@ export type {
 } from "./types/index";
 
 export {
+  type BaselineCounts,
+  compareWithBaseline,
+  isNewFinding,
+} from "./baseline";
+
+export {
   toJsonReport,
   type JsonReport,
   type ReportDiagnostic,
+  type ReportInput,
   type ReportSuppressed,
 } from "./report";
 

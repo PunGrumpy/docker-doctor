@@ -13,9 +13,9 @@ export interface IgnoreFileWarning {
   message: string;
 }
 
-export interface IgnoreResult {
-  diagnostics: Diagnostic[];
-  suppressed: SuppressedDiagnostic[];
+export interface IgnoreResult<T extends Diagnostic = Diagnostic> {
+  diagnostics: T[];
+  suppressed: (T & SuppressedDiagnostic)[];
   warnings: IgnoreFileWarning[];
 }
 
@@ -132,10 +132,10 @@ const matchReason = (
  * an ignore comment suppressed, matching each by file, rule and line. A
  * file-wide ignore also covers findings that have no line.
  */
-export const applyIgnores = (
-  diagnostics: Diagnostic[],
+export const applyIgnores = <T extends Diagnostic>(
+  diagnostics: T[],
   ignoresByFile: ReadonlyMap<string, FileIgnores>
-): IgnoreResult => {
+): IgnoreResult<T> => {
   const indexed = new Map<string, FileRuleIgnores>();
   const warnings: IgnoreFileWarning[] = [];
 
@@ -149,8 +149,8 @@ export const applyIgnores = (
     }
   }
 
-  const live: Diagnostic[] = [];
-  const suppressed: SuppressedDiagnostic[] = [];
+  const live: T[] = [];
+  const suppressed: (T & SuppressedDiagnostic)[] = [];
 
   for (const diagnostic of diagnostics) {
     const match = matchReason(indexed.get(diagnostic.file), diagnostic);

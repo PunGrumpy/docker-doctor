@@ -3,9 +3,11 @@ import { describe, test, expect } from "bun:test";
 import { parseDockerfile } from "../src/parsers/dockerfile-parser";
 import { REPORT_SCHEMA_VERSION, toJsonReport } from "../src/report";
 import { runDockerfileRules } from "../src/runners/dockerfile-runner";
+import { fingerprintDiagnostics } from "../src/runners/fingerprint";
 import { calculateScore } from "../src/scoring";
 import type {
   Diagnostic,
+  FingerprintedDiagnostic,
   ProjectInfo,
   RuleCategory,
   SuppressedDiagnostic,
@@ -23,6 +25,7 @@ const ALL_CATEGORIES: RuleCategory[] = [
 
 const TOP_LEVEL_KEYS = [
   "analyzedFiles",
+  "baseline",
   "diagnostics",
   "failures",
   "label",
@@ -36,6 +39,7 @@ const TOP_LEVEL_KEYS = [
 const DIAGNOSTIC_KEYS = [
   "category",
   "file",
+  "fingerprint",
   "help",
   "line",
   "message",
@@ -51,29 +55,31 @@ const ONE_INFO_SCORE = 99;
 const SUPPRESSED_KEYS = [...DIAGNOSTIC_KEYS, "reason"].toSorted();
 
 const buildReport = (
-  diagnostics: Diagnostic[],
+  diagnostics: FingerprintedDiagnostic[],
   score: number | null,
   label: string | null,
   project: ProjectInfo,
   failures: { file: string; message: string }[],
   analyzedFiles: number,
-  suppressed: SuppressedDiagnostic[] = []
+  suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[] = []
 ) =>
-  toJsonReport(
+  toJsonReport({
+    analyzedFiles,
+    baseline: null,
     diagnostics,
-    score,
+    failures,
     label,
     project,
-    failures,
-    analyzedFiles,
-    suppressed
-  );
+    score,
+    suppressed,
+  });
 
 const diagnostic = (
   rule: string,
   severity: Diagnostic["severity"]
-): Diagnostic => ({
+): FingerprintedDiagnostic => ({
   file: "Dockerfile",
+  fingerprint: "0123456789abcdef",
   help: "",
   message: "",
   rule,
@@ -86,12 +92,12 @@ const diagnostic = (
 // commit, because external consumers (the GitHub Action renderer, the
 // benchmarks scanner, the improve-docker skill) key off that number.
 describe("JSON report contract", () => {
-  test("schemaVersion is 7", () => {
-    expect(REPORT_SCHEMA_VERSION).toBe(7);
+  test("schemaVersion is 8", () => {
+    expect(REPORT_SCHEMA_VERSION).toBe(8);
     expect(
       buildReport([], PERFECT_SCORE, "Excellent 🏆", EMPTY_PROJECT, [], 1)
         .schemaVersion
-    ).toBe(7);
+    ).toBe(8);
   });
 
   test("top-level keys are exactly the documented set", () => {
@@ -133,10 +139,11 @@ describe("JSON report contract", () => {
   });
 
   test("every diagnostic carries exactly the documented keys", () => {
-    const diagnostics = runDockerfileRules(
-      parseDockerfile("FROM node\nCOPY . .\n"),
-      "Dockerfile",
-      []
+    const content = "FROM node\nCOPY . .\n";
+
+    const diagnostics = fingerprintDiagnostics(
+      runDockerfileRules(parseDockerfile(content), "Dockerfile", []),
+      { Dockerfile: content }
     );
 
     const { score, label } = calculateScore(diagnostics, 1);
@@ -168,7 +175,7 @@ describe("JSON report contract", () => {
   });
 
   test("every suppressed finding carries the diagnostic keys and a reason", () => {
-    const suppressed: SuppressedDiagnostic[] = [
+    const suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[] = [
       {
         ...diagnostic("docker-doctor/no-root-user", "warning"),
         line: 1,
@@ -258,5 +265,45 @@ describe("JSON report contract", () => {
       label: "Excellent 🏆",
       score: ONE_INFO_SCORE,
     });
+  });
+});
+
+const findingWith = (fingerprint: string): FingerprintedDiagnostic => ({
+  ...diagnostic("docker-doctor/no-root-user", "warning"),
+  fingerprint,
+});
+
+describe("JSON report with a baseline", () => {
+  test("has no baseline counts and no new field without one", () => {
+    const report = buildReport(
+      [findingWith("aaaaaaaaaaaaaaaa")],
+      0,
+      "Critical 🚨",
+      EMPTY_PROJECT,
+      [],
+      1
+    );
+
+    expect(report.baseline).toBeNull();
+    expect(Object.keys(report.diagnostics[0] ?? {})).not.toContain("new");
+  });
+
+  test("marks the findings the baseline lacks and counts the ones it lost", () => {
+    const report = toJsonReport({
+      analyzedFiles: 1,
+      baseline: new Set(["aaaaaaaaaaaaaaaa", "cccccccccccccccc"]),
+      diagnostics: [
+        findingWith("aaaaaaaaaaaaaaaa"),
+        findingWith("bbbbbbbbbbbbbbbb"),
+      ],
+      failures: [],
+      label: "Critical 🚨",
+      project: EMPTY_PROJECT,
+      score: 0,
+      suppressed: [],
+    });
+
+    expect(report.baseline).toEqual({ existing: 1, new: 1, resolved: 1 });
+    expect(report.diagnostics.map((d) => d.new)).toEqual([false, true]);
   });
 });

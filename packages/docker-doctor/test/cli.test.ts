@@ -218,6 +218,378 @@ describe("--fail-on", () => {
   });
 });
 
+// Warnings: no-root-user and avoid-dev-dependencies. Infos:
+// require-healthcheck and require-labels.
+const BASELINE_DOCKERFILE = [
+  "FROM node:22.2.0-alpine",
+  "WORKDIR /app",
+  "COPY package.json ./",
+  "RUN npm ci",
+  "COPY . .",
+  'CMD ["node", "index.js"]',
+].join("\n");
+
+// A project whose Dockerfile can be rewritten between scans, and a saved
+// report kept outside it.
+const withBaselineProject = async (
+  run: (paths: {
+    baseline: string;
+    project: string;
+    write: (dockerfile: string) => void;
+  }) => Promise<void>
+) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-baseline-"));
+  const project = path.join(root, "project");
+  const baseline = path.join(root, "baseline.json");
+
+  const write = (dockerfile: string) => {
+    fs.writeFileSync(path.join(project, "Dockerfile"), dockerfile);
+  };
+
+  try {
+    fs.mkdirSync(project);
+    fs.writeFileSync(path.join(project, ".dockerignore"), "node_modules\n");
+    write(BASELINE_DOCKERFILE);
+    const saved = await runCli([project, "--json"]);
+    fs.writeFileSync(baseline, saved.stdout);
+    await run({ baseline, project, write });
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
+  }
+};
+
+describe("--baseline", () => {
+  test("passes a project whose findings are all in the saved report", async () => {
+    await withBaselineProject(async ({ baseline, project }) => {
+      const without = await runCli([project, "--json", "--fail-on", "info"]);
+
+      const withBaseline = await runCli([
+        project,
+        "--json",
+        "--fail-on",
+        "info",
+        "--baseline",
+        baseline,
+      ]);
+
+      const report = parseReport(withBaseline.stdout);
+
+      expect(without.exitCode).toBe(1);
+      expect(withBaseline.exitCode).toBe(0);
+      expect(withBaseline.stderr).not.toContain("no finding matches");
+      expect(report.baseline).toEqual({
+        existing: report.diagnostics.length,
+        new: 0,
+        resolved: 0,
+      });
+      expect(report.diagnostics.every((d) => d.new === false)).toBe(true);
+    });
+  });
+
+  test("fails on a new finding and marks only that one new", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("COPY . .", "COPY . .\nWORKDIR app"));
+
+      const { exitCode, stdout } = await runCli([
+        project,
+        "--json",
+        "--fail-on",
+        "warning",
+        "--baseline",
+        baseline,
+      ]);
+
+      const report = parseReport(stdout);
+
+      expect(exitCode).toBe(1);
+      expect(report.baseline?.new).toBe(1);
+      expect(
+        report.diagnostics.flatMap((d) => (d.new === true ? [d.rule] : []))
+      ).toEqual(["docker-doctor/absolute-workdir"]);
+    });
+  });
+
+  test("--fail-on decides whether a new finding fails", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("COPY . .", "COPY . .\nWORKDIR app"));
+
+      const exitCodeFor = async (failOn: string): Promise<number> => {
+        const { exitCode } = await runCli([
+          project,
+          "--score",
+          "--fail-on",
+          failOn,
+          "--baseline",
+          baseline,
+        ]);
+
+        return exitCode;
+      };
+
+      expect(await exitCodeFor("error")).toBe(0);
+      expect(await exitCodeFor("warning")).toBe(1);
+      expect(await exitCodeFor("none")).toBe(0);
+    });
+  });
+
+  test("counts a fixed finding as resolved", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("CMD", "USER node\nCMD"));
+
+      const { exitCode, stdout } = await runCli([
+        project,
+        "--json",
+        "--fail-on",
+        "info",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(exitCode).toBe(0);
+      expect(parseReport(stdout).baseline).toMatchObject({
+        new: 0,
+        resolved: 1,
+      });
+    });
+  });
+
+  test("keeps findings existing when lines are inserted above them", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(
+        `# syntax=docker/dockerfile:1\n# build the app\n\n${BASELINE_DOCKERFILE.replace("COPY . .", "\n\nCOPY . .")}`
+      );
+
+      const { exitCode, stdout } = await runCli([
+        project,
+        "--json",
+        "--fail-on",
+        "info",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(exitCode).toBe(0);
+      expect(parseReport(stdout).baseline).toMatchObject({
+        new: 0,
+        resolved: 0,
+      });
+    });
+  });
+
+  test("leaves the score and the findings as they are without it", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("COPY . .", "COPY . .\nWORKDIR app"));
+
+      const plain = await runCli([project, "--json"]);
+
+      const compared = await runCli([
+        project,
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      const without = parseReport(plain.stdout);
+      const withBaseline = parseReport(compared.stdout);
+
+      const scoreOnly = await runCli([
+        project,
+        "--score",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(without.baseline).toBeNull();
+      expect(without.diagnostics.some((d) => "new" in d)).toBe(false);
+      expect(withBaseline.score).toBe(without.score);
+      expect(scoreOnly.stdout.trim()).toBe(String(without.score));
+      expect(
+        withBaseline.diagnostics.map(({ new: _new, ...rest }) => rest)
+      ).toEqual(without.diagnostics);
+    });
+  });
+
+  test("--json, --score and the terminal report agree on the exit code", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("COPY . .", "COPY . .\nWORKDIR app"));
+
+      const flags = ["--fail-on", "warning", "--baseline", baseline];
+      const json = await runCli([project, "--json", ...flags]);
+      const score = await runCli([project, "--score", ...flags]);
+      const terminal = await runCli([project, ...flags]);
+
+      expect([json.exitCode, score.exitCode, terminal.exitCode]).toEqual([
+        1, 1, 1,
+      ]);
+      expect(terminal.stdout).toContain("Baseline: 1 new, ");
+    });
+  });
+
+  test("warns when a report saved from another directory matches nothing", async () => {
+    await withBaselineProject(async ({ baseline, project }) => {
+      const parent = await runCli([path.dirname(project), "--json"]);
+      fs.writeFileSync(baseline, parent.stdout);
+
+      const { stderr, stdout } = await runCli([
+        project,
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(parseReport(stdout).baseline?.existing).toBe(0);
+      expect(stderr).toContain(
+        "Warning: no finding matches the --baseline report."
+      );
+    });
+  });
+
+  test("does not warn when the only saved finding was fixed and another appeared in the same file", async () => {
+    await withBaselineProject(async ({ baseline, project, write }) => {
+      write(BASELINE_DOCKERFILE.replace("COPY . .", "RUN cd /app && make"));
+      const scan = await runCli([project, "--json"]);
+      const saved = parseReport(scan.stdout);
+
+      fs.writeFileSync(
+        baseline,
+        JSON.stringify({
+          ...saved,
+          diagnostics: saved.diagnostics.filter(
+            (d) => d.rule === "docker-doctor/avoid-run-cd"
+          ),
+        })
+      );
+
+      const fixed = BASELINE_DOCKERFILE.replace(
+        "COPY . .",
+        "WORKDIR /app\nRUN make"
+      );
+
+      write(`${fixed}\nWORKDIR app`);
+
+      const { stderr, stdout } = await runCli([
+        project,
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      const report = parseReport(stdout);
+
+      expect(report.baseline?.existing).toBe(0);
+      expect(report.baseline?.resolved).toBe(1);
+      expect(report.baseline?.new).toBeGreaterThan(0);
+      expect(stderr).not.toContain("--baseline");
+    });
+  });
+
+  test("warns when a root report is used for a scan of a subdirectory", async () => {
+    await withBaselineProject(async ({ baseline, project }) => {
+      const services = path.join(project, "svc");
+
+      fs.mkdirSync(path.join(services, "a"), { recursive: true });
+      fs.renameSync(
+        path.join(project, "Dockerfile"),
+        path.join(services, "a", "Dockerfile")
+      );
+      const root = await runCli([project, "--json"]);
+      fs.writeFileSync(baseline, root.stdout);
+
+      const { stderr } = await runCli([
+        services,
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(stderr).toContain(
+        "Warning: no finding matches the --baseline report."
+      );
+    });
+  });
+
+  test("never warns when the saved report has no findings", async () => {
+    await withBaselineProject(async ({ baseline, project }) => {
+      const saved = parseReport(fs.readFileSync(baseline, "utf-8"));
+      fs.writeFileSync(baseline, JSON.stringify({ ...saved, diagnostics: [] }));
+
+      const { stderr, stdout } = await runCli([
+        project,
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      const report = parseReport(stdout);
+
+      expect(report.baseline?.existing).toBe(0);
+      expect(report.baseline?.new).toBe(report.diagnostics.length);
+      expect(stderr).not.toContain("--baseline");
+    });
+  });
+
+  test("still exits 2 when a file could not be analyzed", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-baseline-broken-"));
+    const baseline = path.join(root, "baseline.json");
+
+    try {
+      const saved = await runCli([fixture("partly-broken"), "--json"]);
+      fs.writeFileSync(baseline, saved.stdout);
+
+      const { exitCode } = await runCli([
+        fixture("partly-broken"),
+        "--json",
+        "--baseline",
+        baseline,
+      ]);
+
+      expect(saved.exitCode).toBe(2);
+      expect(exitCode).toBe(2);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("refuses a report without fingerprints, a non-report and a missing file", async () => {
+    await withBaselineProject(async ({ baseline, project }) => {
+      const saved = parseReport(fs.readFileSync(baseline, "utf-8"));
+      const schema7 = path.join(path.dirname(baseline), "schema7.json");
+      const notJson = path.join(path.dirname(baseline), "not-json.json");
+
+      fs.writeFileSync(
+        schema7,
+        JSON.stringify({
+          ...saved,
+          diagnostics: saved.diagnostics.map(
+            ({ fingerprint: _fingerprint, ...rest }) => rest
+          ),
+          schemaVersion: 7,
+        })
+      );
+      fs.writeFileSync(notJson, "{ not json");
+
+      const old = await runCli([project, "--json", "--baseline", schema7]);
+      const broken = await runCli([project, "--json", "--baseline", notJson]);
+
+      const missing = await runCli([
+        project,
+        "--json",
+        "--baseline",
+        path.join(path.dirname(baseline), "missing.json"),
+      ]);
+
+      expect(old.exitCode).toBe(1);
+      expect(old.stderr).toContain("have no fingerprints");
+      expect(old.stderr).toContain(`--json --fail-on none > '${schema7}'`);
+      expect(old.stdout).toBe("");
+      expect(broken.exitCode).toBe(1);
+      expect(broken.stderr).toContain("is not a docker-doctor JSON report");
+      expect(missing.exitCode).toBe(1);
+      expect(missing.stderr).toContain("Cannot read the --baseline report");
+    });
+  });
+});
+
 describe("rules subcommands", () => {
   test("rules explain accepts the short rule name", async () => {
     const { exitCode, stdout } = await runCli([
@@ -505,6 +877,7 @@ describe("--json contract", () => {
     expect(Object.keys(report).toSorted()).toEqual(
       [
         "analyzedFiles",
+        "baseline",
         "diagnostics",
         "failures",
         "label",
@@ -517,11 +890,28 @@ describe("--json contract", () => {
     );
   });
 
-  test("schemaVersion is 7 and analyzedFiles counts the scanned files", async () => {
+  test("schemaVersion is 8 and analyzedFiles counts the scanned files", async () => {
     const { stdout } = await runCli([fixture("multi-file"), "--json"]);
     const report = parseReport(stdout);
-    expect(report.schemaVersion).toBe(7);
+    expect(report.schemaVersion).toBe(8);
     expect(report.analyzedFiles).toBe(2);
+  });
+
+  test("every finding, suppressed or not, carries a distinct fingerprint", async () => {
+    const { stdout } = await runCli([fixture("ignore-compose"), "--json"]);
+    const { diagnostics, suppressed } = parseReport(stdout);
+
+    const fingerprints = [...diagnostics, ...suppressed].map(
+      (d) => d.fingerprint
+    );
+
+    expect(diagnostics.length).toBeGreaterThan(0);
+    expect(suppressed.length).toBeGreaterThan(0);
+    expect(new Set(fingerprints).size).toBe(fingerprints.length);
+
+    for (const fingerprint of fingerprints) {
+      expect(fingerprint).toMatch(/^[0-9a-f]{16}$/u);
+    }
   });
 
   test("a complete scan reports an empty failures list", async () => {

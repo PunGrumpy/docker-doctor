@@ -33,6 +33,7 @@ const defaultsToNonroot = (image: string): boolean =>
   isDockerSandboxTemplate(image);
 
 export const noRootUser: DockerfileRule = {
+  anchor: "file",
   category: "Security",
   check(instructions, file) {
     // A stage built FROM a previous stage inherits that stage's image

@@ -13,6 +13,7 @@ export {
   loadConfig,
   allRules,
   findRule,
+  fingerprintDiagnostics,
   toJsonReport,
 } from "@docker-doctor/core";
 
@@ -21,6 +22,9 @@ export type {
   ComposeValue,
   Diagnostic,
   DockerDoctorConfig,
+  FingerprintedDiagnostic,
+  JsonReport,
+  ReportInput,
   RuleCategory,
   RuleSeverity,
   ScoreResult,

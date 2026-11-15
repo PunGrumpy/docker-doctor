@@ -14,21 +14,23 @@ Pass `--no-config` when you scan a repository the user did not author. A JavaScr
 
 ## After editing a Dockerfile or Compose file:
 
-Scan once before you touch anything and once after your change. Save both reports outside the project and note both exit codes.
+Save a report before you touch anything, outside the project. After your change, scan again from the same directory with `--baseline` pointing at it, and write the second report to a different file. The second scan fails only on findings the saved report does not have.
 
 ```bash
-npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-before.json; echo "exit=$?"   # BEFORE editing
-npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-after.json; echo "exit=$?"    # AFTER editing
+npx @docker-doctor/cli@latest . --json > /tmp/docker-doctor-before.json   # BEFORE editing, ignore its exit code
+npx @docker-doctor/cli@latest . --json --fail-on info --baseline /tmp/docker-doctor-before.json > /tmp/docker-doctor-after.json; echo "exit=$?"   # AFTER editing
 ```
 
-The CLI scans the whole project. There is no changed-only scope, so compare the two whole-project reports in this order:
+Findings match by their path from the scanned directory, so a report saved from another directory matches nothing and every finding looks new. Never redirect the second scan into the file you pass to `--baseline`. The shell empties that file before docker-doctor reads it.
 
-1. **Exit code.** `0` means no `error`-severity finding, `1` means at least one, `2` means a file could not be read or parsed. If it went from `0` to `1`, your change added an error. Fix it before committing. On `2` the scan is incomplete and nothing else is comparable. Fix the file named on stderr, then scan again.
-2. **Findings per rule and file.** Count `diagnostics[]` by `rule` and `file` in each report. A pair with more findings after your change is a regression, even when the score did not move. A rule total can fall while one file gets worse, so never count per rule alone. Fix it before committing.
-3. **Suppressed findings.** Count `suppressed[]` the same way. A rise is a regression. An ignore comment moves a finding out of `diagnostics`, so fewer findings mean nothing when `suppressed` grew.
+The CLI scans the whole project, so the second report lists every finding. Read it in this order:
+
+1. **Exit code.** `0` means your change added no finding of any severity. `1` means it added at least one, or the saved report could not be used, and stderr says which. If stderr says `unknown option '--fail-on'` or `unknown option '--baseline'`, the CLI predates the flag. Then save a plain `--json` report after your change too, and count `diagnostics[]` by `rule` and `file` in both. A pair with more findings after your change is a regression. Skip steps 2 and 3, which need the newer CLI. `2` means a file could not be read or parsed, so the scan is incomplete and nothing else is comparable. Fix the file named on stderr, then scan again.
+2. **New findings.** `baseline.new` counts them, and each has `"new": true` in `diagnostics[]`. Fix every one before committing, even when the score did not move. A finding on an instruction or Compose entry you edited counts as new even if it was there before, because its fingerprint covers that text. Fix it or tell the user it was already there. `baseline.resolved` counts the findings your change fixed.
+3. **Suppressed findings.** `--baseline` never looks at `suppressed[]`. An ignore comment moves a finding out of `diagnostics`, so list the suppressed findings that are new since the saved report. Any entry is a regression.
 
 ```bash
-node -e 'for (const f of process.argv.slice(1)) { const r = require(f); const c = {}; for (const list of ["diagnostics", "suppressed"]) for (const d of r[list] ?? []) { const k = `${list} ${d.rule} ${d.file}`; c[k] = (c[k] ?? 0) + 1; } console.log(f, c); }' /tmp/docker-doctor-before.json /tmp/docker-doctor-after.json
+node -e 'const [before, after] = process.argv.slice(1).map((f) => require(f)); const old = new Set(before.suppressed.map((d) => d.fingerprint)); console.log(after.suppressed.filter((d) => !old.has(d.fingerprint)));' /tmp/docker-doctor-before.json /tmp/docker-doctor-after.json
 ```
 
 4. **Score.** A coarse signal only. It averages the penalty over every analyzed file, so a new error in one file of a large project can leave the score almost unchanged. Never accept a change because the score held.
@@ -77,7 +79,8 @@ npx @docker-doctor/cli@latest . --verbose
 | `--score`, `-s` | Output only the numeric score, or nothing when no file was analyzed (exits 1 on a finding at or above `--fail-on`, `error` by default, and 2 if a file could not be analyzed) |
 | `--json`, `-j` | Output the full JSON report (exits 1 on a finding at or above `--fail-on`, `error` by default, and 2 if a file could not be analyzed) |
 | `--config <path>`, `-c` | Use a custom config file |
-| `--fail-on <severity>` | The lowest severity that exits `1`: `error` (default), `warning`, `info`, or `none`. Use it only when the user asks for a stricter or a report-only gate, and say which one you ran |
+| `--fail-on <severity>` | The lowest severity that exits `1`: `error` (default), `warning`, `info`, or `none`. Outside the regression check above, use it only when the user asks for a stricter or a report-only gate, and say which one you ran |
+| `--baseline <report.json>` | Compare with a report saved by `--json`. Only findings it does not have can exit `1`. The score and `diagnostics[]` are the same as without it |
 | `--no-config` | Skip config files and inline ignore comments and use the defaults. Use it on a repository the user did not write. Cannot be combined with `--config` |
 | `rules list` | List every rule with its category, default severity, and description |
 | `rules explain <rule>` | Print one rule's category, default severity, description and fix hint (the same text as `Help:`). Accepts the full key (`docker-doctor/no-root-user`) or the short name (`no-root-user`) |

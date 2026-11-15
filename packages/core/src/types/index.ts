@@ -26,6 +26,12 @@ export interface SuppressedDiagnostic extends Diagnostic {
   reason: string | null;
 }
 
+// A finding with the stable key that matches it across scans. See
+// runners/fingerprint.ts.
+export interface FingerprintedDiagnostic extends Diagnostic {
+  fingerprint: string;
+}
+
 export type IgnoreScope = { kind: "file" } | { kind: "line"; line: number };
 
 export interface IgnoreDirective {
@@ -71,6 +77,9 @@ export type RuleSeverity = DiagnosticSeverity | "off";
 
 export interface RuleDefinition {
   key: string;
+  // "file" marks a rule that reports at most once per file, about the file
+  // as a whole. Its finding keeps its fingerprint whatever line it points at.
+  anchor?: "file";
   category: RuleCategory;
   // "off" is a config-only severity: a rule's own default is always emitting.
   defaultSeverity: DiagnosticSeverity;
