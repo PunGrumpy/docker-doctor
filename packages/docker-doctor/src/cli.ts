@@ -1,9 +1,7 @@
 import type { Stats } from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { setTimeout } from "node:timers/promises";
 
 import type {
   ComposeSource,
@@ -38,12 +36,6 @@ import {
   toJsonReport,
 } from "@docker-doctor/core";
 import type { SkillAgentType } from "agent-install";
-import {
-  detectInstalledSkillAgents,
-  getSkillAgentConfig,
-  getSkillAgentTypes,
-  isSkillAgentType,
-} from "agent-install";
 import chalk from "chalk";
 import { Command, Option } from "commander";
 
@@ -61,10 +53,6 @@ import {
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
 import { sanitizePath } from "./agents/sanitize";
-import {
-  getSkillSourceDirectory,
-  installSkillForAgents,
-} from "./agents/skill-install";
 import { formatTerminal } from "./formatters/terminal";
 import {
   CLEAR_TO_LINE_END,
@@ -77,6 +65,12 @@ import {
   scaffoldActionWorkflow,
   WORKFLOW_RELATIVE_PATH,
 } from "./workflow-scaffold";
+
+// chalk reads FORCE_COLOR but not NO_COLOR. Per https://no-color.org any
+// non-empty NO_COLOR turns color off, and here it wins over FORCE_COLOR.
+if (hasText(process.env.NO_COLOR)) {
+  chalk.level = 0;
+}
 
 interface KeypressKey {
   name?: string;
@@ -392,13 +386,15 @@ interface WizardContext {
   rootDir: string;
 }
 
-const agentDisplayName = (agent: SkillAgentType): string =>
-  getSkillAgentConfig(agent).displayName;
+// agent-install is only needed by `install` and the handoff, so a scan loads
+// it on demand rather than at startup.
+const loadSkillInstall = async () => await import("./agents/skill-install");
 
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
 // prompt for any other agent. Only reached when the scan found something.
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
+  const { agentDisplayName, installSkillForAgents } = await loadSkillInstall();
   const launchable = detectLaunchableAgents();
 
   const options = [
@@ -589,12 +585,24 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
   return summary;
 };
 
+// While the spinner runs it owns the current line, so a warning written to
+// stderr would land after the frame text. Clear the line first.
+let spinnerOwnsLine = false;
+
+const printWarning = (message: string): void => {
+  if (spinnerOwnsLine) {
+    process.stdout.write(`\r${CLEAR_TO_LINE_END}`);
+  }
+
+  console.error(message);
+};
+
 // Stderr, like the config warnings, so --json and --score stay parseable.
 const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
   for (const { file, line, message } of warnings) {
     // The path comes from the scanned tree, so it is flattened like the
     // message before it reaches stderr.
-    console.error(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
+    printWarning(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
   }
 };
 
@@ -605,16 +613,10 @@ const runRulesEngine = async (
   categoriesConfig: Record<string, RuleSeverity> | undefined,
   projectFilesList: string[],
   fileContents: Record<string, string>,
-  options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void,
   readIgnores: boolean
 ): Promise<RulesEngineResult> => {
-  const isSilent = options.score === true || options.json === true;
-
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
 
   const dockerfileResults = await Promise.all(
     project.dockerfiles.map(async (df): Promise<FileResult> => {
@@ -644,7 +646,7 @@ const runRulesEngine = async (
         // A file we could not read or parse has not been checked. The
         // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
+        printWarning(`Failed to analyze Dockerfile ${df}: ${msg}`);
 
         return {
           analyzed: false,
@@ -656,10 +658,7 @@ const runRulesEngine = async (
     })
   );
 
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
 
   const composeReads = await Promise.all(
     project.composeFiles.map(async (cf): Promise<ComposeRead | ScanFailure> => {
@@ -677,7 +676,7 @@ const runRulesEngine = async (
         };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+        printWarning(`Failed to analyze Compose file ${cf}: ${msg}`);
 
         return { file: cf, message: msg };
       }
@@ -694,7 +693,7 @@ const runRulesEngine = async (
     composeSources,
     { categoriesConfig, rulesConfig },
     (message) => {
-      console.error(`Warning: ${message}`);
+      printWarning(`Warning: ${message}`);
     }
   );
 
@@ -1125,6 +1124,7 @@ program
       };
 
       if (showProgress) {
+        spinnerOwnsLine = true;
         process.stdout.write(HIDE_CURSOR);
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
         spinnerInterval = setInterval(() => {
@@ -1136,10 +1136,6 @@ program
       }
 
       try {
-        if (showProgress) {
-          await setTimeout(150);
-        }
-
         // A config file can be code, so --no-config never reads one.
         let config: DockerDoctorConfig = {};
 
@@ -1150,7 +1146,7 @@ program
           const configPath = await resolveConfigPath(options.config, rootDir);
 
           config = await loadConfig(rootDir, configPath, (message) => {
-            console.error(`Warning: ${message}`);
+            printWarning(`Warning: ${message}`);
           });
         }
 
@@ -1159,7 +1155,7 @@ program
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
           onSkippedDirectory: (skippedDir) => {
-            console.error(
+            printWarning(
               `Warning: skipped unreadable directory ${skippedDir} (permission denied)`
             );
           },
@@ -1184,7 +1180,6 @@ program
           config.categories,
           projectFilesList,
           fileContents,
-          options,
           setStatus,
           // An ignore comment is as author-controlled as a config file, so
           // --no-config turns both off.
@@ -1201,17 +1196,19 @@ program
         printIgnoreWarnings(warnings);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-        const concurrency = os.cpus().length;
 
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
           spinnerInterval = null;
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
 
         if (showProgress) {
+          const fileWord = scannedFileCount === 1 ? "file" : "files";
+
           console.log(
-            `${chalk.green("✔")} Scanned ${scannedFileCount} files in ${duration}s [~${concurrency} workers]`
+            `${chalk.green("✔")} Scanned ${scannedFileCount} ${fileWord} in ${duration}s`
           );
         }
 
@@ -1232,6 +1229,7 @@ program
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
       }
@@ -1256,6 +1254,13 @@ const CURATED_INSTALL_AGENTS: SkillAgentType[] = [
 const resolveInstallAgents = async (
   requested: string[] | undefined
 ): Promise<SkillAgentType[] | null> => {
+  const {
+    agentDisplayName,
+    detectInstalledSkillAgents,
+    getSkillAgentTypes,
+    isSkillAgentType,
+  } = await loadSkillInstall();
+
   if (requested && requested.length > 0) {
     const invalid = requested.filter((agent) => !isSkillAgentType(agent));
 
@@ -1309,7 +1314,8 @@ program
     "install into each agent's global skills directory (e.g. ~/.claude/skills) instead of the current project"
   )
   .action(async (options: { agent?: string[]; global?: boolean }) => {
-    const source = getSkillSourceDirectory();
+    const skills = await loadSkillInstall();
+    const source = skills.getSkillSourceDirectory();
 
     if (source === null) {
       console.error(
@@ -1334,7 +1340,7 @@ program
       return;
     }
 
-    const result = await installSkillForAgents(agents, {
+    const result = await skills.installSkillForAgents(agents, {
       global: options.global,
       projectRoot: process.cwd(),
     });
@@ -1348,13 +1354,13 @@ program
 
     for (const installed of result.installed) {
       console.log(
-        `  ${chalk.green("✔")} ${agentDisplayName(installed.agent)} → ${installed.path}`
+        `  ${chalk.green("✔")} ${skills.agentDisplayName(installed.agent)} → ${installed.path}`
       );
     }
 
     for (const failed of result.failed) {
       console.log(
-        `  ${chalk.red("✖")} ${agentDisplayName(failed.agent)}: ${failed.error}`
+        `  ${chalk.red("✖")} ${skills.agentDisplayName(failed.agent)}: ${failed.error}`
       );
     }
 

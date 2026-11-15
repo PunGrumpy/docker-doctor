@@ -2,7 +2,22 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { SkillAgentType, SkillInstallResult } from "agent-install";
-import { SKILL_MANIFEST_FILE, installSkillsFromSource } from "agent-install";
+import {
+  SKILL_MANIFEST_FILE,
+  getSkillAgentConfig,
+  installSkillsFromSource,
+} from "agent-install";
+
+// cli.ts loads this module with import() when `install` or the post-scan
+// handoff needs it, so a plain scan never pays for agent-install.
+export {
+  detectInstalledSkillAgents,
+  getSkillAgentTypes,
+  isSkillAgentType,
+} from "agent-install";
+
+export const agentDisplayName = (agent: SkillAgentType): string =>
+  getSkillAgentConfig(agent).displayName;
 
 const moduleDir = import.meta.dirname;
 
