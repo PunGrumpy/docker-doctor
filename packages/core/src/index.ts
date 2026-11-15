@@ -51,6 +51,8 @@ export {
   type UnknownConfigKey,
 } from "./config/unknown-keys";
 
+export { closestMatch } from "./suggest";
+
 export {
   calculateScore,
   getScoreBucket,

@@ -794,6 +794,71 @@ describe("scan target validation", () => {
   });
 });
 
+describe("mistyped commands", () => {
+  test.each([
+    ["init", undefined],
+    ["help", "docker-doctor --help"],
+    ["list", "docker-doctor rules list"],
+    ["rule", "docker-doctor rules"],
+    ["instal", "docker-doctor install"],
+  ])("%s exits 1 with an unknown command message", async (word, suggestion) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-empty-"));
+
+    try {
+      const { exitCode, stderr, stdout } = await runCli([word], { cwd: root });
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain(`Unknown command "${word}"`);
+      expect(stderr).toContain("docker-doctor --help");
+      expect(stderr).not.toContain("Directory not found");
+      expect(stdout).toBe("");
+
+      if (suggestion !== undefined) {
+        expect(stderr).toContain(`Did you mean "${suggestion}"?`);
+      }
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("a real directory with a command's name is still scanned", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-dir-"));
+
+    try {
+      const target = path.join(root, "init");
+      fs.mkdirSync(target);
+      fs.writeFileSync(path.join(target, "Dockerfile"), "FROM alpine:3.20\n");
+
+      const { exitCode, stderr, stdout } = await runCli(["init", "--json"], {
+        cwd: root,
+      });
+
+      expect(stderr).not.toContain("Unknown command");
+      expect(exitCode).toBe(0);
+      expect(parseReport(stdout).diagnostics).toBeInstanceOf(Array);
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test.each(["./init", "services", "sub/init"])(
+    "the missing path %s keeps the directory error",
+    async (target) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-command-path-"));
+
+      try {
+        const { exitCode, stderr } = await runCli([target], { cwd: root });
+
+        expect(exitCode).toBe(1);
+        expect(stderr).toContain("Directory not found");
+        expect(stderr).not.toContain("Unknown command");
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+});
+
 describe("ignore.files config", () => {
   test("ignored files are excluded from the scan and the report", async () => {
     // The vendored/ Dockerfile holds an error-severity finding; ignoring it
