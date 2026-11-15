@@ -468,6 +468,14 @@ describe("loadConfig", () => {
     );
   });
 
+  test("rejects a custom path that is a directory", async () => {
+    await fs.mkdir(path.join(dir, "configs"));
+
+    expect(await failureMessage(dir, "configs")).toBe(
+      `The config path ${path.join(dir, "configs")} is a directory. Pass the config file itself, for example ${path.join(dir, "configs", "docker-doctor.config.json")}.`
+    );
+  });
+
   test("names the file given to a custom path", async () => {
     const file = path.join(dir, "custom.yaml");
     await fs.writeFile(file, "rules: []\n");

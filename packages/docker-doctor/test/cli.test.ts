@@ -747,6 +747,29 @@ describe("--config resolution", () => {
   });
 });
 
+describe("--config on a directory", () => {
+  test("exits 1 with a one-line error that names the path", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-configdir-"));
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+
+      const { exitCode, stderr, stdout } = await runCli(
+        [root, "--json", "--config", root],
+        { cwd: root }
+      );
+
+      expect(exitCode).toBe(1);
+      expect(stderr.trim().split("\n")).toHaveLength(1);
+      expect(stderr).toContain(`The config path ${root} is a directory`);
+      expect(stderr).not.toContain("ERR_");
+      expect(stdout).toBe("");
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("scan target validation", () => {
   test("a nonexistent path exits 1 with a plain error", async () => {
     const { exitCode, stderr, stdout } = await runCli([

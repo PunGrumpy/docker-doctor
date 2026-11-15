@@ -15,6 +15,16 @@ import { hasText } from "../text";
 import type { UnknownConfigKey } from "./unknown-keys";
 import { collectUnknownConfigKeys } from "./unknown-keys";
 
+const isDirectory = async (filePath: string): Promise<boolean> => {
+  try {
+    const stats = await fs.stat(filePath);
+
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+};
+
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     await fs.access(filePath);
@@ -261,6 +271,12 @@ export const loadConfig = async (
     if (!(await fileExists(fullPath))) {
       throw new ConfigError({
         message: `Specified config file not found at ${fullPath}`,
+      });
+    }
+
+    if (await isDirectory(fullPath)) {
+      throw new ConfigError({
+        message: `The config path ${fullPath} is a directory. Pass the config file itself, for example ${path.join(fullPath, "docker-doctor.config.json")}.`,
       });
     }
 
