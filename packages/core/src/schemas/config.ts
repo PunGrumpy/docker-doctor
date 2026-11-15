@@ -19,13 +19,29 @@ const RULE_SEVERITIES: ReadonlySet<string> = new Set<string>(
 
 const SEVERITY_CHOICES = RULE_SEVERITY_VALUES.join(", ");
 
-const RULE_CATEGORIES: ReadonlySet<string> = new Set<RuleCategory>([
+export const RULE_CATEGORY_NAMES: readonly RuleCategory[] = [
   "Best Practices",
   "Compose",
   "Image Size",
   "Performance",
   "Security",
-]);
+];
+
+const RULE_CATEGORIES: ReadonlySet<string> = new Set<string>(
+  RULE_CATEGORY_NAMES
+);
+
+// The keys a config file may hold. apps/web/app/schema.json/route.ts and
+// apps/web/content/docs/reference/configuration.mdx list the same keys.
+// `$schema` is for editors and is not read.
+export const TOP_LEVEL_CONFIG_KEYS: readonly string[] = [
+  "$schema",
+  "categories",
+  "ignore",
+  "rules",
+];
+
+export const IGNORE_CONFIG_KEYS: readonly string[] = ["files"];
 
 export interface ConfigInput {
   readonly categories?: unknown;

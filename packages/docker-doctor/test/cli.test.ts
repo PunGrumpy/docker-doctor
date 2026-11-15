@@ -924,6 +924,57 @@ describe("config errors", () => {
   });
 });
 
+describe("unknown config keys in the config file", () => {
+  const MISTYPED =
+    '{"rule": {"docker-doctor/no-root-user": "off"}, "ignore": {"file": ["x"]}}';
+
+  test("warn on stderr and leave the --json report as if the keys were absent", async () => {
+    const clean = await scanWithConfig(
+      "dd-nounknown-",
+      "docker-doctor.config.json",
+      "{}"
+    );
+
+    const mistyped = await scanWithConfig(
+      "dd-unknown-",
+      "docker-doctor.config.json",
+      MISTYPED
+    );
+
+    expect(mistyped.exitCode).toBe(clean.exitCode);
+    expect(parseReport(mistyped.stdout).diagnostics).toEqual(
+      parseReport(clean.stdout).diagnostics
+    );
+    expect(parseReport(mistyped.stdout).score).toEqual(
+      parseReport(clean.stdout).score
+    );
+    expect(clean.stderr).toBe("");
+    expect(mistyped.stderr).toContain("docker-doctor.config.json");
+    expect(mistyped.stderr).toContain('Unknown config key "rule"');
+    expect(mistyped.stderr).toContain('Did you mean "rules"?');
+    expect(mistyped.stderr).toContain('Unknown config key "ignore.file"');
+    expect(mistyped.stderr).toContain('Did you mean "ignore.files"?');
+  });
+
+  test("leave the --score stdout alone", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-unknown-score-"));
+
+    try {
+      fs.writeFileSync(path.join(root, "Dockerfile"), "FROM alpine:3.20\n");
+      const before = await runCli([root, "--score"]);
+
+      fs.writeFileSync(path.join(root, "docker-doctor.config.json"), MISTYPED);
+      const after = await runCli([root, "--score"]);
+
+      expect(after.stdout).toBe(before.stdout);
+      expect(after.exitCode).toBe(before.exitCode);
+      expect(after.stderr).toContain('Unknown config key "rule"');
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
 const MARKER_FILE = "config-ran.txt";
 
 const RUNNING_CONFIG = `import fs from "node:fs";

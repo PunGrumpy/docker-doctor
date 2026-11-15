@@ -177,4 +177,13 @@ export default defineConfig({
 
 `defineConfig` is a real runtime import — a config that uses it fails to load when the package isn't installed in the project, so prefer the `satisfies` form for npx-only projects.
 
-docker-doctor reports unknown rule keys and unknown category names on stderr (`Warning: Unknown rule "…" in config`, `Warning: Unknown category "…" in config`), so a typo in a rule or category name doesn't go unnoticed. It drops unknown top-level keys without a warning. An invalid severity throws a config error that names the rule or category.
+docker-doctor warns on stderr about keys it does not know, so a typo does not go unnoticed. The warning names the config file and the key, and suggests the closest known key when one is within two edits:
+
+```text
+Warning: Unknown config key "rule" in /repo/docker-doctor.config.json. docker-doctor ignores it. Did you mean "rules"?
+Warning: Unknown config key "ignore.file" in /repo/docker-doctor.config.json. docker-doctor ignores it. Did you mean "ignore.files"?
+Warning: Unknown rule "no-root-user" in /repo/docker-doctor.config.json. It matches no rule and has no effect. Did you mean "docker-doctor/no-root-user"?
+Warning: Unknown category "security" in /repo/docker-doctor.config.json. Category names are case-sensitive. Did you mean "Security"?
+```
+
+A warning never changes the exit code, the score or the `--json` and `--score` output on stdout, and the unknown key has no effect on the scan. An invalid value is an error. The message names the config file and the key, says the type it found (`null`, `array`, `string`), and for a severity lists the accepted values, which are `error`, `warning`, `info` and `off`.

@@ -23,6 +23,18 @@ const failureMessage = async (
   throw new Error("loadConfig should have thrown a ConfigError");
 };
 
+const collectWarnings = async (
+  configDir: string,
+  customPath?: string
+): Promise<string[]> => {
+  const warnings: string[] = [];
+  await loadConfig(configDir, customPath, (message) => {
+    warnings.push(message);
+  });
+
+  return warnings;
+};
+
 describe("loadConfig", () => {
   let dir: string;
 
@@ -57,9 +69,10 @@ describe("loadConfig", () => {
     expect(config.rules).toEqual({ "docker-doctor/no-root-user": "warning" });
   });
 
-  test("warns about unknown rule and category keys", async () => {
+  test("warns about unknown rule and category keys with the file and a suggestion", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
     await fs.writeFile(
-      path.join(dir, "docker-doctor.config.json"),
+      file,
       JSON.stringify({
         categories: { Security: "error", security: "error" },
         rules: {
@@ -69,20 +82,179 @@ describe("loadConfig", () => {
       })
     );
 
-    const warnings: string[] = [];
-    await loadConfig(dir, undefined, (message) => {
-      warnings.push(message);
-    });
+    expect(await collectWarnings(dir)).toEqual([
+      `Unknown category "security" in ${file}. Category names are case-sensitive. Did you mean "Security"?`,
+      `Unknown rule "docker-doctor/no-root-users" in ${file}. It matches no rule and has no effect. Did you mean "docker-doctor/no-root-user"?`,
+    ]);
+  });
 
-    expect(warnings).toHaveLength(2);
-    expect(warnings[0]).toContain("docker-doctor/no-root-users");
-    expect(warnings[1]).toContain('"security"');
-    // The correctly-spelled keys are never reported as unknown. (The hint
-    // text quotes "Security" as an example, so match the full phrase.)
-    expect(warnings.join(" ")).not.toContain('Unknown category "Security"');
-    expect(warnings.join(" ")).not.toContain(
-      'Unknown rule "docker-doctor/no-root-user"'
+  test("suggests the full rule key for a bare rule name", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: { "no-root-user": "off" } })
     );
+
+    const [warning] = await collectWarnings(dir);
+
+    expect(warning).toContain('Unknown rule "no-root-user"');
+    expect(warning).toContain('Did you mean "docker-doctor/no-root-user"?');
+  });
+
+  test("lists the categories when none is close", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ categories: { Networking: "off" } })
+    );
+
+    const [warning] = await collectWarnings(dir);
+
+    expect(warning).toContain('Unknown category "Networking"');
+    expect(warning).toContain(
+      "Use Best Practices, Compose, Image Size, Performance, Security."
+    );
+  });
+
+  test("warns about an unknown rule with no close match without a suggestion", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: { "something/entirely-different": "off" } })
+    );
+
+    const [warning] = await collectWarnings(dir);
+
+    expect(warning).toContain('Unknown rule "something/entirely-different"');
+    expect(warning).not.toContain("Did you mean");
+  });
+
+  test("warns about an unknown top-level key and suggests the close one", async () => {
+    const file = path.join(dir, "docker-doctor.config.yaml");
+    await fs.writeFile(
+      file,
+      "rule:\n  docker-doctor/no-root-user: off\nfoo: 1\n"
+    );
+
+    expect(await collectWarnings(dir)).toEqual([
+      `Unknown config key "rule" in ${file}. docker-doctor ignores it. Did you mean "rules"?`,
+      `Unknown config key "foo" in ${file}. docker-doctor ignores it.`,
+    ]);
+  });
+
+  test("warns about an unknown key under ignore", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    await fs.writeFile(
+      file,
+      JSON.stringify({ ignore: { file: ["a"], files: ["b"] } })
+    );
+
+    expect(await collectWarnings(dir)).toEqual([
+      `Unknown config key "ignore.file" in ${file}. docker-doctor ignores it. Did you mean "ignore.files"?`,
+    ]);
+  });
+
+  test("names package.json when its dockerDoctor key has an unknown key", async () => {
+    const file = path.join(dir, "package.json");
+    await fs.writeFile(
+      file,
+      JSON.stringify({ dockerDoctor: { rule: {} }, name: "fixture" })
+    );
+
+    expect(await collectWarnings(dir)).toEqual([
+      `Unknown config key "rule" in ${file} ("dockerDoctor"). docker-doctor ignores it. Did you mean "rules"?`,
+    ]);
+  });
+
+  test("does not warn about $schema", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({
+        $schema: "https://docker-doctor.vercel.app/schema.json",
+        rules: { "docker-doctor/no-root-user": "off" },
+      })
+    );
+
+    expect(await collectWarnings(dir)).toEqual([]);
+  });
+
+  test("a warning does not change the returned config", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({
+        ignore: { file: ["a"] },
+        rule: { "docker-doctor/no-root-user": "off" },
+      })
+    );
+
+    expect(await collectWarnings(dir)).toHaveLength(2);
+    expect(await loadConfig(dir)).toEqual({ ignore: {} });
+  });
+
+  test("prints the first 20 unknown keys and counts the rest", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    const config: Record<string, string> = {};
+
+    for (let index = 0; index < 23; index += 1) {
+      config[`bogus${index}`] = "x";
+    }
+
+    await fs.writeFile(file, JSON.stringify(config));
+
+    const warnings = await collectWarnings(dir);
+
+    expect(warnings).toHaveLength(21);
+    expect(warnings[0]).toContain('"bogus0"');
+    expect(warnings[19]).toContain('"bogus19"');
+    expect(warnings[20]).toBe(`and 3 more unknown keys in ${file}`);
+  });
+
+  test("counts a single hidden unknown key in the singular", async () => {
+    const file = path.join(dir, "docker-doctor.config.json");
+    const config: Record<string, string> = {};
+
+    for (let index = 0; index < 21; index += 1) {
+      config[`bogus${index}`] = "x";
+    }
+
+    await fs.writeFile(file, JSON.stringify(config));
+
+    const warnings = await collectWarnings(dir);
+
+    expect(warnings.at(-1)).toBe(`and 1 more unknown key in ${file}`);
+  });
+
+  test("does not run an edit-distance table over a 20,000-character key", async () => {
+    const config: Record<string, string> = {};
+
+    for (let index = 0; index < 20; index += 1) {
+      config[`${index}`.padEnd(20_000, "x")] = "error";
+    }
+
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({ rules: config })
+    );
+
+    const start = performance.now();
+    const warnings = await collectWarnings(dir);
+
+    expect(warnings).toHaveLength(20);
+    // A full table per key and candidate takes several seconds here. The
+    // bound is loose because CI runners are 5 to 10 times slower.
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  test("says category names are case-sensitive only for a case difference", async () => {
+    await fs.writeFile(
+      path.join(dir, "docker-doctor.config.json"),
+      JSON.stringify({
+        categories: { Performanse: "error", security: "error" },
+      })
+    );
+
+    const [typo, caseOnly] = await collectWarnings(dir);
+
+    expect(typo).toContain('Did you mean "Performance"?');
+    expect(typo).not.toContain("case-sensitive");
+    expect(caseOnly).toContain("case-sensitive");
   });
 
   test("stays silent for a fully valid config", async () => {
@@ -369,7 +541,7 @@ describe("loadConfig", () => {
     expect(config).toEqual({});
   });
 
-  test("silently strips unknown top-level keys instead of throwing", async () => {
+  test("drops unknown top-level keys instead of throwing", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({
@@ -382,7 +554,7 @@ describe("loadConfig", () => {
     expect(config).not.toHaveProperty("unknownTopLevelKey");
   });
 
-  test("silently strips unknown keys nested under categories", async () => {
+  test("drops unknown keys nested under categories", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({
@@ -395,7 +567,7 @@ describe("loadConfig", () => {
     });
   });
 
-  test("silently strips unknown keys nested under ignore", async () => {
+  test("drops unknown keys nested under ignore", async () => {
     await fs.writeFile(
       path.join(dir, "docker-doctor.config.json"),
       JSON.stringify({

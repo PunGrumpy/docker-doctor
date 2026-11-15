@@ -6,8 +6,13 @@ import { parse as parseYaml } from "yaml";
 
 import { ConfigError } from "../errors";
 import type { ConfigInput, DockerDoctorConfig } from "../schemas/config";
-import { isConfigObject, validateConfig } from "../schemas/config";
+import {
+  isConfigObject,
+  RULE_CATEGORY_NAMES,
+  validateConfig,
+} from "../schemas/config";
 import { hasText } from "../text";
+import type { UnknownConfigKey } from "./unknown-keys";
 import { collectUnknownConfigKeys } from "./unknown-keys";
 
 const fileExists = async (filePath: string): Promise<boolean> => {
@@ -192,22 +197,53 @@ const readPackageConfig = async (
     : null;
 };
 
-const warnUnknownKeys = (
-  raw: ConfigInput,
-  onWarning: (message: string) => void
-): void => {
-  const unknown = collectUnknownConfigKeys(raw);
+const describeUnknownKey = (
+  unknownKey: UnknownConfigKey,
+  source: string
+): string => {
+  const { key, kind, path: keyPath, suggestion } = unknownKey;
 
-  for (const key of unknown.rules) {
-    onWarning(
-      `Unknown rule "${key}" in config — it matches no rule and has no effect.`
-    );
+  const hint = suggestion === undefined ? "" : ` Did you mean "${suggestion}"?`;
+
+  if (kind === "rule") {
+    return `Unknown rule "${key}" in ${source}. It matches no rule and has no effect.${hint}`;
   }
 
-  for (const key of unknown.categories) {
-    onWarning(
-      `Unknown category "${key}" in config — categories are case-sensitive (e.g. "Best Practices", "Security").`
-    );
+  if (kind === "category") {
+    const caseOnly = suggestion?.toLowerCase() === key.toLowerCase();
+    const rule = caseOnly ? " Category names are case-sensitive." : "";
+
+    const valid =
+      suggestion === undefined
+        ? ` Use ${RULE_CATEGORY_NAMES.join(", ")}.`
+        : hint;
+
+    return `Unknown category "${key}" in ${source}.${rule}${valid}`;
+  }
+
+  return `Unknown config key "${keyPath}" in ${source}. docker-doctor ignores it.${hint}`;
+};
+
+// A config that is wrong in many places would bury the rest of the output.
+const MAX_UNKNOWN_KEY_WARNINGS = 20;
+
+const warnUnknownKeys = (
+  raw: ConfigInput,
+  source: string,
+  onWarning: (message: string) => void
+): void => {
+  const unknownKeys = collectUnknownConfigKeys(raw);
+
+  for (const unknownKey of unknownKeys.slice(0, MAX_UNKNOWN_KEY_WARNINGS)) {
+    onWarning(describeUnknownKey(unknownKey, source));
+  }
+
+  const hidden = unknownKeys.length - MAX_UNKNOWN_KEY_WARNINGS;
+
+  if (hidden > 0) {
+    const noun = hidden === 1 ? "key" : "keys";
+
+    onWarning(`and ${hidden} more unknown ${noun} in ${source}`);
   }
 };
 
@@ -252,7 +288,7 @@ export const loadConfig = async (
     const config = validateConfig(configObject);
 
     if (onWarning) {
-      warnUnknownKeys(configObject, onWarning);
+      warnUnknownKeys(configObject, source, onWarning);
     }
 
     return config;
