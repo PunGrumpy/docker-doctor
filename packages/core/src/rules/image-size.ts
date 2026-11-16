@@ -500,7 +500,7 @@ const YARN_INFO_FLAGS = new Set(["--version", "-v", "--help", "-h"]);
 
 // A bare `yarn`, with or without flags, is Yarn's default `yarn install`.
 const withYarnDefaultVerb = (command: string[]): string[] => {
-  const [manager, first] = command;
+  const [manager, first, ...rest] = command;
 
   if (manager !== "yarn") {
     return command;
@@ -508,7 +508,8 @@ const withYarnDefaultVerb = (command: string[]): string[] => {
 
   const bare =
     first === undefined ||
-    (first.startsWith("-") && !YARN_INFO_FLAGS.has(first));
+    (first.startsWith("-") &&
+      ![first, ...rest].some((arg) => YARN_INFO_FLAGS.has(arg)));
 
   return bare ? [manager, "install", ...command.slice(1)] : command;
 };

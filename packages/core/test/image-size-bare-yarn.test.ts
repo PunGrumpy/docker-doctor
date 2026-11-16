@@ -26,6 +26,8 @@ describe("avoidDevDependencies bare yarn", () => {
     "yarn --version",
     "yarn -v",
     "yarn --help",
+    "yarn --offline --help",
+    "yarn --offline -v",
     "yarn --cwd app",
     "yarn build",
     "yarn run build",
