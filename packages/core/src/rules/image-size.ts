@@ -495,6 +495,25 @@ const NODE_PACKAGE_MANAGERS = new Set(["npm", "yarn", "pnpm", "bun"]);
 const MANAGERS_HONORING_NODE_ENV = new Set(["npm", "yarn"]);
 const INSTALL_VERBS = new Set(["install", "ci", "i"]);
 
+// `yarn --version` and friends print something instead of installing.
+const YARN_INFO_FLAGS = new Set(["--version", "-v", "--help", "-h"]);
+
+// A bare `yarn`, with or without flags, is Yarn's default `yarn install`.
+const withYarnDefaultVerb = (command: string[]): string[] => {
+  const [manager, first, ...rest] = command;
+
+  if (manager !== "yarn") {
+    return command;
+  }
+
+  const bare =
+    first === undefined ||
+    (first.startsWith("-") &&
+      ![first, ...rest].some((arg) => YARN_INFO_FLAGS.has(arg)));
+
+  return bare ? [manager, "install", ...command.slice(1)] : command;
+};
+
 // Flags that mean the install leaves devDependencies out of the image.
 // `-g`/`--global` install a tool instead of the project, `-P` is pnpm's
 // production flag and `-p` is bun's.
@@ -561,7 +580,9 @@ const segmentInstallsDevDependencies = (
     return false;
   }
 
-  const [manager, verb, ...options] = tokens.slice(commandStart);
+  const [manager, verb, ...options] = withYarnDefaultVerb(
+    tokens.slice(commandStart)
+  );
 
   if (!(NODE_PACKAGE_MANAGERS.has(manager) && INSTALL_VERBS.has(verb))) {
     return false;
