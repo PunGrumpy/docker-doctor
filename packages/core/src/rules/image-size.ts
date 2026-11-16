@@ -408,7 +408,18 @@ const removesRecursively = (args: string, dir: string): boolean =>
 
 // `apk add --no-cache`, with the option as a whole word in the same command.
 // `pip install --no-cache-dir` in a later command does not count.
-const APK_ADD_NO_CACHE_RE = /\bapk\s+add\b[^;&|]*\s--no-cache(?=[\s;&|]|$)/u;
+// Global options may come before `add`: `apk --update add`, `apk --no-cache add`.
+const APK_ADD_RE = /\bapk\s+(?:-[^\s;&|]*\s+)*add\b/u;
+
+const APK_ADD_THEN_NO_CACHE_RE =
+  /\bapk\s+(?:-[^\s;&|]*\s+)*add\b[^;&|]*\s--no-cache(?=[\s;&|]|$)/u;
+
+const APK_NO_CACHE_THEN_ADD_RE =
+  /\bapk\s+(?:-[^\s;&|]*\s+)*--no-cache(?:\s+-[^\s;&|]*)*\s+add\b/u;
+
+const apkAddHasNoCache = (masked: string): boolean =>
+  APK_ADD_THEN_NO_CACHE_RE.test(masked) ||
+  APK_NO_CACHE_THEN_ADD_RE.test(masked);
 
 // apt-get keeps the package lists here. A cache mount on `/var/cache/apt`
 // alone leaves them in the layer, so Docker's apt example mounts
@@ -439,6 +450,7 @@ export const cleanPackageCache: DockerfileRule = {
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
         const { args } = inst;
+        const maskedArgs = maskQuotedText(args);
 
         if (
           hasAptGetInstall(args) &&
@@ -458,8 +470,8 @@ export const cleanPackageCache: DockerfileRule = {
         }
 
         if (
-          args.includes("apk add") &&
-          !APK_ADD_NO_CACHE_RE.test(maskQuotedText(args)) &&
+          APK_ADD_RE.test(maskedArgs) &&
+          !apkAddHasNoCache(maskedArgs) &&
           !removesRecursively(args, "/var/cache/apk") &&
           !hasCacheMountFor(args, APK_CACHE_DIRS)
         ) {
