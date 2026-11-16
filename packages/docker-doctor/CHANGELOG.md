@@ -1,5 +1,37 @@
 # @docker-doctor/cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 0fe184e: Add `--fail-on <error|warning|info|none>` to choose which findings make a scan exit `1`. The default, `error`, keeps the current behavior. `none` reports findings without failing, and an incomplete scan still exits `2`.
+- b1c034f: Add `--baseline <report.json>` to fail a scan only on findings that a report saved earlier with `--json` does not have, so a project with findings today can turn on `--fail-on warning` and still catch every new one. Every finding in the `--json` report now has a `fingerprint`, a short key that stays the same from scan to scan while the code the finding points at is unchanged, even when lines above it move or a new release rewords the message. The report `schemaVersion` is now 8. Scores do not change. The bundled skill now checks a change for regressions with `--baseline` instead of counting findings per rule and file.
+
+  For library users, `toJsonReport` now takes one object with named fields (`analyzedFiles`, `baseline`, `diagnostics`, `failures`, `label`, `project`, `score` and `suppressed`) instead of seven positional arguments. Its `diagnostics` and `suppressed` need a `fingerprint` on each finding, which the new `fingerprintDiagnostics(diagnostics, fileContents)` export adds. Pass `baseline: null` unless you compare with a saved report.
+
+### Patch Changes
+
+- d9284c3: Check `RUN apk --update add ...` and other `apk` commands with an option before `add` for a missing `--no-cache`, and accept a global `apk --no-cache add`.
+- bb488c8: A bare `RUN yarn`, which is Yarn's default install, is now checked by `avoid-dev-dependencies` like `yarn install`.
+- b2bbda5: A config error now names the config file it came from and the real type it found, so a `null` or list `rules` section reads "got null" or "got array" instead of "got object". An invalid severity lists the accepted values: error, warning, info, off.
+- b2bbda5: `--config` pointing at a directory now fails with a one-line error that names the path and asks for the config file itself, instead of a raw Node.js module import error. The exit code is still 1.
+- 858e10e: A backslash before a newline inside double quotes is now dropped from the word, as a POSIX shell does, instead of staying in it.
+- 3b9a31f: An escaped backslash (`\\`) at the end of a line no longer joins the next line into the same shell command, so rules see `rm -rf x` on its own line.
+- 4b79237: The terminal report now turns colors off when `NO_COLOR` is set to any non-empty value, as the GitHub Action already expected. `NO_COLOR` wins over `FORCE_COLOR`.
+- 4b79237: The interactive scan no longer sleeps for 350 ms before it reports, and the "Scanned" line shows the time the scan took. It also stops printing a worker count, which was never real, and says "1 file" for a single file.
+- 4b79237: Every run starts about 20 ms faster. The CLI now loads its agent installer only for `install` and the post-scan agent handoff.
+- 2886837: Scans are faster on large or unusual inputs. A Dockerfile with thousands of stages no longer takes seconds to check, an `ignore.files` pattern with adjacent repeats of `**/` no longer stalls the scan, and discovery does less work on large trees.
+- b772915: `avoid-dev-dependencies` no longer goes silent when a `RUN` merely contains the text "prune" (for example `node scripts/prune-cache.js`); only a real `npm prune` or `pnpm prune` command suppresses it.
+- 91164dd: A quoted environment prefix such as `NODE_ENV="development" npm ci` no longer hides the install from `avoid-dev-dependencies`.
+- 1c126e6: Stop a quoted `NODE_ENV=production` inside another `ENV` value from silencing `avoid-dev-dependencies`.
+- b2bbda5: A scan flag placed after a subcommand, such as `docker-doctor rules list --json`, now fails with "unknown option" instead of being accepted and ignored. `rules list` has no JSON output. Scan flags still work on either side of the directory. Flags such as `--json` or `--version` go before the subcommand, so `docker-doctor install --version` now fails too. A command-line error now ends with a hint to add `--help`.
+- 7da50a3: Diagnostics on a Compose list item or key that follows a `!reset` entry now point at the right line instead of the `!reset` line.
+- b2bbda5: A mistyped command such as `docker-doctor instal`, `init`, `help` or `list` now prints "Unknown command" with a suggestion and a pointer to `--help`, instead of "Directory not found". A real directory with that name is still scanned, and the exit code is still 1.
+- 2bb31b6: Detect `useradd` with a large UID in exec-form `RUN` shells that pass options before `-c`, such as `["bash", "-o", "pipefail", "-c", "..."]`.
+- 4b79237: `--verbose` no longer slows down on large files. A 20,000-line Dockerfile with 40,000 findings went from 27 seconds to under 2.
+- b2bbda5: docker-doctor now warns on stderr about an unknown key in the config, such as `rule:` for `rules:` or `ignore.file` for `ignore.files`. The warning names the config file and suggests the closest known key. The warnings about an unknown rule or category name now name the file and suggest a fix too, and a bare rule name such as `no-root-user` gets the full key. A config with more than 20 unknown keys prints the first 20 and a count of the rest. Warnings never change the exit code or the `--json` and `--score` output.
+- 4b79237: A warning printed during an interactive scan now starts on its own line instead of after the spinner text.
+
 ## 0.10.0
 
 ### Minor Changes
