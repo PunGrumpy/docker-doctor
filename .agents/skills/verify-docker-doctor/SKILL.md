@@ -23,7 +23,7 @@ The helper enforces these, so keep every docker-doctor command inside `$C run`.
 - **Work directory only.** `run` refuses a scan directory, a `--config` path or a `--baseline` path that resolves outside the run's `work/`, after following symlinks. Your real projects are never scanned.
 - **No home writes.** `run` refuses `-g` and `--global`. docker-doctor gets a clean environment: `PATH`, a throwaway `HOME` and `XDG_*` under the run, a throwaway `TMPDIR` and `NO_COLOR=1`.
 - **No terminal.** stdin is closed, so no prompt, agent handoff, clipboard copy or workflow scaffold can run.
-- **Own Docker images only.** `image-build` tags images `ddverify-<run>-<dir>` with labels `ddverify=1` and `ddverify.run=<run>`. `down` removes only images that carry both labels and that tag prefix, by ID. The helper has no prune, no container command and no Docker passthrough.
+- **Own Docker images only.** `image-build` gives every build a fresh tag, `ddverify-<run>-<dir>:b<time>`, and the labels `ddverify=1` and `ddverify.run=<run>`. `down` removes those tags by name, never by image ID, so a tag the helper did not create keeps its image. A labeled image without a `ddverify-<run>-` tag is reported and left alone, and `down` then exits 1. The helper has no prune, no container command and no Docker passthrough.
 
 A refusal prints `control-docker-doctor: refused: <why>` and exits 64 without running docker-doctor. docker-doctor itself never exits 64, so a refusal can't pass for a scan result. It is recorded in the evidence too.
 
@@ -85,7 +85,7 @@ A rule claims something about how Docker builds or runs an image. When the Docke
 $C image-build --run "$RUN" <dir under work>
 ```
 
-It runs only `docker build --label ddverify=1 --label ddverify.run=<run> -t ddverify-<run>-<dir>:latest <dir>` and records the output as evidence. It refuses when the daemon is unreachable. Don't run other `docker` commands against these images by hand.
+It runs only `docker build --label ddverify=1 --label ddverify.run=<run> -t ddverify-<run>-<dir>:b<time> <dir>` and records the output as evidence. It refuses when the daemon is unreachable. Don't run other `docker` commands against these images by hand.
 
 ## Evidence
 
@@ -95,7 +95,7 @@ Proof standards:
 
 - Show the input and the result. Before scanning a case you wrote, `cat` it, so the proof shows what was scanned.
 - For JSON, parse stdout (`jq` or `bun -e`) and assert the field. Don't grep the pretty report.
-- Prove the exit code. docker-doctor exits 0 below the fail threshold, 1 at or above it, and 2 when it could analyze no file.
+- Prove the exit code. docker-doctor exits 0 below the fail threshold, 1 at or above it, and 2 when it could not analyze at least one file. Exit 2 wins over 1, and the score then covers only the files it analyzed.
 - A check passes on what docker-doctor printed for the user path, never on a unit test or an internal function.
 - A fixed false positive needs two proofs. The bad case no longer reports, and a true positive next to it still does.
 
@@ -105,7 +105,7 @@ Proof standards:
 $C down --run "$RUN"
 ```
 
-`down` removes the run's labeled Docker images when the daemon is up, then deletes the run directory. It keeps `<tmp>/ddverify/evidence/<run>/` and its output names that folder. Run `down` after every failed attempt too. Delete evidence by hand once it is in the PR.
+`down` removes the run's image tags when the daemon is up, then deletes the run directory. It exits 1 when the image list fails or a tag can't be removed, so a clean exit means no image of the run is left. It keeps `<tmp>/ddverify/evidence/<run>/` and its output names that folder. Run `down` after every failed attempt too. Delete evidence by hand once it is in the PR.
 
 ## Helpers
 

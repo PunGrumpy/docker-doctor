@@ -33,13 +33,13 @@ actions:
 const REFUSAL_EXIT_CODE = 64;
 const RUN_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/u;
 const FIXTURE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
-const IMAGE_ID_PATTERN = /^[a-f0-9]{12,64}$/u;
 const DEFAULT_RUN = "default";
 const DOCKER_TIMEOUT_MS = 15_000;
 const VERSION_TIMEOUT_MS = 15_000;
 const CLI_TIMEOUT_MS = 120_000;
 const BUILD_TIMEOUT_MS = 900_000;
 const SLUG_MAX_LENGTH = 48;
+const BUILD_TAG_RADIX = 36;
 const SEQUENCE_WIDTH = 2;
 const BUILD_COMMAND = "bun run build --filter @docker-doctor/cli";
 const DIST_MISSING = "skipped; dist/cli.mjs is missing";
@@ -237,10 +237,12 @@ type DockerCommand =
   | { kind: "version" }
   | { kind: "build"; run: string; tag: string; dir: string }
   | { kind: "list-images"; run: string }
-  | { kind: "remove-image"; id: string };
+  | { kind: "remove-images"; refs: readonly string[] };
 
 // Every docker invocation this tool can make is a case of this switch. There
-// is no passthrough and no prune, system or container command.
+// is no passthrough and no prune, system or container command. Images are
+// removed by tag, never by ID: an ID can also carry a tag this tool did not
+// create, and removing one tag leaves that other tag and its image alone.
 const dockerArgs = (command: DockerCommand): string[] => {
   switch (command.kind) {
     case "version": {
@@ -269,12 +271,12 @@ const dockerArgs = (command: DockerCommand): string[] => {
         "--filter",
         `label=ddverify.run=${command.run}`,
         "--format",
-        "{{.ID}} {{.Repository}}",
+        "{{.ID}} {{.Repository}} {{.Tag}}",
       ];
     }
 
-    case "remove-image": {
-      return ["image", "rm", command.id];
+    case "remove-images": {
+      return ["image", "rm", ...command.refs];
     }
 
     default: {
@@ -305,15 +307,39 @@ const probeDockerServer = async (): Promise<string | null> => {
     : null;
 };
 
-const listRunImages = async (runName: string): Promise<string[]> => {
+interface RunImage {
+  id: string;
+  repository: string;
+  tag: string;
+}
+
+type ImageListing =
+  | { images: RunImage[]; ok: true }
+  | { error: string; ok: false };
+
+const listRunImages = async (runName: string): Promise<ImageListing> => {
   const result = await runDocker(
     { kind: "list-images", run: runName },
     { tee: false, timeoutMs: DOCKER_TIMEOUT_MS }
   );
 
-  return result.code === 0
-    ? result.stdout.split("\n").filter((line) => line.trim() !== "")
-    : [];
+  if (result.spawnError !== null || result.code !== 0) {
+    return {
+      error: (result.spawnError?.message ?? result.stderr).trim(),
+      ok: false,
+    };
+  }
+
+  const images = result.stdout
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const [id = "", repository = "", tag = ""] = line.trim().split(" ");
+
+      return { id, repository, tag };
+    });
+
+  return { images, ok: true };
 };
 
 const cleanEnv = (paths: RunPaths) => ({
@@ -494,12 +520,27 @@ const pathsToCheck = (args: readonly string[]): PathArg[] => {
   const isScan = !NON_SCAN_MODES.some((mode) => mode === first);
 
   // install, rules and help take no paths; install writes into the child's cwd.
-  return isScan
-    ? [
-        ...state.positionals.map((value) => ({ label: "path", value })),
-        ...state.flagPaths,
-      ]
-    : [];
+  if (!isScan) {
+    return [];
+  }
+
+  // docker-doctor falls back to resolving --config from the scanned directory
+  // when the cwd-relative path is missing, so both candidates must stay inside.
+  const scanDir = first === "" ? "." : first;
+
+  const configFallbacks = state.flagPaths
+    .filter((entry) => entry.label !== "--baseline")
+    .filter((entry) => !path.isAbsolute(entry.value))
+    .map((entry) => ({
+      label: entry.label,
+      value: path.join(scanDir, entry.value),
+    }));
+
+  return [
+    ...state.positionals.map((value) => ({ label: "path", value })),
+    ...state.flagPaths,
+    ...configFallbacks,
+  ];
 };
 
 const assertInvocationAllowed = async (
@@ -837,13 +878,26 @@ const checkDocker = async (paths: RunPaths): Promise<Check[]> => {
     ];
   }
 
-  const images = await listRunImages(paths.name);
+  const listing = await listRunImages(paths.name);
+
+  if (!listing.ok) {
+    return [
+      check("ok", CHECK_NAMES.docker, `server ${version}`),
+      check("FAIL", CHECK_NAMES.images, `image ls failed: ${listing.error}`),
+    ];
+  }
 
   return [
     check("ok", CHECK_NAMES.docker, `server ${version}`),
-    ...(images.length === 0
+    ...(listing.images.length === 0
       ? [check("info", CHECK_NAMES.images, "none")]
-      : images.map((line) => check("info", CHECK_NAMES.images, line))),
+      : listing.images.map((image) =>
+          check(
+            "info",
+            CHECK_NAMES.images,
+            `${image.id} ${image.repository}:${image.tag}`
+          )
+        )),
   ];
 };
 
@@ -951,10 +1005,12 @@ const runAction: ActionHandler = async (context) => {
   return result.code;
 };
 
+// A fresh tag per build keeps an earlier build of the same directory tagged,
+// so down can still find it. A reused tag would leave it as <none>.
 const imageTag = (runName: string, dir: string): string => {
   const name = slugify(path.basename(dir));
 
-  return `ddverify-${runName}-${name === "" ? "dir" : name}:latest`;
+  return `ddverify-${runName}-${name === "" ? "dir" : name}:b${Date.now().toString(BUILD_TAG_RADIX)}`;
 };
 
 const planBuild = async (
@@ -1027,48 +1083,64 @@ const imageBuildAction: ActionHandler = async (context) => {
   return result.code;
 };
 
-const removeImage = async (id: string, repository: string): Promise<number> => {
+// One call for every tag: docker removes them in order, so two tags of one
+// image never race to delete it.
+const removeImages = async (refs: readonly string[]): Promise<number> => {
   const result = await runDocker(
-    { id, kind: "remove-image" },
+    { kind: "remove-images", refs },
     { tee: false, timeoutMs: DOCKER_TIMEOUT_MS }
   );
 
-  if (result.code === 0) {
-    say(`removed image ${id} ${repository}`);
+  for (const line of result.stdout.split("\n")) {
+    if (line.trim() !== "") {
+      say(line.trim());
+    }
+  }
 
+  if (result.code === 0) {
     return 0;
   }
 
-  complain(`${TOOL}: could not remove image ${id}: ${result.stderr.trim()}`);
+  complain(`${TOOL}: could not remove every image: ${result.stderr.trim()}`);
 
   return 1;
 };
 
 const removeRunImages = async (paths: RunPaths): Promise<number> => {
   const prefix = `ddverify-${paths.name}-`;
-  const owned = new Map<string, string>();
+  const listing = await listRunImages(paths.name);
 
-  for (const line of await listRunImages(paths.name)) {
-    const [id = "", repository = ""] = line.trim().split(" ");
+  if (!listing.ok) {
+    complain(`${TOOL}: could not list the run's images: ${listing.error}`);
 
-    if (IMAGE_ID_PATTERN.test(id) && repository.startsWith(prefix)) {
-      owned.set(id, repository);
-    }
+    return 1;
   }
 
-  if (owned.size === 0) {
-    say("info no images to remove");
-
-    return 0;
-  }
-
-  const failures = await Promise.all(
-    [...owned].map(
-      async ([id, repository]) => await removeImage(id, repository)
-    )
+  const owned = listing.images.filter((image) =>
+    image.repository.startsWith(prefix)
   );
 
-  return failures.some((failure) => failure !== 0) ? 1 : 0;
+  const strays = listing.images.filter(
+    (image) => !image.repository.startsWith(prefix)
+  );
+
+  for (const image of strays) {
+    complain(
+      `${TOOL}: image ${image.id} carries this run's labels but no ${prefix} tag; not removed`
+    );
+  }
+
+  if (owned.length === 0) {
+    say("info no images to remove");
+
+    return strays.length === 0 ? 0 : 1;
+  }
+
+  const removal = await removeImages(
+    owned.map((image) => `${image.repository}:${image.tag}`)
+  );
+
+  return removal === 0 && strays.length === 0 ? 0 : 1;
 };
 
 const removeRunDir = async (paths: RunPaths): Promise<void> => {
