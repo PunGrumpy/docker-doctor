@@ -1,5 +1,33 @@
 # docker-doctor-kit
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [d9284c3]
+- Updated dependencies [bb488c8]
+- Updated dependencies [b2bbda5]
+- Updated dependencies [b2bbda5]
+- Updated dependencies [858e10e]
+- Updated dependencies [3b9a31f]
+- Updated dependencies [0fe184e]
+- Updated dependencies [b1c034f]
+- Updated dependencies [4b79237]
+- Updated dependencies [4b79237]
+- Updated dependencies [4b79237]
+- Updated dependencies [2886837]
+- Updated dependencies [b772915]
+- Updated dependencies [91164dd]
+- Updated dependencies [1c126e6]
+- Updated dependencies [b2bbda5]
+- Updated dependencies [7da50a3]
+- Updated dependencies [b2bbda5]
+- Updated dependencies [2bb31b6]
+- Updated dependencies [4b79237]
+- Updated dependencies [b2bbda5]
+- Updated dependencies [4b79237]
+  - @docker-doctor/cli@0.11.0
+
 ## 0.2.0
 
 ### Minor Changes
