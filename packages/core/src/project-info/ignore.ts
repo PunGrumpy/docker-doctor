@@ -19,6 +19,12 @@ const globToRegExp = (pattern: string): RegExp => {
         if (pattern[index + 2] === "/") {
           source += "(?:[^/]*/)*";
           index += 3;
+
+          // `**/**/` matches what `**/` does. Stacked repeats of the same
+          // group would backtrack in polynomial time of the path depth.
+          while (pattern.startsWith("**/", index)) {
+            index += 3;
+          }
         } else {
           source += ".*";
           index += 2;

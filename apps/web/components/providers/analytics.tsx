@@ -1,11 +1,11 @@
-import { DatabuddyDevtools } from "@databuddy/devtools/react";
 import { Databuddy } from "@databuddy/sdk/react";
 
+import { Devtools } from "@/components/providers/devtools";
 import { env } from "@/env";
 
 export const Analytics = () => (
   <>
-    <DatabuddyDevtools enabled={process.env.NODE_ENV !== "production"} />
+    <Devtools />
     <Databuddy
       clientId={env.NEXT_PUBLIC_DATABUDDY_CLIENT_ID}
       trackHashChanges

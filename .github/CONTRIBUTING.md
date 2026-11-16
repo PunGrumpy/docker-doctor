@@ -39,7 +39,7 @@ Docker Doctor is a monorepo managed with [Bun](https://bun.sh) workspaces and [T
 4. Set up the web app environment: if you are not working on the web app, export `SKIP_ENV_VALIDATION=1` before `bun run build`, the only command in this list that builds the web app (`bun run test` and `bun run typecheck` do not need it); otherwise copy `apps/web/.env.example` to `apps/web/.env` and fill it in
 5. Create a new branch for your feature or bug fix: `git checkout -b fix/description`
 6. Make your changes
-7. Run tests: `bun run test`
+7. Run tests: `bun run test`, then `bun run test:scripts` (`bun run test` builds the CLI first, because its tests run the built `dist/cli.mjs`)
 8. Build packages: `bun run build`
 9. Type-check: `bun run typecheck`
 10. Lint and format: `bun run check`
@@ -115,7 +115,7 @@ Work through this checklist in order:
 3. Add the authored docs entry to `scripts/rule-page-content.ts`. Generation fails when a rule has no entry.
 4. Run `bun run docs:rules` and commit the generated page under `apps/web/content/docs/reference/rules/`. The Format CI job diffs this output.
 5. Add a changeset: `bun run changeset`, select `@docker-doctor/cli`, `minor` for a new rule or `patch` for a fix.
-6. Run `bun run fix && bun run test && bun run typecheck`.
+6. Run `bun run fix && bun run test && bun run typecheck`, then `bun run check:rule-count`. When the rule count changed, it names the READMEs and docs pages whose hand-typed count to update.
 
 ## Pull Request Guidelines
 
@@ -138,17 +138,27 @@ Work through this checklist in order:
 
 From the root directory:
 
-- `bun run test` - Run tests across all packages
-- `bun run build` - Build all packages
+- `bun run test` - Run tests across all packages. Turbo builds what they need first
+- `bun run test:scripts` - Run the tests in `scripts/`
+- `bun run build` - Build all packages, the website and the videos. Add `--filter @docker-doctor/cli` to build only the CLI
 - `bun run typecheck` - Type-check all packages
 - `bun run check` - Run Ultracite linter on the codebase
 - `bun run fix` - Auto-fix linting and formatting issues
+- `bun run docs:rules` - Regenerate the rule pages from the rule definitions
+- `bun run kit:sync` - Regenerate the kit descriptor from `kits/docker-doctor/package.json`
+- `bun run check:rule-count` - Check the rule counts typed by hand on the READMEs and docs pages
 - `bun run dev` - Watch mode for all packages
 
 From a specific package (e.g., `packages/core`):
 
-- `bun test` - Run tests for that package only
+- `bun test` - Run tests for that package only. In `packages/docker-doctor` it runs the last build of `dist/cli.mjs` without rebuilding it, so run `bun run build --filter @docker-doctor/cli` first
 - `bun run typecheck` - Type-check that package only
+
+### The Pre-commit Hook
+
+`bun install` sets up a Husky hook. On each commit it formats and lints the staged files, then runs `bun run docs:rules`, `bun run kit:sync`, `bun run check:rule-count`, `bun run test:scripts`, `bun run test` and `bun run typecheck`. It does not run a full build. The hook sets `SKIP_ENV_VALIDATION=1` for you.
+
+The three generators are the ones CI's Format job runs, and they read the working tree rather than the commit. When a file they read or write has unstaged or untracked changes, the hook skips them, prints which paths are dirty, and leaves the check to the Format job. Otherwise, when a generator writes a file that your commit does not include, the hook fails and prints `git add` to keep the file and `git restore` to discard it.
 
 ### Package Dependencies
 

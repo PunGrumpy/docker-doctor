@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // Only the website reads this. Listed on the shared build task it also
+      // changed the CLI's build and test hashes, so a build run with the
+      // variable (the pre-commit hook) never shared a cache entry with one
+      // run without it.
+      "env": ["SKIP_ENV_VALIDATION"]
+    }
+  }
+}

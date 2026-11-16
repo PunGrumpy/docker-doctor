@@ -17,6 +17,17 @@ A scan without a terminal attached prints the report and exits. It shows no spin
 
 By default warnings and info findings never fail the command. `--fail-on warning` fails on any warning or error, and `--fail-on info` on any finding. To fail on one rule's warnings only, raise that rule to `error` in your [config file](/docs/reference/configuration). `--fail-on none` reports findings without failing, so you can try docker-doctor in a pipeline before you enforce it. An incomplete scan still exits `2`. The [CLI reference](/docs/reference/cli#exit-codes) has the full table.
 
+To enforce a stricter threshold in a repository that already has findings, commit a saved report and pass it as `--baseline`. Only findings the report does not have fail the command, so new code meets the strict gate while existing findings wait to be fixed.
+
+```bash
+npx --yes @docker-doctor/cli@latest . --json --fail-on none > docker-doctor-baseline.json
+npx --yes @docker-doctor/cli@latest . --fail-on warning --baseline docker-doctor-baseline.json
+```
+
+Save the report from the directory you scan, because findings match by their path from it. Write it to a different file than the one you pass to `--baseline`. A command such as `--json --baseline b.json > b.json` empties `b.json` before docker-doctor reads it.
+
+Write the report again after you fix findings, so a fixed finding cannot come back unnoticed. The [CLI reference](/docs/reference/cli#baseline) describes how findings are matched.
+
 ## GitLab CI
 
 ```yaml

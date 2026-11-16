@@ -170,3 +170,20 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 - **Rule docs pages are generated**: author the prose in `scripts/rule-page-content.ts`, then run `bun run docs:rules`. Generation fails when a rule has no authored entry, and the Format CI job diffs the output.
 - **Two artifacts are copied at release time**: `skills/docker-doctor` is copied into the npm package at build, and the version and CLI pin in `kits/docker-doctor/docker-doctor.yaml` are synced by `bun run kit:sync`.
 - **User-visible CLI changes need a changeset**: that includes edits to the bundled skill, since it ships inside `@docker-doctor/cli`.
+
+## Commands
+
+Run these from the repository root.
+
+- `bun install --frozen-lockfile` installs the dependencies.
+- `SKIP_ENV_VALIDATION=1` lets the website build without an `apps/web/.env`. Export it before `bun run build`. CI and the pre-commit hook set it.
+- `bun run build` builds every package, the website and the videos. `bun run build --filter @docker-doctor/cli` builds only the CLI.
+- `bun run test` runs the package tests. Turbo builds the CLI first, because its tests run `packages/docker-doctor/dist/cli.mjs`.
+- `bun run test:scripts` runs the tests in `scripts/`.
+- `bun run typecheck` type-checks every package and `scripts/`.
+- `bun run check` lints and checks formatting. `bun run fix` fixes what it can.
+- `bun run docs:rules` regenerates the rule pages, `bun run kit:sync` regenerates the kit descriptor, and `bun run check:rule-count` checks the rule counts typed by hand on the READMEs and docs pages. The Format CI job runs all three and fails when one of them fails or leaves a diff.
+
+`bun test` inside `packages/docker-doctor` does not rebuild `dist/`, so it tests the last build and can pass on stale code. Run `bun run build --filter @docker-doctor/cli` first, or run `bun run test` from the root.
+
+The pre-commit hook formats the staged files, runs the three generators, then runs `test:scripts`, `test` and `typecheck`. It does not run a full build. The generators read the working tree, not the commit, so the hook skips them when a file under their inputs or outputs has unstaged or untracked changes, prints which paths, and leaves the check to CI's Format job. Otherwise it fails when a generator wrote a file the commit does not include, and prints `git add` to keep the file and `git restore` to discard it.

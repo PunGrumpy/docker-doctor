@@ -1,9 +1,7 @@
 import type { Stats } from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { setTimeout } from "node:timers/promises";
 
 import type {
   ComposeSource,
@@ -11,6 +9,7 @@ import type {
   DiagnosticSeverity,
   DockerDoctorConfig,
   FileIgnores,
+  FingerprintedDiagnostic,
   IgnoreFileWarning,
   JsonReport,
   ProjectInfo,
@@ -30,6 +29,9 @@ import {
   runComposeFiles,
   applyIgnores,
   calculateScore,
+  compareWithBaseline,
+  fingerprintDiagnostics,
+  isNewFinding,
   loadConfig,
   allRules,
   findRuleByName,
@@ -38,12 +40,6 @@ import {
   toJsonReport,
 } from "@docker-doctor/core";
 import type { SkillAgentType } from "agent-install";
-import {
-  detectInstalledSkillAgents,
-  getSkillAgentConfig,
-  getSkillAgentTypes,
-  isSkillAgentType,
-} from "agent-install";
 import chalk from "chalk";
 import { Command, Option } from "commander";
 
@@ -61,10 +57,8 @@ import {
   detectLaunchableAgents,
 } from "./agents/launchable-agents";
 import { sanitizePath } from "./agents/sanitize";
-import {
-  getSkillSourceDirectory,
-  installSkillForAgents,
-} from "./agents/skill-install";
+import { readBaseline } from "./baseline";
+import type { SavedBaseline } from "./baseline";
 import { formatTerminal } from "./formatters/terminal";
 import {
   CLEAR_TO_LINE_END,
@@ -73,10 +67,17 @@ import {
   SHOW_CURSOR,
 } from "./terminal-control";
 import { hasText } from "./text";
+import { describeUnknownCommand } from "./unknown-command";
 import {
   scaffoldActionWorkflow,
   WORKFLOW_RELATIVE_PATH,
 } from "./workflow-scaffold";
+
+// chalk reads FORCE_COLOR but not NO_COLOR. Per https://no-color.org any
+// non-empty NO_COLOR turns color off, and here it wins over FORCE_COLOR.
+if (hasText(process.env.NO_COLOR)) {
+  chalk.level = 0;
+}
 
 interface KeypressKey {
   name?: string;
@@ -392,13 +393,15 @@ interface WizardContext {
   rootDir: string;
 }
 
-const agentDisplayName = (agent: SkillAgentType): string =>
-  getSkillAgentConfig(agent).displayName;
+// agent-install is only needed by `install` and the handoff, so a scan loads
+// it on demand rather than at startup.
+const loadSkillInstall = async () => await import("./agents/skill-install");
 
 // Post-scan handoff: offer to send the findings to a coding agent detected on
 // this machine (launching it with the issues as its prompt), or copy the
 // prompt for any other agent. Only reached when the scan found something.
 const runAgentHandoff = async (context: WizardContext): Promise<void> => {
+  const { agentDisplayName, installSkillForAgents } = await loadSkillInstall();
   const launchable = detectLaunchableAgents();
 
   const options = [
@@ -589,12 +592,24 @@ const summarizeFileResults = (results: FileResult[]): RulesEngineResult => {
   return summary;
 };
 
+// While the spinner runs it owns the current line, so a warning written to
+// stderr would land after the frame text. Clear the line first.
+let spinnerOwnsLine = false;
+
+const printWarning = (message: string): void => {
+  if (spinnerOwnsLine) {
+    process.stdout.write(`\r${CLEAR_TO_LINE_END}`);
+  }
+
+  console.error(message);
+};
+
 // Stderr, like the config warnings, so --json and --score stay parseable.
 const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
   for (const { file, line, message } of warnings) {
     // The path comes from the scanned tree, so it is flattened like the
     // message before it reaches stderr.
-    console.error(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
+    printWarning(`Warning: ${sanitizePath(file)}:${line}: ${message}`);
   }
 };
 
@@ -605,16 +620,10 @@ const runRulesEngine = async (
   categoriesConfig: Record<string, RuleSeverity> | undefined,
   projectFilesList: string[],
   fileContents: Record<string, string>,
-  options: { score?: boolean; json?: boolean },
   setStatus: (text: string) => void,
   readIgnores: boolean
 ): Promise<RulesEngineResult> => {
-  const isSilent = options.score === true || options.json === true;
-
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.dockerfiles.length} Dockerfile(s)...`);
 
   const dockerfileResults = await Promise.all(
     project.dockerfiles.map(async (df): Promise<FileResult> => {
@@ -644,7 +653,7 @@ const runRulesEngine = async (
         // A file we could not read or parse has not been checked. The
         // caller refuses to report such a run as clean.
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Dockerfile ${df}: ${msg}`);
+        printWarning(`Failed to analyze Dockerfile ${df}: ${msg}`);
 
         return {
           analyzed: false,
@@ -656,10 +665,7 @@ const runRulesEngine = async (
     })
   );
 
-  if (process.stdout.isTTY && !isSilent) {
-    setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
-    await setTimeout(100);
-  }
+  setStatus(`Analyzing ${project.composeFiles.length} Compose file(s)...`);
 
   const composeReads = await Promise.all(
     project.composeFiles.map(async (cf): Promise<ComposeRead | ScanFailure> => {
@@ -677,7 +683,7 @@ const runRulesEngine = async (
         };
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to analyze Compose file ${cf}: ${msg}`);
+        printWarning(`Failed to analyze Compose file ${cf}: ${msg}`);
 
         return { file: cf, message: msg };
       }
@@ -694,7 +700,7 @@ const runRulesEngine = async (
     composeSources,
     { categoriesConfig, rulesConfig },
     (message) => {
-      console.error(`Warning: ${message}`);
+      printWarning(`Warning: ${message}`);
     }
   );
 
@@ -814,17 +820,20 @@ const printNothingScanned = (rootDir: string): void => {
 
 interface ScanOutcome {
   analyzedFileCount: number;
-  diagnostics: Diagnostic[];
+  diagnostics: FingerprintedDiagnostic[];
   failures: ScanFailure[];
   fileContents: Record<string, string>;
   ignoredConfig: boolean;
   project: ProjectInfo;
   rootDir: string;
   scannedFileCount: number;
-  suppressed: SuppressedDiagnostic[];
+  suppressed: (FingerprintedDiagnostic & SuppressedDiagnostic)[];
 }
 
 interface OutputOptions {
+  // Only findings whose fingerprint is missing from the saved report can
+  // fail the scan.
+  baseline: SavedBaseline | null;
   failOn: FailOn;
   json?: boolean;
   score?: boolean;
@@ -834,7 +843,7 @@ interface OutputOptions {
 const writeTerminalReport = async (
   scan: ScanOutcome,
   { label, score }: { label: string; score: number },
-  verbose: boolean,
+  { baseline, verbose }: OutputOptions,
   exitCode: number
 ): Promise<number> => {
   const {
@@ -851,10 +860,13 @@ const writeTerminalReport = async (
     score,
     label,
     project,
-    verbose,
+    verbose === true,
     fileContents,
     failures.length,
-    scan.suppressed
+    scan.suppressed,
+    baseline === null
+      ? null
+      : compareWithBaseline(diagnostics, baseline.fingerprints)
   );
 
   let wizardOk = true;
@@ -863,15 +875,16 @@ const writeTerminalReport = async (
     wizardOk = await runInteractiveWizard({
       diagnostics,
       ignoredConfig,
-      report: toJsonReport(
+      report: toJsonReport({
+        analyzedFiles: scan.analyzedFileCount,
+        baseline: baseline?.fingerprints ?? null,
         diagnostics,
-        score,
+        failures,
         label,
         project,
-        failures,
-        scan.analyzedFileCount,
-        scan.suppressed
-      ),
+        score,
+        suppressed: scan.suppressed,
+      }),
       rootDir,
     });
   }
@@ -885,9 +898,9 @@ const writeTerminalReport = async (
 const writeMachineReport = (
   scan: ScanOutcome,
   { label, score }: ScoreResult,
-  scoreOnly: boolean
+  { baseline, score: scoreOnly }: OutputOptions
 ): void => {
-  if (scoreOnly) {
+  if (scoreOnly === true) {
     if (score !== null) {
       console.log(score);
     }
@@ -895,17 +908,37 @@ const writeMachineReport = (
     return;
   }
 
-  const report = toJsonReport(
-    scan.diagnostics,
-    score,
+  const report = toJsonReport({
+    analyzedFiles: scan.analyzedFileCount,
+    baseline: baseline?.fingerprints ?? null,
+    diagnostics: scan.diagnostics,
+    failures: scan.failures,
     label,
-    scan.project,
-    scan.failures,
-    scan.analyzedFileCount,
-    scan.suppressed
-  );
+    project: scan.project,
+    score,
+    suppressed: scan.suppressed,
+  });
 
   console.log(JSON.stringify(report, null, 2));
+};
+
+// Findings match by their path from the scan root, so a report saved from
+// another directory shares no path with this scan. A report whose files are
+// scanned here is from the right directory, however many of its findings
+// were fixed since.
+const warnIfBaselineIsFromAnotherDirectory = (
+  baseline: SavedBaseline,
+  { dockerfiles, composeFiles }: ProjectInfo
+): void => {
+  const scanned = [...dockerfiles, ...composeFiles];
+
+  if (baseline.files.size === 0 || scanned.some((f) => baseline.files.has(f))) {
+    return;
+  }
+
+  printWarning(
+    "Warning: no finding matches the --baseline report. Save the report and run the scan from the same directory, because findings match by their path from it."
+  );
 };
 
 const writeScanOutput = async (
@@ -920,8 +953,19 @@ const writeScanOutput = async (
   // Every output mode gates on the same condition, so the same
   // project cannot pass in one mode and fail in another.
   const failingSeverities = FAILING_SEVERITIES[options.failOn];
-  const failing = diagnostics.some((d) => failingSeverities.has(d.severity));
+
+  const failing = diagnostics.some(
+    (d) =>
+      failingSeverities.has(d.severity) &&
+      (options.baseline === null ||
+        isNewFinding(d, options.baseline.fingerprints))
+  );
+
   const exitCode = scanExitCode(failures.length > 0, failing);
+
+  if (options.baseline !== null) {
+    warnIfBaselineIsFromAnotherDirectory(options.baseline, scan.project);
+  }
 
   if (options.score === true || options.json === true) {
     if (scoreResult.score === null) {
@@ -933,7 +977,7 @@ const writeScanOutput = async (
       console.error(`Warning: ${message}`);
     }
 
-    writeMachineReport(scan, scoreResult, options.score === true);
+    writeMachineReport(scan, scoreResult, options);
 
     return exitCode;
   }
@@ -948,12 +992,7 @@ const writeScanOutput = async (
     return exitCode;
   }
 
-  return await writeTerminalReport(
-    scan,
-    scoreResult,
-    options.verbose === true,
-    exitCode
-  );
+  return await writeTerminalReport(scan, scoreResult, options, exitCode);
 };
 
 const statOrNull = async (filePath: string): Promise<Stats | null> => {
@@ -1009,12 +1048,13 @@ const resolveConfigPath = async (
 // Project discovery would otherwise fail with a raw ENOENT or ENOTDIR from
 // scandir.
 const findScanTargetProblem = async (
-  rootDir: string
+  rootDir: string,
+  unknownCommand: string | null
 ): Promise<string | null> => {
   const rootStat = await statOrNull(rootDir);
 
   if (rootStat === null) {
-    return `Directory not found: ${rootDir}`;
+    return unknownCommand ?? `Directory not found: ${rootDir}`;
   }
 
   if (!rootStat.isDirectory()) {
@@ -1029,9 +1069,14 @@ const program = new Command();
 program
   .name("docker-doctor")
   .description("Static analysis for Dockerfile and Docker Compose files")
-  .version(packageJson.version, "-V, --version", "display the version number");
+  .version(packageJson.version, "-V, --version", "display the version number")
+  // Without this, a scan flag after a subcommand is accepted and ignored, as
+  // in `rules list --json`.
+  .enablePositionalOptions()
+  .showHelpAfterError("(add --help for additional information)");
 
 interface ScanOptions {
+  baseline?: string;
   config?: string | false;
   failOn: FailOn;
   json: boolean;
@@ -1064,6 +1109,10 @@ program
     )
       .choices(FAIL_ON_VALUES)
       .default("error")
+  )
+  .option(
+    "--baseline <report.json>",
+    "a saved --json report; only findings it does not have can fail the scan"
   )
   .option(
     "--no-config",
@@ -1102,9 +1151,16 @@ program
       }
 
       const rootDir = path.resolve(dir);
+
       // Checked before the spinner starts, so the error path never hides
       // the cursor.
-      const scanTargetProblem = await findScanTargetProblem(rootDir);
+      const scanTargetProblem = await findScanTargetProblem(
+        rootDir,
+        describeUnknownCommand(
+          dir,
+          program.commands.map((command) => command.name())
+        )
+      );
 
       if (scanTargetProblem !== null) {
         console.error(`Error: ${scanTargetProblem}`);
@@ -1112,6 +1168,12 @@ program
 
         return;
       }
+
+      // Read before the scan, so a missing or stale report fails at once.
+      const baseline =
+        options.baseline === undefined
+          ? null
+          : await readBaseline(options.baseline);
 
       const startTime = Date.now();
 
@@ -1125,6 +1187,7 @@ program
       };
 
       if (showProgress) {
+        spinnerOwnsLine = true;
         process.stdout.write(HIDE_CURSOR);
         process.stdout.write(`${chalk.cyan(spinnerFrames[0])} ${statusText}`);
         spinnerInterval = setInterval(() => {
@@ -1136,10 +1199,6 @@ program
       }
 
       try {
-        if (showProgress) {
-          await setTimeout(150);
-        }
-
         // A config file can be code, so --no-config never reads one.
         let config: DockerDoctorConfig = {};
 
@@ -1150,7 +1209,7 @@ program
           const configPath = await resolveConfigPath(options.config, rootDir);
 
           config = await loadConfig(rootDir, configPath, (message) => {
-            console.error(`Warning: ${message}`);
+            printWarning(`Warning: ${message}`);
           });
         }
 
@@ -1159,7 +1218,7 @@ program
         const project = await discoverProject(rootDir, {
           ignoreFiles: config.ignore?.files,
           onSkippedDirectory: (skippedDir) => {
-            console.error(
+            printWarning(
               `Warning: skipped unreadable directory ${skippedDir} (permission denied)`
             );
           },
@@ -1184,7 +1243,6 @@ program
           config.categories,
           projectFilesList,
           fileContents,
-          options,
           setStatus,
           // An ignore comment is as author-controlled as a config file, so
           // --no-config turns both off.
@@ -1193,25 +1251,29 @@ program
 
         const { analyzedFileCount, failures } = engine;
 
+        // Fingerprinted before the ignore comments split the list, so an
+        // ignore on one of two identical findings renumbers neither.
         const { diagnostics, suppressed, warnings } = applyIgnores(
-          engine.diagnostics,
+          fingerprintDiagnostics(engine.diagnostics, fileContents),
           engine.ignores
         );
 
         printIgnoreWarnings(warnings);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-        const concurrency = os.cpus().length;
 
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
           spinnerInterval = null;
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
 
         if (showProgress) {
+          const fileWord = scannedFileCount === 1 ? "file" : "files";
+
           console.log(
-            `${chalk.green("✔")} Scanned ${scannedFileCount} files in ${duration}s [~${concurrency} workers]`
+            `${chalk.green("✔")} Scanned ${scannedFileCount} ${fileWord} in ${duration}s`
           );
         }
 
@@ -1227,11 +1289,12 @@ program
             scannedFileCount,
             suppressed,
           },
-          options
+          { ...options, baseline }
         );
       } finally {
         if (spinnerInterval !== null) {
           clearInterval(spinnerInterval);
+          spinnerOwnsLine = false;
           process.stdout.write(`\r${CLEAR_TO_LINE_END}${SHOW_CURSOR}`);
         }
       }
@@ -1256,6 +1319,13 @@ const CURATED_INSTALL_AGENTS: SkillAgentType[] = [
 const resolveInstallAgents = async (
   requested: string[] | undefined
 ): Promise<SkillAgentType[] | null> => {
+  const {
+    agentDisplayName,
+    detectInstalledSkillAgents,
+    getSkillAgentTypes,
+    isSkillAgentType,
+  } = await loadSkillInstall();
+
   if (requested && requested.length > 0) {
     const invalid = requested.filter((agent) => !isSkillAgentType(agent));
 
@@ -1309,7 +1379,8 @@ program
     "install into each agent's global skills directory (e.g. ~/.claude/skills) instead of the current project"
   )
   .action(async (options: { agent?: string[]; global?: boolean }) => {
-    const source = getSkillSourceDirectory();
+    const skills = await loadSkillInstall();
+    const source = skills.getSkillSourceDirectory();
 
     if (source === null) {
       console.error(
@@ -1334,7 +1405,7 @@ program
       return;
     }
 
-    const result = await installSkillForAgents(agents, {
+    const result = await skills.installSkillForAgents(agents, {
       global: options.global,
       projectRoot: process.cwd(),
     });
@@ -1348,13 +1419,13 @@ program
 
     for (const installed of result.installed) {
       console.log(
-        `  ${chalk.green("✔")} ${agentDisplayName(installed.agent)} → ${installed.path}`
+        `  ${chalk.green("✔")} ${skills.agentDisplayName(installed.agent)} → ${installed.path}`
       );
     }
 
     for (const failed of result.failed) {
       console.log(
-        `  ${chalk.red("✖")} ${agentDisplayName(failed.agent)}: ${failed.error}`
+        `  ${chalk.red("✖")} ${skills.agentDisplayName(failed.agent)}: ${failed.error}`
       );
     }
 

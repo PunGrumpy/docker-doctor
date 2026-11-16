@@ -1,6 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 
 import type {
+  BaselineCounts,
   Diagnostic,
   ProjectInfo,
   RuleCategory,
@@ -13,19 +14,20 @@ import { sanitizeMessage } from "../agents/sanitize";
 import { cursorUp, HIDE_CURSOR, SHOW_CURSOR } from "../terminal-control";
 import { hasText } from "../text";
 
+const NEWLINE = /\r?\n/u;
+
 const isLineNumber = (line: number | undefined): line is number =>
   line !== undefined && line !== 0 && !Number.isNaN(line);
 
 const printCodeFrame = (
-  content: string | undefined,
+  lines: string[] | undefined,
   line: number | undefined,
   severityColor: (msg: string) => string
 ): void => {
-  if (!hasText(content) || !isLineNumber(line)) {
+  if (lines === undefined || !isLineNumber(line)) {
     return;
   }
 
-  const lines = content.split(/\r?\n/u);
   const start = Math.max(1, line - 1);
   const end = Math.min(lines.length, line + 1);
 
@@ -154,6 +156,9 @@ const printDiagnosticsByFile = (
   for (const [file, fileDiags] of filesGrouped) {
     console.log(`\n${chalk.underline.bold(file)}`);
 
+    const content = fileContents[file];
+    const lines = hasText(content) ? content.split(NEWLINE) : undefined;
+
     for (const d of fileDiags) {
       let sevColor = chalk.cyan;
       let prefix = "ℹ INFO";
@@ -169,8 +174,7 @@ const printDiagnosticsByFile = (
       const lineInfo = isLineNumber(d.line) ? `:${d.line}` : "";
       console.log(`  ${sevColor(prefix)} [${chalk.dim(d.rule)}]${lineInfo}`);
 
-      const content = fileContents[file];
-      printCodeFrame(content, d.line, sevColor);
+      printCodeFrame(lines, d.line, sevColor);
 
       console.log(`    ${chalk.white(d.message)}`);
       console.log(`    ${chalk.dim("Help:")} ${d.help}`);
@@ -235,6 +239,18 @@ const printSuppressed = (
 
     console.log(`    ${chalk.cyan(d.rule)}  ${location}${reason}`);
   }
+};
+
+// Only the new findings can fail a scan run with --baseline, so the
+// summary says how many there are.
+const printBaseline = (baseline: BaselineCounts | null): void => {
+  if (baseline === null) {
+    return;
+  }
+
+  console.log(
+    `\n  ${chalk.bold("Baseline:")} ${baseline.new} new, ${baseline.existing} existing, ${baseline.resolved} resolved`
+  );
 };
 
 const getWhaleMascot = (
@@ -397,7 +413,8 @@ export const formatTerminal = async (
   verbose = false,
   fileContents: Record<string, string> = {},
   failedFileCount = 0,
-  suppressed: SuppressedDiagnostic[] = []
+  suppressed: SuppressedDiagnostic[] = [],
+  baseline: BaselineCounts | null = null
 ): Promise<void> => {
   if (verbose) {
     console.log(`\n${chalk.bold("Docker Doctor Diagnostics")}`);
@@ -438,6 +455,7 @@ export const formatTerminal = async (
   );
 
   printSuppressed(suppressed, verbose);
+  printBaseline(baseline);
 
   await printScoreBox(
     score,

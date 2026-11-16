@@ -160,27 +160,31 @@ export const parseFromArgs = (args: string): FromArgs => {
 export const isScratch = (base: string | null): boolean =>
   base?.toLowerCase() === "scratch";
 
-// The stage names declared on FROM lines above `beforeLine`. A FROM can
-// only refer to a stage declared before it (BuildKit registers a stage's
-// name after resolving its base), so `FROM golang AS golang` pulls the
-// golang image.
-export const collectStageAliases = (
-  instructions: DockerfileInstruction[],
-  beforeLine = Number.POSITIVE_INFINITY
-): Set<string> => {
-  const aliases = new Set<string>();
+// Answers whether a stage name was declared on a FROM line above a given
+// line. A FROM can only refer to a stage declared before it (BuildKit
+// registers a stage's name after resolving its base), so
+// `FROM golang AS golang` pulls the golang image. Built in one pass over the
+// file, so each answer costs a map lookup instead of a walk.
+export const createStageLookup = (
+  instructions: DockerfileInstruction[]
+): ((name: string, beforeLine: number) => boolean) => {
+  const firstDeclaredAt = new Map<string, number>();
 
   for (const inst of instructions) {
-    if (inst.instruction !== "FROM" || inst.line >= beforeLine) {
-      continue;
-    }
+    if (inst.instruction === "FROM") {
+      const { stage } = parseFromArgs(inst.args);
 
-    const { stage } = parseFromArgs(inst.args);
+      if (hasText(stage)) {
+        const name = stage.toLowerCase();
 
-    if (hasText(stage)) {
-      aliases.add(stage.toLowerCase());
+        if (!firstDeclaredAt.has(name)) {
+          firstDeclaredAt.set(name, inst.line);
+        }
+      }
     }
   }
 
-  return aliases;
+  return (name, beforeLine) =>
+    (firstDeclaredAt.get(name.toLowerCase()) ?? Number.POSITIVE_INFINITY) <
+    beforeLine;
 };

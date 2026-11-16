@@ -47,8 +47,5 @@ jobs:
             ${{ runner.os }}-bun-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Build
-        if: ${{ matrix.name != 'Format' }}
-        run: bun run build
       - name: ${{ matrix.name }}
         run: ${{ matrix.command }}

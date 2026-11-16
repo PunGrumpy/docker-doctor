@@ -1,5 +1,4 @@
 import {
-  collectStageAliases,
   isDockerSandboxTemplate,
   isHardenedImage,
   isScratch,
@@ -51,6 +50,8 @@ interface BuildStage {
   base: string;
   from: DockerfileInstruction;
   name: string | null;
+  // Index of the earlier stage this one builds FROM, or -1 for a fresh base.
+  parent: number;
   runs: StageRun[];
 }
 
@@ -212,6 +213,9 @@ const applyNodeEnv = (
 
 const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
   const stages: BuildStage[] = [];
+  // Where each name was first declared. A later stage with the same name
+  // does not take it over.
+  const firstIndexByName = new Map<string, number>();
   // A stage built FROM this one inherits its ENV and its ARGs.
   const nodeEnv: NodeEnvState[] = [];
   // An ARG before the first FROM is not visible inside a stage.
@@ -224,17 +228,16 @@ const collectStages = (instructions: DockerfileInstruction[]): BuildStage[] => {
       const { base, stage } = parseFromArgs(inst.args);
       const baseKey = base?.toLowerCase() ?? "";
 
-      const parent = stages.findIndex(
-        (s) => s.name !== null && s.name === baseKey
-      );
+      const parent = firstIndexByName.get(baseKey) ?? -1;
+      const name = stage?.toLowerCase() ?? null;
 
       nodeEnv.push(parent === -1 ? {} : { ...nodeEnv[parent] });
-      stages.push({
-        base: baseKey,
-        from: inst,
-        name: stage?.toLowerCase() ?? null,
-        runs: [],
-      });
+
+      if (name !== null && !firstIndexByName.has(name)) {
+        firstIndexByName.set(name, stages.length);
+      }
+
+      stages.push({ base: baseKey, from: inst, name, parent, runs: [] });
     } else if (inst.instruction === "RUN") {
       stages.at(-1)?.runs.push({
         env: {
@@ -258,14 +261,11 @@ const shippedStages = (stages: BuildStage[]): BuildStage[] => {
   let index = stages.length - 1;
 
   while (index >= 0) {
-    shipped.unshift(stages[index]);
-    const { base } = stages[index];
-    index = stages
-      .slice(0, index)
-      .findIndex((s) => s.name !== null && s.name === base);
+    shipped.push(stages[index]);
+    index = stages[index].parent;
   }
 
-  return shipped;
+  return shipped.toReversed();
 };
 
 // Minimal bases identify themselves either in the name (alpine, busybox,
@@ -290,10 +290,7 @@ const MINIMAL_BASE_SEGMENT_RE = /(?:^|[/_. -])(?:minimal|micro)(?:$|[/_. -])/u;
 
 // The base image of a shipped stage when it may be a full-OS distribution,
 // or null when it is exempt or already minimal.
-const fullOsBase = (
-  from: DockerfileInstruction,
-  instructions: DockerfileInstruction[]
-): string | null => {
+const fullOsBase = ({ from, parent }: BuildStage): string | null => {
   const imagePart = parseFromArgs(from.args).base;
 
   if (!hasText(imagePart) || isScratch(imagePart)) {
@@ -301,9 +298,8 @@ const fullOsBase = (
   }
 
   const ref = parseImageRef(imagePart);
-  const stageAliases = collectStageAliases(instructions, from.line);
 
-  if (ref.isVariable || stageAliases.has(imagePart.toLowerCase())) {
+  if (ref.isVariable || parent !== -1) {
     return null;
   }
 
@@ -343,8 +339,9 @@ export const preferSlimBase: DockerfileRule = {
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
 
-    for (const { from } of shippedStages(collectStages(instructions))) {
-      const imagePart = fullOsBase(from, instructions);
+    for (const stage of shippedStages(collectStages(instructions))) {
+      const { from } = stage;
+      const imagePart = fullOsBase(stage);
 
       if (imagePart !== null) {
         diagnostics.push(
@@ -585,15 +582,79 @@ const segmentInstallsDevDependencies = (
   );
 };
 
-// An `export` earlier in the same RUN reaches every install after it. A plain
-// `NODE_ENV=production;` assignment does not, because the shell keeps it to
-// itself.
-const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
-  if (inst.args.includes("prune")) {
+// `--omit dev` and `--omit=dev` mean the same to npm; the switch reader only
+// knows the `=` spelling.
+const joinSpacedOmit = (options: string[]): string[] =>
+  options.flatMap((option, index) =>
+    options[index - 1] === "--omit"
+      ? []
+      : [
+          option === "--omit" && index + 1 < options.length
+            ? `--omit=${options[index + 1]}`
+            : option,
+        ]
+  );
+
+// One shell command that removes devDependencies from node_modules: `npm
+// prune` that omits dev (by flag, or NODE_ENV=production or npm_config_*), or
+// `pnpm prune --prod`. A bare `npm prune` only removes extraneous packages,
+// and `--dry-run` removes nothing. pnpm's prune takes its production setting
+// from the flag, as pnpm's install ignores NODE_ENV. The word "prune" in a
+// script path, an echo or another tool's subcommand does not count.
+const segmentPrunesDevDependencies = (
+  tokens: string[],
+  runEnv: InstallEnv
+): boolean => {
+  const commandStart = tokens.findIndex(
+    (token) => !ENV_ASSIGNMENT_RE.test(token)
+  );
+
+  if (commandStart === -1) {
     return false;
   }
 
+  const [manager, ...rest] = tokens.slice(commandStart);
+
+  if (manager !== "npm" && manager !== "pnpm") {
+    return false;
+  }
+
+  const verbAt = rest.findIndex((token) => !token.startsWith("-"));
+
+  if (verbAt === -1 || rest[verbAt] !== "prune") {
+    return false;
+  }
+
+  const options = joinSpacedOmit([
+    ...rest.slice(0, verbAt),
+    ...rest.slice(verbAt + 1),
+  ]);
+
+  if (
+    options.some(
+      (option) => option === "--dry-run" || option === "--dry-run=true"
+    )
+  ) {
+    return false;
+  }
+
+  if (manager === "pnpm") {
+    return options.some((option) => flagLeavesDevOut(manager, option));
+  }
+
+  return npmOmitsDev(
+    npmCommandLineSwitches(options),
+    withAssignments(runEnv, tokens.slice(0, commandStart))
+  );
+};
+
+// An `export` earlier in the same RUN reaches every install after it. A plain
+// `NODE_ENV=production;` assignment does not, because the shell keeps it to
+// itself. A prune only removes what the installs before it brought in, so an
+// install after it counts again.
+const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
   let exported = env;
+  let installed = false;
 
   for (const segment of splitShellCommands(stripRunFlags(inst.args))) {
     const tokens = splitShellWords(segment);
@@ -601,11 +662,13 @@ const installsDevDependencies = ({ env, inst }: StageRun): boolean => {
     if (tokens[0] === "export") {
       exported = withAssignments(exported, tokens.slice(1));
     } else if (segmentInstallsDevDependencies(tokens, exported)) {
-      return true;
+      installed = true;
+    } else if (segmentPrunesDevDependencies(tokens, exported)) {
+      installed = false;
     }
   }
 
-  return false;
+  return installed;
 };
 
 export const avoidDevDependencies: DockerfileRule = {

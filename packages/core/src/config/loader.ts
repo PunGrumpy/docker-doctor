@@ -6,9 +6,24 @@ import { parse as parseYaml } from "yaml";
 
 import { ConfigError } from "../errors";
 import type { ConfigInput, DockerDoctorConfig } from "../schemas/config";
-import { isConfigObject, validateConfig } from "../schemas/config";
+import {
+  isConfigObject,
+  RULE_CATEGORY_NAMES,
+  validateConfig,
+} from "../schemas/config";
 import { hasText } from "../text";
+import type { UnknownConfigKey } from "./unknown-keys";
 import { collectUnknownConfigKeys } from "./unknown-keys";
+
+const isDirectory = async (filePath: string): Promise<boolean> => {
+  try {
+    const stats = await fs.stat(filePath);
+
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+};
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
@@ -47,9 +62,17 @@ const findFirstConfigFile = async (
 const describeError = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
+const invalidConfig = (source: string, cause: unknown): ConfigError =>
+  new ConfigError({
+    message: `Invalid configuration in ${source}: ${describeError(cause)}`,
+  });
+
 // A config source holds nothing (a falsy value) or an object to validate.
 // Anything else fails with the message validation has always given it.
-const isConfigExport = (exported: unknown): exported is ConfigInput => {
+const isConfigExport = (
+  exported: unknown,
+  source: string
+): exported is ConfigInput => {
   const present = Boolean(exported);
 
   if (!present) {
@@ -59,9 +82,7 @@ const isConfigExport = (exported: unknown): exported is ConfigInput => {
   try {
     return isConfigObject(exported);
   } catch (error: unknown) {
-    throw new ConfigError({
-      message: `Invalid configuration format: ${describeError(error)}`,
-    });
+    throw invalidConfig(source, error);
   }
 };
 
@@ -76,11 +97,11 @@ const parseConfigFile = async (
     parsed = format === "JSON" ? JSON.parse(content) : parseYaml(content);
   } catch (error: unknown) {
     throw new ConfigError({
-      message: `Failed to parse config ${format}: ${describeError(error)}`,
+      message: `Failed to parse config ${format} in ${filePath}: ${describeError(error)}`,
     });
   }
 
-  return isConfigExport(parsed) ? parsed : null;
+  return isConfigExport(parsed, filePath) ? parsed : null;
 };
 
 const TYPESCRIPT_CONFIG_PATTERN = /\.[cm]?ts$/u;
@@ -156,8 +177,11 @@ const importConfig = async (filePath: string): Promise<ConfigInput | null> => {
   const hasDefaultExport = Boolean(defaultExport);
   const exported = hasDefaultExport ? defaultExport : configModule;
 
-  return isConfigExport(exported) ? exported : null;
+  return isConfigExport(exported, filePath) ? exported : null;
 };
+
+const packageConfigSource = (pkgPath: string): string =>
+  `${pkgPath} ("dockerDoctor")`;
 
 const readPackageConfig = async (
   rootDir: string
@@ -178,25 +202,58 @@ const readPackageConfig = async (
     return null;
   }
 
-  return isConfigExport(dockerDoctor) ? dockerDoctor : null;
+  return isConfigExport(dockerDoctor, packageConfigSource(pkgPath))
+    ? dockerDoctor
+    : null;
 };
+
+const describeUnknownKey = (
+  unknownKey: UnknownConfigKey,
+  source: string
+): string => {
+  const { key, kind, path: keyPath, suggestion } = unknownKey;
+
+  const hint = suggestion === undefined ? "" : ` Did you mean "${suggestion}"?`;
+
+  if (kind === "rule") {
+    return `Unknown rule "${key}" in ${source}. It matches no rule and has no effect.${hint}`;
+  }
+
+  if (kind === "category") {
+    const caseOnly = suggestion?.toLowerCase() === key.toLowerCase();
+    const rule = caseOnly ? " Category names are case-sensitive." : "";
+
+    const valid =
+      suggestion === undefined
+        ? ` Use ${RULE_CATEGORY_NAMES.join(", ")}.`
+        : hint;
+
+    return `Unknown category "${key}" in ${source}.${rule}${valid}`;
+  }
+
+  return `Unknown config key "${keyPath}" in ${source}. docker-doctor ignores it.${hint}`;
+};
+
+// A config that is wrong in many places would bury the rest of the output.
+const MAX_UNKNOWN_KEY_WARNINGS = 20;
 
 const warnUnknownKeys = (
   raw: ConfigInput,
+  source: string,
   onWarning: (message: string) => void
 ): void => {
-  const unknown = collectUnknownConfigKeys(raw);
+  const unknownKeys = collectUnknownConfigKeys(raw);
 
-  for (const key of unknown.rules) {
-    onWarning(
-      `Unknown rule "${key}" in config — it matches no rule and has no effect.`
-    );
+  for (const unknownKey of unknownKeys.slice(0, MAX_UNKNOWN_KEY_WARNINGS)) {
+    onWarning(describeUnknownKey(unknownKey, source));
   }
 
-  for (const key of unknown.categories) {
-    onWarning(
-      `Unknown category "${key}" in config — categories are case-sensitive (e.g. "Best Practices", "Security").`
-    );
+  const hidden = unknownKeys.length - MAX_UNKNOWN_KEY_WARNINGS;
+
+  if (hidden > 0) {
+    const noun = hidden === 1 ? "key" : "keys";
+
+    onWarning(`and ${hidden} more unknown ${noun} in ${source}`);
   }
 };
 
@@ -206,6 +263,7 @@ export const loadConfig = async (
   onWarning?: (message: string) => void
 ): Promise<DockerDoctorConfig> => {
   let configObject: ConfigInput | null = null;
+  let source = "";
 
   if (hasText(customPath)) {
     const fullPath = path.resolve(rootDir, customPath);
@@ -216,15 +274,26 @@ export const loadConfig = async (
       });
     }
 
+    if (await isDirectory(fullPath)) {
+      throw new ConfigError({
+        message: `The config path ${fullPath} is a directory. Pass the config file itself, for example ${path.join(fullPath, "docker-doctor.config.json")}.`,
+      });
+    }
+
+    source = fullPath;
     configObject = await importConfig(fullPath);
   } else {
     const configPath = await findFirstConfigFile(rootDir);
 
     if (configPath !== undefined) {
+      source = configPath;
       configObject = await importConfig(configPath);
     }
 
-    configObject ??= await readPackageConfig(rootDir);
+    if (configObject === null) {
+      source = packageConfigSource(path.join(rootDir, "package.json"));
+      configObject = await readPackageConfig(rootDir);
+    }
   }
 
   if (configObject === null) {
@@ -235,13 +304,11 @@ export const loadConfig = async (
     const config = validateConfig(configObject);
 
     if (onWarning) {
-      warnUnknownKeys(configObject, onWarning);
+      warnUnknownKeys(configObject, source, onWarning);
     }
 
     return config;
   } catch (error: unknown) {
-    throw new ConfigError({
-      message: `Invalid configuration format: ${describeError(error)}`,
-    });
+    throw invalidConfig(source, error);
   }
 };

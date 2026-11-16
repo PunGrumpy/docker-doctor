@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Cursor } from "@/components/icons/cursor";
 import { Pill } from "@/components/pill";
+import { Toaster } from "@/components/ui/sonner";
 import { getScoreData } from "@/lib/score";
 import { hasText } from "@/lib/text";
 import { cn, pluralize } from "@/lib/utils";
@@ -122,6 +123,7 @@ export const Card = ({ score, warnings, errors }: CardProps) => {
 
   return (
     <div className="bg-card/20 shadow-custom flex flex-col items-center justify-center rounded-2xl p-1">
+      <Toaster />
       <div className="preview-card relative flex size-full flex-col overflow-hidden rounded-xl">
         <div className="flex w-full grow flex-col items-center justify-center gap-5.5 pt-9.75 pb-6">
           <div className="flex flex-col items-center gap-2.25">
