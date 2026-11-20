@@ -1,9 +1,14 @@
 import { readFileSync } from "node:fs";
 
+export interface ChangeDetail {
+  kind: "bullet" | "paragraph";
+  text: string;
+}
+
 export interface Change {
   sha: string;
   title: string;
-  details: string[];
+  details: ChangeDetail[];
 }
 
 export interface VersionEntry {
@@ -37,8 +42,7 @@ const sectionOf = (line: string): Section | null => {
   return null;
 };
 
-export const parseChangelog = (filePath: string): ChangelogData => {
-  const text = readFileSync(filePath, "utf-8");
+export const parseChangelogText = (text: string): ChangelogData => {
   const lines = text.split("\n");
 
   let packageName = "";
@@ -78,10 +82,18 @@ export const parseChangelog = (filePath: string): ChangelogData => {
         };
         currentVersion[currentSection].push(currentChange);
       } else if (currentChange) {
-        currentChange.details.push(line.replace(/^-\s+/u, "").trim());
+        currentChange.details.push({
+          kind: "bullet",
+          text: line.replace(/^-\s+/u, "").trim(),
+        });
       }
     } else if (line.startsWith("  - ") && currentChange) {
-      currentChange.details.push(line.replace(/^\s+-\s+/u, "").trim());
+      currentChange.details.push({
+        kind: "bullet",
+        text: line.replace(/^\s+-\s+/u, "").trim(),
+      });
+    } else if (line.startsWith("  ") && currentChange && line.trim()) {
+      currentChange.details.push({ kind: "paragraph", text: line.trim() });
     }
   }
 
@@ -91,3 +103,6 @@ export const parseChangelog = (filePath: string): ChangelogData => {
 
   return { packageName, versions };
 };
+
+export const parseChangelog = (filePath: string): ChangelogData =>
+  parseChangelogText(readFileSync(filePath, "utf-8"));

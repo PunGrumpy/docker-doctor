@@ -1,13 +1,13 @@
 import { Pill } from "@/components/pill";
 import { Section } from "@/components/section";
-import type { ChangelogData } from "@/lib/changelog";
+import type { ChangelogData, ChangeDetail } from "@/lib/changelog";
 import { cn } from "@/lib/utils";
 
 interface ChangeItemProps {
   readonly change: {
     sha: string;
     title: string;
-    details: string[];
+    details: ChangeDetail[];
   };
 }
 
@@ -34,20 +34,28 @@ const ChangeItem = ({ change }: ChangeItemProps) => (
     </div>
     {change.details.length > 0 && (
       <ul className="mt-1 space-y-0.5">
-        {change.details.map((detail, i) => (
-          <li
-            key={`${change.sha}-${i}`}
-            className="text-muted-foreground/70 relative pl-4 text-sm"
-          >
-            <span
-              className="text-muted-foreground/30 absolute top-0 left-0 select-none"
-              aria-hidden="true"
+        {change.details.map((detail, i) =>
+          detail.kind === "paragraph" ? (
+            <li key={`${change.sha}-${i}`}>
+              <p className="text-muted-foreground/70 py-1 text-sm">
+                {detail.text}
+              </p>
+            </li>
+          ) : (
+            <li
+              key={`${change.sha}-${i}`}
+              className="text-muted-foreground/70 relative pl-4 text-sm"
             >
-              –
-            </span>
-            {detail}
-          </li>
-        ))}
+              <span
+                className="text-muted-foreground/30 absolute top-0 left-0 select-none"
+                aria-hidden="true"
+              >
+                –
+              </span>
+              {detail.text}
+            </li>
+          )
+        )}
       </ul>
     )}
   </li>
