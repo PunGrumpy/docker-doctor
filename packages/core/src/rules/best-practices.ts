@@ -12,7 +12,12 @@ import type {
   RuleCategory,
 } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
-import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
+import {
+  hasAptGetInstall,
+  hasAptGetUpdate,
+  hasAptInstall,
+  hasAptUpdate,
+} from "./package-managers";
 
 const BEST_PRACTICES = "Best Practices" satisfies RuleCategory;
 
@@ -108,39 +113,6 @@ export const preferCopyOverAdd: DockerfileRule = {
   message: "Prefer COPY over ADD",
 };
 
-export const useExecForm: DockerfileRule = {
-  category: BEST_PRACTICES,
-  check(instructions, file) {
-    const diagnostics: Diagnostic[] = [];
-
-    for (const inst of instructions) {
-      const takesExecForm =
-        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
-
-      // Bracket-wrapped args that are not a JSON string array still run under
-      // /bin/sh -c, so they count as shell form.
-      if (takesExecForm && parseExecForm(inst.args) === null) {
-        diagnostics.push(
-          createDiagnostic(
-            file,
-            this.key,
-            this.defaultSeverity,
-            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
-            this.help,
-            inst.line
-          )
-        );
-      }
-    }
-
-    return diagnostics;
-  },
-  defaultSeverity: "warning",
-  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.',
-  key: "docker-doctor/use-exec-form",
-  message: "Use exec form for CMD and ENTRYPOINT",
-};
-
 export const requireLabels: DockerfileRule = {
   anchor: "file",
   category: BEST_PRACTICES,
@@ -175,10 +147,12 @@ export const combineAptUpdateInstall: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
+        // The rule is about apt-get, so only an apt-get half starts a report.
+        // The other half may be written as `apt`, as the build cache docs do.
         const hasUpdate = hasAptGetUpdate(inst.args);
         const hasInstall = hasAptGetInstall(inst.args);
 
-        if (hasUpdate && !hasInstall) {
+        if (hasUpdate && !hasAptInstall(inst.args)) {
           diagnostics.push(
             createDiagnostic(
               file,
@@ -189,7 +163,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
               inst.line
             )
           );
-        } else if (hasInstall && !hasUpdate) {
+        } else if (hasInstall && !hasAptUpdate(inst.args)) {
           diagnostics.push(
             createDiagnostic(
               file,
@@ -283,6 +257,78 @@ const withoutNonPipeBars = (text: string): string => {
   return result.replace(CASE_PATTERN_RE, " ");
 };
 
+// A single `&` that is not `&&` and not part of a redirection (`2>&1`,
+// `&>file`, `<&3`) starts a background job.
+const BACKGROUND_RE = /(?<![&<>|])&(?![&>])/u;
+
+// The shell runs each part of a pipeline and each background job in a
+// subshell, so `exec` there replaces the subshell and /bin/sh stays PID 1.
+const runsInSubshell = (args: string): boolean => {
+  const text = withoutNonPipeBars(maskQuotedText(args));
+
+  return HAS_PIPE_RE.test(text) || BACKGROUND_RE.test(text);
+};
+
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
+const SHELL_OPERATOR_OR_REDIRECT_RE = /^(?:[&|;<>]|\d+[<>])/u;
+
+// `exec` replaces the shell with the command, so the command gets the
+// signals. The Dockerfile reference tells shell-form ENTRYPOINT users to
+// start with it. Leading NAME=value words do not change that.
+const startsWithExec = (args: string): boolean => {
+  const words = splitShellWords(args);
+  const first = words.findIndex((word) => !ENV_ASSIGNMENT_RE.test(word));
+
+  if (first === -1 || words[first] !== "exec") {
+    return false;
+  }
+
+  const command = words[first + 1];
+
+  return (
+    command !== undefined &&
+    !SHELL_OPERATOR_OR_REDIRECT_RE.test(command) &&
+    !runsInSubshell(args)
+  );
+};
+
+export const useExecForm: DockerfileRule = {
+  category: BEST_PRACTICES,
+  check(instructions, file) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const inst of instructions) {
+      const takesExecForm =
+        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
+
+      // Bracket-wrapped args that are not a JSON string array still run under
+      // /bin/sh -c, so they count as shell form.
+      if (
+        takesExecForm &&
+        parseExecForm(inst.args) === null &&
+        !startsWithExec(inst.args)
+      ) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
+            this.help,
+            inst.line
+          )
+        );
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.',
+  key: "docker-doctor/use-exec-form",
+  message: "Use exec form for CMD and ENTRYPOINT",
+};
+
 // `cd` only where a command can start: line start, or after a list/pipe
 // separator or a subshell open. Path segments (/opt/cd) and words never sit
 // in command position.
@@ -297,6 +343,26 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
   return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
+const NON_POSIX_SHELLS = new Set(["cmd", "powershell", "pwsh"]);
+const PATH_SEPARATOR_RE = /[\\/]/u;
+const EXE_SUFFIX_RE = /\.exe$/u;
+
+// cmd and PowerShell have no `pipefail`, so a pipe under them cannot be made
+// safe that way. The program is argv[0], whatever its directory or case.
+const shellDirectiveIsNonPosix = (args: string): boolean => {
+  const program = parseExecForm(args)?.[0];
+
+  if (program === undefined) {
+    return false;
+  }
+
+  const name = (program.split(PATH_SEPARATOR_RE).at(-1) ?? "")
+    .toLowerCase()
+    .replace(EXE_SUFFIX_RE, "");
+
+  return NON_POSIX_SHELLS.has(name);
+};
+
 // True when a RUN pipes without pipefail. SHELL only applies to shell-form
 // RUN; exec-form RUN runs its own argv directly, so check the argv for
 // pipefail instead. Exec-form argv elements arrive already unquoted, so a
@@ -304,9 +370,14 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
 // a quoted argument (grep -E "foo|bar") does not read as a pipeline.
 const pipesWithoutPipefail = (
   args: string,
-  shellHasPipefail: boolean
+  shellHasPipefail: boolean,
+  shellIsNonPosix: boolean
 ): boolean => {
   const execArgv = parseExecForm(args);
+
+  if (execArgv === null && shellIsNonPosix) {
+    return false;
+  }
 
   const pipeText = withoutNonPipeBars(
     execArgv === null ? maskQuotedText(args) : execArgv.join(" ")
@@ -328,14 +399,20 @@ export const usePipefail: DockerfileRule = {
   category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     // FROM <previous stage> inherits that stage's image config — SHELL
     // included (verified against BuildKit); FROM a fresh base image, or the
     // reserved empty stage `scratch`, resets it to the Docker default. A
     // SHELL instruction replaces it for the rest of the current stage.
     // NOTE: FROM ${VAR} (variable base) misses the map lookup and silently
     // resets — fails safe (extra warning, never a missed one).
-    const stagePipefail = new Map<string, boolean>();
+    const stageShells = new Map<
+      string,
+      { hasPipefail: boolean; isNonPosix: boolean }
+    >();
+
     let shellHasPipefail = false;
+    let shellIsNonPosix = false;
     let currentStage: string | null = null;
 
     for (const inst of instructions) {
@@ -346,22 +423,32 @@ export const usePipefail: DockerfileRule = {
           ? null
           : (base?.toLowerCase() ?? null);
 
-        shellHasPipefail =
-          parentStage !== null && stagePipefail.get(parentStage) === true;
+        const parentShell =
+          parentStage === null ? undefined : stageShells.get(parentStage);
+
+        shellHasPipefail = parentShell?.hasPipefail === true;
+        shellIsNonPosix = parentShell?.isNonPosix === true;
         currentStage = stage?.toLowerCase() ?? null;
 
         if (hasText(currentStage)) {
-          stagePipefail.set(currentStage, shellHasPipefail);
+          stageShells.set(currentStage, {
+            hasPipefail: shellHasPipefail,
+            isNonPosix: shellIsNonPosix,
+          });
         }
       } else if (inst.instruction === "SHELL") {
         shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
+        shellIsNonPosix = shellDirectiveIsNonPosix(inst.args);
 
         if (hasText(currentStage)) {
-          stagePipefail.set(currentStage, shellHasPipefail);
+          stageShells.set(currentStage, {
+            hasPipefail: shellHasPipefail,
+            isNonPosix: shellIsNonPosix,
+          });
         }
       } else if (
         inst.instruction === "RUN" &&
-        pipesWithoutPipefail(inst.args, shellHasPipefail)
+        pipesWithoutPipefail(inst.args, shellHasPipefail, shellIsNonPosix)
       ) {
         diagnostics.push(
           createDiagnostic(
