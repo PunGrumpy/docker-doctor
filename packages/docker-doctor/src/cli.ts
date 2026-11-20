@@ -613,6 +613,18 @@ const printIgnoreWarnings = (warnings: IgnoreFileWarning[]): void => {
   }
 };
 
+// A symlink to a device or a FIFO committed under a Dockerfile name would
+// stall the read or exhaust memory, so only regular files are read.
+const readRegularFile = async (fullPath: string): Promise<string> => {
+  const stats = await fs.stat(fullPath);
+
+  if (!stats.isFile()) {
+    throw new Error("not a regular file");
+  }
+
+  return await fs.readFile(fullPath, "utf-8");
+};
+
 const runRulesEngine = async (
   rootDir: string,
   project: { dockerfiles: string[]; composeFiles: string[] },
@@ -630,7 +642,7 @@ const runRulesEngine = async (
       const fullPath = path.join(rootDir, df);
 
       try {
-        const content = await fs.readFile(fullPath, "utf-8");
+        const content = await readRegularFile(fullPath);
         fileContents[df] = content;
         const instructions = parseDockerfile(content, df);
 
@@ -672,7 +684,7 @@ const runRulesEngine = async (
       const fullPath = path.join(rootDir, cf);
 
       try {
-        const content = await fs.readFile(fullPath, "utf-8");
+        const content = await readRegularFile(fullPath);
         fileContents[cf] = content;
 
         return {

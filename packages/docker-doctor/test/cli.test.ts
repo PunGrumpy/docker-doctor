@@ -844,6 +844,85 @@ describe("unreadable directories", () => {
   );
 });
 
+const scanLinkedFile = async (name: string, target: string) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-device-"));
+
+  try {
+    fs.symlinkSync(target, path.join(root, name));
+
+    const { exitCode, stderr, stdout } = await runCli([root, "--json"]);
+
+    return { exitCode, report: parseReport(stdout), stderr };
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
+  }
+};
+
+describe("files that are not regular files", () => {
+  // Windows has no /dev/zero.
+  const canTestDevices = process.platform !== "win32";
+
+  test.skipIf(!canTestDevices)(
+    "a Dockerfile that links to /dev/zero fails the scan instead of reading it",
+    async () => {
+      const { exitCode, report, stderr } = await scanLinkedFile(
+        "Dockerfile",
+        "/dev/zero"
+      );
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toContain(
+        "Failed to analyze Dockerfile Dockerfile: not a regular file"
+      );
+      expect(report.failures).toEqual([
+        { file: "Dockerfile", message: "not a regular file" },
+      ]);
+    }
+  );
+
+  test.skipIf(!canTestDevices)(
+    "a Compose file that links to /dev/zero fails the scan instead of reading it",
+    async () => {
+      const { exitCode, report, stderr } = await scanLinkedFile(
+        "compose.yaml",
+        "/dev/zero"
+      );
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toContain(
+        "Failed to analyze Compose file compose.yaml: not a regular file"
+      );
+      expect(report.failures).toEqual([
+        { file: "compose.yaml", message: "not a regular file" },
+      ]);
+    }
+  );
+
+  test.skipIf(!canTestDevices)(
+    "a Dockerfile that links to a regular file is still scanned",
+    async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "dd-link-"));
+
+      try {
+        fs.writeFileSync(
+          path.join(root, "real"),
+          'FROM node:22-alpine\nUSER node\nCMD ["node"]\n'
+        );
+        fs.symlinkSync("real", path.join(root, "Dockerfile"));
+
+        const { exitCode, stdout } = await runCli([root, "--json"]);
+        const report = parseReport(stdout);
+
+        expect(exitCode).toBe(0);
+        expect(report.analyzedFiles).toBe(1);
+        expect(report.failures).toEqual([]);
+      } finally {
+        fs.rmSync(root, { force: true, recursive: true });
+      }
+    }
+  );
+});
+
 describe("agent-stack fixture", () => {
   test("reports the interpolated socket mount and the provider-syntax model", async () => {
     const { exitCode, stdout } = await runCli([
