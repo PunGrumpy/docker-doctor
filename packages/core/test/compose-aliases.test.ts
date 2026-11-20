@@ -286,6 +286,31 @@ describe("Compose aliases", () => {
     expect(replacedPaths).toContainEqual(["services", "web", "c"]);
   });
 
+  // compose-go binds `*x` to the anchor inside the dropped `!reset` value and
+  // reads it without its own `!reset` key.
+  test("the document and the replaced paths bind an alias the same way", () => {
+    const content = [
+      "x-a: &x {k: 1}",
+      "x-b: !reset",
+      "  r: &x {k: !reset 2, j: 3}",
+      "services:",
+      "  web:",
+      "    image: nginx:1.27.3",
+      "    x-c: *x",
+      "",
+    ].join("\n");
+
+    const { document, replacedPaths } = readComposeFile(
+      content,
+      "compose.yaml"
+    );
+
+    expect(document).toMatchObject({
+      services: { web: { "x-c": { j: 3 } } },
+    });
+    expect(replacedPaths).toContainEqual(["services", "web", "x-c", "k"]);
+  });
+
   // The bounds are loose on purpose. Resolving each alias by walking the
   // whole document took several seconds for these files, and CI runners are
   // 5 to 10 times slower than a laptop.

@@ -1,4 +1,4 @@
-import type { Alias, Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
+import type { Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
 import {
   isAlias,
   isCollection,
@@ -9,13 +9,13 @@ import {
   isSeq,
   LineCounter,
   parseDocument,
-  Scalar,
-  visit,
 } from "yaml";
 
 import { ParseError } from "../errors";
 import type { ComposeLocator, ComposeValue } from "../types/index";
 import { isComposeValue } from "./compose-value";
+import type { AliasTargets } from "./yaml-to-js";
+import { findAliasTargets, isMergeKey, toJsValue } from "./yaml-to-js";
 
 // yaml appends the offending source lines to its error message. Those lines
 // can hold a secret, and the message reaches --json output and PR comments.
@@ -61,30 +61,6 @@ export interface ComposeFile {
   document: ComposeValue;
   replacedPaths: readonly ComposePath[];
 }
-
-// Each alias and the node it names: the last node before it with its anchor,
-// the node yaml's `Alias.resolve` finds. That method walks the document up
-// to the alias on every call. This map is built in one walk.
-type AliasTargets = ReadonlyMap<Alias, Node>;
-
-const findAliasTargets = (doc: Document): AliasTargets => {
-  const targets = new Map<Alias, Node>();
-  const anchored = new Map<string, Node>();
-
-  visit(doc, (_key, node) => {
-    if (isAlias(node)) {
-      const target = anchored.get(node.source);
-
-      if (target !== undefined) {
-        targets.set(node, target);
-      }
-    } else if (isNode(node) && node.anchor !== undefined) {
-      anchored.set(node.anchor, node);
-    }
-  });
-
-  return targets;
-};
 
 interface TagScan {
   // Relative paths found below each container, kept so an alias replays them
@@ -148,23 +124,6 @@ const keyOf = (pair: Pair): string => {
   }
 
   return pair.key.source === MERGE_KEY ? MERGE_KEY : String(pair.key.value);
-};
-
-// A key yaml merges on: a plain `<<`, which its merge tag reads as a symbol.
-const isMergeKey = (key: unknown): key is Scalar => {
-  if (!isScalar(key)) {
-    return false;
-  }
-
-  const { value } = key;
-
-  if (typeof value === "symbol") {
-    return value.description === MERGE_KEY;
-  }
-
-  const isPlain = key.type === undefined || key.type === Scalar.PLAIN;
-
-  return isPlain && value === MERGE_KEY;
 };
 
 // compose-go decodes a file with go-yaml's default alias check
@@ -455,16 +414,13 @@ export const readComposeFile = (
     // Counted after the scan has dropped the `!reset` values, as compose-go
     // counts them.
     checkAliasing(doc, targets);
-    // checkAliasing has refused what Compose refuses. yaml's own cap refuses
-    // an anchor used more than 100 times, as files that merge one anchor into
-    // every service do.
-    document = doc.toJS({ maxAliasCount: -1 });
+    document = toJsValue(doc, targets);
   } catch (error: unknown) {
     throw new ParseError({ file: filepath, message: describeYamlError(error) });
   }
 
-  // yaml builds only strings, numbers, booleans, null, arrays and objects,
-  // so no YAML text reaches this error.
+  // The document holds only scalar values, arrays and objects, so no YAML
+  // text reaches this error.
   if (!isComposeValue(document)) {
     throw new ParseError({
       file: filepath,
