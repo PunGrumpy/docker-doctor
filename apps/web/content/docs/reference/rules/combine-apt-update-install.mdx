@@ -40,6 +40,8 @@ RUN apt-get update \
 
 `--no-install-recommends` skips the recommended-package tree that quietly doubles install size, and the trailing `rm -rf /var/lib/apt/lists/*` removes the package index from the image — covered in depth by [clean-package-cache](/docs/reference/rules/clean-package-cache). All three habits belong in the same `RUN`.
 
+The rule starts from the `apt-get` spelling, but it reads the other half of the pair in either spelling. An `apt-get install` that has an `apt update` in the same `RUN` is not reported, which covers the cache mount example in the Docker build cache docs. A `RUN` that uses only `apt install` or only `apt update` is not checked.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/combine-apt-update-install`

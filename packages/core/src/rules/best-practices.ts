@@ -12,7 +12,12 @@ import type {
   RuleCategory,
 } from "../types/index";
 import { createDiagnostic } from "./create-diagnostic";
-import { hasAptGetInstall, hasAptGetUpdate } from "./package-managers";
+import {
+  hasAptGetInstall,
+  hasAptGetUpdate,
+  hasAptInstall,
+  hasAptUpdate,
+} from "./package-managers";
 
 const BEST_PRACTICES = "Best Practices" satisfies RuleCategory;
 
@@ -198,10 +203,12 @@ export const combineAptUpdateInstall: DockerfileRule = {
 
     for (const inst of instructions) {
       if (inst.instruction === "RUN") {
+        // The rule is about apt-get, so only an apt-get half starts a report.
+        // The other half may be written as `apt`, as the build cache docs do.
         const hasUpdate = hasAptGetUpdate(inst.args);
         const hasInstall = hasAptGetInstall(inst.args);
 
-        if (hasUpdate && !hasInstall) {
+        if (hasUpdate && !hasAptInstall(inst.args)) {
           diagnostics.push(
             createDiagnostic(
               file,
@@ -212,7 +219,7 @@ export const combineAptUpdateInstall: DockerfileRule = {
               inst.line
             )
           );
-        } else if (hasInstall && !hasUpdate) {
+        } else if (hasInstall && !hasAptUpdate(inst.args)) {
           diagnostics.push(
             createDiagnostic(
               file,
