@@ -6,7 +6,7 @@ import {
 } from "../parsers/compose-value";
 import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
 import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
-import { composeServices } from "./compose-services";
+import { composeServices, isProviderService } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
 export const noVersionKey: ComposeRule = {
@@ -39,6 +39,10 @@ export const requireResourceLimits: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
+      if (isProviderService(config)) {
+        continue;
+      }
+
       const limits = composeField(
         composeField(config.deploy, "resources"),
         "limits"
@@ -110,7 +114,7 @@ export const requireRestartPolicy: ComposeRule = {
     const oneShot = oneShotServices(context?.project ?? composeContent);
 
     for (const [name, config] of composeServices(composeContent)) {
-      if (oneShot.has(name)) {
+      if (oneShot.has(name) || isProviderService(config)) {
         continue;
       }
 
@@ -141,13 +145,36 @@ export const requireRestartPolicy: ComposeRule = {
   message: "Set restart policy for services",
 };
 
+// Compose does not wait on a provider service, so a `condition:` on it
+// would change nothing. A name that is not declared counts as ordinary.
+const namesOrdinaryService = (
+  dependsOn: readonly ComposeValue[],
+  project: ComposeValue
+): boolean => {
+  const providers = new Set<string>();
+
+  for (const [name, config] of composeServices(project)) {
+    if (isProviderService(config)) {
+      providers.add(name);
+    }
+  }
+
+  return dependsOn.some(
+    (dependency) => !(isComposeString(dependency) && providers.has(dependency))
+  );
+};
+
 export const useDependsOnCondition: ComposeRule = {
   category: "Compose",
   check(composeContent, file, context) {
     const diagnostics: Diagnostic[] = [];
+    const project = context?.project ?? composeContent;
 
     for (const [name, config] of composeServices(composeContent)) {
-      if (isComposeSequence(config.depends_on)) {
+      if (
+        isComposeSequence(config.depends_on) &&
+        namesOrdinaryService(config.depends_on, project)
+      ) {
         diagnostics.push(
           createDiagnostic(
             file,

@@ -640,6 +640,7 @@ export const rulePageContent: RulePages = {
     notes: [
       "`docker compose` applies `deploy.resources.limits` directly (no Swarm required). Size limits from observed usage plus real headroom — a limit that's too tight turns normal traffic spikes into OOM kills. Note that Java and Node runtimes size their heaps from the container limit only in recent versions; older runtimes may need explicit flags (`-Xmx`, `--max-old-space-size`) to match.\n\nThe service-level `mem_limit`, `cpus`, and `cpu_quota` keys are the older spelling of the same limits and satisfy the rule too.",
       "A one-shot job, such as a migration that another service waits on with `condition: service_completed_successfully`, still needs a limit. Only [require-restart-policy](/docs/reference/rules/require-restart-policy) exempts it.",
+      "A service with a `provider:` mapping is skipped. Compose hands it to a provider instead of running it as a container, so a limit has nothing to apply to.",
       OVERRIDE_PAIRING_NOTE,
     ].join("\n\n"),
     why: "Limits are the isolation part of running containers. With a memory limit, a leaking service is OOM-killed at its cap and restarts — see [require-restart-policy](/docs/reference/rules/require-restart-policy) — while its neighbors keep serving; without one, the _host_ OOM killer picks a victim, and it often picks wrong (your database, for instance). CPU limits likewise keep one busy-looping service from starving everything else. Setting limits also forces the question every production service should answer: how much is this supposed to use?",
@@ -663,6 +664,7 @@ export const rulePageContent: RulePages = {
     notes: [
       "`on-failure[:max-retries]` restarts only on non-zero exits, useful for one-shot jobs that should retry a bounded number of times. Restart policies handle a _dead_ process; they can't see a process that's alive but broken — pair them with a [HEALTHCHECK](/docs/reference/rules/require-healthcheck) so unhealthy states are visible too. Docker restarts with exponential backoff, so a crash-looping service won't peg the host.",
       "A service that another service names under `depends_on` with `condition: service_completed_successfully` is a one-shot job, such as a database migration or a bucket setup. The rule skips it, because `restart: always` would run the job again every time it finishes. Give such a job `restart: on-failure` if it should retry, or nothing. A service under `profiles:` is optional, not one-shot, so it is still checked.",
+      "A service with a `provider:` mapping is skipped. Compose hands it to a provider instead of running it as a container, so a restart policy has nothing to restart.",
       OVERRIDE_PAIRING_NOTE,
     ].join("\n\n"),
     why: "Crashes are normal operation: OOM kills, unhandled exceptions, dropped database connections, host reboots. A restart policy is the difference between a 10-second blip and an outage that lasts until someone checks. `unless-stopped` is the policy that matches operational intent — it restarts on any crash and after reboot, but stays down when you _deliberately_ stopped the service (whereas `always` will resurrect it at the next daemon restart, surprising whoever stopped it for maintenance).",
@@ -723,8 +725,10 @@ export const rulePageContent: RulePages = {
     },
     intro:
       "Short-form `depends_on: [db]` controls start **order**, not readiness: Compose starts the app the instant the database _container_ exists — several seconds before the database inside it accepts connections. The app's first connection attempt fails, and you're in crash-loop-until-the-race-resolves territory. This rule flags short-form `depends_on` lists.",
-    notes:
+    notes: [
       "The conditions: `service_healthy` (wait for the healthcheck to pass — what you want for databases and queues), `service_started` (the old short-form behavior), and `service_completed_successfully` (wait for a one-shot task like a migration job to exit 0 — handy for `migrate → app` sequences). Startup ordering complements, but doesn't replace, connection retry logic in the app: services can still become unready _later_.",
+      "A list that names only services with a `provider:` mapping is accepted. Compose does not wait on a provider service, so a condition on it would change nothing.",
+    ].join("\n\n"),
     why: '"Web can\'t connect to postgres on `docker compose up`, but works after a restart" is one of the most-asked Compose questions, and this race is the answer. The fix is built in: give the dependency a `healthcheck` that verifies real readiness, and make the dependent wait with `condition: service_healthy`. Compose then holds the app until the database has _proven_ it accepts connections — no `sleep 10`, no wait-for-it scripts, no retry-loop scaffolding around startup.',
   },
 

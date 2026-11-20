@@ -11,6 +11,11 @@ export const isComposeTrue = (value: ComposeValue | undefined): boolean =>
   value === true ||
   (isComposeString(value) && TRUE_SPELLINGS.has(value.trim().toLowerCase()));
 
+// A service with a `provider` mapping is run by a Compose plugin or a
+// platform, not as a container, so container settings mean nothing on it.
+export const isProviderService = (config: ComposeMapping): boolean =>
+  isComposeMapping(config.provider);
+
 /**
  * Narrows a compose document to its service entries. A service
  * with a null body (`web:` with nothing under it) is returned as an empty
