@@ -411,15 +411,31 @@ const removesRecursively = (args: string, dir: string): boolean =>
 // Global options may come before `add`: `apk --update add`, `apk --no-cache add`.
 const APK_ADD_RE = /\bapk\s+(?:-[^\s;&|]*\s+)*add\b/u;
 
-const APK_ADD_THEN_NO_CACHE_RE =
-  /\bapk\s+(?:-[^\s;&|]*\s+)*add\b[^;&|]*\s--no-cache(?=[\s;&|]|$)/u;
+const NO_CACHE_OPTION_RE = /\s--no-cache(?=\s|$)/u;
 
 const APK_NO_CACHE_THEN_ADD_RE =
   /\bapk\s+(?:-[^\s;&|]*\s+)*--no-cache(?:\s+-[^\s;&|]*)*\s+add\b/u;
 
+const COMMAND_SEPARATOR_RE = /[;&|]/u;
+
+// Each command is checked from its first `apk add`. A later one in the same
+// command sees less of the text, so it cannot find an option the first missed,
+// and a single pass keeps the check linear on a line that repeats `apk add`.
+const commandAddsWithNoCache = (command: string): boolean => {
+  const add = APK_ADD_RE.exec(command);
+
+  if (!add) {
+    return false;
+  }
+
+  return (
+    NO_CACHE_OPTION_RE.test(command.slice(add.index + add[0].length)) ||
+    APK_NO_CACHE_THEN_ADD_RE.test(command)
+  );
+};
+
 const apkAddHasNoCache = (masked: string): boolean =>
-  APK_ADD_THEN_NO_CACHE_RE.test(masked) ||
-  APK_NO_CACHE_THEN_ADD_RE.test(masked);
+  masked.split(COMMAND_SEPARATOR_RE).some(commandAddsWithNoCache);
 
 // apt-get keeps the package lists here. A cache mount on `/var/cache/apt`
 // alone leaves them in the layer, so Docker's apt example mounts
