@@ -29,6 +29,12 @@ const URL_RE =
 const USER_FLAG_RE =
   /(?<![\w-])(?<flag>--proxy-user|--user|-u)(?<gap>\s+|=)(?<value>"[^"]*"|'[^']*'|[^\s;&|]+)/gu;
 
+// Only the short option takes its value attached: `curl -uuser:password`.
+// An unquoted value stops before a quote, a backtick or a closing parenthesis,
+// so `sh -c 'curl -uuser:password'` keeps its closing quote.
+const ATTACHED_USER_RE =
+  /(?<![\w-])(?<flag>-u)(?<value>"[^"]*"|'[^']*'|[^\s;&|'"`)]+)/gu;
+
 // `docker run -u 1000:1000` names a user and a group, not a credential.
 const UID_GID_RE = /^\d+:\d+$/u;
 const QUOTE_EDGES_RE = /^["']|["']$/gu;
@@ -54,6 +60,7 @@ const ENV_SPACE_FORM_RE =
 const TRAILING_COMMENT_RE = /[ \t]#.*$/u;
 
 const AUTH_HEADER_RE = /^(?:proxy-)?authorization$/iu;
+const COOKIE_HEADER_RE = /^(?:set-)?cookie$/iu;
 const WHITESPACE_RE = /\s+/u;
 
 // Flags and npm keys spell words as `api-key`, `apiKey` or `_authToken`.
@@ -73,6 +80,17 @@ const isSecretField = (name: string, sep: string): boolean =>
 // stays visible.
 const isLiteralCredential = (value: string): boolean =>
   isLiteralSecretValue(value.trim().split(WHITESPACE_RE).at(-1) ?? value);
+
+// A cookie header holds `name=value` pairs, so it is only free of a literal
+// when the whole value is one variable reference such as `$SESSION`. Any pair
+// or a second word keeps the header masked.
+const COOKIE_PAIR_RE = /[\s;]/u;
+
+const isLiteralCookie = (value: string): boolean => {
+  const trimmed = value.trim();
+
+  return COOKIE_PAIR_RE.test(trimmed) || isLiteralSecretValue(trimmed);
+};
 
 const maskQuery = (url: string): string => {
   const queryStart = url.indexOf("?");
@@ -99,7 +117,7 @@ const isUserCredential = (value: string): boolean => {
   return unquoted.includes(":") && !UID_GID_RE.test(unquoted);
 };
 
-const maskField = (
+const maskNamedValue = (
   match: string,
   lead: string,
   name: string,
@@ -110,6 +128,22 @@ const maskField = (
     ? `${lead}${name}${sep}${REDACTED}`
     : match;
 
+// A `Cookie` header only counts inside a quoted shell string. A YAML mapping
+// line such as `cookie: enabled` goes through `maskNamedValue` alone.
+const maskField = (
+  match: string,
+  open: string,
+  name: string,
+  sep: string,
+  value: string
+): string => {
+  if (!COOKIE_HEADER_RE.test(name)) {
+    return maskNamedValue(match, open, name, sep, value);
+  }
+
+  return isLiteralCookie(value) ? `${open}${name}${sep}${REDACTED}` : match;
+};
+
 // A trailing `# comment` is not part of the value: `${DB_PASSWORD} # note`
 // still names a variable.
 const maskMapping = (
@@ -119,7 +153,7 @@ const maskMapping = (
   sep: string,
   rest: string
 ): string =>
-  maskField(match, lead, key, sep, rest.replace(TRAILING_COMMENT_RE, ""));
+  maskNamedValue(match, lead, key, sep, rest.replace(TRAILING_COMMENT_RE, ""));
 
 /**
  * Masks credentials in text quoted from a scanned file before it becomes
@@ -134,6 +168,9 @@ export const redactSecrets = (text: string): string => {
       USER_FLAG_RE,
       (match, flag: string, gap: string, value: string) =>
         isUserCredential(value) ? `${flag}${gap}${REDACTED}` : match
+    )
+    .replaceAll(ATTACHED_USER_RE, (match, flag: string, value: string) =>
+      isUserCredential(value) ? `${flag}${REDACTED}` : match
     )
     .replaceAll(HEADER_RE, maskField)
     .replaceAll(ASSIGNMENT_RE, (match, key: string, value: string) =>
