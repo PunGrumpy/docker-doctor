@@ -4,14 +4,13 @@ Assess every discovered Dockerfile and Compose file across these five categories
 
 ## 1. Security
 
-**Rules:** `no-root-user`, `no-secrets-in-env`, `pin-image-version`, `no-add-remote`.
+**Rules:** `no-root-user`, `no-secrets-in-env`, `pin-image-version`, `no-add-remote`, `no-unsafe-build-features`.
 
 **Beyond the rules:**
 
 - Base image provenance — official/verified publisher? Known-vulnerable tag?
 - Attack surface — is a full OS shipped where distroless/scratch would do?
 - Build-time secrets leaking into layers (check for tokens in `ARG`, `COPY` of `.env`/`.npmrc`).
-- Privileged mode in Compose (`privileged: true`).
 
 ## 2. Image Size
 
@@ -45,12 +44,12 @@ Assess every discovered Dockerfile and Compose file across these five categories
 
 ## 5. Compose
 
-**Rules:** `no-version-key`, `require-resource-limits`, `require-restart-policy`, `use-depends-on-condition`.
+**Rules:** `no-version-key`, `require-resource-limits`, `require-restart-policy`, `use-depends-on-condition`, `pin-service-image`, `no-privileged-service`, `no-host-namespaces`, `no-weakened-confinement`, `no-docker-socket-mount`, `no-broad-bind-mount`, `prefer-read-only-bind-mount`, `no-plaintext-secrets`, `undefined-model-reference`, `pin-model-version`, `no-exposed-unauthenticated-service`.
 
 **Beyond the rules:**
 
 - Networks & isolation — services on scoped networks, not all on default bridge.
-- Named volumes vs bind mounts for stateful data; secrets via `secrets:` not `environment:`.
+- Named volumes vs bind mounts for stateful data.
 - Healthcheck definitions that `depends_on: condition: service_healthy` can actually key off.
 
 ---

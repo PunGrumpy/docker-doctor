@@ -70,12 +70,13 @@ npx @docker-doctor/cli@latest
 Pass `--verbose` to list every diagnostic with its source lines, message, and fix:
 
 ```text
-⚠ WARN [docker-doctor/no-root-user]:1
->     1 │ FROM node:22-slim
-      2 │ WORKDIR /app
+Dockerfile
+  ⚠ WARN [docker-doctor/no-root-user]:1
+  >     1 │ FROM node:22-slim
+        2 │ WORKDIR /app
 
-  The container runs as root. Running as root allows potential container breakout vulnerabilities.
-  Help: Add a non-root user (e.g., 'USER node' or 'USER 1000') to improve security.
+    The container runs as root. Running as root allows potential container breakout vulnerabilities.
+    Help: Add a non-root user (e.g., `USER node` or `USER 1000`) to improve security.
 ```
 
 ## API

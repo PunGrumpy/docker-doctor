@@ -100,7 +100,7 @@ Scan the same directory both times, because fingerprints include each file's pat
 | 5 | 0.7.0 | The score averages the penalty over the analyzed files. Scores are not comparable with version 4. |
 | 6 | 0.8.0 | Added `analyzedFiles`. `score` and `label` are `null` when no file was analyzed. Empty files and files with nothing to check no longer count toward the average. |
 | 7 | 0.10.0 | Added `suppressed`. Removed `diagnostics[].column`, which was never set. |
-| 8 | next release | Added `fingerprint` to every `diagnostics` and `suppressed` entry, and `baseline`. |
+| 8 | 0.11.0 | Added `fingerprint` to every `diagnostics` and `suppressed` entry, and `baseline`. |
 
 Reports from before 0.3.0 have no `schemaVersion` field. Treat them as version 1.
 
