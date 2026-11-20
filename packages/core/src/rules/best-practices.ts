@@ -108,6 +108,25 @@ export const preferCopyOverAdd: DockerfileRule = {
   message: "Prefer COPY over ADD",
 };
 
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
+const SHELL_OPERATOR_OR_REDIRECT_RE = /^(?:[&|;<>]|\d+[<>])/u;
+
+// `exec` replaces the shell with the command, so the command gets the
+// signals. The Dockerfile reference tells shell-form ENTRYPOINT users to
+// start with it. Leading NAME=value words do not change that.
+const startsWithExec = (args: string): boolean => {
+  const words = splitShellWords(args);
+  const first = words.findIndex((word) => !ENV_ASSIGNMENT_RE.test(word));
+
+  if (first === -1 || words[first] !== "exec") {
+    return false;
+  }
+
+  const command = words[first + 1];
+
+  return command !== undefined && !SHELL_OPERATOR_OR_REDIRECT_RE.test(command);
+};
+
 export const useExecForm: DockerfileRule = {
   category: BEST_PRACTICES,
   check(instructions, file) {
@@ -119,7 +138,11 @@ export const useExecForm: DockerfileRule = {
 
       // Bracket-wrapped args that are not a JSON string array still run under
       // /bin/sh -c, so they count as shell form.
-      if (takesExecForm && parseExecForm(inst.args) === null) {
+      if (
+        takesExecForm &&
+        parseExecForm(inst.args) === null &&
+        !startsWithExec(inst.args)
+      ) {
         diagnostics.push(
           createDiagnostic(
             file,
