@@ -134,6 +134,26 @@ describe("redactSecrets", () => {
         "Running 'curl --header 'X-Auth-Token: ***' https://example.com && npm install' after copying",
     },
     {
+      input: `curl -H "Cookie: session=${PLACEHOLDER}" https://example.com`,
+      output: 'curl -H "Cookie: ***" https://example.com',
+    },
+    {
+      input: `curl -H 'cookie:session=${PLACEHOLDER}; theme=dark' https://example.com`,
+      output: "curl -H 'cookie:***' https://example.com",
+    },
+    {
+      input: `curl -H "Cookie: session=abc; theme=$THEME" https://example.com`,
+      output: 'curl -H "Cookie: ***" https://example.com',
+    },
+    {
+      input: `curl -H "Cookie: $SESSION; theme=dark" https://example.com`,
+      output: 'curl -H "Cookie: ***" https://example.com',
+    },
+    {
+      input: `curl -H 'Set-Cookie: id=${PLACEHOLDER}' https://example.com`,
+      output: "curl -H 'Set-Cookie: ***' https://example.com",
+    },
+    {
       input: `curl -u deploy:${PLACEHOLDER} https://example.com`,
       output: "curl -u *** https://example.com",
     },
@@ -239,6 +259,9 @@ describe("redactSecrets", () => {
     "su -u app",
     'curl -H "Content-Type: application/json" https://example.com',
     'curl -H "Authorization: Bearer $TOKEN" https://example.com',
+    'curl -H "Cookie: $SESSION" https://example.com',
+    `curl -H "Cookie: \${SESSION}" https://example.com`,
+    'curl -H "Accept: text/html" https://example.com',
     "curl -H 'PRIVATE-TOKEN: $CI_TOKEN' https://example.com",
     'curl -H "X-Auth-Enabled: true" https://example.com',
     "Base image 'auth:1.2' may be a full-OS distribution.",
@@ -251,6 +274,9 @@ describe("redactSecrets", () => {
     "      POSTGRES_PASSWORD:",
     "      NODE_ENV: production",
     "    image: auth:1.2",
+    "      cookie: enabled",
+    "  Cookie: enabled",
+    "  set-cookie: on",
     "# Set the password: see the README",
     "Service db has password: weak",
     "ENV NODE_ENV production",
@@ -397,6 +423,14 @@ const adversarialInputs = [
   {
     name: "repeated header openers",
     text: '"A: b '.repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  {
+    name: "repeated cookie header openers",
+    text: '"Cookie: a=b; '.repeat(ADVERSARIAL_LENGTH / 14),
+  },
+  {
+    name: "spaces in a cookie header",
+    text: `"Cookie:${" ".repeat(ADVERSARIAL_LENGTH)}`,
   },
   { name: "spaces in a header", text: `"A:${" ".repeat(ADVERSARIAL_LENGTH)}` },
   { name: "pairs on one line", text: "A: b ".repeat(ADVERSARIAL_LENGTH / 5) },
