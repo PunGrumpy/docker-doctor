@@ -6,7 +6,7 @@ import {
 } from "../parsers/compose-value";
 import { mutableRefIssue, parseImageRef } from "../parsers/image-ref";
 import type { ComposeRule, ComposeValue, Diagnostic } from "../types/index";
-import { composeServices } from "./compose-services";
+import { composeServices, isProviderService } from "./compose-services";
 import { createDiagnostic } from "./create-diagnostic";
 
 export const noVersionKey: ComposeRule = {
@@ -39,6 +39,10 @@ export const requireResourceLimits: ComposeRule = {
     const diagnostics: Diagnostic[] = [];
 
     for (const [name, config] of composeServices(composeContent)) {
+      if (isProviderService(config)) {
+        continue;
+      }
+
       const limits = composeField(
         composeField(config.deploy, "resources"),
         "limits"
@@ -110,7 +114,7 @@ export const requireRestartPolicy: ComposeRule = {
     const oneShot = oneShotServices(context?.project ?? composeContent);
 
     for (const [name, config] of composeServices(composeContent)) {
-      if (oneShot.has(name)) {
+      if (oneShot.has(name) || isProviderService(config)) {
         continue;
       }
 
