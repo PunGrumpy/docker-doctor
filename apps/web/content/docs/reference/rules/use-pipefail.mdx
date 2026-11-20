@@ -38,6 +38,8 @@ RUN curl -fsSL https://example.com/install.sh | sh
 
 `pipefail` is a bash/ash feature, and Debian-family images run `RUN` under `/bin/sh` (dash), which doesn't support it — hence the `SHELL` instruction in the fix. On Alpine, BusyBox ash supports it, so `RUN set -o pipefail && curl … | sh` works per-line without changing `SHELL`. Setting `SHELL` once at the top covers every subsequent `RUN` in the stage.
 
+The rule does not report a shell-form `RUN` while the stage's `SHELL` is `cmd`, `powershell` or `pwsh`, because those shells have no `pipefail` option. A later `SHELL` that names a POSIX shell, or a fresh `FROM` of a base image, brings the check back.
+
 ## Rule details
 
 - **Rule key** — `docker-doctor/use-pipefail`

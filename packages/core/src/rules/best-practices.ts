@@ -297,6 +297,26 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
   return argv !== null && PIPEFAIL_SETTING_RE.test(argv.join(" "));
 };
 
+const NON_POSIX_SHELLS = new Set(["cmd", "powershell", "pwsh"]);
+const PATH_SEPARATOR_RE = /[\\/]/u;
+const EXE_SUFFIX_RE = /\.exe$/u;
+
+// cmd and PowerShell have no `pipefail`, so a pipe under them cannot be made
+// safe that way. The program is argv[0], whatever its directory or case.
+const shellDirectiveIsNonPosix = (args: string): boolean => {
+  const program = parseExecForm(args)?.[0];
+
+  if (program === undefined) {
+    return false;
+  }
+
+  const name = (program.split(PATH_SEPARATOR_RE).at(-1) ?? "")
+    .toLowerCase()
+    .replace(EXE_SUFFIX_RE, "");
+
+  return NON_POSIX_SHELLS.has(name);
+};
+
 // True when a RUN pipes without pipefail. SHELL only applies to shell-form
 // RUN; exec-form RUN runs its own argv directly, so check the argv for
 // pipefail instead. Exec-form argv elements arrive already unquoted, so a
@@ -304,9 +324,14 @@ const shellDirectiveEnablesPipefail = (args: string): boolean => {
 // a quoted argument (grep -E "foo|bar") does not read as a pipeline.
 const pipesWithoutPipefail = (
   args: string,
-  shellHasPipefail: boolean
+  shellHasPipefail: boolean,
+  shellIsNonPosix: boolean
 ): boolean => {
   const execArgv = parseExecForm(args);
+
+  if (execArgv === null && shellIsNonPosix) {
+    return false;
+  }
 
   const pipeText = withoutNonPipeBars(
     execArgv === null ? maskQuotedText(args) : execArgv.join(" ")
@@ -328,14 +353,20 @@ export const usePipefail: DockerfileRule = {
   category: BEST_PRACTICES,
   check(instructions, file) {
     const diagnostics: Diagnostic[] = [];
+
     // FROM <previous stage> inherits that stage's image config — SHELL
     // included (verified against BuildKit); FROM a fresh base image, or the
     // reserved empty stage `scratch`, resets it to the Docker default. A
     // SHELL instruction replaces it for the rest of the current stage.
     // NOTE: FROM ${VAR} (variable base) misses the map lookup and silently
     // resets — fails safe (extra warning, never a missed one).
-    const stagePipefail = new Map<string, boolean>();
+    const stageShells = new Map<
+      string,
+      { hasPipefail: boolean; isNonPosix: boolean }
+    >();
+
     let shellHasPipefail = false;
+    let shellIsNonPosix = false;
     let currentStage: string | null = null;
 
     for (const inst of instructions) {
@@ -346,22 +377,32 @@ export const usePipefail: DockerfileRule = {
           ? null
           : (base?.toLowerCase() ?? null);
 
-        shellHasPipefail =
-          parentStage !== null && stagePipefail.get(parentStage) === true;
+        const parentShell =
+          parentStage === null ? undefined : stageShells.get(parentStage);
+
+        shellHasPipefail = parentShell?.hasPipefail === true;
+        shellIsNonPosix = parentShell?.isNonPosix === true;
         currentStage = stage?.toLowerCase() ?? null;
 
         if (hasText(currentStage)) {
-          stagePipefail.set(currentStage, shellHasPipefail);
+          stageShells.set(currentStage, {
+            hasPipefail: shellHasPipefail,
+            isNonPosix: shellIsNonPosix,
+          });
         }
       } else if (inst.instruction === "SHELL") {
         shellHasPipefail = shellDirectiveEnablesPipefail(inst.args);
+        shellIsNonPosix = shellDirectiveIsNonPosix(inst.args);
 
         if (hasText(currentStage)) {
-          stagePipefail.set(currentStage, shellHasPipefail);
+          stageShells.set(currentStage, {
+            hasPipefail: shellHasPipefail,
+            isNonPosix: shellIsNonPosix,
+          });
         }
       } else if (
         inst.instruction === "RUN" &&
-        pipesWithoutPipefail(inst.args, shellHasPipefail)
+        pipesWithoutPipefail(inst.args, shellHasPipefail, shellIsNonPosix)
       ) {
         diagnostics.push(
           createDiagnostic(
