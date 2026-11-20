@@ -41,7 +41,7 @@ CMD ["node", "server.js"]
 
 Exec form is a JSON array, so it must use **double quotes**, and there is no shell: `$VAR`, pipes, and `&&` won't work inside it. If you genuinely need shell features at startup, wrap them in an entrypoint script that ends with `exec node server.js` — `exec` replaces the shell so the app still ends up as PID 1. Then make sure the app actually handles `SIGTERM`; PID 1 gets no default signal handlers.
 
-The rule does not report a shell-form `CMD` or `ENTRYPOINT` whose first command word is `exec` followed by a command, such as `ENTRYPOINT exec top -b`, which is the shell-form example in the Dockerfile reference. Leading `NAME=value` words are skipped first. A command like `cd /app && exec node server.js` is still reported, because the shell stays PID 1 until `exec` runs.
+The rule does not report a shell-form `CMD` or `ENTRYPOINT` whose first command word is `exec` followed by a command, such as `ENTRYPOINT exec top -b`, which is the shell-form example in the Dockerfile reference. Leading `NAME=value` words are skipped first. The command line must not be a pipeline or a background job, because the shell runs each part of those in a subshell and stays PID 1, so `CMD exec node x | tee log` and `CMD exec node x &` are still reported. A command like `cd /app && exec node server.js` is still reported too, because the shell stays PID 1 until `exec` runs.
 
 ## Rule details
 

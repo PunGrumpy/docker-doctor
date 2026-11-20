@@ -113,62 +113,6 @@ export const preferCopyOverAdd: DockerfileRule = {
   message: "Prefer COPY over ADD",
 };
 
-const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
-const SHELL_OPERATOR_OR_REDIRECT_RE = /^(?:[&|;<>]|\d+[<>])/u;
-
-// `exec` replaces the shell with the command, so the command gets the
-// signals. The Dockerfile reference tells shell-form ENTRYPOINT users to
-// start with it. Leading NAME=value words do not change that.
-const startsWithExec = (args: string): boolean => {
-  const words = splitShellWords(args);
-  const first = words.findIndex((word) => !ENV_ASSIGNMENT_RE.test(word));
-
-  if (first === -1 || words[first] !== "exec") {
-    return false;
-  }
-
-  const command = words[first + 1];
-
-  return command !== undefined && !SHELL_OPERATOR_OR_REDIRECT_RE.test(command);
-};
-
-export const useExecForm: DockerfileRule = {
-  category: BEST_PRACTICES,
-  check(instructions, file) {
-    const diagnostics: Diagnostic[] = [];
-
-    for (const inst of instructions) {
-      const takesExecForm =
-        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
-
-      // Bracket-wrapped args that are not a JSON string array still run under
-      // /bin/sh -c, so they count as shell form.
-      if (
-        takesExecForm &&
-        parseExecForm(inst.args) === null &&
-        !startsWithExec(inst.args)
-      ) {
-        diagnostics.push(
-          createDiagnostic(
-            file,
-            this.key,
-            this.defaultSeverity,
-            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
-            this.help,
-            inst.line
-          )
-        );
-      }
-    }
-
-    return diagnostics;
-  },
-  defaultSeverity: "warning",
-  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.',
-  key: "docker-doctor/use-exec-form",
-  message: "Use exec form for CMD and ENTRYPOINT",
-};
-
 export const requireLabels: DockerfileRule = {
   anchor: "file",
   category: BEST_PRACTICES,
@@ -311,6 +255,78 @@ const withoutNonPipeBars = (text: string): string => {
   }
 
   return result.replace(CASE_PATTERN_RE, " ");
+};
+
+// A single `&` that is not `&&` and not part of a redirection (`2>&1`,
+// `&>file`, `<&3`) starts a background job.
+const BACKGROUND_RE = /(?<![&<>|])&(?![&>])/u;
+
+// The shell runs each part of a pipeline and each background job in a
+// subshell, so `exec` there replaces the subshell and /bin/sh stays PID 1.
+const runsInSubshell = (args: string): boolean => {
+  const text = withoutNonPipeBars(maskQuotedText(args));
+
+  return HAS_PIPE_RE.test(text) || BACKGROUND_RE.test(text);
+};
+
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_]\w*=/u;
+const SHELL_OPERATOR_OR_REDIRECT_RE = /^(?:[&|;<>]|\d+[<>])/u;
+
+// `exec` replaces the shell with the command, so the command gets the
+// signals. The Dockerfile reference tells shell-form ENTRYPOINT users to
+// start with it. Leading NAME=value words do not change that.
+const startsWithExec = (args: string): boolean => {
+  const words = splitShellWords(args);
+  const first = words.findIndex((word) => !ENV_ASSIGNMENT_RE.test(word));
+
+  if (first === -1 || words[first] !== "exec") {
+    return false;
+  }
+
+  const command = words[first + 1];
+
+  return (
+    command !== undefined &&
+    !SHELL_OPERATOR_OR_REDIRECT_RE.test(command) &&
+    !runsInSubshell(args)
+  );
+};
+
+export const useExecForm: DockerfileRule = {
+  category: BEST_PRACTICES,
+  check(instructions, file) {
+    const diagnostics: Diagnostic[] = [];
+
+    for (const inst of instructions) {
+      const takesExecForm =
+        inst.instruction === "CMD" || inst.instruction === "ENTRYPOINT";
+
+      // Bracket-wrapped args that are not a JSON string array still run under
+      // /bin/sh -c, so they count as shell form.
+      if (
+        takesExecForm &&
+        parseExecForm(inst.args) === null &&
+        !startsWithExec(inst.args)
+      ) {
+        diagnostics.push(
+          createDiagnostic(
+            file,
+            this.key,
+            this.defaultSeverity,
+            `${inst.instruction} instruction uses shell form instead of exec form. In shell form, the command runs under '/bin/sh -c', which does not pass signals to child processes.`,
+            this.help,
+            inst.line
+          )
+        );
+      }
+    }
+
+    return diagnostics;
+  },
+  defaultSeverity: "warning",
+  help: 'Write CMD/ENTRYPOINT instructions as JSON arrays (e.g. `ENTRYPOINT ["node", "index.js"]`) so OS signals (like SIGTERM) are forwarded correctly.',
+  key: "docker-doctor/use-exec-form",
+  message: "Use exec form for CMD and ENTRYPOINT",
 };
 
 // `cd` only where a command can start: line start, or after a list/pipe

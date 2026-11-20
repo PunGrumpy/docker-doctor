@@ -51,6 +51,25 @@ describe("use-exec-form with a shell-form command that starts with exec", () => 
     expect(check("CMD FOO=1")).toHaveLength(1);
   });
 
+  test("still reports exec at the head of a pipeline", () => {
+    expect(check("CMD exec node x | tee log")).toHaveLength(1);
+    expect(check("CMD exec node x 2>&1 | tee log")).toHaveLength(1);
+    expect(check("CMD exec node x|tee log")).toHaveLength(1);
+  });
+
+  test("still reports exec at the head of a background job", () => {
+    expect(check("CMD exec node x &")).toHaveLength(1);
+  });
+
+  test("accepts exec followed by a list, a redirection or a quoted pipe", () => {
+    expect(check("CMD exec node x && echo done")).toHaveLength(0);
+    expect(check("CMD exec node x || echo failed")).toHaveLength(0);
+    expect(check("CMD exec node x; echo done")).toHaveLength(0);
+    expect(check("CMD exec node x 2>&1")).toHaveLength(0);
+    expect(check("CMD exec node x >/dev/null 2>&1")).toHaveLength(0);
+    expect(check('CMD exec sh -c "a | b"')).toHaveLength(0);
+  });
+
   test("still accepts exec form", () => {
     expect(check('CMD ["node", "server.js"]')).toHaveLength(0);
   });
