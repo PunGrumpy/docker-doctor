@@ -42,6 +42,16 @@ describe("combine-apt-update-install with the apt spelling", () => {
     expect(check("RUN apt-key update; apt-get install -y gcc")).toHaveLength(1);
   });
 
+  test("does not read apt update-notifier as an update step", () => {
+    expect(check("RUN apt-get install -y apt update-notifier")).toHaveLength(1);
+  });
+
+  test("does not read apt install-something as an install step", () => {
+    expect(check("RUN apt-get update && apt install-something")).toHaveLength(
+      1
+    );
+  });
+
   test("stays silent for a bare apt install or apt update", () => {
     expect(check("RUN apt install -y gcc")).toHaveLength(0);
     expect(check("RUN apt update")).toHaveLength(0);

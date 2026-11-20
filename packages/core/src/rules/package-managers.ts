@@ -13,8 +13,8 @@ export const hasAptGetUpdate = (text: string): boolean =>
 
 // The same match for `apt` as well as `apt-get`. The name is followed by
 // whitespace, so apt-cache, apt-key and a name like my-apt never match.
-const APT_INSTALL_RE = /(?<![\w-])apt(?:-get)?(?:\s+-\S+)*\s+install\b/u;
-const APT_UPDATE_RE = /(?<![\w-])apt(?:-get)?(?:\s+-\S+)*\s+update\b/u;
+const APT_INSTALL_RE = /(?<![\w-])apt(?:-get)?(?:\s+-\S+)*\s+install(?![\w-])/u;
+const APT_UPDATE_RE = /(?<![\w-])apt(?:-get)?(?:\s+-\S+)*\s+update(?![\w-])/u;
 
 export const hasAptInstall = (text: string): boolean =>
   APT_INSTALL_RE.test(text);
