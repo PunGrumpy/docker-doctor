@@ -19,7 +19,7 @@ Kit releases from 0.2.0 on need sbx 0.51 or later. The tag is required, because 
 
 On sbx older than 0.51, use `docker.io/pungrumpy/docker-doctor-kit:0.1.14`, the last kit in the v2 format. From 0.51 on, the built-in agents such as `claude` are v3 kits, and sbx refuses to combine them with v1 or v2 kits ([release notes](https://github.com/docker/sbx-releases/releases/tag/v0.51.0)).
 
-It's a `mixin` kit, so it composes with any agent (`claude`, `codex`, `gemini`, `opencode`, …) and stacks with your other kits.
+It's a `mixin` kit, so it composes with any agent (`claude`, `codex`, `copilot`, `opencode`, …) and stacks with your other kits.
 
 You can also pull it straight from the repository (requires allowing the source once with `sbx settings set kit.allowedSources '["docker.io/","github.com/PunGrumpy/"]'`):
 
