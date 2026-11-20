@@ -1,4 +1,4 @@
-import type { Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
+import type { Alias, Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
 import {
   isAlias,
   isMap,
@@ -7,6 +7,7 @@ import {
   isSeq,
   LineCounter,
   parseDocument,
+  visit,
 } from "yaml";
 
 import { ParseError } from "../errors";
@@ -58,23 +59,49 @@ export interface ComposeFile {
   replacedPaths: readonly ComposePath[];
 }
 
+// Each alias and the node it names: the last node before it with its anchor,
+// the node yaml's `Alias.resolve` finds. That method walks the document up
+// to the alias on every call. This map is built in one walk.
+type AliasTargets = ReadonlyMap<Alias, Node>;
+
+const findAliasTargets = (doc: Document): AliasTargets => {
+  const targets = new Map<Alias, Node>();
+  const anchored = new Map<string, Node>();
+
+  visit(doc, (_key, node) => {
+    if (isAlias(node)) {
+      const target = anchored.get(node.source);
+
+      if (target !== undefined) {
+        targets.set(node, target);
+      }
+    } else if (isNode(node) && node.anchor !== undefined) {
+      anchored.set(node.anchor, node);
+    }
+  });
+
+  return targets;
+};
+
 interface TagScan {
-  doc: Document;
   // Relative paths found below each container, kept so an alias replays them
   // at every place it is used, as compose-go's `cachedResolve` does.
   found: Map<Node, ComposePath[]>;
   // The containers being scanned. An alias back to one is a cycle.
   open: Set<Node>;
   tagged: number;
+  targets: AliasTargets;
 }
 
 const resolveNode = (
   node: Node | undefined,
-  doc: Document
-): Node | undefined => (isAlias(node) ? node.resolve(doc) : node);
+  targets: AliasTargets
+): Node | undefined => (isAlias(node) ? targets.get(node) : node);
 
-const tagOf = (node: Node | undefined, doc: Document): string | undefined =>
-  resolveNode(node, doc)?.tag;
+const tagOf = (
+  node: Node | undefined,
+  targets: AliasTargets
+): string | undefined => resolveNode(node, targets)?.tag;
 
 const isMergeTag = (tag: string | undefined): boolean =>
   tag === RESET_TAG || tag === OVERRIDE_TAG;
@@ -91,17 +118,20 @@ const countTagged = (scan: TagScan, count: number) => {
 
 // A `!reset` item leaves its sequence and a `!reset` pair its mapping
 // (`loader/reset.go:204-208` and `:232-234`).
-const dropResetValues = (container: YAMLMap | YAMLSeq, doc: Document) => {
+const dropResetValues = (
+  container: YAMLMap | YAMLSeq,
+  targets: AliasTargets
+) => {
   if (isSeq(container)) {
     container.items = container.items.filter(
-      (item) => !(isNode(item) && tagOf(item, doc) === RESET_TAG)
+      (item) => !(isNode(item) && tagOf(item, targets) === RESET_TAG)
     );
 
     return;
   }
 
   container.items = container.items.filter(
-    (pair) => !(isNode(pair.value) && tagOf(pair.value, doc) === RESET_TAG)
+    (pair) => !(isNode(pair.value) && tagOf(pair.value, targets) === RESET_TAG)
   );
 };
 
@@ -121,11 +151,11 @@ const keyOf = (pair: Pair): string => {
 // match a base value (`loader/reset.go:307-316`), so a sequence has none.
 const mergeTaggedKeys = (
   container: YAMLMap | YAMLSeq,
-  doc: Document
+  targets: AliasTargets
 ): string[] =>
   isMap(container)
     ? container.items.flatMap((pair) =>
-        isNode(pair.value) && isMergeTag(tagOf(pair.value, doc))
+        isNode(pair.value) && isMergeTag(tagOf(pair.value, targets))
           ? [keyOf(pair)]
           : []
       )
@@ -136,7 +166,7 @@ const mergeTaggedKeys = (
 // (`loader/reset.go:115-118`).
 const untaggedChildren = (
   container: YAMLMap | YAMLSeq,
-  doc: Document
+  targets: AliasTargets
 ): [string | null, Node][] => {
   const children: [string | null, Node][] = isMap(container)
     ? container.items.flatMap((pair) =>
@@ -144,11 +174,11 @@ const untaggedChildren = (
       )
     : container.items.flatMap((item) => (isNode(item) ? [[null, item]] : []));
 
-  return children.filter(([, child]) => !isMergeTag(tagOf(child, doc)));
+  return children.filter(([, child]) => !isMergeTag(tagOf(child, targets)));
 };
 
 const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
-  const target = resolveNode(node, scan.doc);
+  const target = resolveNode(node, scan.targets);
 
   if (!(isMap(target) || isSeq(target)) || scan.open.has(target)) {
     return [];
@@ -165,14 +195,14 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
   scan.open.add(target);
   const paths: ComposePath[] = [];
 
-  for (const key of mergeTaggedKeys(target, scan.doc)) {
+  for (const key of mergeTaggedKeys(target, scan.targets)) {
     countTagged(scan, 1);
     paths.push([key]);
   }
 
-  dropResetValues(target, scan.doc);
+  dropResetValues(target, scan.targets);
 
-  for (const [key, child] of untaggedChildren(target, scan.doc)) {
+  for (const [key, child] of untaggedChildren(target, scan.targets)) {
     const below = scanTags(child, scan);
 
     if (key === null) {
@@ -214,10 +244,10 @@ export const readComposeFile = (
     }
 
     replacedPaths = scanTags(doc.contents ?? undefined, {
-      doc,
       found: new Map(),
       open: new Set(),
       tagged: 0,
+      targets: findAliasTargets(doc),
     });
     document = doc.toJS();
   } catch (error: unknown) {
@@ -253,6 +283,7 @@ const isSequenceIndex = (segment: string | number): segment is number =>
 export const createComposeLocator = (content: string): ComposeLocator => {
   const lineCounter = new LineCounter();
   const doc = parseDocument(content, { lineCounter, merge: true });
+  const targets = findAliasTargets(doc);
 
   // The offset of the last key or item on the path, or null when the path
   // leaves the document or that node has no position.
@@ -262,7 +293,7 @@ export const createComposeLocator = (content: string): ComposeLocator => {
 
     for (const segment of path) {
       if (isAlias(node)) {
-        node = node.resolve(doc);
+        node = targets.get(node);
       }
 
       if (isMap(node)) {
@@ -282,7 +313,7 @@ export const createComposeLocator = (content: string): ComposeLocator => {
         // A `!reset` pair stays findable: the runner reports a reset setting
         // at its key.
         const item = node.items.filter(
-          (entry) => !(isNode(entry) && tagOf(entry, doc) === RESET_TAG)
+          (entry) => !(isNode(entry) && tagOf(entry, targets) === RESET_TAG)
         )[segment];
 
         if (item === undefined || item === null) {
