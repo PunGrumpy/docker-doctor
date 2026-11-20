@@ -74,7 +74,7 @@ CMD ["node", "dist/server.js"]
 | **No Docker socket bind mount** — a filtering socket proxy instead | `no-docker-socket-mount` |
 | **No host namespaces** — no `pid`, `ipc`, `uts`, `cgroup` or `userns_mode` set to `host`, and `shm_size` for shared memory | `no-host-namespaces` |
 | **Keep confinement** — no `SYS_ADMIN`, `SYS_MODULE`, `SYS_RAWIO` or `DAC_READ_SEARCH` in `cap_add`, no `unconfined` or `label:disable` in `security_opt`, and never `cap_add: [ALL]` | `no-weakened-confinement`, `no-privileged-service` |
-| **Loopback for unauthenticated AI services** — bind Ollama, Qdrant and the MCP gateway to `127.0.0.1` or an internal network | `no-exposed-unauthenticated-service` |
+| **Loopback for unauthenticated AI services** — bind Ollama and Qdrant to `127.0.0.1` or an internal network, and never publish an MCP gateway started with `--allow-unauthenticated` | `no-exposed-unauthenticated-service` |
 
 ## Verify before handing off
 
