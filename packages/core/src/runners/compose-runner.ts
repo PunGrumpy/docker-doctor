@@ -1,7 +1,11 @@
 import { overlayCompose, pairComposeFiles } from "../parsers/compose-overlay";
 import type { ComposeFile, ComposePath } from "../parsers/compose-parser";
 import { composeField } from "../parsers/compose-value";
-import { requireResourceLimits, requireRestartPolicy } from "../rules/compose";
+import {
+  requireResourceLimits,
+  requireRestartPolicy,
+  useDependsOnCondition,
+} from "../rules/compose";
 import { undefinedModelReference } from "../rules/compose-models";
 import { composeServices } from "../rules/compose-services";
 import { allComposeRules } from "../rules/index";
@@ -101,11 +105,12 @@ const EFFECTIVE_SERVICE_RULES: ReadonlyMap<
   [requireRestartPolicy, [["restart"], ["deploy", "restart_policy"]]],
 ]);
 
-// The rules that report a name a file writes. They judge each file's own
-// lines but look the name up in the merged project, where a model the base
-// declares can serve a reference in the override.
+// The rules that look a name up in the merged project. They judge each
+// file's own lines, but a model or service the base declares can serve a
+// name the override writes.
 const PROJECT_LOOKUP_RULES: ReadonlySet<ComposeRule> = new Set([
   undefinedModelReference,
+  useDependsOnCondition,
 ]);
 
 /** One parsed Compose file of a scan. */

@@ -725,8 +725,10 @@ export const rulePageContent: RulePages = {
     },
     intro:
       "Short-form `depends_on: [db]` controls start **order**, not readiness: Compose starts the app the instant the database _container_ exists — several seconds before the database inside it accepts connections. The app's first connection attempt fails, and you're in crash-loop-until-the-race-resolves territory. This rule flags short-form `depends_on` lists.",
-    notes:
+    notes: [
       "The conditions: `service_healthy` (wait for the healthcheck to pass — what you want for databases and queues), `service_started` (the old short-form behavior), and `service_completed_successfully` (wait for a one-shot task like a migration job to exit 0 — handy for `migrate → app` sequences). Startup ordering complements, but doesn't replace, connection retry logic in the app: services can still become unready _later_.",
+      "A list that names only services with a `provider:` mapping is accepted. Compose does not wait on a provider service, so a condition on it would change nothing.",
+    ].join("\n\n"),
     why: '"Web can\'t connect to postgres on `docker compose up`, but works after a restart" is one of the most-asked Compose questions, and this race is the answer. The fix is built in: give the dependency a `healthcheck` that verifies real readiness, and make the dependent wait with `condition: service_healthy`. Compose then holds the app until the database has _proven_ it accepts connections — no `sleep 10`, no wait-for-it scripts, no retry-loop scaffolding around startup.',
   },
 
