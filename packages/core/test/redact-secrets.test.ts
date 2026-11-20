@@ -158,6 +158,34 @@ describe("redactSecrets", () => {
       output: "curl -u *** https://example.com",
     },
     {
+      input: `curl -uadmin:${PLACEHOLDER} https://example.com`,
+      output: "curl -u*** https://example.com",
+    },
+    {
+      input: `curl -u"admin:${PLACEHOLDER}" https://example.com`,
+      output: "curl -u*** https://example.com",
+    },
+    {
+      input: `RUN sh -c 'curl -uadmin:${PLACEHOLDER}'`,
+      output: "RUN sh -c 'curl -u***'",
+    },
+    {
+      input: `RUN sh -c "curl -uadmin:${PLACEHOLDER}"`,
+      output: 'RUN sh -c "curl -u***"',
+    },
+    {
+      input: `RUN x=$(curl -uadmin:${PLACEHOLDER} https://example.com)`,
+      output: "RUN x=$(curl -u*** https://example.com)",
+    },
+    {
+      input: `RUN x=$(curl -uadmin:${PLACEHOLDER})`,
+      output: "RUN x=$(curl -u***)",
+    },
+    {
+      input: "curl -u $USER:$PASS https://example.com",
+      output: "curl -u *** https://example.com",
+    },
+    {
       input: `curl --user "deploy:${PLACEHOLDER}" https://example.com`,
       output: "curl --user *** https://example.com",
     },
@@ -257,6 +285,11 @@ describe("redactSecrets", () => {
     "docker run -u 1000:1000 app",
     "docker run --user 0:0 app",
     "su -u app",
+    "docker run -u1000:1000 app",
+    "mysql -uroot -h db",
+    "tar -uf archive.tar app",
+    "curl --unsafe:x https://example.com",
+    "curl --usera:b https://example.com",
     'curl -H "Content-Type: application/json" https://example.com',
     'curl -H "Authorization: Bearer $TOKEN" https://example.com',
     'curl -H "Cookie: $SESSION" https://example.com',
@@ -419,6 +452,14 @@ const adversarialInputs = [
     text: "https://(a)?(b)".repeat(ADVERSARIAL_LENGTH / 15),
   },
   { name: "repeated -u flags", text: "-u a ".repeat(ADVERSARIAL_LENGTH / 5) },
+  {
+    name: "repeated attached -u values",
+    text: "-ua:b ".repeat(ADVERSARIAL_LENGTH / 6),
+  },
+  {
+    name: "a long attached -u value",
+    text: `-u${"a:".repeat(ADVERSARIAL_LENGTH / 2)}`,
+  },
   { name: "spaces after -u", text: `-u${" ".repeat(ADVERSARIAL_LENGTH)}` },
   {
     name: "repeated header openers",

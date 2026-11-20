@@ -63,4 +63,49 @@ describe("verbose code frames", () => {
     );
     expect(elapsed).toBeLessThan(VERBOSE_BUDGET_MS);
   });
+
+  test("a code frame masks a Cookie header and an attached -u password", async () => {
+    const file = "Dockerfile";
+    const cookieValue = "abcdef0123456789";
+    const password = "s3cr3tpass";
+
+    const content = [
+      "FROM alpine:3.20",
+      `RUN curl -H "Cookie: session=${cookieValue}" -uadmin:${password} https://example.com/x.sh -o /x.sh && apk add curl`,
+    ].join("\n");
+
+    const printed: string[] = [];
+
+    const log = spyOn(console, "log").mockImplementation((text?: string) => {
+      printed.push(text ?? "");
+    });
+
+    try {
+      await formatTerminal(
+        [
+          {
+            file,
+            help: "Pin the version.",
+            line: 2,
+            message: "Package is not pinned.",
+            rule: "docker-doctor/pin-package-versions",
+            severity: "warning",
+          },
+        ],
+        SCORE,
+        "Needs work",
+        { composeFiles: [], dockerfiles: [file] },
+        true,
+        { [file]: content }
+      );
+    } finally {
+      log.mockRestore();
+    }
+
+    const output = printed.join("\n");
+
+    expect(output).toContain("RUN curl");
+    expect(output).not.toContain(cookieValue);
+    expect(output).not.toContain(password);
+  });
 });

@@ -29,6 +29,12 @@ const URL_RE =
 const USER_FLAG_RE =
   /(?<![\w-])(?<flag>--proxy-user|--user|-u)(?<gap>\s+|=)(?<value>"[^"]*"|'[^']*'|[^\s;&|]+)/gu;
 
+// Only the short option takes its value attached: `curl -uuser:password`.
+// An unquoted value stops before a quote, a backtick or a closing parenthesis,
+// so `sh -c 'curl -uuser:password'` keeps its closing quote.
+const ATTACHED_USER_RE =
+  /(?<![\w-])(?<flag>-u)(?<value>"[^"]*"|'[^']*'|[^\s;&|'"`)]+)/gu;
+
 // `docker run -u 1000:1000` names a user and a group, not a credential.
 const UID_GID_RE = /^\d+:\d+$/u;
 const QUOTE_EDGES_RE = /^["']|["']$/gu;
@@ -162,6 +168,9 @@ export const redactSecrets = (text: string): string => {
       USER_FLAG_RE,
       (match, flag: string, gap: string, value: string) =>
         isUserCredential(value) ? `${flag}${gap}${REDACTED}` : match
+    )
+    .replaceAll(ATTACHED_USER_RE, (match, flag: string, value: string) =>
+      isUserCredential(value) ? `${flag}${REDACTED}` : match
     )
     .replaceAll(HEADER_RE, maskField)
     .replaceAll(ASSIGNMENT_RE, (match, key: string, value: string) =>
