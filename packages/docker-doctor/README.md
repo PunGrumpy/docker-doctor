@@ -90,7 +90,7 @@ Running coding agents unattended in [Docker Sandboxes](https://www.docker.com/pr
 sbx run --kit docker.io/pungrumpy/docker-doctor-kit:latest claude
 ```
 
-See [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) for what the kit installs and how it works.
+Kit releases from 0.2.0 on need sbx 0.51 or later. On older sbx, use the `0.1.14` tag. See [`kits/docker-doctor`](https://github.com/PunGrumpy/docker-doctor/tree/main/kits/docker-doctor) for what the kit installs and how it works.
 
 ### 4. Run in CI
 
