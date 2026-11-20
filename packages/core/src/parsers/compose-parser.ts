@@ -1,12 +1,15 @@
 import type { Alias, Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
 import {
   isAlias,
+  isCollection,
   isMap,
   isNode,
+  isPair,
   isScalar,
   isSeq,
   LineCounter,
   parseDocument,
+  Scalar,
   visit,
 } from "yaml";
 
@@ -147,6 +150,204 @@ const keyOf = (pair: Pair): string => {
   return pair.key.source === MERGE_KEY ? MERGE_KEY : String(pair.key.value);
 };
 
+// A key yaml merges on: a plain `<<`, which its merge tag reads as a symbol.
+const isMergeKey = (key: unknown): key is Scalar => {
+  if (!isScalar(key)) {
+    return false;
+  }
+
+  const { value } = key;
+
+  if (typeof value === "symbol") {
+    return value.description === MERGE_KEY;
+  }
+
+  const isPlain = key.type === undefined || key.type === Scalar.PLAIN;
+
+  return isPlain && value === MERGE_KEY;
+};
+
+// compose-go decodes a file with go-yaml's default alias check
+// (`loader/reset.go:80`, and go.yaml.in/yaml/v4 v4.0.0
+// `internal/libyaml/options.go:118-140`). It counts every value it builds,
+// counts again as repeated each value an alias stands for, and refuses a
+// file whose repeated values pass a share that shrinks as the file grows.
+// go-yaml checks as it builds and this checks the totals, so a file whose
+// written values make up the share only after its aliases passes here.
+const UNCHECKED_REPEATED_VALUES = 100;
+const UNCHECKED_VALUES = 1000;
+const SHRINK_FROM_VALUES = 400_000;
+const SHRINK_TO_VALUES = 4_000_000;
+const LARGEST_REPEATED_SHARE = 0.99;
+const SMALLEST_REPEATED_SHARE = 0.1;
+
+// compose-go does not count merged values as repeats, so the share alone
+// lets a chain of merge keys grow a file without limit. The largest ordinary
+// file found, 500 services that merge a common block, expands to about
+// 146,000 values.
+const MAX_EXPANDED_VALUES = 1_000_000;
+
+const allowedRepeatedShare = (values: number): number => {
+  if (values <= SHRINK_FROM_VALUES) {
+    return LARGEST_REPEATED_SHARE;
+  }
+
+  if (values >= SHRINK_TO_VALUES) {
+    return SMALLEST_REPEATED_SHARE;
+  }
+
+  const progress =
+    (values - SHRINK_FROM_VALUES) / (SHRINK_TO_VALUES - SHRINK_FROM_VALUES);
+
+  return (
+    LARGEST_REPEATED_SHARE -
+    (LARGEST_REPEATED_SHARE - SMALLEST_REPEATED_SHARE) * progress
+  );
+};
+
+// The values a node stands for once its aliases and merge keys are applied,
+// and how many of them an alias repeats.
+interface Expansion {
+  repeated: number;
+  values: number;
+}
+
+const ONE_VALUE: Expansion = { repeated: 0, values: 1 };
+
+const NO_VALUES: Expansion = { repeated: 0, values: 0 };
+
+interface Sizing {
+  // The containers being sized. An alias back to one is a cycle.
+  open: Set<Node>;
+  sizes: Map<Node, Expansion>;
+  targets: AliasTargets;
+}
+
+const addExpansions = (left: Expansion, right: Expansion): Expansion => ({
+  repeated: left.repeated + right.repeated,
+  values: left.values + right.values,
+});
+
+// yaml copies a merged mapping again at every merge, so a merge key that
+// reaches a mapping it sits in would recurse until the stack overflows. The
+// mappings are checked at each merge key, before the sizes of the
+// containers holding them are reused.
+const refuseMergeCycle = (value: Node, sizing: Sizing) => {
+  const source = resolveNode(value, sizing.targets);
+  const merged = isSeq(source) ? source.items : [source];
+
+  for (const item of merged) {
+    const mapping = isNode(item) ? resolveNode(item, sizing.targets) : item;
+
+    // yaml refuses a source that is not a mapping before it reads the next.
+    if (!isMap(mapping)) {
+      return;
+    }
+
+    if (sizing.open.has(mapping)) {
+      throw new Error("A merge key merges a mapping into itself");
+    }
+  }
+};
+
+// Each container is sized once, so a chain of anchors that doubles at every
+// step costs linear time to measure. An alias inside its own anchor counts
+// once, as the tag scan does. compose-go puts the mapping in place of the
+// alias in `<<: *x` before go-yaml reads it (`loader/reset.go:235-244`), so
+// those values count as written. The aliases in `<<: [*a, *b]` stay aliases.
+const expandedSize = (node: Node | Pair, sizing: Sizing): Expansion => {
+  if (isPair(node)) {
+    const key = isNode(node.key) ? expandedSize(node.key, sizing) : NO_VALUES;
+
+    if (!isNode(node.value)) {
+      return key;
+    }
+
+    if (!isMergeKey(node.key)) {
+      return addExpansions(key, expandedSize(node.value, sizing));
+    }
+
+    refuseMergeCycle(node.value, sizing);
+
+    const merged = resolveNode(node.value, sizing.targets);
+
+    return addExpansions(
+      key,
+      merged === undefined ? ONE_VALUE : expandedSize(merged, sizing)
+    );
+  }
+
+  if (isAlias(node)) {
+    const target = sizing.targets.get(node);
+
+    if (target === undefined || sizing.open.has(target)) {
+      return ONE_VALUE;
+    }
+
+    const { values } = expandedSize(target, sizing);
+
+    return { repeated: values, values: values + 1 };
+  }
+
+  if (!isCollection(node) || sizing.open.has(node)) {
+    return ONE_VALUE;
+  }
+
+  const known = sizing.sizes.get(node);
+
+  if (known !== undefined) {
+    return known;
+  }
+
+  sizing.open.add(node);
+  let size = ONE_VALUE;
+
+  for (const item of node.items) {
+    if (isNode(item) || isPair(item)) {
+      size = addExpansions(size, expandedSize(item, sizing));
+    }
+  }
+
+  sizing.open.delete(node);
+  sizing.sizes.set(node, size);
+
+  return size;
+};
+
+const checkAliasing = (doc: Document, targets: AliasTargets) => {
+  const { repeated, values } =
+    doc.contents === null
+      ? NO_VALUES
+      : expandedSize(doc.contents, {
+          open: new Set(),
+          sizes: new Map(),
+          targets,
+        });
+
+  // A deep enough chain of anchors expands past the largest number, and
+  // this refuses it before the share is computed.
+  if (values > MAX_EXPANDED_VALUES) {
+    throw new Error(
+      `The file expands to more than ${MAX_EXPANDED_VALUES.toLocaleString("en-US")} values once its aliases and merge keys are applied`
+    );
+  }
+
+  const allowedShare = allowedRepeatedShare(values);
+
+  const isRefused =
+    repeated > UNCHECKED_REPEATED_VALUES &&
+    values > UNCHECKED_VALUES &&
+    repeated / values > allowedShare;
+
+  if (isRefused) {
+    const percent = Number((allowedShare * 100).toFixed(1));
+
+    throw new Error(
+      `The file's aliases repeat ${repeated.toLocaleString("en-US")} of its ${values.toLocaleString("en-US")} values, more than the ${percent}% that Compose's YAML decoder allows`
+    );
+  }
+};
+
 // The keys whose values carry a merge tag. Paths below a sequence never
 // match a base value (`loader/reset.go:307-316`), so a sequence has none.
 const mergeTaggedKeys = (
@@ -243,13 +444,21 @@ export const readComposeFile = (
       throw firstError;
     }
 
+    const targets = findAliasTargets(doc);
+
     replacedPaths = scanTags(doc.contents ?? undefined, {
       found: new Map(),
       open: new Set(),
       tagged: 0,
-      targets: findAliasTargets(doc),
+      targets,
     });
-    document = doc.toJS();
+    // Counted after the scan has dropped the `!reset` values, as compose-go
+    // counts them.
+    checkAliasing(doc, targets);
+    // checkAliasing has refused what Compose refuses. yaml's own cap refuses
+    // an anchor used more than 100 times, as files that merge one anchor into
+    // every service do.
+    document = doc.toJS({ maxAliasCount: -1 });
   } catch (error: unknown) {
     throw new ParseError({ file: filepath, message: describeYamlError(error) });
   }
