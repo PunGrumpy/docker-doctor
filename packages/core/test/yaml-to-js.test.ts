@@ -489,6 +489,29 @@ describe("toJsValue", () => {
     expect(isSameOutcome(viaTargets(text), viaYaml(text))).toBe(true);
   });
 
+  // A document that ends with `...` must not leave the marker in the names
+  // of its collection keys.
+  test("names a collection key without the document's end marker, as yaml does", () => {
+    const text = [
+      "x-k:",
+      "  ? [a]",
+      "  : 1",
+      "services:",
+      "  web:",
+      "    image: alpine:3.21",
+      "...",
+      "",
+    ].join("\n");
+
+    const built = viaTargets(text);
+
+    expect(isSameOutcome(built, viaYaml(text))).toBe(true);
+    expect(built).toMatchObject({
+      kind: "value",
+      value: { "x-k": { "[ a ]": 1 } },
+    });
+  });
+
   // yaml reads a merged set with the loop it reads a merged map's entries
   // with, so each member comes apart as a [key, value] pair.
   test("a merged set comes apart into keys and values as in yaml", () => {

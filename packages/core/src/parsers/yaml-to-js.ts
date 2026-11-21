@@ -161,7 +161,13 @@ const collectionKeyText = (key: YAMLMap | YAMLSeq, doc: Document): string => {
   probe.contents = isMap(key)
     ? Object.assign(new YAMLMap(), { items: key.items })
     : Object.assign(new YAMLSeq(), { items: key.items });
-  probe.directives = doc.directives;
+  const directives = doc.directives?.clone();
+
+  if (directives !== undefined) {
+    directives.docEnd = false;
+  }
+
+  probe.directives = directives;
   probe.schema = doc.schema;
 
   return probe
