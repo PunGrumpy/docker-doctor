@@ -65,7 +65,7 @@ const isSameContent = (
       Array.isArray(left) &&
       Array.isArray(right) &&
       left.length === right.length &&
-      left.every((item, index) => compare(item, right[index] ?? null))
+      left.every((item, index) => compare(item, right[index]))
     );
   }
 
@@ -80,7 +80,7 @@ const isSameContent = (
       return (
         other !== undefined &&
         String(key) === String(other) &&
-        compare(left[key] ?? null, right[other] ?? null)
+        compare(left[key], right[other])
       );
     })
   );
@@ -455,8 +455,8 @@ describe("toJsValue", () => {
     ["20,000 anchors used once each", 20_000, true],
   ])("builds %s in linear time", (_name, count, isDistinct) => {
     const doc = parseDocument(manyAliases(count, isDistinct), PARSE_OPTIONS);
-    const targets = findAliasTargets(doc);
     const start = performance.now();
+    const targets = findAliasTargets(doc);
     const value = toJsValue(doc, targets);
 
     expect(performance.now() - start).toBeLessThan(1000);
@@ -528,7 +528,37 @@ describe("toJsValue", () => {
       kind: "value",
       value: { services: { web: { a: "b", c: "d" } } },
     });
-    expect(isSameOutcome(viaTargets(text), viaYaml(text))).toBe(true);
+
+    const built = viaTargets(text);
+
+    expect(isSameOutcome(built, viaYaml(text))).toBe(true);
+
+    if (built.kind !== "value" || !isObjectValue(built.value)) {
+      throw new TypeError("the builder produced no document");
+    }
+
+    const document = built.value;
+
+    if (!("services" in document)) {
+      throw new TypeError("the document has no services entry");
+    }
+
+    const { services } = document;
+
+    if (!isObjectValue(services) || !("web" in services)) {
+      throw new TypeError("the services entry has no web service");
+    }
+
+    const { web } = services;
+
+    if (!isObjectValue(web)) {
+      throw new TypeError("the web service is not a mapping");
+    }
+
+    const member = Object.getOwnPropertyDescriptor(web, "e");
+
+    expect(member).toBeDefined();
+    expect(member?.value).toBeUndefined();
   });
 
   // The engines word the error differently, so only the refusal is compared.
