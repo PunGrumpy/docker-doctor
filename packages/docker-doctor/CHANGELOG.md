@@ -1,5 +1,18 @@
 # @docker-doctor/cli
 
+## 0.11.1
+
+### Patch Changes
+
+- e115553: The clean-package-cache rule no longer slows down on a RUN line that repeats `apk add` many times. A 400 KB line took about 8 seconds and now takes milliseconds, with the same findings.
+- d900fe1: `combine-apt-update-install` now counts `apt update` as the update step of an `apt-get install`, and `apt install` as the install step of an `apt-get update`, so the example in the Docker build cache docs is no longer reported.
+- 8314c29: Compose files that merge one anchor into more than 100 services are scanned again instead of being refused as an alias attack, and a file that uses aliases 100,000 times scans in about a second instead of more than a minute. Docker Doctor still refuses a file whose aliases repeat more of its values than Compose's YAML decoder allows, and a file that expands to more than 1,000,000 values.
+- cb1e768: Compose services that use `provider:` are no longer asked for a restart policy or resource limits, because Compose does not run them as containers. A short `depends_on` list that names only provider services is no longer flagged either, because Compose does not wait on them. Scores can rise for files that have provider services.
+- d900fe1: `use-exec-form` no longer reports a shell-form `CMD` or `ENTRYPOINT` that starts with `exec`, such as `ENTRYPOINT exec top -b`, because `exec` hands signals to the command. It still reports one that pipes or runs in the background, such as `CMD exec node x | tee log`.
+- d900fe1: `use-pipefail` no longer reports a pipe in a `RUN` when the stage's `SHELL` is `cmd`, `powershell` or `pwsh`, because those shells have no `pipefail` option.
+- fd5b15f: `--verbose` code frames and messages now mask the value of a `Cookie` or `Set-Cookie` header and a password attached to curl's `-u` option (`-uuser:password`) when they are quoted from a scanned file. With `--baseline`, a finding on a line that holds such a header or option gets a new fingerprint, so it shows once as new and once as resolved against a baseline saved by an earlier version.
+- e115553: A Dockerfile or Compose file that is a device, a FIFO or a link to one now fails the scan with exit code 2 instead of hanging or running out of memory.
+
 ## 0.11.0
 
 ### Minor Changes
