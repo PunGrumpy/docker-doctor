@@ -1,8 +1,10 @@
 import type { Document, Node, Pair, YAMLMap, YAMLSeq } from "yaml";
 import {
   isAlias,
+  isCollection,
   isMap,
   isNode,
+  isPair,
   isScalar,
   isSeq,
   LineCounter,
@@ -12,6 +14,8 @@ import {
 import { ParseError } from "../errors";
 import type { ComposeLocator, ComposeValue } from "../types/index";
 import { isComposeValue } from "./compose-value";
+import type { AliasTargets } from "./yaml-to-js";
+import { findAliasTargets, isMergeKey, toJsValue } from "./yaml-to-js";
 
 // yaml appends the offending source lines to its error message. Those lines
 // can hold a secret, and the message reaches --json output and PR comments.
@@ -59,22 +63,24 @@ export interface ComposeFile {
 }
 
 interface TagScan {
-  doc: Document;
   // Relative paths found below each container, kept so an alias replays them
   // at every place it is used, as compose-go's `cachedResolve` does.
   found: Map<Node, ComposePath[]>;
   // The containers being scanned. An alias back to one is a cycle.
   open: Set<Node>;
   tagged: number;
+  targets: AliasTargets;
 }
 
 const resolveNode = (
   node: Node | undefined,
-  doc: Document
-): Node | undefined => (isAlias(node) ? node.resolve(doc) : node);
+  targets: AliasTargets
+): Node | undefined => (isAlias(node) ? targets.get(node) : node);
 
-const tagOf = (node: Node | undefined, doc: Document): string | undefined =>
-  resolveNode(node, doc)?.tag;
+const tagOf = (
+  node: Node | undefined,
+  targets: AliasTargets
+): string | undefined => resolveNode(node, targets)?.tag;
 
 const isMergeTag = (tag: string | undefined): boolean =>
   tag === RESET_TAG || tag === OVERRIDE_TAG;
@@ -91,17 +97,20 @@ const countTagged = (scan: TagScan, count: number) => {
 
 // A `!reset` item leaves its sequence and a `!reset` pair its mapping
 // (`loader/reset.go:204-208` and `:232-234`).
-const dropResetValues = (container: YAMLMap | YAMLSeq, doc: Document) => {
+const dropResetValues = (
+  container: YAMLMap | YAMLSeq,
+  targets: AliasTargets
+) => {
   if (isSeq(container)) {
     container.items = container.items.filter(
-      (item) => !(isNode(item) && tagOf(item, doc) === RESET_TAG)
+      (item) => !(isNode(item) && tagOf(item, targets) === RESET_TAG)
     );
 
     return;
   }
 
   container.items = container.items.filter(
-    (pair) => !(isNode(pair.value) && tagOf(pair.value, doc) === RESET_TAG)
+    (pair) => !(isNode(pair.value) && tagOf(pair.value, targets) === RESET_TAG)
   );
 };
 
@@ -117,15 +126,196 @@ const keyOf = (pair: Pair): string => {
   return pair.key.source === MERGE_KEY ? MERGE_KEY : String(pair.key.value);
 };
 
+// compose-go decodes a file with go-yaml's default alias check
+// (`loader/reset.go:80`, and go.yaml.in/yaml/v4 v4.0.0
+// `internal/libyaml/options.go:118-140`). It counts every value it builds,
+// counts again as repeated each value an alias stands for, and refuses a
+// file whose repeated values pass a share that shrinks as the file grows.
+// go-yaml checks as it builds and this checks the totals, so a file whose
+// written values make up the share only after its aliases passes here.
+const UNCHECKED_REPEATED_VALUES = 100;
+const UNCHECKED_VALUES = 1000;
+const SHRINK_FROM_VALUES = 400_000;
+const SHRINK_TO_VALUES = 4_000_000;
+const LARGEST_REPEATED_SHARE = 0.99;
+const SMALLEST_REPEATED_SHARE = 0.1;
+
+// compose-go does not count merged values as repeats, so the share alone
+// lets a chain of merge keys grow a file without limit. The largest ordinary
+// file found, 500 services that merge a common block, expands to about
+// 146,000 values.
+const MAX_EXPANDED_VALUES = 1_000_000;
+
+const allowedRepeatedShare = (values: number): number => {
+  if (values <= SHRINK_FROM_VALUES) {
+    return LARGEST_REPEATED_SHARE;
+  }
+
+  if (values >= SHRINK_TO_VALUES) {
+    return SMALLEST_REPEATED_SHARE;
+  }
+
+  const progress =
+    (values - SHRINK_FROM_VALUES) / (SHRINK_TO_VALUES - SHRINK_FROM_VALUES);
+
+  return (
+    LARGEST_REPEATED_SHARE -
+    (LARGEST_REPEATED_SHARE - SMALLEST_REPEATED_SHARE) * progress
+  );
+};
+
+// The values a node stands for once its aliases and merge keys are applied,
+// and how many of them an alias repeats.
+interface Expansion {
+  repeated: number;
+  values: number;
+}
+
+const ONE_VALUE: Expansion = { repeated: 0, values: 1 };
+
+const NO_VALUES: Expansion = { repeated: 0, values: 0 };
+
+interface Sizing {
+  // The containers being sized. An alias back to one is a cycle.
+  open: Set<Node>;
+  sizes: Map<Node, Expansion>;
+  targets: AliasTargets;
+}
+
+const addExpansions = (left: Expansion, right: Expansion): Expansion => ({
+  repeated: left.repeated + right.repeated,
+  values: left.values + right.values,
+});
+
+// yaml copies a merged mapping again at every merge, so a merge key that
+// reaches a mapping it sits in would recurse until the stack overflows. The
+// mappings are checked at each merge key, before the sizes of the
+// containers holding them are reused.
+const refuseMergeCycle = (value: Node, sizing: Sizing) => {
+  const source = resolveNode(value, sizing.targets);
+  const merged = isSeq(source) ? source.items : [source];
+
+  for (const item of merged) {
+    const mapping = isNode(item) ? resolveNode(item, sizing.targets) : item;
+
+    // yaml refuses a source that is not a mapping before it reads the next.
+    if (!isMap(mapping)) {
+      return;
+    }
+
+    if (sizing.open.has(mapping)) {
+      throw new Error("A merge key merges a mapping into itself");
+    }
+  }
+};
+
+// Each container is sized once, so a chain of anchors that doubles at every
+// step costs linear time to measure. An alias inside its own anchor counts
+// once, as the tag scan does. compose-go puts the mapping in place of the
+// alias in `<<: *x` before go-yaml reads it (`loader/reset.go:235-244`), so
+// those values count as written. The aliases in `<<: [*a, *b]` stay aliases.
+const expandedSize = (node: Node | Pair, sizing: Sizing): Expansion => {
+  if (isPair(node)) {
+    const key = isNode(node.key) ? expandedSize(node.key, sizing) : NO_VALUES;
+
+    if (!isNode(node.value)) {
+      return key;
+    }
+
+    if (!isMergeKey(node.key)) {
+      return addExpansions(key, expandedSize(node.value, sizing));
+    }
+
+    refuseMergeCycle(node.value, sizing);
+
+    const merged = resolveNode(node.value, sizing.targets);
+
+    return addExpansions(
+      key,
+      merged === undefined ? ONE_VALUE : expandedSize(merged, sizing)
+    );
+  }
+
+  if (isAlias(node)) {
+    const target = sizing.targets.get(node);
+
+    if (target === undefined || sizing.open.has(target)) {
+      return ONE_VALUE;
+    }
+
+    const { values } = expandedSize(target, sizing);
+
+    return { repeated: values, values: values + 1 };
+  }
+
+  if (!isCollection(node) || sizing.open.has(node)) {
+    return ONE_VALUE;
+  }
+
+  const known = sizing.sizes.get(node);
+
+  if (known !== undefined) {
+    return known;
+  }
+
+  sizing.open.add(node);
+  let size = ONE_VALUE;
+
+  for (const item of node.items) {
+    if (isNode(item) || isPair(item)) {
+      size = addExpansions(size, expandedSize(item, sizing));
+    }
+  }
+
+  sizing.open.delete(node);
+  sizing.sizes.set(node, size);
+
+  return size;
+};
+
+const checkAliasing = (doc: Document, targets: AliasTargets) => {
+  const { repeated, values } =
+    doc.contents === null
+      ? NO_VALUES
+      : expandedSize(doc.contents, {
+          open: new Set(),
+          sizes: new Map(),
+          targets,
+        });
+
+  // A deep enough chain of anchors expands past the largest number, and
+  // this refuses it before the share is computed.
+  if (values > MAX_EXPANDED_VALUES) {
+    throw new Error(
+      `The file expands to more than ${MAX_EXPANDED_VALUES.toLocaleString("en-US")} values once its aliases and merge keys are applied`
+    );
+  }
+
+  const allowedShare = allowedRepeatedShare(values);
+
+  const isRefused =
+    repeated > UNCHECKED_REPEATED_VALUES &&
+    values > UNCHECKED_VALUES &&
+    repeated / values > allowedShare;
+
+  if (isRefused) {
+    const percent = Number((allowedShare * 100).toFixed(1));
+
+    throw new Error(
+      `The file's aliases repeat ${repeated.toLocaleString("en-US")} of its ${values.toLocaleString("en-US")} values, more than the ${percent}% that Compose's YAML decoder allows`
+    );
+  }
+};
+
 // The keys whose values carry a merge tag. Paths below a sequence never
 // match a base value (`loader/reset.go:307-316`), so a sequence has none.
 const mergeTaggedKeys = (
   container: YAMLMap | YAMLSeq,
-  doc: Document
+  targets: AliasTargets
 ): string[] =>
   isMap(container)
     ? container.items.flatMap((pair) =>
-        isNode(pair.value) && isMergeTag(tagOf(pair.value, doc))
+        isNode(pair.value) && isMergeTag(tagOf(pair.value, targets))
           ? [keyOf(pair)]
           : []
       )
@@ -136,7 +326,7 @@ const mergeTaggedKeys = (
 // (`loader/reset.go:115-118`).
 const untaggedChildren = (
   container: YAMLMap | YAMLSeq,
-  doc: Document
+  targets: AliasTargets
 ): [string | null, Node][] => {
   const children: [string | null, Node][] = isMap(container)
     ? container.items.flatMap((pair) =>
@@ -144,11 +334,11 @@ const untaggedChildren = (
       )
     : container.items.flatMap((item) => (isNode(item) ? [[null, item]] : []));
 
-  return children.filter(([, child]) => !isMergeTag(tagOf(child, doc)));
+  return children.filter(([, child]) => !isMergeTag(tagOf(child, targets)));
 };
 
 const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
-  const target = resolveNode(node, scan.doc);
+  const target = resolveNode(node, scan.targets);
 
   if (!(isMap(target) || isSeq(target)) || scan.open.has(target)) {
     return [];
@@ -165,14 +355,14 @@ const scanTags = (node: Node | undefined, scan: TagScan): ComposePath[] => {
   scan.open.add(target);
   const paths: ComposePath[] = [];
 
-  for (const key of mergeTaggedKeys(target, scan.doc)) {
+  for (const key of mergeTaggedKeys(target, scan.targets)) {
     countTagged(scan, 1);
     paths.push([key]);
   }
 
-  dropResetValues(target, scan.doc);
+  dropResetValues(target, scan.targets);
 
-  for (const [key, child] of untaggedChildren(target, scan.doc)) {
+  for (const [key, child] of untaggedChildren(target, scan.targets)) {
     const below = scanTags(child, scan);
 
     if (key === null) {
@@ -213,19 +403,24 @@ export const readComposeFile = (
       throw firstError;
     }
 
+    const targets = findAliasTargets(doc);
+
     replacedPaths = scanTags(doc.contents ?? undefined, {
-      doc,
       found: new Map(),
       open: new Set(),
       tagged: 0,
+      targets,
     });
-    document = doc.toJS();
+    // Counted after the scan has dropped the `!reset` values, as compose-go
+    // counts them.
+    checkAliasing(doc, targets);
+    document = toJsValue(doc, targets);
   } catch (error: unknown) {
     throw new ParseError({ file: filepath, message: describeYamlError(error) });
   }
 
-  // yaml builds only strings, numbers, booleans, null, arrays and objects,
-  // so no YAML text reaches this error.
+  // The document holds only scalar values, arrays and objects, so no YAML
+  // text reaches this error.
   if (!isComposeValue(document)) {
     throw new ParseError({
       file: filepath,
@@ -253,6 +448,7 @@ const isSequenceIndex = (segment: string | number): segment is number =>
 export const createComposeLocator = (content: string): ComposeLocator => {
   const lineCounter = new LineCounter();
   const doc = parseDocument(content, { lineCounter, merge: true });
+  const targets = findAliasTargets(doc);
 
   // The offset of the last key or item on the path, or null when the path
   // leaves the document or that node has no position.
@@ -262,7 +458,7 @@ export const createComposeLocator = (content: string): ComposeLocator => {
 
     for (const segment of path) {
       if (isAlias(node)) {
-        node = node.resolve(doc);
+        node = targets.get(node);
       }
 
       if (isMap(node)) {
@@ -282,7 +478,7 @@ export const createComposeLocator = (content: string): ComposeLocator => {
         // A `!reset` pair stays findable: the runner reports a reset setting
         // at its key.
         const item = node.items.filter(
-          (entry) => !(isNode(entry) && tagOf(entry, doc) === RESET_TAG)
+          (entry) => !(isNode(entry) && tagOf(entry, targets) === RESET_TAG)
         )[segment];
 
         if (item === undefined || item === null) {
